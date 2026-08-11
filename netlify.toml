@@ -1,0 +1,10 @@
+# The finished site is pre-built and committed in /site, so Netlify just
+# serves it directly — no build step, nothing that can fail at deploy time.
+# To make content changes: edit build/build.py, run `python3 build/build.py`
+# locally to regenerate /site, then commit and push both.
+# (site/_redirects already handles "/" -> "/index.html".)
+[build]
+  publish = "site"
+
+[functions]
+  directory = "netlify/functions"

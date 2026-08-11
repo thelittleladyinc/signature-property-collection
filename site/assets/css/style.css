@@ -1,0 +1,283 @@
+/* ==========================================================================
+   Signature Property Collection — brand tokens
+   Colors audited from the official brand swatch in Google Drive
+   (SignaturePropertyCollection_Colors.jpg — matches the fill color used
+   inside the real logo file):
+     #B86F7A  dusty rose   — PRIMARY accent (this is "the dusty rose")
+     #BA8C84  mauve        — secondary accent / hover state
+     #DEB3A5  peach        — tertiary tint only, used sparingly (not primary)
+     #000000 / #FFFFFF     — true black / white
+     #A7A9AC / #C0C1C4     — cool grays
+   No red anywhere — removed per Christine's note.
+   Fonts audited from SignaturePropertyCollection_Typography doc:
+     Baskerville (headers) -> Libre Baskerville (closest free equivalent)
+     Poppins (sub-headers & body) -> Poppins (exact match, free on Google Fonts)
+   Corinthia (script accent) confirmed separately via the live site's own
+   Google Fonts link — kept for small script eyebrow text only.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --charcoal: #141415;
+  --rose: #B86F7A;       /* primary — "the dusty rose" */
+  --mauve: #BA8C84;      /* secondary / hover */
+  --peach: #DEB3A5;      /* tertiary tint only — used sparingly */
+  --cream: #F9F9EC;
+  --white: #FFFFFF;
+  --black: #000000;
+  --gray: #A7A9AC;
+  --gray-light: #C0C1C4;
+
+  /* legacy aliases so nothing silently breaks if referenced elsewhere */
+  --dusty-rose: var(--rose);
+  --deep-mauve: var(--mauve);
+
+  --font-script: 'Corinthia', cursive;
+  --font-serif: 'Libre Baskerville', Georgia, serif;
+  --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --max-width: 1280px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--charcoal);
+  background: var(--cream);
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; text-decoration: none; }
+.wrap { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+
+/* ---------- Header ---------- */
+.site-header {
+  background: var(--dusty-rose);
+  color: var(--white);
+  padding: 18px 0;
+}
+.site-header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand-logo { height: 34px; width: auto; display: block; filter: brightness(0) invert(1); }
+.brand-mark { font-family: var(--font-script); font-size: 30px; line-height: 1; color: var(--white); }
+.brand-sub { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; opacity: .9; }
+.brokerage { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; border-left: 1px solid rgba(255,255,255,.5); padding-left: 14px; margin-left: 4px; opacity: .95; }
+
+nav.primary-nav { display: flex; gap: 28px; }
+nav.primary-nav a {
+  font-size: 13px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+nav.primary-nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* ---------- Hero ---------- */
+.hero {
+  background: linear-gradient(180deg, rgba(20,20,21,.55), rgba(20,20,21,.75)), var(--charcoal);
+  background-size: cover;
+  background-position: center;
+  color: var(--white);
+  padding: 130px 0 100px;
+  text-align: center;
+}
+.hero h1 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(40px, 6vw, 76px);
+  margin: 0 0 10px;
+  line-height: 1.05;
+}
+.hero p.lede {
+  color: rgba(255,255,255,.85);
+  font-size: 18px;
+  max-width: 640px;
+  margin: 18px auto 34px;
+  opacity: .92;
+}
+.btn-row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-block;
+  padding: 14px 30px;
+  font-size: 13px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn-primary { background: var(--dusty-rose); color: var(--white); }
+.btn-primary:hover { background: var(--deep-mauve); }
+.btn-outline { border-color: var(--white); color: var(--white); background: transparent; }
+.btn-outline:hover { background: var(--white); color: var(--charcoal); }
+.btn-dark { background: var(--charcoal); color: var(--white); }
+.btn-dark:hover { background: #000; }
+
+/* ---------- Sections ---------- */
+section { padding: 90px 0; }
+section.tight { padding: 60px 0; }
+.eyebrow {
+  font-family: var(--font-script);
+  font-size: 32px;
+  color: var(--deep-mauve);
+  display: block;
+  margin-bottom: 6px;
+}
+h2.section-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(30px, 4vw, 48px);
+  margin: 0 0 20px;
+}
+.lede { font-size: 17px; line-height: 1.7; max-width: 720px; color: #3a3a3c; }
+
+.section-dark { background: var(--charcoal); color: var(--white); }
+.section-dark .lede { color: rgba(255,255,255,.78); }
+.section-dark .eyebrow { color: var(--dusty-rose); }
+
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 40px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+@media (max-width: 900px) {
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  nav.primary-nav { display: none; }
+}
+
+.card {
+  background: var(--white);
+  padding: 34px 28px;
+  border-radius: 2px;
+  box-shadow: 0 10px 30px rgba(20,20,21,.06);
+}
+.card h3 { font-family: var(--font-serif); font-weight: 600; font-size: 22px; margin: 0 0 12px; }
+.card p { color: #4a4a4c; line-height: 1.6; font-size: 15px; }
+.card a.cta { display: inline-block; margin-top: 16px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--deep-mauve); border-bottom: 1px solid var(--deep-mauve); }
+
+/* ---------- Video embeds ---------- */
+.video-embed { position: relative; width: 100%; padding-top: 56.25%; border-radius: 2px; overflow: hidden; background: #141415; box-shadow: 0 10px 30px rgba(20,20,21,.10); }
+.video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-embed-caption { margin-top: 12px; font-size: 14px; color: #6a6a6c; }
+.video-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 40px; }
+@media (max-width: 900px) { .video-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Communities / Map ---------- */
+.communities-layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; align-items: stretch; min-height: 760px; }
+@media (max-width: 980px) { .communities-layout { grid-template-columns: 1fr; min-height: auto; } }
+.communities-panel { display: flex; flex-direction: column; justify-content: center; padding: 50px 24px; }
+.county-list { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 24px; }
+.county-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--rose); color: var(--white);
+  padding: 14px 18px; font-weight: 600; font-size: 14px;
+  transition: background .15s ease, transform .15s ease;
+}
+.county-btn:hover, .county-btn.active { background: var(--mauve); transform: translateX(2px); }
+#county-map { width: 100%; min-height: 760px; height: 100%; background: var(--charcoal); }
+@media (max-width: 980px) { #county-map { min-height: 520px; } }
+.leaflet-container { background: var(--charcoal) !important; font-family: var(--font-sans); }
+
+/* County name labels shown directly on the map (not just on hover) */
+.county-label {
+  color: var(--white);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .03em;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* City icon markers — clean white line-art SVGs (mountain/tree/paw/columns/
+   grad-cap/wave), not colored emoji, to match the original map's look */
+.city-icon-marker {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--rose); border: 2px solid var(--white);
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+  color: var(--white);
+}
+.city-icon-marker svg { width: 15px; height: 15px; }
+.city-icon-marker.priority { background: var(--mauve); width: 30px; height: 30px; }
+.city-icon-marker.priority svg { width: 17px; height: 17px; }
+.city-label {
+  color: var(--white);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.9);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.river-label {
+  color: #BFE0EC;
+  font-family: var(--font-script);
+  font-size: 20px;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+}
+.leaflet-control-zoom a { font-size: 20px !important; width: 34px !important; height: 34px !important; line-height: 32px !important; }
+
+/* ---------- FAQ (answer-shaped content for AI/local search) ---------- */
+.faq-item { padding: 24px 0; border-top: 1px solid #e4e4d8; }
+.faq-item h3 { font-family: var(--font-serif); font-weight: 600; font-size: 19px; margin: 0 0 10px; }
+.faq-item p { color: #4a4a4c; line-height: 1.7; font-size: 15px; margin: 0; }
+
+/* ---------- Testimonials ---------- */
+.testimonial { background: var(--white); padding: 30px; border-left: 3px solid var(--dusty-rose); }
+.testimonial p { font-style: italic; color: #3a3a3c; line-height: 1.7; }
+.testimonial .who { margin-top: 14px; font-weight: 700; font-size: 13px; letter-spacing: .04em; }
+
+/* ---------- Forms ---------- */
+form.lead-form { display: grid; gap: 16px; max-width: 560px; }
+form.lead-form input, form.lead-form textarea {
+  padding: 14px 16px; border: 1px solid var(--gray); background: var(--white);
+  font-family: var(--font-sans); font-size: 14px;
+}
+form.lead-form label.consent { font-size: 12px; color: #6a6a6c; display: flex; gap: 8px; align-items: flex-start; }
+
+/* ---------- Footer ---------- */
+.site-footer { background: var(--charcoal); color: rgba(255,255,255,.8); padding: 60px 0 30px; font-size: 14px; }
+.footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1.3fr 1fr; gap: 40px; }
+@media (max-width: 1100px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .footer-grid { grid-template-columns: 1fr; } }
+.footer-grid h4 { color: var(--white); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 16px; }
+.footer-grid ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.footer-grid ul a { color: rgba(255,255,255,.72); font-size: 14px; }
+.footer-grid ul a:hover { color: var(--white); text-decoration: underline; }
+.footer-bottom { margin-top: 50px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; opacity: .6; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+
+/* ---------- Breadcrumb / county page hero variants ---------- */
+.county-hero { padding: 90px 0 60px; background: var(--charcoal); color: var(--white); }
+.county-hero .eyebrow { color: var(--dusty-rose); }
+.county-hero .lede { color: rgba(255,255,255,.85); }
+.city-pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.city-pill { border: 1px solid rgba(255,255,255,.35); padding: 8px 16px; font-size: 13px; border-radius: 999px; display: inline-block; transition: background .15s ease, border-color .15s ease; }
+a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
+
+/* ---------- Live property search (MLS Grid / IRES) ---------- */
+.search-form { display: grid; grid-template-columns: repeat(5, 1fr) auto; gap: 12px; align-items: end; margin-top: 30px; }
+.search-form .field { display: flex; flex-direction: column; }
+.search-form label { font-size: 12px; color: #6a6a6c; margin-bottom: 6px; }
+.search-form select, .search-form input {
+  padding: 12px 14px; border: 1px solid var(--gray); background: var(--white);
+  font-family: var(--font-sans); font-size: 14px; width: 100%;
+}
+@media (max-width: 900px) { .search-form { grid-template-columns: 1fr 1fr; } }
+
+.search-status { margin-top: 22px; font-size: 14px; color: #6a6a6c; }
+.listing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 20px; }
+@media (max-width: 900px) { .listing-grid { grid-template-columns: 1fr; } }
+.listing-card { border: 1px solid #e4e4d8; background: var(--white); overflow: hidden; }
+.listing-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #eee; }
+.listing-card .listing-body { padding: 18px 20px; }
+.listing-card .listing-price { font-family: var(--font-serif); font-size: 22px; margin: 0 0 4px; }
+.listing-card .listing-meta { color: #4a4a4c; font-size: 14px; margin: 0 0 8px; }
+.listing-card .listing-address { font-size: 14px; color: #6a6a6c; margin: 0 0 10px; }
+.listing-card .listing-compliance { font-size: 14px; color: #3a3a3c; line-height: 1.5; border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px; }
+.mls-disclaimer { font-size: 12px; color: #6a6a6c; line-height: 1.7; margin-top: 44px; padding-top: 24px; border-top: 1px solid #e4e4d8; }
+.mls-disclaimer .mls-source-badge { font-weight: 700; color: #3a3a3c; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }

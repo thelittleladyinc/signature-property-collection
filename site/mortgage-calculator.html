@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mortgage Calculator | Estimate Your Payment | Signature Property Collection</title>
+<meta name="description" content="Estimate monthly mortgage payments and home affordability with a free, interactive calculator for Northern Colorado buyers.">
+<link rel="canonical" href="https://signaturepropertycollection.com/mortgage-calculator.html">
+<meta property="og:title" content="Mortgage Calculator | Estimate Your Payment | Signature Property Collection">
+<meta property="og:description" content="Estimate monthly mortgage payments and home affordability with a free, interactive calculator for Northern Colorado buyers.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://signaturepropertycollection.com/mortgage-calculator.html">
+<meta property="og:image" content="https://signaturepropertycollection.com/assets/img/logo.png">
+<meta property="og:updated_time" content="2026-08-11">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Mortgage Calculator | Estimate Your Payment | Signature Property Collection">
+<meta name="twitter:description" content="Estimate monthly mortgage payments and home affordability with a free, interactive calculator for Northern Colorado buyers.">
+<meta name="last-modified" content="2026-08-11">
+<link rel="stylesheet" href="/assets/css/style.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/index.html", "image": "https://signaturepropertycollection.com/assets/img/logo.png", "telephone": "303-709-4262", "email": "hello@signaturepropertycollection.com", "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.youtube.com/@thelittleladysellshomes"], "dateModified": "2026-08-11"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://signaturepropertycollection.com/index.html"}, {"@type": "ListItem", "position": 2, "name": "Mortgage Calculator"}]}</script>
+
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <div class="brand">
+      <a href="/index.html"><img class="brand-logo" src="/assets/img/logo.svg" alt="Signature Property Collection"></a>
+      <span class="brokerage">LPT Realty</span>
+    </div>
+    <nav class="primary-nav">
+      <a href="/communities/index.html">Communities</a>
+      <a href="/search-homes.html">Search Homes</a>
+      <a href="/about.html">About</a>
+      <a href="/buyers.html">Buy</a>
+      <a href="/sellers.html">Sell</a>
+      <a href="/testimonials.html">Testimonials</a>
+      <a href="/contact.html">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" style="padding:100px 0 60px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Plan With Confidence</span>
+    <h1>Mortgage Affordability Calculator</h1>
+    <p class="lede">Estimate your monthly payment and see how much house you can afford —
+    updates instantly as you type. Estimate only; talk to a lender for an exact quote.</p>
+  </div>
+</section>
+<section>
+  <div class="wrap grid-2">
+    <div class="card">
+      <h3>Your Numbers</h3>
+      <div style="display:grid;gap:14px;margin-top:16px">
+        <label class="consent">Home Price
+          <input class="mc-input" id="mc-price" type="number" value="550000" step="1000"
+            style="display:block;width:100%;margin-top:6px;padding:10px;border:1px solid var(--gray)">
+        </label>
+        <label class="consent">Down Payment (%)
+          <input class="mc-input" id="mc-down" type="number" value="20" step="1"
+            style="display:block;width:100%;margin-top:6px;padding:10px;border:1px solid var(--gray)">
+        </label>
+        <label class="consent">Interest Rate (%)
+          <input class="mc-input" id="mc-rate" type="number" value="6.5" step="0.05"
+            style="display:block;width:100%;margin-top:6px;padding:10px;border:1px solid var(--gray)">
+        </label>
+        <label class="consent">Loan Term (years)
+          <input class="mc-input" id="mc-term" type="number" value="30" step="5"
+            style="display:block;width:100%;margin-top:6px;padding:10px;border:1px solid var(--gray)">
+        </label>
+        <label class="consent">Property Tax Rate (% of price / yr)
+          <input class="mc-input" id="mc-tax" type="number" value="0.6" step="0.05"
+            style="display:block;width:100%;margin-top:6px;padding:10px;border:1px solid var(--gray)">
+        </label>
+        <label class="consent">Homeowners Insurance ($ / month)
+          <input class="mc-input" id="mc-ins" type="number" value="120" step="5"
+            style="display:block;width:100%;margin-top:6px;padding:10px;border:1px solid var(--gray)">
+        </label>
+        <label class="consent">HOA Dues ($ / month)
+          <input class="mc-input" id="mc-hoa" type="number" value="0" step="5"
+            style="display:block;width:100%;margin-top:6px;padding:10px;border:1px solid var(--gray)">
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Estimated Monthly Payment</h3>
+      <p style="font-size:34px;font-family:var(--font-serif);margin:8px 0 20px" id="mc-total">$0</p>
+      <table style="width:100%;font-size:14px;color:#4a4a4c;border-collapse:collapse">
+        <tr><td style="padding:6px 0">Principal &amp; Interest</td><td style="text-align:right" id="mc-pi">$0</td></tr>
+        <tr><td style="padding:6px 0">Property Tax</td><td style="text-align:right" id="mc-tax-out">$0</td></tr>
+        <tr><td style="padding:6px 0">Homeowners Insurance</td><td style="text-align:right" id="mc-ins-out">$0</td></tr>
+        <tr><td style="padding:6px 0">HOA Dues</td><td style="text-align:right" id="mc-hoa-out">$0</td></tr>
+        <tr style="border-top:1px solid #e4e4d8"><td style="padding:10px 0 0;font-weight:700">Down Payment</td><td style="text-align:right;font-weight:700;padding-top:10px" id="mc-down-amt">$0</td></tr>
+      </table>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-dark" href="/contact.html">Talk To Christine About Financing</a>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+(function () {
+  function fmt(n) {
+    return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  }
+  function calc() {
+    var price = parseFloat(document.getElementById('mc-price').value) || 0;
+    var downPct = parseFloat(document.getElementById('mc-down').value) || 0;
+    var rate = parseFloat(document.getElementById('mc-rate').value) || 0;
+    var years = parseFloat(document.getElementById('mc-term').value) || 30;
+    var taxRate = parseFloat(document.getElementById('mc-tax').value) || 0;
+    var insMonthly = parseFloat(document.getElementById('mc-ins').value) || 0;
+    var hoaMonthly = parseFloat(document.getElementById('mc-hoa').value) || 0;
+
+    var down = price * (downPct / 100);
+    var principal = Math.max(price - down, 0);
+    var monthlyRate = (rate / 100) / 12;
+    var numPayments = years * 12;
+    var pi = 0;
+    if (principal > 0 && numPayments > 0) {
+      pi = monthlyRate > 0
+        ? principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1)
+        : principal / numPayments;
+    }
+    var taxMonthly = (price * (taxRate / 100)) / 12;
+    var total = pi + taxMonthly + insMonthly + hoaMonthly;
+
+    document.getElementById('mc-pi').textContent = fmt(pi);
+    document.getElementById('mc-tax-out').textContent = fmt(taxMonthly);
+    document.getElementById('mc-ins-out').textContent = fmt(insMonthly);
+    document.getElementById('mc-hoa-out').textContent = fmt(hoaMonthly);
+    document.getElementById('mc-total').textContent = fmt(total);
+    document.getElementById('mc-down-amt').textContent = fmt(down);
+  }
+  document.querySelectorAll('.mc-input').forEach(function (el) {
+    el.addEventListener('input', calc);
+  });
+  calc();
+})();
+</script>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <h4>Signature Property Collection</h4>
+        <p style="max-width:340px;color:rgba(255,255,255,.7);line-height:1.6">
+          Christine Gwinnup &middot; LPT Realty<br>
+          Luxury real estate across Loveland, Berthoud, Masonville, and the
+          Larimer, Weld &amp; Boulder County Front Range.
+        </p>
+      </div>
+      <div>
+        <h4>Communities</h4>
+        <ul><li><a href="/communities/larimer.html">Larimer County</a></li>
+        <li><a href="/communities/weld.html">Weld County</a></li>
+        <li><a href="/communities/boulder.html">Boulder County</a></li>
+        <li><a href="/communities/broomfield.html">Broomfield County</a></li>
+        <li><a href="/communities/jefferson.html">Jefferson County</a></li>
+        <li><a href="/communities/denver.html">Denver County</a></li>
+        <li><a href="/communities/arapahoe.html">Arapahoe County</a></li>
+        <li><a href="/communities/adams.html">Adams County</a></li></ul>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="/search-homes.html">Search Homes</a></li>
+          <li><a href="/blog/index.html">Blog</a></li>
+          <li><a href="/guides/buyers-guide.html">Buyer's Guide</a></li>
+          <li><a href="/guides/sellers-guide.html">Seller's Guide</a></li>
+          <li><a href="/guides/buy-like-a-pro.html">11 Tips To Buy Like A Pro</a></li><li><a href="/guides/upsizing-into-a-new-home.html">The Definitive Guide To Upsizing Into A New Home</a></li><li><a href="/guides/sell-your-home-fast.html">Unlocking Maximum Value From Your Home Sale</a></li>
+          <li><a href="/guides/rent-to-own-homes-northern-colorado.html">Rent-To-Own Homes in Northern Colorado: How It Actually Works</a></li><li><a href="/guides/multi-generational-homes-northern-colorado.html">Multi-Generational Homes For Sale in Northern Colorado: Find Your Family's Fit</a></li><li><a href="/guides/cost-to-develop-raw-land-colorado.html">What's The Real Cost To Develop Raw Land in Colorado?</a></li><li><a href="/guides/best-places-to-retire-in-northern-colorado.html">Best Places to Retire in Northern Colorado: A Community-by-Community Guide</a></li>
+          <li><a href="/relocation.html">Relocation</a></li>
+          <li><a href="/free-home-valuation.html">Free Home Valuation</a></li>
+          <li><a href="/mortgage-calculator.html">Mortgage Calculator</a></li>
+          <li><a href="/past-sales.html">Past Sales</a></li>
+          <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
+          <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
+          <li><a href="/expired-listings.html">Expired Listings</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Connect</h4>
+        <ul>
+          <li>303-709-4262</li>
+          <li>hello@signaturepropertycollection.com</li>
+          <li><a href="#" rel="noopener">Facebook</a></li>
+        <li><a href="#" rel="noopener">Instagram</a></li>
+        <li><a href="#" rel="noopener">LinkedIn</a></li>
+        <li><a href="https://www.youtube.com/@thelittleladysellshomes" rel="noopener">YouTube</a></li>
+        <li><a href="#" rel="noopener">TikTok</a></li>
+        <li><a href="#" rel="noopener">Zillow</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2026 Signature Property Collection &middot; Christine Gwinnup, LPT Realty. All information deemed reliable but not guaranteed.
+      &middot; <a href="/privacy-policy.html" style="text-decoration:underline">Privacy Policy</a>
+      &middot; <a href="/accessibility.html" style="text-decoration:underline">Accessibility</a></span>
+      <span>Built by Claude for Christine Gwinnup</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
