@@ -340,3 +340,14 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .gallery-nav { display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 16px; }
 .gallery-nav button { background: none; border: 1px solid var(--white); color: var(--white); padding: 8px 18px; font-family: var(--font-sans); font-size: 13px; cursor: pointer; }
 .gallery-nav span { color: var(--white); font-size: 13px; }
+
+/* ---------- Map click-to-search popup (build/assets/js/map.js) ---------- */
+.quick-price-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.quick-price-btn {
+  background: var(--white); border: 1px solid var(--gray-light); color: var(--charcoal);
+  padding: 10px 16px; font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.quick-price-btn:hover { border-color: var(--dusty-rose); }
+.quick-price-btn.active { background: var(--dusty-rose); border-color: var(--dusty-rose); color: var(--white); }
+#map-quick-search .lb-box { max-width: 440px; }

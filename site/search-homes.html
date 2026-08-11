@@ -208,6 +208,14 @@
     });
     if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
     if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
+    // Deep link from the homepage map's click-to-search popup
+    // (build/assets/js/map.js): 'cities' covers a whole county at once
+    // (multiple cities OR'd together server-side) and 'noFloor' is the
+    // narrow, explicit exception to this site's usual $950K luxury search
+    // floor (see listings-search.js) — both only ever arrive via that map
+    // link, never from this form's own controls.
+    if (urlParams.get('cities')) p.cities = urlParams.get('cities');
+    if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
     return p;
   }
 
@@ -261,11 +269,24 @@
     var citySelect = document.getElementById('sf-city');
     if (citySelect) citySelect.value = urlParams.get('city');
   }
+  // Map popup deep link: prefill the visible min-price field with whatever
+  // the popup's price search landed on, and — only when noFloor=true was
+  // explicitly passed — remove this field's normal 950000 floor so it can
+  // actually be edited lower on this page too, not just via the popup.
+  if (urlParams.get('minPrice')) {
+    var minInput = document.getElementById('sf-min');
+    if (minInput) minInput.value = urlParams.get('minPrice');
+  }
+  if (urlParams.get('noFloor') === 'true') {
+    var minInputNoFloor = document.getElementById('sf-min');
+    if (minInputNoFloor) minInputNoFloor.removeAttribute('min');
+  }
   var deepLinkNoteEl = document.getElementById('deep-link-note');
-  if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true')) {
+  if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true' || urlParams.get('cities'))) {
     var bits = [];
     if (urlParams.get('subdivision')) bits.push('the ' + urlParams.get('subdivision') + ' area');
     if (urlParams.get('waterfront') === 'true') bits.push('waterfront/riverfront features');
+    if (urlParams.get('cities')) bits.push(urlParams.get('cities').split(',').join(', '));
     deepLinkNoteEl.textContent = 'Showing listings filtered to ' + bits.join(' and ') +
       '. Clear the filters below and search again for the full, unfiltered result set.';
     deepLinkNoteEl.style.display = 'block';

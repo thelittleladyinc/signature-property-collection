@@ -80,6 +80,22 @@ function statusClause(statuses) {
 // active inventory," at any price, per her explicit request 2026-08-11.
 const LUXURY_PRICE_FLOOR = 950000;
 
+// Deliberate, narrow exception to the floor above, added 2026-08-11 for the
+// homepage map's "click a city/county -> quick price search" popup
+// (build/assets/js/map.js + build/build.py's search_js). Christine's
+// reasoning: her luxury clients aren't only shopping $950K+ single-family —
+// they may also be buying for kids, multi-generational family, etc., so the
+// map entry point should let them search lower than the site's default
+// luxury floor. This is NOT exposed as a control on the main Search Homes
+// form (that page's own UI keeps the $950K default) — it only takes effect
+// when the request explicitly opts in with noFloor=true, which only the map
+// popup's generated link does. When noFloor is set, the hard
+// `ListPrice ge 950000` clause below is skipped entirely and the search
+// falls back to whatever minPrice the client sent (still required to be a
+// positive number — see the minPrice handling further down — so this can
+// narrow the results but never removes the price filter altogether).
+
+
 function odataEscape(value) {
   return String(value).replace(/'/g, "''");
 }
@@ -95,12 +111,24 @@ function buildFilter(params) {
       `(contains(tolower(ListAgentFullName),'${AGENT_SURNAME}') or ` +
       `contains(tolower(CoListAgentFullName),'${AGENT_SURNAME}'))`
     );
-  } else {
+  } else if (params.noFloor !== "true") {
     clauses.push(`ListPrice ge ${LUXURY_PRICE_FLOOR}`);
   }
 
   if (params.city) {
     clauses.push(`City eq '${odataEscape(params.city)}'`);
+  }
+  // Multi-city variant, used by the homepage map's county-level popup (a
+  // county spans several cities — e.g. clicking Larimer County should search
+  // Fort Collins, Loveland, Berthoud, etc. all at once, not just one).
+  // Comma-separated list, same City field, OR'd together.
+  if (params.cities) {
+    const cityList = params.cities.split(",").map((c) => c.trim()).filter(Boolean);
+    if (cityList.length) {
+      clauses.push(
+        "(" + cityList.map((c) => `City eq '${odataEscape(c)}'`).join(" or ") + ")"
+      );
+    }
   }
   const minPrice = parseInt(params.minPrice, 10);
   if (Number.isFinite(minPrice) && minPrice > 0) {

@@ -20,6 +20,36 @@
     'Adams': 'adams'
   };
 
+  // City lists per county, kept in sync by hand with COUNTIES[].cities in
+  // build.py (same pattern already used for CITY_ICONS below) — this is what
+  // powers the "click a county -> search all its cities at once" popup.
+  // Only the three IRES-covered counties (priority=True in build.py) get
+  // live MLS results; the rest fall back to the county guide page link only
+  // since a live search there would just return zero matches.
+  var COUNTY_CITIES = {
+    'Larimer': ['Fort Collins', 'Loveland', 'Berthoud', 'Masonville', 'Windsor',
+      'Timnath', 'Wellington', 'Red Feather Lakes'],
+    'Weld': ['Greeley', 'Windsor', 'Severance', 'Eaton', 'Ault', 'Johnstown',
+      'Milliken', 'Firestone', 'Frederick', 'Dacono', 'Fort Lupton', 'Mead', 'Erie'],
+    'Boulder': ['Boulder', 'Lafayette', 'Louisville', 'Nederland']
+  };
+  var IRES_COUNTIES = { 'Larimer': true, 'Weld': true, 'Boulder': true };
+
+  // Quick price-floor presets for the popup. $950K+ matches the site's
+  // luxury default; the lower presets are the deliberate, narrow exception
+  // added 2026-08-11 (see listings-search.js's noFloor comment) — Christine
+  // wanted map searchers able to go below the site's usual luxury floor
+  // since her clients sometimes need family-sized homes too, not just
+  // $950K+ single properties. Floored at $350K rather than truly "no
+  // minimum" so the map still reads as this site's (luxury-leaning)
+  // inventory rather than the full general market.
+  var PRICE_PRESETS = [
+    { label: '$950K+', value: 950000 },
+    { label: '$700K+', value: 700000 },
+    { label: '$500K+', value: 500000 },
+    { label: '$350K+', value: 350000 }
+  ];
+
   var BASE_FILL = '#141415';
   var HOVER_FILL = '#BA8C84';   /* mauve */
   var CLICK_FILL = '#B86F7A';   /* dusty rose — no red anywhere */
@@ -120,6 +150,125 @@
     });
   }
 
+  // ---- Click-to-search popup -------------------------------------------
+  // Clicking a city marker or a county shape opens this instead of (city)
+  // or in addition to (county) the old behavior, per Christine's request
+  // 2026-08-11: "when I click into the maps it isn't filtering prices for
+  // me — I want a search bar to pop up with auto 950k and up but they can
+  // lower it to include other homes too."
+
+  var quickSearchState = { cities: [], selectedPrice: 950000 };
+
+  function buildQuickSearchModal() {
+    if (document.getElementById('map-quick-search')) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'lb-overlay';
+    overlay.id = 'map-quick-search';
+    overlay.innerHTML =
+      '<div class="lb-box">' +
+        '<button type="button" class="lb-close" aria-label="Close">&times;</button>' +
+        '<h3 id="mqs-title">Search Homes</h3>' +
+        '<p class="lede" style="font-size:14px;margin:0 0 20px" id="mqs-sub">' +
+          'Live, active IRES MLS listings.</p>' +
+        '<div class="quick-price-row" id="mqs-presets"></div>' +
+        '<div class="field" style="margin-top:16px">' +
+          '<label for="mqs-price" style="font-size:12px;color:#6a6a6c;margin-bottom:6px;display:block">' +
+            'Or set your own minimum price</label>' +
+          '<input type="number" id="mqs-price" step="10000" min="0" value="950000" ' +
+          'style="padding:12px 14px;border:1px solid var(--gray);width:100%;font-family:var(--font-sans);font-size:14px">' +
+        '</div>' +
+        '<div class="btn-row" style="margin-top:24px;justify-content:flex-start">' +
+          '<a class="btn btn-dark" id="mqs-go" href="/search-homes.html">View Listings</a>' +
+          '<a class="btn btn-outline" id="mqs-guide" style="border-color:#141415;color:#141415;display:none">Full Area Guide</a>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    var presetsEl = overlay.querySelector('#mqs-presets');
+    PRICE_PRESETS.forEach(function (p) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'quick-price-btn';
+      btn.textContent = p.label;
+      btn.dataset.value = p.value;
+      btn.addEventListener('click', function () {
+        setSelectedPrice(p.value);
+      });
+      presetsEl.appendChild(btn);
+    });
+
+    overlay.querySelector('#mqs-price').addEventListener('input', function (e) {
+      setSelectedPrice(parseInt(e.target.value, 10) || 0, true);
+    });
+    overlay.querySelector('.lb-close').addEventListener('click', closeQuickSearch);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeQuickSearch();
+    });
+
+    function setSelectedPrice(value, skipInputSync) {
+      quickSearchState.selectedPrice = value;
+      presetsEl.querySelectorAll('.quick-price-btn').forEach(function (b) {
+        b.classList.toggle('active', parseInt(b.dataset.value, 10) === value);
+      });
+      if (!skipInputSync) overlay.querySelector('#mqs-price').value = value;
+      updateGoLink();
+    }
+
+    function updateGoLink() {
+      var params = new URLSearchParams();
+      if (quickSearchState.cities.length === 1) {
+        params.set('city', quickSearchState.cities[0]);
+      } else if (quickSearchState.cities.length > 1) {
+        params.set('cities', quickSearchState.cities.join(','));
+      }
+      var price = quickSearchState.selectedPrice;
+      if (price !== 950000) {
+        params.set('minPrice', String(price));
+        params.set('noFloor', 'true');
+      } else {
+        params.set('minPrice', '950000');
+      }
+      overlay.querySelector('#mqs-go').href = '/search-homes.html?' + params.toString();
+    }
+
+    overlay._setSelectedPrice = setSelectedPrice;
+    overlay._updateGoLink = updateGoLink;
+  }
+
+  function closeQuickSearch() {
+    var overlay = document.getElementById('map-quick-search');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  function openQuickSearch(opts) {
+    buildQuickSearchModal();
+    var overlay = document.getElementById('map-quick-search');
+    quickSearchState.cities = opts.cities || [];
+    overlay.querySelector('#mqs-title').textContent = 'Homes in ' + opts.label;
+    overlay.querySelector('#mqs-sub').textContent = opts.covered
+      ? 'Live, active IRES MLS listings — defaults to $950K+, adjust below to include more homes.'
+      : 'Live search covers Larimer, Weld & Boulder County. Browse the area guide below instead.';
+    var goBtn = overlay.querySelector('#mqs-go');
+    var guideBtn = overlay.querySelector('#mqs-guide');
+    if (opts.guideHref) {
+      guideBtn.href = opts.guideHref;
+      guideBtn.style.display = 'inline-block';
+    } else {
+      guideBtn.style.display = 'none';
+    }
+    if (opts.covered) {
+      goBtn.style.display = 'inline-block';
+      overlay.querySelector('#mqs-presets').style.display = 'flex';
+      overlay.querySelector('#mqs-price').closest('.field').style.display = 'block';
+      overlay._setSelectedPrice(950000);
+    } else {
+      goBtn.style.display = 'none';
+      overlay.querySelector('#mqs-presets').style.display = 'none';
+      overlay.querySelector('#mqs-price').closest('.field').style.display = 'none';
+    }
+    overlay.classList.add('open');
+  }
+
   function init() {
     var mapEl = document.getElementById('county-map');
     if (!mapEl || typeof L === 'undefined') return;
@@ -163,9 +312,13 @@
             });
             lyr.on('click', function () {
               lyr.setStyle({ fillColor: CLICK_FILL });
-              if (slug) {
-                window.location.href = '/communities/' + slug + '.html';
-              }
+              var covered = !!IRES_COUNTIES[name];
+              openQuickSearch({
+                label: name + ' County',
+                cities: COUNTY_CITIES[name] || [],
+                covered: covered,
+                guideHref: slug ? '/communities/' + slug + '.html' : null,
+              });
             });
           },
         }).addTo(map);
@@ -182,6 +335,11 @@
           } else {
             marker.bindTooltip(city.name, { direction: 'right', offset: [14, 0] });
           }
+          // Every CITY_ICONS entry is inside Larimer/Weld/Boulder (see the
+          // grouping comments above), so live search always covers it.
+          marker.on('click', function () {
+            openQuickSearch({ label: city.name, cities: [city.name], covered: true });
+          });
         });
 
         // River lines + script-font labels, matching the original map's
