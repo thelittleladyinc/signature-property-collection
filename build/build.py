@@ -315,8 +315,13 @@ _LISTING_VIDEO_ENTRIES = [
      "kdR6wbWPMQU", "Windsor, Colorado Living — 945 Maplebrook Dr Tour", "live"),
     (["475 homestead ln", "475 homestead lane"],
      "6Hrdv6LZIDM", "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)", "sold"),
-    (["913 green mountain dr", "913 green mountain drive"],
-     "e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", "sold"),
+    # NOTE: 913 Green Mountain Dr (Erie) is deliberately NOT in this list —
+    # confirmed 2026-08-11 that it's Christine's own personal home, not a
+    # past client sale, so it must never appear in the "How I Sold These
+    # Homes" showcase (past-sales.html) or be matched as a client listing
+    # against the live MLS feed. Its video instead lives only on the Erie
+    # city page's "A Personal Note" section (build_city_pages()) as a
+    # marketing-quality showcase, correctly framed as her own residence.
 ]
 LISTING_VIDEOS = {addr: (vid, title) for addrs, vid, title, _status in _LISTING_VIDEO_ENTRIES for addr in addrs}
 
