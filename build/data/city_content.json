@@ -158,10 +158,15 @@
     "things_to_do": "Visit the Luvin Arms Animal Sanctuary to meet rescued farm animals through guided tours. Experience seasonal fun at Anderson Farms, known for its 25-acre corn maze, pumpkin patch, and hayrides during the fall season. Enjoy a leisurely walk or fishing at Thomas Reservoir. Spend time at Erie Community Park, a roughly 40-acre space featuring picnic shelters, sports fields, a skatepark, and walking trails. Explore Erie's history at the Wise Homestead Museum, a late 19th-century homestead.",
     "restaurants": "24 Carrot Bistro is a local favorite for weekend brunch, known for its eggs Benedict. The Old Mine is the go-to for comfort food — great pizza and barbecue — and Echo Brewing and Pizzeria rounds things out with house-brewed beer and wood-fired pizza.",
     "dog_parks": "Erie has its own dedicated off-leash park: The Boneyard at Reliance Park, a 7.9-acre facility with a double-gated entry and separate fenced areas for large and small dogs.",
+    "rec_center": "The Erie Community Center (450 Powers St.) is the town's hub for indoor recreation — a full-court gymnasium for basketball and volleyball, an indoor pool with a lazy river and hot tub, racquetball courts, several meeting rooms, and fitness programming, plus the Columbine Lounge for active adults.",
     "hikes": "The Erie Forest Trail is a beginner-friendly connector trail through Erie's growing singletrack network. The Coal Creek Trail runs along Erie's edge toward Broomfield and Louisville, and Thomas Reservoir has its own walking loop around the water.",
     "school_district": "St. Vrain Valley Schools serves most of Erie (including Erie High School); a portion of town falls in Boulder Valley School District (BVSD) depending on the neighborhood",
     "commute": "About 27 miles / 39 minutes to Denver via I-25, and roughly 15-18 miles to Boulder — within a reasonable daily commute of both job centers.",
-    "relocate_extra": "Erie is one of the southern Weld County towns seeing outsized growth from buyers priced out of Boulder County and metro Denver."
+    "relocate_extra": "Erie is one of the southern Weld County towns seeing outsized growth from buyers priced out of Boulder County and metro Denver.",
+    "local_faqs": [
+      ["Can you have chickens in Erie, CO?",
+       "Yes — the Town of Erie allows backyard chickens, but you need a chicken license from the Town before bringing any chickens onto the property, and the lot must be larger than 5,000 square feet. If the property is in an HOA-governed neighborhood, check with the HOA first — most Erie HOAs prohibit chickens even where the Town itself allows them. For the current hen-count limit and coop setback rules, apply directly through the Town of Erie's Chicken License program at erieco.gov."]
+    ]
   },
   "firestone": {
     "meta": "Welcome to Firestone. In this guide we will explore the local market including listings, schools, businesses, and more.",

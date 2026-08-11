@@ -1164,6 +1164,7 @@ def build_city_pages():
             ttd = info.get("things_to_do", "")
             restaurants = info.get("restaurants", "")
             dog_parks = info.get("dog_parks", "")
+            rec_center = info.get("rec_center", "")
             hikes = info.get("hikes", "")
             school_district = info.get("school_district", "")
             commute = info.get("commute", "")
@@ -1190,10 +1191,20 @@ def build_city_pages():
                 relocate_bits.append(relocate_extra)
             relocate_text = " ".join(relocate_bits)
 
+            restaurants_card = ""
+            if restaurants:
+                maps_q = urllib.parse.quote(f"restaurants near {city}, CO")
+                restaurants_card = f"""<div class="card">
+      <h3>Restaurants &amp; Dining</h3>
+      <p>{esc(restaurants)}</p>
+      <a class="cta" href="https://www.google.com/maps/search/{maps_q}" target="_blank" rel="noopener">See More On Google Maps &rarr;</a>
+    </div>"""
+
             local_cards = "\n      ".join(filter(None, [
                 _local_card(f"Things To Do In {city}", ttd),
-                _local_card("Restaurants & Dining", restaurants),
+                restaurants_card,
                 _local_card("Dog Parks & Pet-Friendly Spots", dog_parks),
+                _local_card(f"{city} Recreation Center", rec_center),
                 _local_card(f"Best Hikes & Trails Near {city}", hikes),
                 _local_card(f"Schools & Commute From {city}", relocate_text),
             ]))
@@ -1225,6 +1236,27 @@ def build_city_pages():
       <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
         <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/listing-video-portfolio.html">More Video Tours &rarr;</a>
       </div>
+    </div>
+  </div>
+</section>"""
+
+            own_home_block = ""
+            if data_slug == "erie":
+                own_home_block = f"""<section class="tight section-dark">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow">A Personal Note</span>
+      <h2 class="section-title" style="color:#fff">{esc(SITE['agent'])}'s Own Home Is Right Here In Erie</h2>
+      <p class="lede">This isn't a staged example — it's the same Colliers Hill neighborhood
+      {esc(SITE['agent'])} calls home. The video tour of 913 Green Mountain Dr shows the
+      exact level of cinematic marketing, staging, and presentation every Signature Property
+      Collection listing gets, because it's the same standard she holds her own home to.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-outline" href="/listing-video-portfolio.html">More Video Tours &rarr;</a>
+      </div>
+    </div>
+    <div>
+      {_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", "Colliers Hill, Erie, CO")}
     </div>
   </div>
 </section>"""
@@ -1295,6 +1327,7 @@ def build_city_pages():
 </section>
 {local_block}
 {video_block}
+{own_home_block}
 {subdivisions_block}
 """
             faq_pairs = [
@@ -1314,6 +1347,15 @@ def build_city_pages():
                                    f"{city} is served by {school_district}."))
             if commute:
                 faq_pairs.append((f"How far is {city}, CO from major job centers?", commute))
+            # City-specific practical questions (zoning/local-ordinance type
+            # answers, not generic real-estate FAQs) — researched per city
+            # against that city's actual municipal code/website rather than
+            # guessed, per Christine's request 2026-08-11 ("can you have
+            # chickens in Milliken" as the example question). Seeded for
+            # Erie first as the pilot city; add more cities' entries to
+            # city_content.json's "local_faqs" list as they're researched.
+            for q, a in info.get("local_faqs", []):
+                faq_pairs.append((q, a))
             faq_html, faq_schema = _faq_block(faq_pairs)
             body += faq_html
             breadcrumbs = _breadcrumb_schema([
