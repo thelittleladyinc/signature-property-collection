@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url><loc>https://signaturepropertycollection.com/index.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/index.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/about.html</loc><lastmod>2026-08-11</lastmod></url>
@@ -21,26 +21,26 @@
   <url><loc>https://signaturepropertycollection.com/communities/arapahoe.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/adams.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/larimer/fort-collins.html</loc><lastmod>2026-08-11</lastmod></url>
-  <url><loc>https://signaturepropertycollection.com/communities/larimer/loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/larimer/loveland.html</loc><lastmod>2026-08-11</lastmod><image:image><image:loc>https://signaturepropertycollection.com/assets/img/communities/loveland.jpg</image:loc></image:image></url>
   <url><loc>https://signaturepropertycollection.com/communities/larimer/berthoud.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/larimer/masonville.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/larimer/windsor.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/larimer/timnath.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/larimer/wellington.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html</loc><lastmod>2026-08-11</lastmod></url>
-  <url><loc>https://signaturepropertycollection.com/communities/weld/greeley.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/weld/greeley.html</loc><lastmod>2026-08-11</lastmod><image:image><image:loc>https://signaturepropertycollection.com/assets/img/communities/greeley.jpg</image:loc></image:image></url>
   <url><loc>https://signaturepropertycollection.com/communities/weld/windsor.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/weld/severance.html</loc><lastmod>2026-08-11</lastmod></url>
-  <url><loc>https://signaturepropertycollection.com/communities/weld/eaton.html</loc><lastmod>2026-08-11</lastmod></url>
-  <url><loc>https://signaturepropertycollection.com/communities/weld/ault.html</loc><lastmod>2026-08-11</lastmod></url>
-  <url><loc>https://signaturepropertycollection.com/communities/weld/johnstown.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/weld/eaton.html</loc><lastmod>2026-08-11</lastmod><image:image><image:loc>https://signaturepropertycollection.com/assets/img/communities/eaton.jpg</image:loc></image:image></url>
+  <url><loc>https://signaturepropertycollection.com/communities/weld/ault.html</loc><lastmod>2026-08-11</lastmod><image:image><image:loc>https://signaturepropertycollection.com/assets/img/communities/ault.jpg</image:loc></image:image></url>
+  <url><loc>https://signaturepropertycollection.com/communities/weld/johnstown.html</loc><lastmod>2026-08-11</lastmod><image:image><image:loc>https://signaturepropertycollection.com/assets/img/communities/johnstown.jpg</image:loc></image:image></url>
   <url><loc>https://signaturepropertycollection.com/communities/weld/milliken.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/weld/firestone.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/weld/frederick.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/weld/dacono.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/weld/fort-lupton.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/weld/mead.html</loc><lastmod>2026-08-11</lastmod></url>
-  <url><loc>https://signaturepropertycollection.com/communities/weld/erie.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/weld/erie.html</loc><lastmod>2026-08-11</lastmod><image:image><image:loc>https://signaturepropertycollection.com/assets/img/communities/erie.jpg</image:loc></image:image></url>
   <url><loc>https://signaturepropertycollection.com/communities/boulder/boulder.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/boulder/lafayette.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/communities/boulder/louisville.html</loc><lastmod>2026-08-11</lastmod></url>
@@ -54,6 +54,16 @@
   <url><loc>https://signaturepropertycollection.com/guides/multi-generational-homes-northern-colorado.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/guides/cost-to-develop-raw-land-colorado.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/guides/best-places-to-retire-in-northern-colorado.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/buckhorn-subdivisions-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/west-loveland-riverfront-homes.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/mariana-butte-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/lakes-at-centerra-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/thompson-valley-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/boyd-lake-north-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/waterfront-at-boyd-lake-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/namaqua-hills-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/kinston-centerra-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/communities/loveland/pyrenees-french-country-loveland.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/blog/index.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/blog/why-some-renovations-reduce-your-homes-value.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/blog/the-true-cost-difference-between-new-builds-and-resale-homes.html</loc><lastmod>2026-08-11</lastmod></url>
@@ -122,4 +132,6 @@
   <url><loc>https://signaturepropertycollection.com/listing-video-portfolio.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/past-sales.html</loc><lastmod>2026-08-11</lastmod></url>
   <url><loc>https://signaturepropertycollection.com/mortgage-calculator.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/search-homes.html</loc><lastmod>2026-08-11</lastmod></url>
+  <url><loc>https://signaturepropertycollection.com/current-listings.html</loc><lastmod>2026-08-11</lastmod></url>
 </urlset>

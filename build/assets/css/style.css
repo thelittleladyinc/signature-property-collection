@@ -250,6 +250,7 @@ form.lead-form label.consent { font-size: 12px; color: #6a6a6c; display: flex; g
 .footer-grid ul a { color: rgba(255,255,255,.72); font-size: 14px; }
 .footer-grid ul a:hover { color: var(--white); text-decoration: underline; }
 .footer-bottom { margin-top: 50px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; opacity: .6; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.qr-share-btn { background: none; border: none; padding: 0; margin: 0; font-family: inherit; font-size: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
 
 /* ---------- Breadcrumb / county page hero variants ---------- */
 .county-hero { padding: 90px 0 60px; background: var(--charcoal); color: var(--white); }
@@ -275,9 +276,33 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .listing-card { border: 1px solid #e4e4d8; background: var(--white); overflow: hidden; }
 .listing-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #eee; }
 .listing-card .listing-body { padding: 18px 20px; }
+.listing-status-badge { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 4px 10px; margin-bottom: 10px; color: var(--white); }
+.listing-status-badge.status-active { background: #3f6b52; }
+.listing-status-badge.status-pending { background: #b7791f; }
+.listing-status-badge.status-other { background: #6a6a6c; }
 .listing-card .listing-price { font-family: var(--font-serif); font-size: 22px; margin: 0 0 4px; }
 .listing-card .listing-meta { color: #4a4a4c; font-size: 14px; margin: 0 0 8px; }
 .listing-card .listing-address { font-size: 14px; color: #6a6a6c; margin: 0 0 10px; }
 .listing-card .listing-compliance { font-size: 14px; color: #3a3a3c; line-height: 1.5; border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px; }
 .mls-disclaimer { font-size: 12px; color: #6a6a6c; line-height: 1.7; margin-top: 44px; padding-top: 24px; border-top: 1px solid #e4e4d8; }
 .mls-disclaimer .mls-source-badge { font-weight: 700; color: #3a3a3c; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+
+/* ---------- Listing media links + inquiry CTAs (Current Listings) ---------- */
+.listing-media { position: relative; }
+.media-links { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 20px 0; }
+.media-link { background: none; border: none; padding: 0; margin: 0; font-family: var(--font-sans); font-size: 13px; color: var(--deep-mauve); text-decoration: underline; cursor: pointer; }
+.listing-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.listing-actions .btn { padding: 10px 18px; font-size: 13px; }
+
+/* ---------- Shared lightbox/modal (photo gallery + listing inquiry) ---------- */
+.lb-overlay { display: none; position: fixed; inset: 0; background: rgba(20,20,21,.85); z-index: 1000; align-items: center; justify-content: center; padding: 24px; }
+.lb-overlay.open { display: flex; }
+.lb-box { position: relative; background: var(--white); max-width: 520px; width: 100%; padding: 36px 32px; max-height: 90vh; overflow-y: auto; }
+.lb-box .lb-close { position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 28px; line-height: 1; color: var(--charcoal); cursor: pointer; }
+.lb-box h3 { margin: 0 0 6px; font-family: var(--font-serif); font-size: 26px; }
+.lb-box-media { background: transparent; max-width: 900px; padding: 0; }
+.lb-box-media .lb-close { color: var(--white); top: -8px; right: -8px; }
+#gallery-img { max-width: 100%; max-height: 76vh; display: block; margin: 0 auto; background: #222; }
+.gallery-nav { display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 16px; }
+.gallery-nav button { background: none; border: 1px solid var(--white); color: var(--white); padding: 8px 18px; font-family: var(--font-sans); font-size: 13px; cursor: pointer; }
+.gallery-nav span { color: var(--white); font-size: 13px; }

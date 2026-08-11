@@ -1,0 +1,5 @@
+# Only needed to run `python3 build/build.py` locally (regenerates /site).
+# The live site is pre-built and committed -- Netlify just serves /site
+# directly (see netlify.toml) -- so this is a dev-time dependency only,
+# never something that needs to be installed anywhere else.
+qrcode>=8.0

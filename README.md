@@ -367,9 +367,20 @@ last 7 nav pages" below). What's left needs credentials/files only you have
    captures everything normally) — nothing breaks either way.
 4. ~~The 60 blog posts~~ — done, see below.
 5. ~~Remaining nav pages~~ — done, see below, **except Agent Training**,
-   which you asked to leave out of this pass. (Past Sales and Listing Video
-   Portfolio are live pages but honestly framed as "coming soon" since there
-   was no real static data to migrate for either — see below.)
+   which you asked to leave out of this pass. (Past Sales links out to
+   `/search-homes.html` now instead of "coming soon"; Listing Video
+   Portfolio uses your real YouTube videos.)
+6. ~~Current Listings page with video~~ — done, added 2026-08-11.
+   `/current-listings.html` shows your own active $950K+ IRES listings live
+   (same MLS Grid feed as Search Homes, filtered to your name via
+   `netlify/functions/listings-search.js`'s `mine=true` param), with a real
+   video tour swapped in for any listing whose exact street address matches
+   an entry in `LISTING_VIDEOS` in `build/build.py` — otherwise it just shows
+   the listing photo, never a mismatched video. Also linked from the footer,
+   Search Homes, and Listing Video Portfolio, and a single-listing "Currently
+   Listed" spotlight appears near the bottom of every blog post (silently
+   hidden if nothing's active). Add a new address/video ID to
+   `LISTING_VIDEOS` any time you film a new listing tour.
 
 ## Blog migration & the last 7 nav pages
 

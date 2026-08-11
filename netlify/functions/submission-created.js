@@ -23,6 +23,7 @@ const SOURCE_LABELS = {
   "relocation": "Signature Property Collection - Relocation Page",
   "free-home-valuation": "Signature Property Collection - Free Home Valuation",
   "lifestyle-search": "Signature Property Collection - Lifestyle Search",
+  "listing-inquiry": "Signature Property Collection - Listing Inquiry (Current Listings page)",
 };
 
 function splitName(fullName) {
@@ -52,7 +53,17 @@ exports.handler = async (event) => {
     if (data.phone) body.phones = [data.phone];
     body.source = SOURCE_LABELS[formName] || `Signature Property Collection - ${formName}`;
     body.tags = ["Website Lead", formName];
-    if (data.address) body.notes = `Requested valuation for: ${data.address}`;
+    if (data.listing_address) {
+      // From the Current Listings page's Ask A Question / Request A Tour
+      // buttons (netlify/functions/listings-search.js + build_current_listings()).
+      const kind = data.inquiry_type === "Tour" ? "Requested a tour" : "Asked a question";
+      const mls = data.listing_mls ? ` (MLS# ${data.listing_mls})` : "";
+      const msg = data.message ? ` — "${data.message}"` : "";
+      body.notes = `${kind} about listing: ${data.listing_address}${mls}${msg}`;
+      body.tags.push(data.inquiry_type === "Tour" ? "Tour Request" : "Listing Question");
+    } else if (data.address) {
+      body.notes = `Requested valuation for: ${data.address}`;
+    }
 
     const res = await fetch(`${LOFTY_BASE_URL}/leads`, {
       method: "POST",
