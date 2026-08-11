@@ -77,6 +77,18 @@ SITE = {
     "phone": "303-709-4262",
     "email": "hello@signaturepropertycollection.com",
     "domain": "https://signaturepropertycollection.com",
+    # Business address, confirmed by Christine 2026-08-11 (cross-checked
+    # against her public Yelp business listing, which lists this same
+    # address for "Christine Gwinnup - The Little Lady Sells Homes") — used
+    # in the RealEstateAgent/LocalBusiness schema below and on Contact/
+    # footer for NAP (name/address/phone) consistency, a real local-SEO
+    # ranking factor.
+    "address": {
+        "street": "2411 Glade Rd",
+        "city": "Loveland",
+        "state": "CO",
+        "zip": "80538",
+    },
     # Verified 2026-08-11 via web search (consistent "thelittleladysellshomes"
     # handle across every platform, matching her confirmed YouTube channel
     # and her own thelittleladysellshomes.com domain) — replaces the "#"
@@ -315,13 +327,14 @@ _LISTING_VIDEO_ENTRIES = [
      "kdR6wbWPMQU", "Windsor, Colorado Living — 945 Maplebrook Dr Tour", "live"),
     (["475 homestead ln", "475 homestead lane"],
      "6Hrdv6LZIDM", "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)", "sold"),
-    # NOTE: 913 Green Mountain Dr (Erie) is deliberately NOT in this list —
-    # confirmed 2026-08-11 that it's Christine's own personal home, not a
-    # past client sale, so it must never appear in the "How I Sold These
-    # Homes" showcase (past-sales.html) or be matched as a client listing
-    # against the live MLS feed. Its video instead lives only on the Erie
-    # city page's "A Personal Note" section (build_city_pages()) as a
-    # marketing-quality showcase, correctly framed as her own residence.
+    # Confirmed 2026-08-11 (after an earlier back-and-forth): 913 Green
+    # Mountain Dr, Erie was a real past CLIENT sale (Christine represented
+    # the seller), not her own home — 2411 Glade Rd, Loveland is her
+    # business address instead (see SITE['address']). Belongs here as
+    # "sold" so it correctly appears in the "How I Sold These Homes"
+    # showcase on past-sales.html.
+    (["913 green mountain dr", "913 green mountain drive"],
+     "e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", "sold"),
 ]
 LISTING_VIDEOS = {addr: (vid, title) for addrs, vid, title, _status in _LISTING_VIDEO_ENTRIES for addr in addrs}
 
@@ -669,9 +682,7 @@ def _real_estate_agent_schema():
     modern local-SEO / AI-search-visibility playbooks (including your own
     NoCo Digital Takeover's stated methodology) recommend: structured data
     that lets Google, ChatGPT, and Perplexity read, trust, and cite the
-    business directly instead of having to guess from prose.
-    No street address is included since none was provided — add one via
-    SITE['address'] in build.py if you want full LocalBusiness precision."""
+    business directly instead of having to guess from prose."""
     area_served = sorted({c["name"] for c in COUNTIES})
     data = {
         "@context": "https://schema.org",
@@ -686,6 +697,16 @@ def _real_estate_agent_schema():
         "sameAs": [u for u in SITE["social"].values() if u and u != "#"],
         "dateModified": BUILD_DATE,
     }
+    if SITE.get("address"):
+        a = SITE["address"]
+        data["address"] = {
+            "@type": "PostalAddress",
+            "streetAddress": a["street"],
+            "addressLocality": a["city"],
+            "addressRegion": a["state"],
+            "postalCode": a["zip"],
+            "addressCountry": "US",
+        }
     return json.dumps(data, indent=None)
 
 
@@ -882,6 +903,7 @@ def footer_html():
         <ul>
           <li>{SITE['phone']}</li>
           <li>{SITE['email']}</li>
+          {f'<li>{esc(SITE["address"]["street"])}, {esc(SITE["address"]["city"])}, {esc(SITE["address"]["state"])} {esc(SITE["address"]["zip"])}</li>' if SITE.get('address') else ''}
           {social_links}
         </ul>
       </div>
@@ -1250,18 +1272,18 @@ def build_city_pages():
                 own_home_block = f"""<section class="tight section-dark">
   <div class="wrap grid-2">
     <div>
-      <span class="eyebrow">A Personal Note</span>
-      <h2 class="section-title" style="color:#fff">{esc(SITE['agent'])}'s Own Home Is Right Here In Erie</h2>
-      <p class="lede">This isn't a staged example — it's the same Colliers Hill neighborhood
-      {esc(SITE['agent'])} calls home. The video tour of 913 Green Mountain Dr shows the
-      exact level of cinematic marketing, staging, and presentation every Signature Property
-      Collection listing gets, because it's the same standard she holds her own home to.</p>
+      <span class="eyebrow">Recently Sold In Erie</span>
+      <h2 class="section-title" style="color:#fff">A Look At {esc(SITE['agent'])}'s Work In Colliers Hill</h2>
+      <p class="lede">913 Green Mountain Dr — a past client sale {esc(SITE['agent'])} represented in Erie's
+      Colliers Hill neighborhood. The video tour shows the same level of cinematic marketing,
+      staging, and presentation every Signature Property Collection listing gets.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-outline" href="/past-sales.html">See More Past Sales &rarr;</a>
         <a class="btn btn-outline" href="/listing-video-portfolio.html">More Video Tours &rarr;</a>
       </div>
     </div>
     <div>
-      {_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", "Colliers Hill, Erie, CO")}
+      {_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", "Colliers Hill, Erie, CO — Sold")}
     </div>
   </div>
 </section>"""
@@ -1579,7 +1601,7 @@ def build_contact():
     </form>
     <div class="card">
       <h3>Contact Information</h3>
-      <p>{SITE['phone']}<br>{SITE['email']}</p>
+      <p>{SITE['phone']}<br>{SITE['email']}{f"<br>{esc(SITE['address']['street'])}, {esc(SITE['address']['city'])}, {esc(SITE['address']['state'])} {esc(SITE['address']['zip'])}" if SITE.get('address') else ''}</p>
       <h3 style="margin-top:24px">Note for setup</h3>
       <p>This form currently posts to Netlify Forms (free, zero backend). Once your
       Lofty webhook/API key is available, swap the form action to POST into Lofty so
