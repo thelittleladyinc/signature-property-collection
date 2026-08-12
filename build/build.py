@@ -616,6 +616,293 @@ def _urlq(v):
     return urllib.parse.quote(str(v), safe="")
 
 
+# Shared bounds for the price-range slider in _fancy_search_widget — this
+# site's luxury floor stays $950K (see listings-search.js's LUXURY_PRICE_FLOOR
+# comment on why: not competing with TheLittleLadySellsHomes.com for general
+# Northern Colorado search traffic). The top handle tops out at $5M and, when
+# left there, is treated as "no max" rather than actually capping results at
+# $5M — most of this market is well under that, but a $6M+ estate should
+# never silently vanish because a slider has to end somewhere.
+_FS_PRICE_FLOOR = 950000
+_FS_PRICE_CEILING = 5000000
+_FS_PRICE_STEP = 25000
+
+
+def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_links=False):
+    """Interactive live-search widget: dual-handle price slider + pill-button
+    beds/baths filters, replacing the old plain dropdown/number-box search
+    form (Christine's request 2026-08-11 — 'a slider and more fancy ways
+    that are easy to use for buyers and sellers'). Backed by the same
+    /.netlify/functions/listings-search endpoint as everything else here.
+
+    wid: short id prefix (e.g. "fs") — keeps element ids unique if a page
+    ever needed two of these (none currently does, but cheap insurance).
+
+    search_cities: full list of searchable city names for the City dropdown.
+    Only used when fixed_city is None.
+
+    fixed_city: when set, this widget is scoped to one city (city pages) —
+    no dropdown, just a hidden field, and the results are pre-filtered to
+    that city from the first search.
+
+    support_deep_links: when True (search-homes.html only), the widget also
+    reads ?city=&minPrice=&subdivision=&waterfront=true&cities=&noFloor=true
+    from the URL on load — the deep-link contract other pages (subdivision
+    guides, the homepage map popup) already link into. City-page instances
+    don't need this since they're not a deep-link target themselves."""
+
+    city_field_html = ""
+    if fixed_city:
+        city_field_html = f'<input type="hidden" name="city" value="{esc(fixed_city)}">'
+    else:
+        city_options = "\n            ".join(
+            f'<option value="{esc(c)}">{esc(c)}</option>' for c in (search_cities or [])
+        )
+        city_field_html = f"""<div class="fs-block" style="flex:1 1 200px;min-width:180px">
+          <span class="fs-label">City</span>
+          <select id="{wid}-city" name="city" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
+            <option value="">All Cities</option>
+            {city_options}
+          </select>
+        </div>"""
+
+    def _pill_group(field, options):
+        btns = "\n          ".join(
+            f'<button type="button" class="fs-pill{" active" if v == "" else ""}" data-value="{v}">{label}</button>'
+            for v, label in options
+        )
+        return f"""<div class="fs-block">
+        <span class="fs-label">{field.capitalize()}</span>
+        <div class="fs-pill-group" data-field="{field}">
+          {btns}
+        </div>
+      </div>"""
+
+    beds_group = _pill_group("beds", [("", "Any"), ("1", "1+"), ("2", "2+"), ("3", "3+"), ("4", "4+"), ("5", "5+")])
+    baths_group = _pill_group("baths", [("", "Any"), ("1", "1+"), ("2", "2+"), ("3", "3+"), ("4", "4+")])
+
+    floor, ceiling, step = _FS_PRICE_FLOOR, _FS_PRICE_CEILING, _FS_PRICE_STEP
+
+    form_html = f"""<div class="fs-widget">
+    <form id="{wid}-form">
+      {city_field_html}
+      <div class="fs-row" style="margin-top:{'22px' if fixed_city else '24px'}">
+        <div class="fs-block" style="flex:1 1 320px">
+          <span class="fs-label">Price Range</span>
+          <div class="fs-price-values"><span id="{wid}-min-label">$950,000</span><span>&mdash;</span><span id="{wid}-max-label">$5,000,000+</span></div>
+          <div class="fs-slider">
+            <div class="fs-slider-track"></div>
+            <div class="fs-slider-range" id="{wid}-range-fill"></div>
+            <input type="range" id="{wid}-min-range" min="{floor}" max="{ceiling}" step="{step}" value="{floor}" aria-label="Minimum price">
+            <input type="range" id="{wid}-max-range" min="{floor}" max="{ceiling}" step="{step}" value="{ceiling}" aria-label="Maximum price">
+          </div>
+        </div>
+        {beds_group}
+        {baths_group}
+      </div>
+      <input type="hidden" name="minPrice" id="{wid}-minPrice">
+      <input type="hidden" name="maxPrice" id="{wid}-maxPrice">
+      <input type="hidden" name="beds" id="{wid}-beds">
+      <input type="hidden" name="baths" id="{wid}-baths">
+      <div class="fs-actions">
+        <button class="btn btn-dark" type="submit">Search Homes</button>
+      </div>
+    </form>
+    <p class="search-status" id="{wid}-deep-link-note" style="display:none;font-weight:600"></p>
+    <p class="search-status" id="{wid}-status">Loading listings&hellip;</p>
+    <div class="listing-grid" id="{wid}-results"></div>
+    <div class="btn-row" style="margin-top:32px">
+      <button type="button" id="{wid}-load-more" class="btn btn-outline" style="border-color:#141415;color:#141415;cursor:pointer;display:none">Load More Listings</button>
+    </div>
+    {_mls_disclaimer_html(fetched_at_id=wid + "-fetched-at")}
+  </div>"""
+
+    fixed_city_js = json.dumps(fixed_city) if fixed_city else "null"
+    deep_links_js = "true" if support_deep_links else "false"
+
+    js = f"""<script>
+(function () {{
+  var wid = {json.dumps(wid)};
+  var fixedCity = {fixed_city_js};
+  var supportDeepLinks = {deep_links_js};
+  var form = document.getElementById(wid + '-form');
+  var resultsEl = document.getElementById(wid + '-results');
+  var statusEl = document.getElementById(wid + '-status');
+  var loadMoreBtn = document.getElementById(wid + '-load-more');
+  var fetchedAtEl = document.getElementById(wid + '-fetched-at');
+  var minRange = document.getElementById(wid + '-min-range');
+  var maxRange = document.getElementById(wid + '-max-range');
+  var minLabel = document.getElementById(wid + '-min-label');
+  var maxLabel = document.getElementById(wid + '-max-label');
+  var rangeFill = document.getElementById(wid + '-range-fill');
+  var minPriceInput = document.getElementById(wid + '-minPrice');
+  var maxPriceInput = document.getElementById(wid + '-maxPrice');
+  var bedsInput = document.getElementById(wid + '-beds');
+  var bathsInput = document.getElementById(wid + '-baths');
+  var CEILING = {ceiling};
+  var skip = 0;
+  var TOP = 12;
+
+  function esc(s) {{
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {{
+      return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[c];
+    }});
+  }}
+  function fmtPrice(n) {{
+    if (n == null) return 'Price N/A';
+    return '$' + Number(n).toLocaleString('en-US');
+  }}
+  function cardHtml(l) {{
+    var img = l.photo
+      ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">'
+      : '<div style="aspect-ratio:4/3;background:#eee"></div>';
+    var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
+    var meta = esc([
+      l.beds ? l.beds + ' bd' : null,
+      l.baths ? l.baths + ' ba' : null,
+      l.sqft ? Number(l.sqft).toLocaleString() + ' sqft' : null,
+    ].filter(Boolean).join(' \\u00b7 '));
+    var remarks = l.remarks ? esc(l.remarks.slice(0, 140) + (l.remarks.length > 140 ? '\\u2026' : '')) : '';
+    var compliance = esc([l.officeName, l.listingId ? ('MLS# ' + l.listingId) : null, l.agentPhone || l.agentEmail, l.status]
+      .filter(Boolean).join(' \\u00b7 '));
+    return '<div class="listing-card">' + img +
+      '<div class="listing-body">' +
+      '<p class="listing-price">' + esc(fmtPrice(l.price)) + '</p>' +
+      '<p class="listing-meta">' + meta + '</p>' +
+      '<p class="listing-address">' + addr + '</p>' +
+      (remarks ? '<p class="listing-address" style="color:#4a4a4c">' + remarks + '</p>' : '') +
+      '<p class="listing-compliance">' + compliance + '</p>' +
+      '</div></div>';
+  }}
+
+  // ---- Price slider: two overlapping range inputs, kept from crossing,
+  // painted as one filled bar between the two thumbs. ----
+  function updateSlider() {{
+    var lo = parseInt(minRange.value, 10);
+    var hi = parseInt(maxRange.value, 10);
+    if (lo > hi) {{ lo = hi; minRange.value = String(lo); }}
+    var pct1 = ((lo - minRange.min) / (minRange.max - minRange.min)) * 100;
+    var pct2 = ((hi - maxRange.min) / (maxRange.max - maxRange.min)) * 100;
+    rangeFill.style.left = pct1 + '%';
+    rangeFill.style.right = (100 - pct2) + '%';
+    minLabel.textContent = fmtPrice(lo);
+    maxLabel.textContent = hi >= CEILING ? fmtPrice(CEILING) + '+' : fmtPrice(hi);
+    minPriceInput.value = lo > 0 ? String(lo) : '';
+    maxPriceInput.value = hi >= CEILING ? '' : String(hi);
+  }}
+  minRange.addEventListener('input', updateSlider);
+  maxRange.addEventListener('input', updateSlider);
+  updateSlider();
+
+  // ---- Beds/baths pill buttons ----
+  function wirePills(groupEl, hiddenInput) {{
+    var btns = groupEl.querySelectorAll('.fs-pill');
+    btns.forEach(function (btn) {{
+      btn.addEventListener('click', function () {{
+        btns.forEach(function (b) {{ b.classList.remove('active'); }});
+        btn.classList.add('active');
+        hiddenInput.value = btn.dataset.value || '';
+      }});
+    }});
+  }}
+  form.querySelectorAll('.fs-pill-group').forEach(function (g) {{
+    wirePills(g, g.dataset.field === 'beds' ? bedsInput : bathsInput);
+  }});
+
+  var urlParams = supportDeepLinks ? new URLSearchParams(window.location.search) : new URLSearchParams('');
+
+  function paramsFromForm() {{
+    var data = new FormData(form);
+    var p = {{}};
+    ['city', 'minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {{
+      var v = data.get(k);
+      if (v) p[k] = v;
+    }});
+    if (fixedCity) p.city = fixedCity;
+    if (supportDeepLinks) {{
+      if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
+      if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
+      if (urlParams.get('cities')) p.cities = urlParams.get('cities');
+      if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
+    }}
+    return p;
+  }}
+
+  function runSearch(reset) {{
+    if (reset) {{ skip = 0; resultsEl.innerHTML = ''; }}
+    var p = paramsFromForm();
+    p.top = TOP;
+    p.skip = skip;
+    var qs = new URLSearchParams(p).toString();
+    statusEl.textContent = 'Searching live IRES listings\\u2026';
+    fetch('/.netlify/functions/listings-search?' + qs)
+      .then(function (r) {{ return r.json(); }})
+      .then(function (data) {{
+        if (data.error === 'not_configured') {{
+          statusEl.textContent = 'Live search isn\\u2019t connected yet \\u2014 contact us directly for current listings.';
+          loadMoreBtn.style.display = 'none';
+          return;
+        }}
+        if (data.error) {{
+          statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
+          loadMoreBtn.style.display = 'none';
+          return;
+        }}
+        var listings = data.listings || [];
+        if (reset && listings.length === 0) {{
+          statusEl.textContent = 'No active listings match those filters right now \\u2014 try widening your search, or contact us and we\\u2019ll help you find it before it hits the market.';
+        }} else {{
+          statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
+        }}
+        resultsEl.insertAdjacentHTML('beforeend', listings.map(cardHtml).join(''));
+        skip += listings.length;
+        loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
+        if (fetchedAtEl) {{
+          fetchedAtEl.textContent = new Date().toLocaleString('en-US', {{ dateStyle: 'medium', timeStyle: 'short' }});
+        }}
+      }})
+      .catch(function () {{
+        statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
+      }});
+  }}
+
+  form.addEventListener('submit', function (e) {{
+    e.preventDefault();
+    runSearch(true);
+  }});
+  loadMoreBtn.addEventListener('click', function () {{ runSearch(false); }});
+
+  if (supportDeepLinks) {{
+    if (urlParams.get('city')) {{
+      var citySelect = document.getElementById(wid + '-city');
+      if (citySelect) citySelect.value = urlParams.get('city');
+    }}
+    if (urlParams.get('minPrice')) {{
+      var mp = parseInt(urlParams.get('minPrice'), 10);
+      if (mp >= parseInt(minRange.min, 10) && mp <= parseInt(minRange.max, 10)) {{
+        minRange.value = String(mp);
+        updateSlider();
+      }}
+    }}
+    var deepLinkNoteEl = document.getElementById(wid + '-deep-link-note');
+    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true' || urlParams.get('cities'))) {{
+      var bits = [];
+      if (urlParams.get('subdivision')) bits.push('the ' + urlParams.get('subdivision') + ' area');
+      if (urlParams.get('waterfront') === 'true') bits.push('waterfront/riverfront features');
+      if (urlParams.get('cities')) bits.push(urlParams.get('cities').split(',').join(', '));
+      deepLinkNoteEl.textContent = 'Showing listings filtered to ' + bits.join(' and ') +
+        '. Clear the filters below and search again for the full, unfiltered result set.';
+      deepLinkNoteEl.style.display = 'block';
+    }}
+  }}
+
+  runSearch(true);
+}})();
+</script>"""
+
+    return form_html, js
+
+
 def _social_follow_section(heading="Follow For More Beautiful Homes"):
     """A dark, full-width social CTA — reused on the pages most likely to
     make someone want to keep seeing Christine's listings (Current Listings,
@@ -1310,12 +1597,32 @@ def build_city_pages():
   </div>
 </section>"""
 
+            # Priority (IRES-covered) cities get the full interactive live
+            # search embedded right on the page — price slider + beds/baths
+            # pills — instead of just a link out to search-homes.html, per
+            # Christine's request 2026-08-12 ("the search be on the town
+            # page... a slider and more fancy ways that are easy to use").
+            # Non-priority cities (outside Larimer/Weld/Boulder, which is all
+            # IRES actually covers) keep the old "reach out" copy since a
+            # live search there would just always come back empty.
+            search_widget_block = ""
             if c["priority"]:
                 mls_blurb = (
-                    f'<a href="/search-homes.html">Search live, active IRES MLS listings</a> in '
-                    f"{esc(city)} directly, or reach out and we'll send you a curated list "
-                    f"matched to what you're looking for."
+                    f"Browse live, active IRES MLS listings in {esc(city)} below — updated in "
+                    f"real time, not a stale snapshot — or reach out and we'll send you a "
+                    f"curated list matched to what you're looking for."
                 )
+                widget_html, widget_js = _fancy_search_widget(f"fs-{data_slug}", fixed_city=city)
+                search_widget_block = f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Live Inventory, $950K+</span>
+    <h2 class="section-title">Search Homes In {esc(city)}</h2>
+    <p class="lede">Real, active {esc(city)} listings from IRES MLS — filter by price, beds,
+    and baths and the results update instantly.</p>
+    {widget_html}
+  </div>
+</section>
+{widget_js}"""
             else:
                 mls_blurb = (
                     f"Reach out and we'll send you a curated list of {esc(city)} listings "
@@ -1352,6 +1659,7 @@ def build_city_pages():
     </div>
   </div>
 </section>
+{search_widget_block}
 {local_block}
 {video_block}
 {own_home_block}
@@ -3254,160 +3562,9 @@ def build_search_homes():
     search_cities = sorted({
         city for county in COUNTIES if county.get("priority") for city in county["cities"]
     })
-    city_options = "\n          ".join(
-        f'<option value="{esc(c)}">{esc(c)}</option>' for c in search_cities
+    widget_html, widget_js = _fancy_search_widget(
+        "fs", search_cities=search_cities, support_deep_links=True
     )
-
-    search_js = """<script>
-(function () {
-  var form = document.getElementById('search-form');
-  var resultsEl = document.getElementById('search-results');
-  var statusEl = document.getElementById('search-status');
-  var loadMoreBtn = document.getElementById('load-more');
-  var fetchedAtEl = document.getElementById('mls-fetched-at');
-  var skip = 0;
-  var TOP = 12;
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-
-  function fmtPrice(n) {
-    if (n == null) return 'Price N/A';
-    return '$' + Number(n).toLocaleString('en-US');
-  }
-
-  function cardHtml(l) {
-    var img = l.photo
-      ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">'
-      : '<div style="aspect-ratio:4/3;background:#eee"></div>';
-    var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
-    var meta = esc([
-      l.beds ? l.beds + ' bd' : null,
-      l.baths ? l.baths + ' ba' : null,
-      l.sqft ? Number(l.sqft).toLocaleString() + ' sqft' : null,
-    ].filter(Boolean).join(' \\u00b7 '));
-    var remarks = l.remarks ? esc(l.remarks.slice(0, 140) + (l.remarks.length > 140 ? '\\u2026' : '')) : '';
-    var compliance = esc([l.officeName, l.listingId ? ('MLS# ' + l.listingId) : null, l.agentPhone || l.agentEmail, l.status]
-      .filter(Boolean).join(' \\u00b7 '));
-    return '<div class="listing-card">' + img +
-      '<div class="listing-body">' +
-      '<p class="listing-price">' + esc(fmtPrice(l.price)) + '</p>' +
-      '<p class="listing-meta">' + meta + '</p>' +
-      '<p class="listing-address">' + addr + '</p>' +
-      (remarks ? '<p class="listing-address" style="color:#4a4a4c">' + remarks + '</p>' : '') +
-      '<p class="listing-compliance">' + compliance + '</p>' +
-      '</div></div>';
-  }
-
-  // Deep-link support: subdivision guide pages (Buckhorn, Mariana Butte,
-  // West Loveland/riverfront, etc.) link here with ?city=...&subdivision=...
-  // or ?waterfront=true rather than duplicating the search UI on every
-  // page. City is a real form field, so its value is applied to the select
-  // on load; subdivision/waterfront have no visible form control (a
-  // single-purpose deep link, not something most general searchers need to
-  // toggle) so they're read straight from the URL and passed through on
-  // every request instead.
-  var urlParams = new URLSearchParams(window.location.search);
-
-  function paramsFromForm() {
-    var data = new FormData(form);
-    var p = {};
-    ['city', 'minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {
-      var v = data.get(k);
-      if (v) p[k] = v;
-    });
-    if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
-    if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
-    // Deep link from the homepage map's click-to-search popup
-    // (build/assets/js/map.js): 'cities' covers a whole county at once
-    // (multiple cities OR'd together server-side) and 'noFloor' is the
-    // narrow, explicit exception to this site's usual $950K luxury search
-    // floor (see listings-search.js) — both only ever arrive via that map
-    // link, never from this form's own controls.
-    if (urlParams.get('cities')) p.cities = urlParams.get('cities');
-    if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
-    return p;
-  }
-
-  function runSearch(reset) {
-    if (reset) { skip = 0; resultsEl.innerHTML = ''; }
-    var p = paramsFromForm();
-    p.top = TOP;
-    p.skip = skip;
-    var qs = new URLSearchParams(p).toString();
-    statusEl.textContent = 'Searching live IRES listings\\u2026';
-    fetch('/.netlify/functions/listings-search?' + qs)
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.error === 'not_configured') {
-          statusEl.textContent = 'Live search isn\\u2019t connected yet \\u2014 contact us directly for current listings.';
-          loadMoreBtn.style.display = 'none';
-          return;
-        }
-        if (data.error) {
-          statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
-          loadMoreBtn.style.display = 'none';
-          return;
-        }
-        var listings = data.listings || [];
-        if (reset && listings.length === 0) {
-          statusEl.textContent = 'No active listings match those filters right now \\u2014 try widening your search, or contact us and we\\u2019ll help you find it before it hits the market.';
-        } else {
-          statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
-        }
-        resultsEl.insertAdjacentHTML('beforeend', listings.map(cardHtml).join(''));
-        skip += listings.length;
-        loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
-        if (fetchedAtEl) {
-          fetchedAtEl.textContent = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-        }
-      })
-      .catch(function () {
-        statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
-      });
-  }
-
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    runSearch(true);
-  });
-  loadMoreBtn.addEventListener('click', function () { runSearch(false); });
-
-  // Pre-fill from the URL (deep link from a subdivision/community guide
-  // page) before the first search runs.
-  if (urlParams.get('city')) {
-    var citySelect = document.getElementById('sf-city');
-    if (citySelect) citySelect.value = urlParams.get('city');
-  }
-  // Map popup deep link: prefill the visible min-price field with whatever
-  // the popup's price search landed on, and — only when noFloor=true was
-  // explicitly passed — remove this field's normal 950000 floor so it can
-  // actually be edited lower on this page too, not just via the popup.
-  if (urlParams.get('minPrice')) {
-    var minInput = document.getElementById('sf-min');
-    if (minInput) minInput.value = urlParams.get('minPrice');
-  }
-  if (urlParams.get('noFloor') === 'true') {
-    var minInputNoFloor = document.getElementById('sf-min');
-    if (minInputNoFloor) minInputNoFloor.removeAttribute('min');
-  }
-  var deepLinkNoteEl = document.getElementById('deep-link-note');
-  if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true' || urlParams.get('cities'))) {
-    var bits = [];
-    if (urlParams.get('subdivision')) bits.push('the ' + urlParams.get('subdivision') + ' area');
-    if (urlParams.get('waterfront') === 'true') bits.push('waterfront/riverfront features');
-    if (urlParams.get('cities')) bits.push(urlParams.get('cities').split(',').join(', '));
-    deepLinkNoteEl.textContent = 'Showing listings filtered to ' + bits.join(' and ') +
-      '. Clear the filters below and search again for the full, unfiltered result set.';
-    deepLinkNoteEl.style.display = 'block';
-  }
-
-  runSearch(true);
-})();
-</script>"""
 
     body = f"""
 <section class="hero" style="padding:100px 0 60px">
@@ -3428,55 +3585,10 @@ def build_search_homes():
     {esc(SITE['agent'].split()[0])}'s primary local search site. Looking specifically for
     {esc(SITE['agent'].split()[0])}'s own listings, with video tours where available?
     <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
-    <form id="search-form" class="search-form">
-      <div class="field">
-        <label for="sf-city">City</label>
-        <select id="sf-city" name="city">
-          <option value="">All Cities</option>
-          {city_options}
-        </select>
-      </div>
-      <div class="field">
-        <label for="sf-min">Min Price</label>
-        <input id="sf-min" name="minPrice" type="number" step="10000" min="950000" value="950000">
-      </div>
-      <div class="field">
-        <label for="sf-max">Max Price</label>
-        <input id="sf-max" name="maxPrice" type="number" step="10000" placeholder="No max">
-      </div>
-      <div class="field">
-        <label for="sf-beds">Beds</label>
-        <select id="sf-beds" name="beds">
-          <option value="">Any</option>
-          <option value="1">1+</option>
-          <option value="2">2+</option>
-          <option value="3">3+</option>
-          <option value="4">4+</option>
-          <option value="5">5+</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="sf-baths">Baths</label>
-        <select id="sf-baths" name="baths">
-          <option value="">Any</option>
-          <option value="1">1+</option>
-          <option value="2">2+</option>
-          <option value="3">3+</option>
-          <option value="4">4+</option>
-        </select>
-      </div>
-      <button class="btn btn-dark" type="submit" style="height:47px">Search</button>
-    </form>
-    <p class="search-status" id="deep-link-note" style="display:none;font-weight:600"></p>
-    <p class="search-status" id="search-status">Loading listings…</p>
-    <div class="listing-grid" id="search-results"></div>
-    <div class="btn-row" style="margin-top:32px">
-      <button type="button" id="load-more" class="btn btn-outline" style="border-color:#141415;color:#141415;cursor:pointer;display:none">Load More Listings</button>
-    </div>
-    {_mls_disclaimer_html()}
+    {widget_html}
   </div>
 </section>
-{search_js}
+{widget_js}
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Search Homes", None)])
     page(
