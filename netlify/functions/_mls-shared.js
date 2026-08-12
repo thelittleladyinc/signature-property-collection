@@ -48,6 +48,30 @@ const BLOB_STORE_NAME = "mls-listings";
 const LISTINGS_KEY = "listings.json";
 const SYNC_STATE_KEY = "sync-state.json";
 
+// Netlify's docs promise getStore(name) auto-configures itself with no
+// setup inside any Netlify Function — but in production here it actually
+// throws MissingBlobsEnvironmentError (confirmed live, 2026-08-12: a real
+// request to listings-search returned a 502 with that exact error).
+// Whatever's different about this site's environment, the documented,
+// guaranteed-to-work fallback is passing siteID/token explicitly — see
+// https://docs.netlify.com/build/data-and-storage/netlify-blobs/#external-clients
+// BLOBS_SITE_ID is just the site's Project ID (not secret — Project
+// configuration > General > Project information > Project ID in the
+// Netlify dashboard). BLOBS_TOKEN is a real Personal Access Token
+// Christine has to generate herself (User settings > Applications >
+// Personal access tokens > New access token) and add as a Netlify env var
+// — same pattern as MLSGRID_API_TOKEN, never passed through this codebase.
+// If those two env vars aren't set yet, this still tries the zero-config
+// path first, in case Netlify's auto-injection starts working on its own.
+function getBlobStore(getStoreFn) {
+  const siteID = process.env.BLOBS_SITE_ID;
+  const token = process.env.BLOBS_TOKEN;
+  if (siteID && token) {
+    return getStoreFn(BLOB_STORE_NAME, { siteID, token });
+  }
+  return getStoreFn(BLOB_STORE_NAME);
+}
+
 function mapListing(item) {
   const address = [item.StreetNumber, item.StreetName, item.StreetSuffix]
     .filter(Boolean).join(" ");
@@ -142,6 +166,7 @@ function matchesQuery(listing, params) {
 }
 
 module.exports = {
+  getBlobStore,
   BASE_URL,
   SELECT_FIELDS,
   REPLICATED_STATUSES,

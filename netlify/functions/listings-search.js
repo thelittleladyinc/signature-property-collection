@@ -44,11 +44,11 @@
 // now, not this function).
 const { getStore } = require("@netlify/blobs");
 const {
-  BLOB_STORE_NAME, LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery,
+  LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery, getBlobStore,
 } = require("./_mls-shared");
 
 exports.handler = async (event) => {
-  const store = getStore(BLOB_STORE_NAME);
+  const store = getBlobStore(getStore);
   const params = event.queryStringParameters || {};
   const top = Math.min(parseInt(params.top, 10) || 12, 24);
   const skip = Math.max(parseInt(params.skip, 10) || 0, 0);

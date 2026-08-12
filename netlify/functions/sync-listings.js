@@ -24,7 +24,7 @@
 const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES,
-  BLOB_STORE_NAME, LISTINGS_KEY, SYNC_STATE_KEY, mapListing,
+  LISTINGS_KEY, SYNC_STATE_KEY, mapListing, getBlobStore,
 } = require("./_mls-shared");
 
 const TIME_BUDGET_MS = 20000; // leave headroom under the 30s function limit
@@ -53,7 +53,7 @@ exports.handler = async () => {
     return { statusCode: 200, body: "no token configured" };
   }
 
-  const store = getStore(BLOB_STORE_NAME);
+  const store = getBlobStore(getStore);
   const startedAt = Date.now();
 
   let state = (await store.get(SYNC_STATE_KEY, { type: "json" })) || {
