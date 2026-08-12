@@ -394,3 +394,13 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 
 .fs-actions { margin-top: 26px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 @media (max-width: 700px) { .fs-row { gap: 22px; } }
+
+/* ---------- Map lifestyle/amenity POI markers (build/assets/js/map.js) ---------- */
+.poi-icon-marker {
+  width: 100%; height: 100%; border-radius: 50%; background: var(--dusty-rose); color: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(20,20,21,.45), 0 0 0 2px var(--white);
+  transition: transform .15s ease;
+}
+.poi-icon-marker svg { width: 60%; height: 60%; }
+.leaflet-marker-icon:hover .poi-icon-marker { transform: scale(1.12); }

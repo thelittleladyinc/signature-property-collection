@@ -104,6 +104,111 @@
     { name: 'Nederland', lat: 39.9614, lng: -105.5108, icon: 'mountain' }
   ];
 
+  // Lifestyle/amenity markers — real places worth a video, not just a pin.
+  // Clicking one opens a real, existing YouTube video (never fabricated —
+  // same "never a lookalike" rule as LISTING_VIDEOS in build.py) plus a
+  // quick link back to that city's search. Started 2026-08-12 with
+  // Christine's request to feature Mariana Butte; add more entries here as
+  // she asks for restaurants/parks/other amenities (kept deliberately small
+  // for now — see notes/websites-strategy.md-style scoping: build what's
+  // asked, not a speculative full POI system).
+  var POI_ICONS = {
+    golf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="21" x2="6" y2="3"/><path d="M6 3 L17 7 L6 11 Z" fill="currentColor" stroke="none"/><circle cx="6" cy="21" r="1.6" fill="currentColor" stroke="none"/></svg>',
+  };
+  var POI_MARKERS = [
+    {
+      name: 'Mariana Butte Golf Course',
+      lat: 40.3990, lng: -105.1430,
+      icon: 'golf',
+      cityLabel: 'Loveland',
+      cityHref: '/communities/larimer/loveland.html',
+      searchCity: 'Loveland',
+      blurb: 'A public, city-owned 18-hole course along the Big Thompson River with sweeping ' +
+        'Front Range views — one of the lifestyle perks of calling Loveland home.',
+      videoId: 'gvO0ZPJ4gD0',
+      videoTitle: 'Mariana Butte Golf Course — Loveland, CO',
+      videoSource: 'Golf Loveland (City of Loveland)',
+    },
+  ];
+
+  function poiIcon(poi) {
+    var glyph = POI_ICONS[poi.icon] || POI_ICONS.golf;
+    return L.divIcon({
+      html: '<div class="poi-icon-marker">' + glyph + '</div>',
+      className: '',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+  }
+
+  // ---- POI video modal ---------------------------------------------------
+  function buildPoiModal() {
+    if (document.getElementById('map-poi-modal')) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'lb-overlay';
+    overlay.id = 'map-poi-modal';
+    overlay.innerHTML =
+      '<div class="lb-box lb-box-media" style="max-width:640px">' +
+        '<button type="button" class="lb-close" aria-label="Close">&times;</button>' +
+        '<div id="poi-video-wrap" style="aspect-ratio:16/9;background:#000"></div>' +
+        '<div style="padding:20px 4px 4px">' +
+          '<h3 id="poi-title" style="color:#fff;margin:0 0 8px"></h3>' +
+          '<p id="poi-blurb" style="color:rgba(255,255,255,.82);font-size:14px;margin:0 0 6px"></p>' +
+          '<p id="poi-source" style="color:rgba(255,255,255,.5);font-size:12px;margin:0 0 18px"></p>' +
+          '<div class="btn-row" id="poi-actions" style="justify-content:flex-start"></div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('.lb-close').addEventListener('click', closePoiModal);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closePoiModal(); });
+  }
+
+  function closePoiModal() {
+    var overlay = document.getElementById('map-poi-modal');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    var wrap = document.getElementById('poi-video-wrap');
+    if (wrap) wrap.innerHTML = ''; // stop playback on close
+  }
+
+  function openPoiModal(poi) {
+    buildPoiModal();
+    var overlay = document.getElementById('map-poi-modal');
+    overlay.querySelector('#poi-title').textContent = poi.name;
+    overlay.querySelector('#poi-blurb').textContent = poi.blurb || '';
+    overlay.querySelector('#poi-source').textContent = poi.videoSource ? ('Video: ' + poi.videoSource) : '';
+    overlay.querySelector('#poi-video-wrap').innerHTML =
+      '<iframe width="100%" height="100%" style="display:block" ' +
+      'src="https://www.youtube-nocookie.com/embed/' + poi.videoId + '?rel=0" ' +
+      'title="' + String(poi.videoTitle || poi.name).replace(/"/g, '&quot;') + '" frameborder="0" ' +
+      'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ' +
+      'allowfullscreen></iframe>';
+
+    var actionsEl = overlay.querySelector('#poi-actions');
+    actionsEl.innerHTML = '';
+    if (poi.searchCity) {
+      var searchBtn = document.createElement('button');
+      searchBtn.type = 'button';
+      searchBtn.className = 'btn btn-outline';
+      searchBtn.style.cssText = 'border-color:#fff;color:#fff';
+      searchBtn.textContent = 'See Homes Near Here';
+      searchBtn.addEventListener('click', function () {
+        closePoiModal();
+        openQuickSearch({ label: poi.searchCity, cities: [poi.searchCity], covered: true });
+      });
+      actionsEl.appendChild(searchBtn);
+    }
+    if (poi.cityHref) {
+      var cityLink = document.createElement('a');
+      cityLink.className = 'btn btn-outline';
+      cityLink.style.cssText = 'border-color:#fff;color:#fff';
+      cityLink.href = poi.cityHref;
+      cityLink.textContent = 'More About ' + (poi.cityLabel || 'This Area');
+      actionsEl.appendChild(cityLink);
+    }
+    overlay.classList.add('open');
+  }
+
   // The two rivers visible on the original map, labeled in the script
   // accent font. Coordinates are simplified/approximate paths, not surveyed
   // hydrology — just enough to place a recognizable line + label.
@@ -340,6 +445,17 @@
           marker.on('click', function () {
             openQuickSearch({ label: city.name, cities: [city.name], covered: true });
           });
+        });
+
+        // Lifestyle/amenity POI markers (golf courses, restaurants, etc. —
+        // see POI_MARKERS above). Distinct rose-colored round icon so they
+        // read as "a real place with a video," not just another city pin.
+        POI_MARKERS.forEach(function (poi) {
+          var marker = L.marker([poi.lat, poi.lng], {
+            icon: poiIcon(poi), interactive: true, zIndexOffset: 600,
+          }).addTo(map);
+          marker.bindTooltip('▶ Watch: ' + poi.name, { direction: 'top', offset: [0, -10] });
+          marker.on('click', function () { openPoiModal(poi); });
         });
 
         // River lines + script-font labels, matching the original map's
