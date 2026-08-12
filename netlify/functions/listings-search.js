@@ -101,6 +101,7 @@ exports.handler = async (event) => {
         lastRunRecordsSeen: state.lastRunRecordsSeen ?? null,
         totalListingsStored: state.totalListingsStored ?? null,
         lastModified: state.lastModified || null,
+        lastRunError: state.lastRunError || null,
       };
     }
     return {

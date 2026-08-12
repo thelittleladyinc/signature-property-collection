@@ -83,6 +83,11 @@ exports.handler = async () => {
   let pagesFetched = 0;
   let recordsSeen = 0;
   let maxModTimestampThisPass = state.lastModified;
+  // 2026-08-12: surfaced into sync-state.json (and from there into
+  // listings-search.js's ?debug=true response) so a failed MLS Grid call
+  // is visible from the browser instead of only in Netlify's own function
+  // logs, which we don't have a way to read directly.
+  let lastRunError = null;
 
   try {
     while (requestUrl) {
@@ -95,7 +100,8 @@ exports.handler = async () => {
       const res = await fetch(requestUrl, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        console.error(`sync-listings: MLS Grid ${res.status}: ${text.slice(0, 500)}`);
+        lastRunError = `MLS Grid ${res.status}: ${text.slice(0, 500)}`;
+        console.error(`sync-listings: ${lastRunError}`);
         break;
       }
       const json = await res.json();
@@ -121,6 +127,7 @@ exports.handler = async () => {
       requestUrl = json["@odata.nextLink"] || null;
     }
   } catch (err) {
+    lastRunError = `exception: ${err && err.message}`;
     console.error("sync-listings: exception during sync", err);
     // Save whatever progress we made before the error, same as a
     // time-budget break — next run resumes from the cursor.
@@ -136,6 +143,7 @@ exports.handler = async () => {
     lastRunPagesFetched: pagesFetched,
     lastRunRecordsSeen: recordsSeen,
     totalListingsStored: Object.keys(listingsById).length,
+    lastRunError,
   });
 
   console.log(
