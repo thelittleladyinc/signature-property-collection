@@ -29,6 +29,26 @@ const {
 
 const TIME_BUDGET_MS = 20000; // leave headroom under the 30s function limit
 const PAGE_SIZE = 50; // kept small since $expand=Media makes each record heavy
+// 2026-08-12 (rate-limit fix): MLS Grid suspended API access today (and
+// several times before, per notify@mlsgrid.com emails going back to
+// mid-July) for exceeding their request-rate limits. Their own numbers:
+// warning at >4 requests/sec at any instant or >7200/hour, temporary
+// suspension at >6 req/sec or >18000/hour. This loop was firing requests
+// back-to-back with zero delay -- a single bootstrap run was measured
+// fetching 140 pages inside the 20s time budget, i.e. ~7 req/sec sustained,
+// already past the "warning" line on its own; stacked with anything else
+// hitting the same token in the same window (a manual "Run now", overlapping
+// invocations, etc.) it's easy to blow past the suspension threshold, which
+// is exactly what happened (MLS Grid logged 13 req/sec for this hour).
+// Suspension is temporary and self-clears once usage drops back under the
+// limit for a while, but it stalls the sync in the meantime, so the real
+// fix is to just never send requests that fast. A fixed delay between pages
+// keeps this comfortably under every limit above (roughly 1.4 req/sec) at
+// the cost of fewer pages per 15-minute run -- the bootstrap pass just takes
+// a few more cycles to finish, which is fine; nothing here is time-critical
+// beyond IDX Rule 12's 12-hour refresh requirement.
+const REQUEST_DELAY_MS = 700;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function statusClause() {
   return "(" + REPLICATED_STATUSES.map((s) => `StandardStatus eq '${s}'`).join(" or ") + ")";
@@ -100,6 +120,13 @@ exports.handler = async () => {
         // Out of time for this invocation — save the cursor and resume on
         // the next scheduled run rather than risk a timeout mid-request.
         break;
+      }
+
+      if (pagesFetched > 0) {
+        // Throttle: see REQUEST_DELAY_MS comment above. Skipped before the
+        // very first request of the run (no prior request to space out
+        // from) so it doesn't eat into the time budget for nothing.
+        await sleep(REQUEST_DELAY_MS);
       }
 
       const res = await fetch(requestUrl, { headers: { Authorization: `Bearer ${token}` } });
