@@ -23,7 +23,7 @@
   --rose: #B86F7A;       /* primary — "the dusty rose" */
   --mauve: #BA8C84;      /* secondary / hover */
   --peach: #DEB3A5;      /* tertiary tint only — used sparingly */
-  --cream: #F9F9EC;
+  --cream: #F8F6F4; /* 2026-08-12: was #F9F9EC (read as yellow to Christine) — warm neutral ivory, no yellow cast */
   --white: #FFFFFF;
   --black: #000000;
   --gray: #A7A9AC;
@@ -119,9 +119,14 @@ nav.primary-nav a:hover { text-decoration: underline; text-underline-offset: 4px
 .btn-dark { background: var(--charcoal); color: var(--white); }
 .btn-dark:hover { background: #000; }
 
-/* ---------- Sections ---------- */
-section { padding: 130px 0; }
-section.tight { padding: 90px 0; }
+/* ---------- Sections ----------
+   2026-08-12: Christine flagged "too much space apart on some pages" —
+   pages like the city pages stack 5-7 sections in a row, and at the old
+   130px/90px padding that added up to 500-800px of pure vertical
+   whitespace before you even hit any content. Tightened both, still
+   generous/elegant but no longer sparse-feeling on long pages. */
+section { padding: 90px 0; }
+section.tight { padding: 64px 0; }
 .eyebrow {
   font-family: var(--font-script);
   font-size: 32px;

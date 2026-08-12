@@ -83,14 +83,30 @@ exports.handler = async (event) => {
       return publicFields;
     });
 
+    const response = {
+      listings: page,
+      totalCount: matched.length,
+      fetchedAt: state.lastRunAt || null,
+    };
+    if (params.debug === "true") {
+      // Opt-in only (?debug=true) so this never shows up in a normal buyer's
+      // network tab — added 2026-08-12 while confirming the very first
+      // sync-listings.js runs are actually finding/storing listings, since
+      // there's no other way to see sync-state.json from outside Netlify's
+      // dashboard. Nothing secret in here — no tokens, no raw MLS data.
+      response.debug = {
+        bootstrapped: !!state.bootstrapped,
+        cursorPending: !!state.cursor,
+        lastRunPagesFetched: state.lastRunPagesFetched ?? null,
+        lastRunRecordsSeen: state.lastRunRecordsSeen ?? null,
+        totalListingsStored: state.totalListingsStored ?? null,
+        lastModified: state.lastModified || null,
+      };
+    }
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        listings: page,
-        totalCount: matched.length,
-        fetchedAt: state.lastRunAt || null,
-      }),
+      body: JSON.stringify(response),
     };
   } catch (err) {
     console.error("listings-search function error:", err);
