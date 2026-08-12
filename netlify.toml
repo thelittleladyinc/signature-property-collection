@@ -8,3 +8,10 @@
 
 [functions]
   directory = "netlify/functions"
+
+# Replicates Christine's licensed IRES listings from MLS Grid into Netlify
+# Blobs every 15 minutes (MLS Grid's own recommended cadence — see
+# sync-listings.js's file comment for why a live per-search query to MLS
+# Grid doesn't work and this replication step is required instead).
+[functions."sync-listings"]
+  schedule = "*/15 * * * *"

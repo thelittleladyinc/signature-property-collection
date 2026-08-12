@@ -1,269 +1,96 @@
-// Server-side proxy for live property search, backed by MLS Grid's RESO Web
-// API (IRES MLS data). This keeps the MLS Grid access token secret (it never
-// reaches the browser) and enforces the IDX compliance rules that must be
-// applied at the API level, not just in the UI:
+// Server-side search over Christine's replicated IRES listing data, backed
+// by Netlify Blobs — NOT a live proxy to MLS Grid anymore (see the
+// 2026-08-12 note below for why). This keeps the MLS Grid access token
+// secret (it never reaches the browser, and this function doesn't even use
+// it — only sync-listings.js does) and enforces the IDX compliance rules
+// that must be applied no matter what a client sends in the query string:
 //   - Only IRES-sourced listings are ever returned, and only in an
-//     on-market status (see MINE_STATUSES/PUBLIC_STATUSES below — Active
-//     only for the general public search; Active + Active Under Contract +
-//     Pending for Christine's own mine=true listing showcase, so it reflects
-//     when her listings go live and go under contract automatically) — no
-//     sold/closed data, no other MLS's listings, regardless of what a
-//     client sends in the query string.
-//   - Only public-safe fields are requested (see SELECT_FIELDS) — nothing
-//     from MLS Grid's IDX Rules 21/31 prohibited list (showing
-//     instructions, security info, seller/occupant contact info).
+//     on-market status (Active only for the general public search; Active +
+//     Active Under Contract + Pending for Christine's own mine=true listing
+//     showcase) — no sold/closed data, no other MLS's listings. This is
+//     enforced twice over: sync-listings.js never even replicates
+//     sold/closed data in the first place, and matchesQuery() re-checks
+//     status here too.
+//   - Only public-safe fields are requested (see SELECT_FIELDS in
+//     _mls-shared.js) — nothing from MLS Grid's IDX Rules 21/31 prohibited
+//     list (showing instructions, security info, seller/occupant contact).
 //
 // Full compliance rules this page (and the disclaimer block rendered with
 // it in search-homes.html) is built against:
 //   https://www.mlsgrid.com/s/MLS-Grid-IDX-Rules.pdf
 //
-// Setup required (one-time, Netlify dashboard -> Site settings ->
-// Environment variables): add MLSGRID_API_TOKEN. Confirmed working against
-// Christine's real MLS Grid account on 2026-08-11 — see
-// notes/verify-mlsgrid-api.mjs for how that was tested (safely, read-only,
-// from her own machine, without the key ever passing through this repo).
-
-const BASE_URL = "https://api.mlsgrid.com/v2/Property";
-
-const SELECT_FIELDS = [
-  "ListingId", "ListingKey", "StandardStatus", "ListPrice",
-  "BedroomsTotal", "BathroomsTotalInteger", "LivingArea",
-  "StreetNumber", "StreetName", "StreetSuffix", "City", "StateOrProvince", "PostalCode",
-  "PublicRemarks", "PropertyType", "PropertySubType", "SubdivisionName",
-  "WaterfrontYN", "WaterfrontFeatures",
-  "ListOfficeName", "ListAgentFullName", "ListAgentDirectPhone", "ListAgentEmail",
-  "CoListAgentFullName",
-].join(",");
-
-// Surname used to filter to Christine's (and her co-listing partner Kendra's
-// listings, when Christine is still the primary/co-agent) own active
-// inventory for the listing showcase — matched with contains()+tolower()
-// rather than an exact name match, since MLS Grid's ListAgentFullName
-// formatting (middle initials, suffixes) isn't something we can predict
-// from outside. A surname substring match is far more robust and, for a
-// distinctive name like this, effectively risk-free of false positives.
-const AGENT_SURNAME = (process.env.LISTING_AGENT_SURNAME || "gwinnup").toLowerCase();
-
-// Always-on, non-negotiable filter — never controlled by the client. IRES
-// only (this repo's MLS); status is handled separately below since it
-// differs between the two search modes.
-const BASE_FILTER = `OriginatingSystemName eq 'ires'`;
-
-// Which StandardStatus values count as "still worth showing," per search
-// mode. Christine's own listing showcase (mine=true) shows Active AND
-// under-contract listings, so a listing's lifecycle no longer has to be
-// tracked by hand — MLS Grid itself is now the single source of truth for
-// when something goes live and when it goes under contract (per Christine's
-// request 2026-08-11; this used to only surface via her separate internal
-// "Each Listing SOP" tracker). The general public search (Search Homes)
-// stays Active-only — showing an under-contract home in general buyer
-// search is a different product decision she hasn't asked for.
+// *** 2026-08-12: WHY THIS FUNCTION NO LONGER QUERIES MLS GRID DIRECTLY ***
+// The live search was failing in production with every single query,
+// confirmed via a real MLS Grid response:
+//   {"error":{"code":400,"message":"Invalid filter field 'ListPrice'",
+//   "details":[{"message":"Replication requests to the Property resource
+//   can only be filtered using the following fields: MlgCanView,
+//   ModificationTimestamp, OriginatingSystemName, StandardStatus,
+//   ListingId, PropertyType, ListOfficeMlsId"}]}}
+// MLS Grid's Property resource simply does not allow filtering by
+// ListPrice, City, BedroomsTotal, etc. — the site's entire "live filtered
+// search" design was built on a request shape MLS Grid rejects outright.
+// Their own Best Practices Guide describes the only pattern that actually
+// works: replicate the allowed dataset into your own storage on a
+// schedule, then filter your own copy. sync-listings.js is that
+// replication job (runs every 15 minutes via netlify.toml's scheduled
+// function config); this function just reads what it wrote and filters in
+// JS — see matchesQuery() in _mls-shared.js, which mirrors the exact same
+// filtering logic (city/price/beds/baths/subdivision/waterfront/mine) the
+// old OData $filter builder used to send to MLS Grid.
 //
-// RESO's Data Dictionary defines both "Active Under Contract" and "Pending"
-// as valid under-contract-style statuses; we don't have a live example to
-// confirm which one(s) IRES actually populates, so both are included — same
-// safe-by-default pattern as LISTING_VIDEOS' address-spelling variants in
-// build.py: an unused value simply never matches anything, no harm done.
-const MINE_STATUSES = ["Active", "Active Under Contract", "Pending"];
-const PUBLIC_STATUSES = ["Active"];
-
-function statusClause(statuses) {
-  return "(" + statuses.map((s) => `StandardStatus eq '${s}'`).join(" or ") + ")";
-}
-
-// The $950K floor applies ONLY to the general public search (mine=false —
-// Search Homes): this site is Christine's luxury/editorial brand, and
-// TheLittleLadySellsHomes.com is her general-market search site, so the two
-// are deliberately kept from competing for the same broad buyer/queries (see
-// notes/websites-strategy.md). It does NOT apply when mine=true (Current
-// Listings, the blog spotlight) — that's specifically "show Christine's own
-// active inventory," at any price, per her explicit request 2026-08-11.
-const LUXURY_PRICE_FLOOR = 950000;
-
-// Deliberate, narrow exception to the floor above, added 2026-08-11 for the
-// homepage map's "click a city/county -> quick price search" popup
-// (build/assets/js/map.js + build/build.py's search_js). Christine's
-// reasoning: her luxury clients aren't only shopping $950K+ single-family —
-// they may also be buying for kids, multi-generational family, etc., so the
-// map entry point should let them search lower than the site's default
-// luxury floor. This is NOT exposed as a control on the main Search Homes
-// form (that page's own UI keeps the $950K default) — it only takes effect
-// when the request explicitly opts in with noFloor=true, which only the map
-// popup's generated link does. When noFloor is set, the hard
-// `ListPrice ge 950000` clause below is skipped entirely and the search
-// falls back to whatever minPrice the client sent (still required to be a
-// positive number — see the minPrice handling further down — so this can
-// narrow the results but never removes the price filter altogether).
-
-
-function odataEscape(value) {
-  return String(value).replace(/'/g, "''");
-}
-
-function buildFilter(params) {
-  const clauses = [BASE_FILTER];
-  const mine = params.mine === "true";
-
-  clauses.push(statusClause(mine ? MINE_STATUSES : PUBLIC_STATUSES));
-
-  if (mine) {
-    clauses.push(
-      `(contains(tolower(ListAgentFullName),'${AGENT_SURNAME}') or ` +
-      `contains(tolower(CoListAgentFullName),'${AGENT_SURNAME}'))`
-    );
-  } else if (params.noFloor !== "true") {
-    clauses.push(`ListPrice ge ${LUXURY_PRICE_FLOOR}`);
-  }
-
-  if (params.city) {
-    clauses.push(`City eq '${odataEscape(params.city)}'`);
-  }
-  // Multi-city variant, used by the homepage map's county-level popup (a
-  // county spans several cities — e.g. clicking Larimer County should search
-  // Fort Collins, Loveland, Berthoud, etc. all at once, not just one).
-  // Comma-separated list, same City field, OR'd together.
-  if (params.cities) {
-    const cityList = params.cities.split(",").map((c) => c.trim()).filter(Boolean);
-    if (cityList.length) {
-      clauses.push(
-        "(" + cityList.map((c) => `City eq '${odataEscape(c)}'`).join(" or ") + ")"
-      );
-    }
-  }
-  const minPrice = parseInt(params.minPrice, 10);
-  if (Number.isFinite(minPrice) && minPrice > 0) {
-    clauses.push(`ListPrice ge ${minPrice}`);
-  }
-  const maxPrice = parseInt(params.maxPrice, 10);
-  if (Number.isFinite(maxPrice) && maxPrice > 0) {
-    clauses.push(`ListPrice le ${maxPrice}`);
-  }
-  const beds = parseInt(params.beds, 10);
-  if (Number.isFinite(beds) && beds > 0) {
-    clauses.push(`BedroomsTotal ge ${beds}`);
-  }
-  const baths = parseInt(params.baths, 10);
-  if (Number.isFinite(baths) && baths > 0) {
-    clauses.push(`BathroomsTotalInteger ge ${baths}`);
-  }
-
-  // Subdivision-scoped feeds (Buckhorn, Mariana Butte, etc. — see
-  // build_subdivision_pages() in build.py). Matched with contains()+tolower()
-  // rather than an exact match since MLS Grid/IRES subdivision naming isn't
-  // fully predictable (e.g. "Buckhorn Ranch" vs "Buckhorn Ranch PUD").
-  if (params.subdivision) {
-    clauses.push(`contains(tolower(SubdivisionName),'${odataEscape(params.subdivision.toLowerCase())}')`);
-  }
-
-  // Waterfront-specific feed (added 2026-08-11 for the West Loveland /
-  // riverfront page — Christine asked for "a feed directing specifically
-  // for waterfront property"). RESO Data Dictionary defines both a
-  // WaterfrontYN boolean and a WaterfrontFeatures multi-value lookup
-  // (values include "River Front", "River Access", "Lake Front",
-  // "Waterfront" — see dd.reso.org/DD1.7/Property). Per-MLS population of
-  // these fields is optional and IRES joined MLS Grid recently (Nov 2025),
-  // so a PublicRemarks keyword fallback is OR'd in as a safety net in case
-  // IRES listings aren't yet consistently tagging the structured fields —
-  // this may surface occasional false positives (e.g. "River Street") but
-  // that's a better trade-off than silently returning zero real riverfront
-  // listings because of an unpopulated structured field.
-  if (params.waterfront === "true") {
-    clauses.push(
-      "(WaterfrontYN eq true or " +
-      "WaterfrontFeatures/any(f: f eq 'River Front' or f eq 'River Access' or " +
-      "f eq 'Lake Front' or f eq 'Waterfront' or f eq 'Creek' or f eq 'Pond') or " +
-      "contains(tolower(PublicRemarks),'riverfront') or " +
-      "contains(tolower(PublicRemarks),'river frontage') or " +
-      "contains(tolower(PublicRemarks),'waterfront'))"
-    );
-  }
-
-  return clauses.join(" and ");
-}
-
-function mapListing(item) {
-  const address = [item.StreetNumber, item.StreetName, item.StreetSuffix]
-    .filter(Boolean).join(" ");
-  const media = Array.isArray(item.Media) ? item.Media : [];
-  // Full photo set (for the on-page gallery) plus `photo` (first image) kept
-  // separately so older callers that only look at `photo` still work.
-  const photos = media.map((m) => m && m.MediaURL).filter(Boolean);
-  const photo = photos.length ? photos[0] : null;
-
-  return {
-    listingId: item.ListingId || item.ListingKey || null,
-    price: item.ListPrice ?? null,
-    beds: item.BedroomsTotal ?? null,
-    baths: item.BathroomsTotalInteger ?? null,
-    sqft: item.LivingArea ?? null,
-    address: address || null,
-    city: item.City || null,
-    state: item.StateOrProvince || null,
-    zip: item.PostalCode || null,
-    status: item.StandardStatus || null,
-    remarks: item.PublicRemarks || null,
-    propertyType: item.PropertySubType || item.PropertyType || null,
-    subdivision: item.SubdivisionName || null,
-    waterfront: item.WaterfrontYN === true || (Array.isArray(item.WaterfrontFeatures) &&
-      item.WaterfrontFeatures.some((f) => f && f !== "None")) || null,
-    officeName: item.ListOfficeName || null,
-    agentName: item.ListAgentFullName || null,
-    coAgentName: item.CoListAgentFullName || null,
-    agentPhone: item.ListAgentDirectPhone || null,
-    agentEmail: item.ListAgentEmail || null,
-    photo,
-    photos,
-  };
-}
+// Setup required (one-time, Netlify dashboard -> Site settings ->
+// Environment variables): MLSGRID_API_TOKEN (used only by sync-listings.js
+// now, not this function).
+const { getStore } = require("@netlify/blobs");
+const {
+  BLOB_STORE_NAME, LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery,
+} = require("./_mls-shared");
 
 exports.handler = async (event) => {
-  const token = process.env.MLSGRID_API_TOKEN;
-  if (!token) {
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "not_configured", listings: [], totalCount: 0 }),
-    };
-  }
-
+  const store = getStore(BLOB_STORE_NAME);
   const params = event.queryStringParameters || {};
   const top = Math.min(parseInt(params.top, 10) || 12, 24);
   const skip = Math.max(parseInt(params.skip, 10) || 0, 0);
 
-  const filter = buildFilter(params);
-  const qs = new URLSearchParams({
-    "$filter": filter,
-    "$select": SELECT_FIELDS,
-    "$expand": "Media",
-    "$top": String(top),
-    "$skip": String(skip),
-    "$orderby": "ListPrice desc",
-    "$count": "true",
-  });
-
   try {
-    const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const [allListings, state] = await Promise.all([
+      store.get(LISTINGS_KEY, { type: "json" }),
+      store.get(SYNC_STATE_KEY, { type: "json" }),
+    ]);
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.error(`MLS Grid ${res.status}: ${text.slice(0, 500)}`);
+    if (!state) {
+      // sync-listings.js hasn't completed a single run yet (e.g. right
+      // after first deploy, before its first scheduled 15-minute tick, or
+      // MLSGRID_API_TOKEN isn't set in Netlify yet) — distinct from a
+      // real search returning zero matches, so the UI can say something
+      // more accurate than "no homes match your filters."
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "upstream_error", status: res.status, listings: [], totalCount: 0 }),
+        body: JSON.stringify({ error: "not_configured", listings: [], totalCount: 0 }),
       };
     }
 
-    const json = await res.json();
-    const listings = (json.value || []).map(mapListing);
-    const totalCount = json["@odata.count"] ?? listings.length;
+    const listingsById = allListings || {};
+    const matched = Object.values(listingsById)
+      .filter((l) => matchesQuery(l, params))
+      .sort((a, b) => (b.price || 0) - (a.price || 0));
+
+    const page = matched.slice(skip, skip + top).map((l) => {
+      // Strip internal-only fields before they reach the browser.
+      const { listingKey, modificationTimestamp, mlgCanView, ...publicFields } = l;
+      return publicFields;
+    });
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ listings, totalCount, fetchedAt: new Date().toISOString() }),
+      body: JSON.stringify({
+        listings: page,
+        totalCount: matched.length,
+        fetchedAt: state.lastRunAt || null,
+      }),
     };
   } catch (err) {
     console.error("listings-search function error:", err);
