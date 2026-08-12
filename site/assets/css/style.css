@@ -423,6 +423,13 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .quiz-runner-up { font-size: 14px; color: var(--gray); margin-top: -14px; margin-bottom: 30px; }
 .quiz-result .lead-form { max-width: 480px; margin: 34px auto 0; text-align: left; }
 
+/* Visually hidden but still announced by screen readers (used by the quiz's
+   live step-announcement region). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
 /* ---------- Map lifestyle/amenity POI markers (build/assets/js/map.js) ---------- */
 .poi-icon-marker {
   width: 100%; height: 100%; border-radius: 50%; background: var(--dusty-rose); color: var(--white);

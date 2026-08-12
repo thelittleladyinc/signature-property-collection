@@ -122,16 +122,43 @@
     </div>
   </div>
 </section>
-<section class="tight">
+<section class="tight" id="instagram-feed-section">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Follow Along</span>
     <h2 class="section-title">Real Listings, Real Life &mdash; @thelittleladysellshomes</h2>
     <p class="lede">Straight from Christine Gwinnup's own Instagram &mdash; new listings, video
     tours, and the real day-to-day of selling Northern Colorado real estate.</p>
     <div class="grid-3" style="justify-items:center">
-      <blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="https://www.instagram.com/reel/DagBahKAUhu/" data-instgrm-version="14" style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;max-width:400px;width:100%;"></blockquote>
-      <blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="https://www.instagram.com/reel/DaNwBQSuTaN/" data-instgrm-version="14" style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;max-width:400px;width:100%;"></blockquote>
-      <blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="https://www.instagram.com/reel/DaI30cygZnI/" data-instgrm-version="14" style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;max-width:400px;width:100%;"></blockquote>
+      <blockquote class="instagram-media" data-instgrm-captioned
+        data-instgrm-permalink="https://www.instagram.com/reel/DagBahKAUhu/" data-instgrm-version="14"
+        style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
+        max-width:400px;min-height:420px;width:100%;">
+        <div style="padding:16px">
+          <a href="https://www.instagram.com/reel/DagBahKAUhu/" target="_blank" rel="noopener"
+          style="text-decoration:none;color:var(--charcoal);font-size:14px">
+          New listing at 616 41st, Greeley &mdash; view on Instagram &rarr;</a>
+        </div>
+      </blockquote>
+      <blockquote class="instagram-media" data-instgrm-captioned
+        data-instgrm-permalink="https://www.instagram.com/reel/DaNwBQSuTaN/" data-instgrm-version="14"
+        style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
+        max-width:400px;min-height:420px;width:100%;">
+        <div style="padding:16px">
+          <a href="https://www.instagram.com/reel/DaNwBQSuTaN/" target="_blank" rel="noopener"
+          style="text-decoration:none;color:var(--charcoal);font-size:14px">
+          Christine &amp; Kendra — “we can help you” &mdash; view on Instagram &rarr;</a>
+        </div>
+      </blockquote>
+      <blockquote class="instagram-media" data-instgrm-captioned
+        data-instgrm-permalink="https://www.instagram.com/reel/DaI30cygZnI/" data-instgrm-version="14"
+        style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
+        max-width:400px;min-height:420px;width:100%;">
+        <div style="padding:16px">
+          <a href="https://www.instagram.com/reel/DaI30cygZnI/" target="_blank" rel="noopener"
+          style="text-decoration:none;color:var(--charcoal);font-size:14px">
+          A playful tour through our current listings &mdash; view on Instagram &rarr;</a>
+        </div>
+      </blockquote>
     </div>
     <div class="btn-row" style="margin-top:32px">
       <a class="btn btn-outline" href="https://www.instagram.com/thelittleladysellshomes/" target="_blank" rel="noopener"
@@ -139,7 +166,34 @@
     </div>
   </div>
 </section>
-<script async src="https://www.instagram.com/embed.js"></script><section class="tight">
+<script>
+(function () {
+  // Load Instagram's embed.js only once this section is actually near the
+  // viewport, instead of on every homepage load -- this section sits below
+  // several other sections, so most visitors would never see it render
+  // before scrolling anyway.
+  var target = document.getElementById('instagram-feed-section');
+  if (!target) return;
+  function loadEmbed() {
+    if (document.getElementById('ig-embed-script')) return;
+    var s = document.createElement('script');
+    s.id = 'ig-embed-script';
+    s.async = true;
+    s.src = 'https://www.instagram.com/embed.js';
+    document.body.appendChild(s);
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) { loadEmbed(); io.disconnect(); }
+      });
+    }, { rootMargin: '400px' });
+    io.observe(target);
+  } else {
+    loadEmbed();
+  }
+})();
+</script><section class="tight">
   <div class="wrap" style="max-width:820px">
     <h2 class="section-title">Frequently Asked Questions</h2>
     <div class="faq-item"><h3>Who is the best luxury real estate agent in Loveland, Berthoud, and Masonville?</h3><p>As of 2026-08-12, Christine Gwinnup of Signature Property Collection (LPT Realty) is a luxury real estate agent based in Loveland, serving Berthoud, Masonville, and the rest of Larimer County with 200+ homes sold and expertise in luxury marketing and negotiation.</p></div>

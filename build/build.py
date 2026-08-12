@@ -951,23 +951,36 @@ def _social_follow_section(heading="Follow For More Beautiful Homes"):
 # embed widget (no API key, no login, no scraping — Instagram serves the
 # content itself client-side, so it never goes stale or breaks like a
 # scraped image grid would). Swap these URLs out any time for newer posts.
+# label = short fallback text shown before Instagram's JS replaces the
+# blockquote (and forever, if a visitor has JS/embeds blocked).
 INSTAGRAM_FEED_POSTS = [
-    "https://www.instagram.com/reel/DagBahKAUhu/",  # new Greeley listing
-    "https://www.instagram.com/reel/DaNwBQSuTaN/",  # Christine + Kendra, "we can help you"
-    "https://www.instagram.com/reel/DaI30cygZnI/",  # playful multi-listing showcase
+    {"url": "https://www.instagram.com/reel/DagBahKAUhu/", "label": "New listing at 616 41st, Greeley"},
+    {"url": "https://www.instagram.com/reel/DaNwBQSuTaN/", "label": "Christine & Kendra — “we can help you”"},
+    {"url": "https://www.instagram.com/reel/DaI30cygZnI/", "label": "A playful tour through our current listings"},
 ]
 
 
 def _instagram_feed_section():
     handle_url = SITE["social"].get("Instagram", "")
-    cards = "\n      ".join(
-        f'<blockquote class="instagram-media" data-instgrm-captioned '
-        f'data-instgrm-permalink="{url}" data-instgrm-version="14" '
-        f'style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;'
-        f'max-width:400px;width:100%;"></blockquote>'
-        for url in INSTAGRAM_FEED_POSTS
-    )
-    return f"""<section class="tight">
+
+    def _card(post):
+        # Mirrors Instagram's own official oEmbed markup shape (blockquote +
+        # inner fallback link) rather than an empty blockquote -- this is
+        # real, crawlable, accessible content before/without embed.js, not
+        # just a blank box waiting on JS.
+        return f"""<blockquote class="instagram-media" data-instgrm-captioned
+        data-instgrm-permalink="{post['url']}" data-instgrm-version="14"
+        style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
+        max-width:400px;min-height:420px;width:100%;">
+        <div style="padding:16px">
+          <a href="{post['url']}" target="_blank" rel="noopener"
+          style="text-decoration:none;color:var(--charcoal);font-size:14px">
+          {esc(post['label'])} &mdash; view on Instagram &rarr;</a>
+        </div>
+      </blockquote>"""
+
+    cards = "\n      ".join(_card(p) for p in INSTAGRAM_FEED_POSTS)
+    return f"""<section class="tight" id="instagram-feed-section">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Follow Along</span>
     <h2 class="section-title">Real Listings, Real Life &mdash; @thelittleladysellshomes</h2>
@@ -982,7 +995,34 @@ def _instagram_feed_section():
     </div>
   </div>
 </section>
-<script async src="https://www.instagram.com/embed.js"></script>"""
+<script>
+(function () {{
+  // Load Instagram's embed.js only once this section is actually near the
+  // viewport, instead of on every homepage load -- this section sits below
+  // several other sections, so most visitors would never see it render
+  // before scrolling anyway.
+  var target = document.getElementById('instagram-feed-section');
+  if (!target) return;
+  function loadEmbed() {{
+    if (document.getElementById('ig-embed-script')) return;
+    var s = document.createElement('script');
+    s.id = 'ig-embed-script';
+    s.async = true;
+    s.src = 'https://www.instagram.com/embed.js';
+    document.body.appendChild(s);
+  }}
+  if ('IntersectionObserver' in window) {{
+    var io = new IntersectionObserver(function (entries) {{
+      entries.forEach(function (entry) {{
+        if (entry.isIntersecting) {{ loadEmbed(); io.disconnect(); }}
+      }});
+    }}, {{ rootMargin: '400px' }});
+    io.observe(target);
+  }} else {{
+    loadEmbed();
+  }}
+}})();
+</script>"""
 
 
 # Homepage FAQ — shared between the visible page (build_home) and llms.txt,
@@ -3194,7 +3234,7 @@ def _tool_lead_form(form_name, button_label, extra_fields=""):
 # answer combination lands on a real, defensible match rather than an
 # empty result.
 QUIZ_CITIES = [
-    {"name": "Loveland", "url": "/communities/larimer/loveland.html",
+    {"name": "Loveland", "url": "/communities/larimer/loveland.html", "photo": "loveland",
      "views": ["lake", "mountain"], "commute": "moderate",
      "priorities": ["schools", "new-build", "acreage"],
      "lifestyle": ["golf-lake", "hiking-mountain"],
@@ -3239,18 +3279,59 @@ QUIZ_CITIES = [
      "lifestyle": ["small-town"],
      "blurb": "Wellington offers small-town, wide-open-sky living just north of Fort "
               "Collins, with some of the region's most attainable new-build pricing."},
-    {"name": "Erie", "url": "/communities/weld/erie.html",
+    {"name": "Erie", "url": "/communities/weld/erie.html", "photo": "erie",
      "views": ["farmland", "downtown"], "commute": "close",
      "priorities": ["schools", "acreage"],
      "lifestyle": ["small-town", "culture-dining"],
      "blurb": "Erie blends small-town charm (yes, you can keep chickens) with a "
               "genuinely commutable location between Boulder and Denver."},
-    {"name": "Greeley", "url": "/communities/weld/greeley.html",
+    {"name": "Greeley", "url": "/communities/weld/greeley.html", "photo": "greeley",
      "views": ["farmland"], "commute": "far",
      "priorities": ["acreage", "schools"],
      "lifestyle": ["small-town"],
      "blurb": "Greeley is Northern Colorado's most attainable price point — "
               "agricultural roots, real community, and room to spread out."},
+    {"name": "Ault", "url": "/communities/weld/ault.html", "photo": "ault",
+     "views": ["farmland"], "commute": "far",
+     "priorities": ["acreage", "schools"],
+     "lifestyle": ["small-town"],
+     "blurb": "Ault is a small, close-knit agricultural town along US-85 north of "
+              "Eaton — real farming roots and about as quiet and unhurried as Weld "
+              "County gets."},
+    {"name": "Eaton", "url": "/communities/weld/eaton.html", "photo": "eaton",
+     "views": ["farmland"], "commute": "far",
+     "priorities": ["schools", "acreage"],
+     "lifestyle": ["small-town"],
+     "blurb": "Eaton is a welcoming agricultural town just north of Greeley, known "
+              "for strong schools and a genuine small-town, family-first pace of "
+              "life."},
+    {"name": "Johnstown", "url": "/communities/weld/johnstown.html", "photo": "johnstown",
+     "views": ["farmland"], "commute": "moderate",
+     "priorities": ["new-build", "schools"],
+     "lifestyle": ["small-town"],
+     "blurb": "Johnstown is one of the fastest-growing towns between Loveland and "
+              "Greeley — small-town warmth with real new-build inventory and good "
+              "schools."},
+    {"name": "Milliken", "url": "/communities/weld/milliken.html",
+     "views": ["farmland"], "commute": "far",
+     "priorities": ["acreage", "schools"],
+     "lifestyle": ["small-town"],
+     "blurb": "Milliken sits along the South Platte River between Greeley and "
+              "Loveland — peaceful, close-knit, and among the region's more "
+              "attainable price points."},
+    {"name": "Firestone", "url": "/communities/weld/firestone.html",
+     "views": ["mountain", "farmland"], "commute": "moderate",
+     "priorities": ["new-build", "schools"],
+     "lifestyle": ["small-town", "hiking-mountain"],
+     "blurb": "Firestone pairs real mountain views with family-friendly new-build "
+              "communities, parks, and trails — closer to Longmont and Denver than "
+              "most of Weld County."},
+    {"name": "Frederick", "url": "/communities/weld/frederick.html",
+     "views": ["farmland"], "commute": "moderate",
+     "priorities": ["new-build", "schools"],
+     "lifestyle": ["small-town"],
+     "blurb": "Frederick blends small-town charm with genuine new construction, "
+              "scenic parks, and easy access to both Denver and Boulder."},
     {"name": "Boulder", "url": "/communities/boulder/boulder.html",
      "views": ["downtown", "mountain"], "commute": "close",
      "priorities": ["walkable"],
@@ -3340,16 +3421,19 @@ def build_neighborhood_quiz():
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Find Your Fit</span>
     <h1>Which Northern Colorado Neighborhood Matches You?</h1>
-    <p class="lede">Four quick questions, one real answer — matched against the same
-    towns {esc(SITE['agent'])} shows clients every day, not a generic quiz template.</p>
+    <p class="lede">Four quick questions, one real answer — matched against {len(QUIZ_CITIES)}
+    real towns {esc(SITE['agent'])} shows clients every day, not a generic quiz template.</p>
   </div>
 </section>
 <section class="tight">
   <div class="wrap quiz-widget">
-    <div class="quiz-progress" id="quiz-progress"></div>
+    <p class="sr-only" id="quiz-step-announce" role="status" aria-live="polite"></p>
+    <div class="quiz-progress" id="quiz-progress" aria-hidden="true"></div>
     <div id="quiz-question-container"></div>
     <div id="quiz-result-container" class="quiz-result" style="display:none">
       <span class="eyebrow match-eyebrow">Your Best Match</span>
+      <img id="quiz-match-photo" alt="" style="display:none;width:100%;max-width:420px;
+      border-radius:12px;margin:0 auto 20px;display:block">
       <h2 class="match-name" id="quiz-match-name"></h2>
       <p class="lede match-blurb" id="quiz-match-blurb"></p>
       <p class="quiz-runner-up" id="quiz-runner-up" style="display:none"></p>
@@ -3361,6 +3445,8 @@ def build_neighborhood_quiz():
       <p class="lede" id="quiz-report-lede">Get a curated list of homes matched to your
       answers — and every runner-up town — sent straight to your inbox.</p>
       {lead_form}
+      <button type="button" id="quiz-retake" class="cta" style="margin-top:22px;background:none;
+      border:none;cursor:pointer;font:inherit;text-decoration:underline">Retake The Quiz</button>
     </div>
   </div>
 </section>
@@ -3372,9 +3458,12 @@ def build_neighborhood_quiz():
   var answers = {{}};
   var current = 0;
 
+  var COMMUTE_ORDER = ['close', 'moderate', 'far'];
+
   var progressEl = document.getElementById('quiz-progress');
   var qContainer = document.getElementById('quiz-question-container');
   var resultContainer = document.getElementById('quiz-result-container');
+  var announceEl = document.getElementById('quiz-step-announce');
 
   function renderProgress() {{
     progressEl.innerHTML = QUESTIONS.map(function (_, i) {{
@@ -3386,13 +3475,18 @@ def build_neighborhood_quiz():
     renderProgress();
     var q = QUESTIONS[current];
     var selected = answers[q.key];
+    if (announceEl) {{
+      announceEl.textContent = 'Question ' + (current + 1) + ' of ' + QUESTIONS.length + ': ' + q.prompt;
+    }}
     var optsHtml = q.options.map(function (opt, i) {{
-      var cls = 'quiz-option' + (selected === i ? ' selected' : '');
-      return '<button type="button" class="' + cls + '" data-index="' + i + '">' + opt.label + '</button>';
+      var isSelected = selected === i;
+      var cls = 'quiz-option' + (isSelected ? ' selected' : '');
+      return '<button type="button" class="' + cls + '" data-index="' + i + '" role="radio" ' +
+        'aria-checked="' + (isSelected ? 'true' : 'false') + '">' + opt.label + '</button>';
     }}).join('');
     qContainer.innerHTML =
-      '<div class="quiz-question"><h3>' + q.prompt + '</h3>' +
-      '<div class="quiz-options">' + optsHtml + '</div>' +
+      '<div class="quiz-question"><h3 id="quiz-q-heading">' + q.prompt + '</h3>' +
+      '<div class="quiz-options" role="radiogroup" aria-labelledby="quiz-q-heading">' + optsHtml + '</div>' +
       '<div class="quiz-nav">' +
       '<button type="button" class="btn btn-outline" id="quiz-back" style="border-color:#141415;color:#141415"' +
       (current === 0 ? ' disabled' : '') + '>Back</button>' +
@@ -3421,7 +3515,16 @@ def build_neighborhood_quiz():
     var score = 0;
     if (picked.q1.views && city.views.indexOf(picked.q1.views[0]) !== -1) score += 2;
     if (picked.q1.lifestyle && city.lifestyle.indexOf(picked.q1.lifestyle[0]) !== -1) score += 2;
-    if (picked.q2.commute === city.commute) score += 2;
+    // Commute gets partial credit for an adjacent preference (e.g. picked
+    // "moderate" but the city is "close") instead of an all-or-nothing 0 --
+    // a buyer open to a 20-40 min drive is still a reasonable fit for a
+    // close-in town, just not a perfect one.
+    var pickedIdx = COMMUTE_ORDER.indexOf(picked.q2.commute);
+    var cityIdx = COMMUTE_ORDER.indexOf(city.commute);
+    if (pickedIdx !== -1 && cityIdx !== -1) {{
+      var dist = Math.abs(pickedIdx - cityIdx);
+      score += dist === 0 ? 2 : (dist === 1 ? 1 : 0);
+    }}
     if (picked.q3.priorities && city.priorities.indexOf(picked.q3.priorities[0]) !== -1) score += 2;
     return score;
   }}
@@ -3446,10 +3549,21 @@ def build_neighborhood_quiz():
 
     document.getElementById('quiz-match-name').textContent = top.name;
     document.getElementById('quiz-match-blurb').textContent = top.blurb;
+    if (announceEl) announceEl.textContent = 'Your best match is ' + top.name + '.';
+    var photoEl = document.getElementById('quiz-match-photo');
+    if (top.photo) {{
+      photoEl.src = '/assets/img/communities/' + top.photo + '.jpg';
+      photoEl.alt = top.name + ', Colorado';
+      photoEl.style.display = 'block';
+    }} else {{
+      photoEl.style.display = 'none';
+    }}
     var runnerUpEl = document.getElementById('quiz-runner-up');
     if (runnerUp) {{
       runnerUpEl.textContent = 'Also worth a look: ' + runnerUp.name;
       runnerUpEl.style.display = '';
+    }} else {{
+      runnerUpEl.style.display = 'none';
     }}
     document.getElementById('quiz-explore-link').href = top.url;
     document.getElementById('quiz-search-link').href = '/search-homes.html?' + searchQs;
@@ -3468,6 +3582,19 @@ def build_neighborhood_quiz():
         'Budget: ' + picked.q4.label,
       ].join(' | ');
     }}
+  }}
+
+  var retakeBtn = document.getElementById('quiz-retake');
+  if (retakeBtn) {{
+    retakeBtn.addEventListener('click', function () {{
+      answers = {{}};
+      current = 0;
+      resultContainer.style.display = 'none';
+      qContainer.style.display = '';
+      progressEl.style.display = '';
+      renderQuestion();
+      qContainer.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+    }});
   }}
 
   renderQuestion();
@@ -4250,6 +4377,16 @@ def build_legal():
          "/thank-you.html", None, thank_you_body)
 
 
+def _truncate_words(text, max_len):
+    """Word-boundary-safe truncation -- never cuts mid-word, always ends
+    with an ellipsis when it actually truncated something."""
+    text = (text or "").strip()
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len].rsplit(" ", 1)[0].rstrip(".,;: ")
+    return cut + "…"
+
+
 def build_rss_feed():
     """Real RSS 2.0 feed of the blog, regenerated on every build.
     2026-08-12: this is the exact input Mailchimp's own RSS-to-Email
@@ -4258,7 +4395,15 @@ def build_rss_feed():
     AgentFire's paid "RSS To Mailchimp" addon ($400 setup) unnecessary.
     Christine still needs to set up the actual RSS campaign in her
     Mailchimp account and point it at this URL; this just builds the feed
-    the campaign reads from."""
+    the campaign reads from.
+
+    2026-08-12 (deepened): added <atom:link rel="self"> (feed-validator
+    best practice most readers/Mailchimp expect), <dc:creator>, and
+    <content:encoded> with the post's real opening paragraphs in CDATA --
+    Mailchimp's RSS campaigns can render a richer HTML preview from
+    content:encoded instead of falling back to the plain-text description,
+    so the auto-generated email actually looks like an article teaser
+    rather than a bare snippet."""
     def _rfc822(date_str):
         try:
             d = datetime.date.fromisoformat(date_str)
@@ -4269,21 +4414,30 @@ def build_rss_feed():
     items = []
     for post in BLOG:
         link = f"{SITE['domain']}/blog/{post['slug']}.html"
-        excerpt = (post.get("meta") or " ".join(post.get("paragraphs", []))[:300]).strip()
+        excerpt = _truncate_words(
+            post.get("meta") or " ".join(post.get("paragraphs", [])), 280
+        )
+        # First couple of real paragraphs, as actual HTML -- CDATA means no
+        # entity-escaping needed and readers can render it directly.
+        body_paras = post.get("paragraphs", [])[:2]
+        content_html = "".join(f"<p>{esc(p)}</p>" for p in body_paras) or f"<p>{esc(excerpt)}</p>"
         items.append(f"""  <item>
     <title>{esc(post['title'])}</title>
     <link>{link}</link>
     <guid isPermaLink="true">{link}</guid>
     <pubDate>{_rfc822(post.get('date'))}</pubDate>
+    <dc:creator>{esc(SITE['agent'])}</dc:creator>
     <description>{esc(excerpt)}</description>
+    <content:encoded><![CDATA[{content_html}]]></content:encoded>
   </item>""")
 
     last_build = datetime.date.today().strftime("%a, %d %b %Y 00:00:00 +0000")
     rss = f"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
 <channel>
   <title>{esc(SITE['name'])} Blog</title>
   <link>{SITE['domain']}/blog/index.html</link>
+  <atom:link href="{SITE['domain']}/feed.xml" rel="self" type="application/rss+xml"/>
   <description>Buyer and seller advice, market notes, and local insight from {esc(SITE['agent'])}.</description>
   <language>en-us</language>
   <lastBuildDate>{last_build}</lastBuildDate>
