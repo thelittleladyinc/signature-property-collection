@@ -21,12 +21,19 @@
 
 const BASE_URL = "https://api.mlsgrid.com/v2/Property";
 
+// 2026-08-12: WaterfrontFeatures pulled after a real 400 from MLS Grid --
+// "The field 'WaterfrontFeatures' does not exist or is unable to be
+// retrieved" for this IRES feed specifically (this is the field that had
+// been silently blocking every sync-listings.js run since launch, well
+// past the earlier ListPrice/City $filter fix). WaterfrontYN plus the
+// PublicRemarks keyword check in matchesQuery() below is still enough to
+// flag waterfront listings without it.
 const SELECT_FIELDS = [
   "ListingId", "ListingKey", "StandardStatus", "ListPrice",
   "BedroomsTotal", "BathroomsTotalInteger", "LivingArea",
   "StreetNumber", "StreetName", "StreetSuffix", "City", "StateOrProvince", "PostalCode",
   "PublicRemarks", "PropertyType", "PropertySubType", "SubdivisionName",
-  "WaterfrontYN", "WaterfrontFeatures",
+  "WaterfrontYN",
   "ListOfficeName", "ListAgentFullName", "ListAgentDirectPhone", "ListAgentEmail",
   "CoListAgentFullName", "ModificationTimestamp", "MlgCanView",
 ].join(",");
@@ -94,8 +101,7 @@ function mapListing(item) {
     remarks: item.PublicRemarks || null,
     propertyType: item.PropertySubType || item.PropertyType || null,
     subdivision: item.SubdivisionName || null,
-    waterfront: item.WaterfrontYN === true || (Array.isArray(item.WaterfrontFeatures) &&
-      item.WaterfrontFeatures.some((f) => f && f !== "None")) || null,
+    waterfront: item.WaterfrontYN === true || null,
     officeName: item.ListOfficeName || null,
     agentName: item.ListAgentFullName || null,
     coAgentName: item.CoListAgentFullName || null,
