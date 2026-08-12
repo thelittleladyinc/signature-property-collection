@@ -41,13 +41,39 @@ const BASE_URL = "https://api.mlsgrid.com/v2/Property";
 // listing office name until we hear back from IRES's Data Feed team,
 // RETS@iresmls.com, on what field (if any) actually exposes it on this
 // feed. ListAgentFullName/phone/email are unaffected and still display.
+//
+// 2026-08-12 (third pass): same story again, this time ListAgentDirectPhone
+// -- "The field 'ListAgentDirectPhone' does not exist or is unable to be
+// retrieved." Pulled here too.
+//
+// 2026-08-12 (fourth pass, final): rather than keep discovering these one
+// per 15-minute sync cycle, tested the exact request shape sync-listings.js
+// sends (same $filter/$select/$expand/$top/$orderby) directly against MLS
+// Grid's live API with MLSGRID_API_TOKEN, iterating on each 400 until it
+// returned 200. ListAgentEmail was also rejected -- "The field
+// 'ListAgentEmail' does not exist or is unable to be retrieved" -- and
+// after removing it too, the request succeeded end-to-end: 200 OK, real
+// listings with real addresses/prices/photos, @odata.nextLink present for
+// pagination. This is now a confirmed-working field list, not a guess.
+//
+// Net effect: this IRES feed exposes ListAgentFullName but neither
+// ListAgentDirectPhone nor ListAgentEmail -- no per-listing agent contact
+// info comes through at all, only their name. IDX Rule 24's "contact"
+// requirement isn't fully satisfiable from this feed as a result; the
+// site's own "Ask A Question" / "Request A Tour" buttons on each listing
+// card (which route through this site's contact form, not the MLS data)
+// are the practical substitute. Same open item as ListOfficeName above:
+// worth asking IRES's Data Feed team (RETS@iresmls.com) whether any of
+// these three fields (office name, agent phone, agent email) are available
+// under a different field name on this feed, since none of the "obvious"
+// RESO Data Dictionary names for them work here.
 const SELECT_FIELDS = [
   "ListingId", "ListingKey", "StandardStatus", "ListPrice",
   "BedroomsTotal", "BathroomsTotalInteger", "LivingArea",
   "StreetNumber", "StreetName", "StreetSuffix", "City", "StateOrProvince", "PostalCode",
   "PublicRemarks", "PropertyType", "PropertySubType", "SubdivisionName",
   "WaterfrontYN",
-  "ListAgentFullName", "ListAgentDirectPhone", "ListAgentEmail",
+  "ListAgentFullName",
   "CoListAgentFullName", "ModificationTimestamp", "MlgCanView",
 ].join(",");
 
