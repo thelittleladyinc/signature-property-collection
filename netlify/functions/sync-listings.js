@@ -88,6 +88,11 @@ exports.handler = async () => {
   // is visible from the browser instead of only in Netlify's own function
   // logs, which we don't have a way to read directly.
   let lastRunError = null;
+  // 2026-08-12: tracks whether this run ended because MLS Grid rejected a
+  // request (4xx/5xx), as opposed to running out of time budget or a
+  // network-level exception. Used below to decide whether it's safe to
+  // save `requestUrl` as next run's resume cursor.
+  let httpErrorOccurred = false;
 
   try {
     while (requestUrl) {
@@ -102,6 +107,7 @@ exports.handler = async () => {
         const text = await res.text().catch(() => "");
         lastRunError = `MLS Grid ${res.status}: ${text.slice(0, 500)}`;
         console.error(`sync-listings: ${lastRunError}`);
+        httpErrorOccurred = true;
         break;
       }
       const json = await res.json();
@@ -134,10 +140,22 @@ exports.handler = async () => {
   }
 
   const passComplete = !requestUrl;
+  // 2026-08-12: previously this always saved `requestUrl` as the resume
+  // cursor, including when it was the exact URL MLS Grid just rejected
+  // with a 4xx (e.g. the WaterfrontFeatures $select bug). That poisoned
+  // cursor then got replayed on every subsequent run forever — bypassing
+  // the fresh query this code builds from the current SELECT_FIELDS/filter
+  // — which is why fixing the underlying field bug in _mls-shared.js never
+  // actually took effect in production. On an HTTP rejection specifically,
+  // we now discard the cursor instead, so the next run rebuilds a brand
+  // new request from scratch using whatever the code currently asks for.
+  // (A time-budget break or network exception still resumes from
+  // `requestUrl` as before — those aren't proof the query itself is bad.)
+  const cursorToSave = httpErrorOccurred ? null : requestUrl;
   await store.setJSON(LISTINGS_KEY, listingsById);
   await store.setJSON(SYNC_STATE_KEY, {
     bootstrapped: state.bootstrapped || passComplete,
-    cursor: requestUrl,
+    cursor: cursorToSave,
     lastModified: passComplete ? maxModTimestampThisPass : state.lastModified,
     lastRunAt: new Date().toISOString(),
     lastRunPagesFetched: pagesFetched,
