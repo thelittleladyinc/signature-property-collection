@@ -78,6 +78,9 @@
     <h2 class="section-title">Search Homes In Nederland</h2>
     <p class="lede">Real, active Nederland listings from IRES MLS — filter by price, beds,
     and baths and the results update instantly.</p>
+    <p class="search-status" style="margin-top:0">This search covers Christine Gwinnup's
+    luxury-focused $950K+ market. Looking for Nederland homes under $950,000?
+    <a href="https://www.thelittleladysellshomes.com/search-northern-colorado-homes-for-sale" target="_blank" rel="noopener" style="text-decoration:underline">Search the full range on The Little Lady Sells Homes</a>.</p>
     <div class="fs-widget">
     <form id="fs-nederland-form">
       <input type="hidden" name="city" value="Nederland">
@@ -173,6 +176,76 @@
     if (n == null) return 'Price N/A';
     return '$' + Number(n).toLocaleString('en-US');
   }
+
+  function nearbyToggleHtml(addr) {
+    return '<div class="listing-nearby">' +
+      '<button type="button" class="nearby-toggle" onclick="toggleNearby(this)" data-address="' + addr + '">' +
+      '\ud83d\udccd Distance To Grocery, Schools &amp; Parks</button>' +
+      '<div class="nearby-panel" style="display:none">' +
+      '<div class="nearby-tabs">' +
+      '<button type="button" class="nearby-tab active" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
+      '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
+      '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
+      '</div>' +
+      '<div class="nearby-results"><p class="search-status" style="margin-top:0">Loading nearby places\u2026</p></div>' +
+      '</div></div>';
+  }
+
+  window.toggleNearby = function (btn) {
+    var panel = btn.nextElementSibling;
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    if (isOpen) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    if (panel.dataset.loaded === 'true') return;
+    var address = btn.dataset.address;
+    var resultsEl = panel.querySelector('.nearby-results');
+    fetch('/.netlify/functions/nearby-places?address=' + encodeURIComponent(address))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error === 'not_configured') {
+          resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Distance lookup isn\u2019t connected yet.</p>';
+          return;
+        }
+        if (data.error) {
+          resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\u2019t look up nearby places right now.</p>';
+          return;
+        }
+        panel.dataset.loaded = 'true';
+        panel._nearbyData = data;
+        renderNearbyCat(panel, 'grocery');
+      })
+      .catch(function () {
+        resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\u2019t look up nearby places right now.</p>';
+      });
+  };
+
+  window.showNearbyCat = function (tabBtn) {
+    var tabs = tabBtn.parentElement;
+    tabs.querySelectorAll('.nearby-tab').forEach(function (t) { t.classList.remove('active'); });
+    tabBtn.classList.add('active');
+    var panel = tabs.parentElement;
+    renderNearbyCat(panel, tabBtn.dataset.cat);
+  };
+
+  var NEARBY_CAT_LABELS = { grocery: 'grocery stores', school: 'schools', park: 'parks' };
+
+  function renderNearbyCat(panel, cat) {
+    var data = panel._nearbyData;
+    var resultsEl = panel.querySelector('.nearby-results');
+    if (!data) return;
+    var items = (data.categories && data.categories[cat]) || [];
+    if (!items.length) {
+      resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">No nearby ' +
+        (NEARBY_CAT_LABELS[cat] || cat) + ' found.</p>';
+      return;
+    }
+    resultsEl.innerHTML = '<ul class="nearby-list">' + items.map(function (p) {
+      return '<li><span class="nearby-name">' + esc(p.name) + '</span>' +
+        '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
+    }).join('') + '</ul>';
+  }
+
   function cardHtml(l) {
     var img = l.photo
       ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">'
@@ -193,6 +266,7 @@
       '<p class="listing-address">' + addr + '</p>' +
       (remarks ? '<p class="listing-address" style="color:#4a4a4c">' + remarks + '</p>' : '') +
       '<p class="listing-compliance">' + compliance + '</p>' +
+      nearbyToggleHtml(addr) +
       '</div></div>';
   }
 

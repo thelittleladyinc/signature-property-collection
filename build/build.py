@@ -380,6 +380,103 @@ def _listing_videos_js():
     return json.dumps(obj)
 
 
+def _nearby_places_js_helpers():
+    """Client-side behavior for the 'Nearby & Distances' panel embedded in
+    every listing card -- added 2026-08-12 per Christine's request for real
+    distance-to-grocery/schools/parks info on listings, expanding on the
+    earlier walking-distance-to-restaurants idea. Backed by
+    netlify/functions/nearby-places.js, which geocodes the address and runs
+    Google Places Nearby Search once per address (cached in Blobs so repeat
+    visitors to the same listing don't re-spend API quota).
+
+    Provides nearbyToggleHtml(addr) for each card renderer to call after it
+    has already built its own esc()-ed `addr` string (so the address is
+    only ever assembled once, the same way, everywhere), plus the
+    toggleNearby / showNearbyCat handlers wired via onclick="" — same idiom
+    as openGallery/openListingInquiry (inline attributes always resolve
+    against window, not a closure).
+
+    Relies on esc() already being defined in the enclosing IIFE (true
+    everywhere this is spliced in — see _listing_showcase_js_helpers() and
+    the live-feed/search-widget card renderers, which all define esc()
+    before this runs). Deliberately simple button-driven UI (not free-text
+    chat) — Christine confirmed this is the right scope for v1 2026-08-12.
+
+    No-ops gracefully (shows a plain 'not connected yet' message) if
+    GOOGLE_MAPS_API_KEY isn't set in Netlify yet — same pattern as every
+    other optional integration on this site."""
+    return """
+  function nearbyToggleHtml(addr) {
+    return '<div class="listing-nearby">' +
+      '<button type="button" class="nearby-toggle" onclick="toggleNearby(this)" data-address="' + addr + '">' +
+      '\\ud83d\\udccd Distance To Grocery, Schools &amp; Parks</button>' +
+      '<div class="nearby-panel" style="display:none">' +
+      '<div class="nearby-tabs">' +
+      '<button type="button" class="nearby-tab active" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
+      '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
+      '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
+      '</div>' +
+      '<div class="nearby-results"><p class="search-status" style="margin-top:0">Loading nearby places\\u2026</p></div>' +
+      '</div></div>';
+  }
+
+  window.toggleNearby = function (btn) {
+    var panel = btn.nextElementSibling;
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    if (isOpen) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    if (panel.dataset.loaded === 'true') return;
+    var address = btn.dataset.address;
+    var resultsEl = panel.querySelector('.nearby-results');
+    fetch('/.netlify/functions/nearby-places?address=' + encodeURIComponent(address))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error === 'not_configured') {
+          resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Distance lookup isn\\u2019t connected yet.</p>';
+          return;
+        }
+        if (data.error) {
+          resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\\u2019t look up nearby places right now.</p>';
+          return;
+        }
+        panel.dataset.loaded = 'true';
+        panel._nearbyData = data;
+        renderNearbyCat(panel, 'grocery');
+      })
+      .catch(function () {
+        resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\\u2019t look up nearby places right now.</p>';
+      });
+  };
+
+  window.showNearbyCat = function (tabBtn) {
+    var tabs = tabBtn.parentElement;
+    tabs.querySelectorAll('.nearby-tab').forEach(function (t) { t.classList.remove('active'); });
+    tabBtn.classList.add('active');
+    var panel = tabs.parentElement;
+    renderNearbyCat(panel, tabBtn.dataset.cat);
+  };
+
+  var NEARBY_CAT_LABELS = { grocery: 'grocery stores', school: 'schools', park: 'parks' };
+
+  function renderNearbyCat(panel, cat) {
+    var data = panel._nearbyData;
+    var resultsEl = panel.querySelector('.nearby-results');
+    if (!data) return;
+    var items = (data.categories && data.categories[cat]) || [];
+    if (!items.length) {
+      resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">No nearby ' +
+        (NEARBY_CAT_LABELS[cat] || cat) + ' found.</p>';
+      return;
+    }
+    resultsEl.innerHTML = '<ul class="nearby-list">' + items.map(function (p) {
+      return '<li><span class="nearby-name">' + esc(p.name) + '</span>' +
+        '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
+    }).join('') + '</ul>';
+  }
+"""
+
+
 def _listing_showcase_js_helpers():
     """Shared JS: escaping, price formatting, address-based video matching,
     and card rendering — used by both build_current_listings() (the full
@@ -415,7 +512,7 @@ def _listing_showcase_js_helpers():
       return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[c];
     }});
   }}
-
+{_nearby_places_js_helpers()}
   function fmtPrice(n) {{
     if (n == null) return 'Price N/A';
     return '$' + Number(n).toLocaleString('en-US');
@@ -504,6 +601,7 @@ def _listing_showcase_js_helpers():
       '<p class="listing-address">' + addr + '</p>' +
       '<p class="listing-compliance">' + compliance + '</p>' +
       actions +
+      nearbyToggleHtml(addr) +
       '</div></div>';
   }}
 """
@@ -571,6 +669,7 @@ def _live_feed_widget(anchor_id, api_params, empty_note=None):
         if (n == null) return 'Price N/A';
         return '$' + Number(n).toLocaleString('en-US');
       }}
+{_nearby_places_js_helpers()}
       function cardHtml(l) {{
         var img = l.photo
           ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">'
@@ -589,6 +688,7 @@ def _live_feed_widget(anchor_id, api_params, empty_note=None):
           '<p class="listing-meta">' + meta + '</p>' +
           '<p class="listing-address">' + addr + '</p>' +
           '<p class="listing-compliance">' + compliance + '</p>' +
+          nearbyToggleHtml(addr) +
           '</div></div>';
       }}
 
@@ -766,6 +866,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     if (n == null) return 'Price N/A';
     return '$' + Number(n).toLocaleString('en-US');
   }}
+{_nearby_places_js_helpers()}
   function cardHtml(l) {{
     var img = l.photo
       ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">'
@@ -786,6 +887,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
       '<p class="listing-address">' + addr + '</p>' +
       (remarks ? '<p class="listing-address" style="color:#4a4a4c">' + remarks + '</p>' : '') +
       '<p class="listing-compliance">' + compliance + '</p>' +
+      nearbyToggleHtml(addr) +
       '</div></div>';
   }}
 
@@ -1716,6 +1818,9 @@ def build_city_pages():
     <h2 class="section-title">Search Homes In {esc(city)}</h2>
     <p class="lede">Real, active {esc(city)} listings from IRES MLS — filter by price, beds,
     and baths and the results update instantly.</p>
+    <p class="search-status" style="margin-top:0">This search covers {esc(SITE['agent'])}'s
+    luxury-focused $950K+ market. Looking for {esc(city)} homes under $950,000?
+    <a href="https://www.thelittleladysellshomes.com/search-northern-colorado-homes-for-sale" target="_blank" rel="noopener" style="text-decoration:underline">Search the full range on The Little Lady Sells Homes</a>.</p>
     {widget_html}
   </div>
 </section>
@@ -2007,10 +2112,10 @@ def build_contact():
     <div class="card">
       <h3>Contact Information</h3>
       <p>{SITE['phone']}<br>{SITE['email']}{f"<br>{esc(SITE['address']['street'])}, {esc(SITE['address']['city'])}, {esc(SITE['address']['state'])} {esc(SITE['address']['zip'])}" if SITE.get('address') else ''}</p>
-      <h3 style="margin-top:24px">Note for setup</h3>
-      <p>This form currently posts to Netlify Forms (free, zero backend). Once your
-      Lofty webhook/API key is available, swap the form action to POST into Lofty so
-      leads land directly in your CRM — see README.md.</p>
+      <h3 style="margin-top:24px">What Happens Next</h3>
+      <p>Every message here comes straight to {esc(SITE['agent'].split()[0])} — expect a
+      reply within one business day. For anything urgent, call or text
+      {SITE['phone']} directly.</p>
     </div>
   </div>
 </section>
