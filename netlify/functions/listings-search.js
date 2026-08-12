@@ -94,10 +94,20 @@ exports.handler = async (event) => {
     };
   } catch (err) {
     console.error("listings-search function error:", err);
+    // message/name are included in the response (not just server logs)
+    // since neither ever contains a secret — just the JS error text — and
+    // it means diagnosing a production issue doesn't require dashboard log
+    // access at all, only the endpoint's own JSON response.
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "exception", listings: [], totalCount: 0 }),
+      body: JSON.stringify({
+        error: "exception",
+        message: err && err.message,
+        name: err && err.name,
+        listings: [],
+        totalCount: 0,
+      }),
     };
   }
 };
