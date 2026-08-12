@@ -3,6 +3,7 @@
   "private": true,
   "description": "Netlify Functions dependencies only — the site itself is static, pre-built into /site (see build/build.py). This file exists so Netlify's build step installs @netlify/blobs before bundling netlify/functions/*.js.",
   "dependencies": {
-    "@netlify/blobs": "^10.0.0"
+    "@netlify/blobs": "^10.0.0",
+    "cloudinary": "^2.5.1"
   }
 }
