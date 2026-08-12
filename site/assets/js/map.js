@@ -129,6 +129,19 @@
       videoTitle: 'Mariana Butte Golf Course — Loveland, CO',
       videoSource: 'Golf Loveland (City of Loveland)',
     },
+    {
+      name: 'The Olde Course at Loveland',
+      lat: 40.4251, lng: -105.1088,
+      icon: 'golf',
+      cityLabel: 'Loveland',
+      cityHref: '/communities/larimer/loveland.html',
+      searchCity: 'Loveland',
+      blurb: 'A traditional, walkable park-style municipal course in the heart of Loveland — ' +
+        'a favorite for an easy, relaxed round close to home.',
+      videoId: 'lAlc6-nyTiM',
+      videoTitle: 'The Olde Course at Loveland',
+      videoSource: 'Golf Loveland (City of Loveland)',
+    },
   ];
 
   function poiIcon(poi) {
