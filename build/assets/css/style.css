@@ -400,6 +400,29 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .fs-actions { margin-top: 26px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 @media (max-width: 700px) { .fs-row { gap: 22px; } }
 
+/* ---------- Neighborhood Quiz (/neighborhood-quiz.html) ---------- */
+.quiz-widget { max-width: 720px; margin: 0 auto; }
+.quiz-progress { display: flex; gap: 8px; margin-bottom: 32px; }
+.quiz-progress-dot { flex: 1; height: 4px; background: var(--gray-light); border-radius: 2px; transition: background .2s ease; }
+.quiz-progress-dot.done { background: var(--dusty-rose); }
+.quiz-question h3 { font-family: var(--font-serif); font-weight: 400; font-size: 28px; margin: 0 0 26px; }
+.quiz-options { display: grid; gap: 14px; }
+.quiz-option {
+  text-align: left; padding: 18px 22px; border: 1.5px solid var(--gray-light); border-radius: 10px;
+  background: var(--white); cursor: pointer; font-size: 16px; color: var(--charcoal);
+  transition: border-color .15s ease, background .15s ease;
+}
+.quiz-option:hover { border-color: var(--dusty-rose); }
+.quiz-option.selected { border-color: var(--dusty-rose); background: rgba(184,111,122,.08); }
+.quiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; }
+.quiz-nav .btn[disabled] { opacity: .35; pointer-events: none; }
+.quiz-result { text-align: center; }
+.quiz-result .match-eyebrow { color: var(--dusty-rose); }
+.quiz-result .match-name { font-family: var(--font-serif); font-size: 40px; margin: 8px 0 18px; }
+.quiz-result .match-blurb { max-width: 560px; margin: 0 auto 30px; }
+.quiz-runner-up { font-size: 14px; color: var(--gray); margin-top: -14px; margin-bottom: 30px; }
+.quiz-result .lead-form { max-width: 480px; margin: 34px auto 0; text-align: left; }
+
 /* ---------- Map lifestyle/amenity POI markers (build/assets/js/map.js) ---------- */
 .poi-icon-marker {
   width: 100%; height: 100%; border-radius: 50%; background: var(--dusty-rose); color: var(--white);

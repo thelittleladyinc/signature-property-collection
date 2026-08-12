@@ -944,6 +944,47 @@ def _social_follow_section(heading="Follow For More Beautiful Homes"):
 </section>"""
 
 
+# Real posts from Christine's own Instagram (@thelittleladysellshomes),
+# picked 2026-08-12 for a mix of listing content, team/credibility, and
+# personality — real permalinks pulled directly from her account. This
+# replaces AgentFire's paid "Instafeed" addon using Instagram's own official
+# embed widget (no API key, no login, no scraping — Instagram serves the
+# content itself client-side, so it never goes stale or breaks like a
+# scraped image grid would). Swap these URLs out any time for newer posts.
+INSTAGRAM_FEED_POSTS = [
+    "https://www.instagram.com/reel/DagBahKAUhu/",  # new Greeley listing
+    "https://www.instagram.com/reel/DaNwBQSuTaN/",  # Christine + Kendra, "we can help you"
+    "https://www.instagram.com/reel/DaI30cygZnI/",  # playful multi-listing showcase
+]
+
+
+def _instagram_feed_section():
+    handle_url = SITE["social"].get("Instagram", "")
+    cards = "\n      ".join(
+        f'<blockquote class="instagram-media" data-instgrm-captioned '
+        f'data-instgrm-permalink="{url}" data-instgrm-version="14" '
+        f'style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;'
+        f'max-width:400px;width:100%;"></blockquote>'
+        for url in INSTAGRAM_FEED_POSTS
+    )
+    return f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Follow Along</span>
+    <h2 class="section-title">Real Listings, Real Life &mdash; @thelittleladysellshomes</h2>
+    <p class="lede">Straight from {esc(SITE['agent'])}'s own Instagram &mdash; new listings, video
+    tours, and the real day-to-day of selling Northern Colorado real estate.</p>
+    <div class="grid-3" style="justify-items:center">
+      {cards}
+    </div>
+    <div class="btn-row" style="margin-top:32px">
+      <a class="btn btn-outline" href="{esc(handle_url)}" target="_blank" rel="noopener"
+      style="border-color:#141415;color:#141415">Follow @thelittleladysellshomes &rarr;</a>
+    </div>
+  </div>
+</section>
+<script async src="https://www.instagram.com/embed.js"></script>"""
+
+
 # Homepage FAQ — shared between the visible page (build_home) and llms.txt,
 # so AI answer engines and human readers see the identical claim. The first
 # answer is a "quotable atom" (see market-takeover-template/docs/SEO-FOUNDATIONS.md
@@ -1196,6 +1237,7 @@ def footer_html():
           <li><a href="/past-sales.html">Past Sales</a></li>
           <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
           <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
+          <li><a href="/neighborhood-quiz.html">Neighborhood Quiz</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
         </ul>
       </div>
@@ -1312,6 +1354,7 @@ def build_home():
   </div>
 </section>
 """
+    body += _instagram_feed_section()
     faq_html, faq_schema = _faq_block(HOME_FAQ)
     body += faq_html
     extra = ('<link rel="stylesheet" href="/assets/vendor/leaflet/leaflet.css">\n'
@@ -3021,7 +3064,8 @@ def build_blog():
     <span class="eyebrow" style="color:var(--dusty-rose)">The Journal</span>
     <h1>Northern Colorado Real Estate Blog</h1>
     <p class="lede">Straight-talk buyer and seller advice, market notes, and local
-    insight from {esc(SITE['agent'])} — {len(BLOG)} articles and counting.</p>
+    insight from {esc(SITE['agent'])} — {len(BLOG)} articles and counting.
+    <a href="/feed.xml" style="text-decoration:underline">Subscribe via RSS &rarr;</a></p>
   </div>
 </section>
 <section>
@@ -3031,11 +3075,15 @@ def build_blog():
 </section>
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Blog", None)])
+    rss_link_tag = (
+        '<link rel="alternate" type="application/rss+xml" '
+        f'title="{esc(SITE["name"])} Blog" href="/feed.xml">'
+    )
     page(
         "Northern Colorado Real Estate Blog | Signature Property Collection",
         f"Buyer and seller advice, market notes, and local insight from {SITE['agent']} — "
         f"{len(BLOG)} articles on Northern Colorado real estate.",
-        "/blog/index.html", None, index_body,
+        "/blog/index.html", None, index_body, extra_head=rss_link_tag,
         schema_extra=[breadcrumbs],
     )
 
@@ -3133,6 +3181,307 @@ def _tool_lead_form(form_name, button_label, extra_fields=""):
       </label>
       <button class="btn btn-dark" type="submit">{esc(button_label)}</button>
     </form>"""
+
+
+
+# ------------------------------------------------------------- QUIZ ----
+# Replaces AgentFire's paid "Neighborhood Quiz" addon ($199 setup + $20/mo)
+# with a real, free, client-side quiz scored against actual Northern
+# Colorado community knowledge (not a generic template) -- see build.py's
+# CITY_CONTENT research for how each of these towns is actually described.
+# Tags picked 2026-08-12 based on that same research; view/lifestyle/
+# priority/commute are deliberately coarse (4-ish buckets each) so every
+# answer combination lands on a real, defensible match rather than an
+# empty result.
+QUIZ_CITIES = [
+    {"name": "Loveland", "url": "/communities/larimer/loveland.html",
+     "views": ["lake", "mountain"], "commute": "moderate",
+     "priorities": ["schools", "new-build", "acreage"],
+     "lifestyle": ["golf-lake", "hiking-mountain"],
+     "blurb": "Loveland is home base for us — lakefront living at Boyd Lake, golf at "
+              "Mariana Butte and The Olde Course, foothill views, and a walkable "
+              "Downtown arts district, all in one town."},
+    {"name": "Berthoud", "url": "/communities/larimer/berthoud.html",
+     "views": ["farmland", "mountain"], "commute": "moderate",
+     "priorities": ["acreage", "schools"],
+     "lifestyle": ["small-town", "hiking-mountain"],
+     "blurb": "Berthoud is small-town Colorado done right — quiet, acreage-friendly, "
+              "and still a short drive to Loveland and Longmont."},
+    {"name": "Masonville", "url": "/communities/larimer/masonville.html",
+     "views": ["mountain", "farmland"], "commute": "far",
+     "priorities": ["acreage"],
+     "lifestyle": ["hiking-mountain", "small-town"],
+     "blurb": "Masonville is foothill acreage country — unincorporated, private, and "
+              "about as much space and quiet as Northern Colorado gets."},
+    {"name": "Fort Collins", "url": "/communities/larimer/fort-collins.html",
+     "views": ["downtown", "mountain"], "commute": "moderate",
+     "priorities": ["walkable", "schools"],
+     "lifestyle": ["culture-dining", "hiking-mountain"],
+     "blurb": "Fort Collins pairs a genuinely walkable Old Town — breweries, "
+              "restaurants, live music — with CSU energy and foothill trails minutes "
+              "away."},
+    {"name": "Windsor", "url": "/communities/larimer/windsor.html",
+     "views": ["lake", "farmland"], "commute": "moderate",
+     "priorities": ["new-build", "schools"],
+     "lifestyle": ["golf-lake", "small-town"],
+     "blurb": "Windsor centers on its own lake and a fast-growing downtown, with "
+              "new-build communities that suit families well."},
+    {"name": "Timnath", "url": "/communities/larimer/timnath.html",
+     "views": ["farmland", "lake"], "commute": "moderate",
+     "priorities": ["new-build", "schools"],
+     "lifestyle": ["small-town", "golf-lake"],
+     "blurb": "Timnath is one of the fastest-growing master-planned communities in "
+              "Northern Colorado — new construction, top schools, and easy access to "
+              "Fort Collins."},
+    {"name": "Wellington", "url": "/communities/larimer/wellington.html",
+     "views": ["farmland"], "commute": "far",
+     "priorities": ["new-build", "schools"],
+     "lifestyle": ["small-town"],
+     "blurb": "Wellington offers small-town, wide-open-sky living just north of Fort "
+              "Collins, with some of the region's most attainable new-build pricing."},
+    {"name": "Erie", "url": "/communities/weld/erie.html",
+     "views": ["farmland", "downtown"], "commute": "close",
+     "priorities": ["schools", "acreage"],
+     "lifestyle": ["small-town", "culture-dining"],
+     "blurb": "Erie blends small-town charm (yes, you can keep chickens) with a "
+              "genuinely commutable location between Boulder and Denver."},
+    {"name": "Greeley", "url": "/communities/weld/greeley.html",
+     "views": ["farmland"], "commute": "far",
+     "priorities": ["acreage", "schools"],
+     "lifestyle": ["small-town"],
+     "blurb": "Greeley is Northern Colorado's most attainable price point — "
+              "agricultural roots, real community, and room to spread out."},
+    {"name": "Boulder", "url": "/communities/boulder/boulder.html",
+     "views": ["downtown", "mountain"], "commute": "close",
+     "priorities": ["walkable"],
+     "lifestyle": ["culture-dining", "hiking-mountain"],
+     "blurb": "Boulder is unmatched for walkable culture and trailhead access "
+              "straight from the Flatirons — a true university-town-meets-outdoor-"
+              "capital."},
+    {"name": "Lafayette", "url": "/communities/boulder/lafayette.html",
+     "views": ["downtown", "farmland"], "commute": "close",
+     "priorities": ["schools", "walkable"],
+     "lifestyle": ["culture-dining"],
+     "blurb": "Lafayette gives you Boulder-adjacent schools and a walkable downtown "
+              "at a more attainable price than Boulder itself."},
+    {"name": "Louisville", "url": "/communities/boulder/louisville.html",
+     "views": ["downtown"], "commute": "close",
+     "priorities": ["schools", "walkable"],
+     "lifestyle": ["culture-dining"],
+     "blurb": "Louisville consistently ranks among the best small towns in America — "
+              "top schools, a genuine Main Street, and quick access to Boulder."},
+    {"name": "Nederland", "url": "/communities/boulder/nederland.html",
+     "views": ["mountain"], "commute": "far",
+     "priorities": ["acreage"],
+     "lifestyle": ["hiking-mountain", "small-town"],
+     "blurb": "Nederland is mountain living, full stop — a small, tight-knit town "
+              "above Boulder with trails out your back door."},
+]
+
+QUIZ_QUESTIONS = [
+    {
+        "key": "q1", "prompt": "What's your idea of a perfect Saturday?",
+        "options": [
+            {"label": "Hiking a mountain trail", "views": ["mountain"], "lifestyle": ["hiking-mountain"]},
+            {"label": "Boating or fishing on the lake", "views": ["lake"], "lifestyle": ["golf-lake"]},
+            {"label": "Wandering a walkable downtown for coffee & shopping", "views": ["downtown"], "lifestyle": ["culture-dining"]},
+            {"label": "Working on a hobby farm or acreage project", "views": ["farmland"], "lifestyle": ["small-town"]},
+        ],
+    },
+    {
+        "key": "q2", "prompt": "How close do you want to be to Denver or Boulder?",
+        "options": [
+            {"label": "Right in it, or very close", "commute": "close"},
+            {"label": "A comfortable 20–40 minute drive", "commute": "moderate"},
+            {"label": "As far as reasonably possible — I want space", "commute": "far"},
+        ],
+    },
+    {
+        "key": "q3", "prompt": "What matters most in your next neighborhood?",
+        "options": [
+            {"label": "Top-rated schools & family amenities", "priorities": ["schools"]},
+            {"label": "Privacy, acreage, and room to spread out", "priorities": ["acreage"]},
+            {"label": "Walkability — restaurants and shops nearby", "priorities": ["walkable"]},
+            {"label": "A newer build with modern HOA amenities", "priorities": ["new-build"]},
+        ],
+    },
+    {
+        "key": "q4", "prompt": "What's your target price range?",
+        "options": [
+            {"label": "Under $700K", "budget": "entry"},
+            {"label": "$700K – $1.2M", "budget": "mid"},
+            {"label": "$1.2M – $2M", "budget": "upper"},
+            {"label": "$2M+", "budget": "luxury"},
+        ],
+    },
+]
+
+_QUIZ_BUDGET_PARAMS = {
+    "entry": "noFloor=true",
+    "mid": "noFloor=true&minPrice=700000",
+    "upper": "minPrice=1200000",
+    "luxury": "minPrice=2000000",
+}
+
+
+def build_neighborhood_quiz():
+    cities_json = json.dumps(QUIZ_CITIES)
+    questions_json = json.dumps(QUIZ_QUESTIONS)
+    budget_params_json = json.dumps(_QUIZ_BUDGET_PARAMS)
+    lead_form = _tool_lead_form(
+        "neighborhood-quiz", "Get My Full Match Report",
+        extra_fields=(
+            '<input type="hidden" name="quiz_match" id="quiz-match-field">\n'
+            '      <input type="hidden" name="quiz_answers" id="quiz-answers-field">'
+        ),
+    )
+    body = f"""
+<section class="hero" style="padding:90px 0 50px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Find Your Fit</span>
+    <h1>Which Northern Colorado Neighborhood Matches You?</h1>
+    <p class="lede">Four quick questions, one real answer — matched against the same
+    towns {esc(SITE['agent'])} shows clients every day, not a generic quiz template.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap quiz-widget">
+    <div class="quiz-progress" id="quiz-progress"></div>
+    <div id="quiz-question-container"></div>
+    <div id="quiz-result-container" class="quiz-result" style="display:none">
+      <span class="eyebrow match-eyebrow">Your Best Match</span>
+      <h2 class="match-name" id="quiz-match-name"></h2>
+      <p class="lede match-blurb" id="quiz-match-blurb"></p>
+      <p class="quiz-runner-up" id="quiz-runner-up" style="display:none"></p>
+      <div class="btn-row" style="justify-content:center">
+        <a class="btn btn-dark" id="quiz-explore-link" href="/communities/index.html">Explore This Town</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" id="quiz-search-link" href="/search-homes.html">See Homes For Sale</a>
+      </div>
+      <h3 style="margin-top:48px">Want Your Full Personalized Report?</h3>
+      <p class="lede" id="quiz-report-lede">Get a curated list of homes matched to your
+      answers — and every runner-up town — sent straight to your inbox.</p>
+      {lead_form}
+    </div>
+  </div>
+</section>
+<script>
+(function () {{
+  var CITIES = {cities_json};
+  var QUESTIONS = {questions_json};
+  var BUDGET_PARAMS = {budget_params_json};
+  var answers = {{}};
+  var current = 0;
+
+  var progressEl = document.getElementById('quiz-progress');
+  var qContainer = document.getElementById('quiz-question-container');
+  var resultContainer = document.getElementById('quiz-result-container');
+
+  function renderProgress() {{
+    progressEl.innerHTML = QUESTIONS.map(function (_, i) {{
+      return '<div class="quiz-progress-dot' + (i < current ? ' done' : '') + '"></div>';
+    }}).join('');
+  }}
+
+  function renderQuestion() {{
+    renderProgress();
+    var q = QUESTIONS[current];
+    var selected = answers[q.key];
+    var optsHtml = q.options.map(function (opt, i) {{
+      var cls = 'quiz-option' + (selected === i ? ' selected' : '');
+      return '<button type="button" class="' + cls + '" data-index="' + i + '">' + opt.label + '</button>';
+    }}).join('');
+    qContainer.innerHTML =
+      '<div class="quiz-question"><h3>' + q.prompt + '</h3>' +
+      '<div class="quiz-options">' + optsHtml + '</div>' +
+      '<div class="quiz-nav">' +
+      '<button type="button" class="btn btn-outline" id="quiz-back" style="border-color:#141415;color:#141415"' +
+      (current === 0 ? ' disabled' : '') + '>Back</button>' +
+      '<button type="button" class="btn btn-dark" id="quiz-next"' +
+      (selected === undefined ? ' disabled' : '') + '>' +
+      (current === QUESTIONS.length - 1 ? 'See My Match' : 'Next') + '</button>' +
+      '</div></div>';
+
+    qContainer.querySelectorAll('.quiz-option').forEach(function (btn) {{
+      btn.addEventListener('click', function () {{
+        answers[q.key] = parseInt(btn.dataset.index, 10);
+        renderQuestion();
+      }});
+    }});
+    document.getElementById('quiz-back').addEventListener('click', function () {{
+      if (current > 0) {{ current -= 1; renderQuestion(); }}
+    }});
+    document.getElementById('quiz-next').addEventListener('click', function () {{
+      if (answers[q.key] === undefined) return;
+      if (current < QUESTIONS.length - 1) {{ current += 1; renderQuestion(); }}
+      else {{ showResults(); }}
+    }});
+  }}
+
+  function scoreCity(city, picked) {{
+    var score = 0;
+    if (picked.q1.views && city.views.indexOf(picked.q1.views[0]) !== -1) score += 2;
+    if (picked.q1.lifestyle && city.lifestyle.indexOf(picked.q1.lifestyle[0]) !== -1) score += 2;
+    if (picked.q2.commute === city.commute) score += 2;
+    if (picked.q3.priorities && city.priorities.indexOf(picked.q3.priorities[0]) !== -1) score += 2;
+    return score;
+  }}
+
+  function showResults() {{
+    var picked = {{
+      q1: QUESTIONS[0].options[answers.q1],
+      q2: QUESTIONS[1].options[answers.q2],
+      q3: QUESTIONS[2].options[answers.q3],
+      q4: QUESTIONS[3].options[answers.q4],
+    }};
+    var ranked = CITIES.map(function (c) {{ return {{ city: c, score: scoreCity(c, picked) }}; }})
+      .sort(function (a, b) {{ return b.score - a.score; }});
+    var top = ranked[0].city;
+    var runnerUp = ranked[1] ? ranked[1].city : null;
+    var budgetKey = picked.q4.budget;
+    var searchQs = BUDGET_PARAMS[budgetKey] + '&cities=' + encodeURIComponent(top.name);
+
+    qContainer.style.display = 'none';
+    progressEl.style.display = 'none';
+    resultContainer.style.display = '';
+
+    document.getElementById('quiz-match-name').textContent = top.name;
+    document.getElementById('quiz-match-blurb').textContent = top.blurb;
+    var runnerUpEl = document.getElementById('quiz-runner-up');
+    if (runnerUp) {{
+      runnerUpEl.textContent = 'Also worth a look: ' + runnerUp.name;
+      runnerUpEl.style.display = '';
+    }}
+    document.getElementById('quiz-explore-link').href = top.url;
+    document.getElementById('quiz-search-link').href = '/search-homes.html?' + searchQs;
+    document.getElementById('quiz-report-lede').textContent =
+      'Get a curated list of homes in ' + top.name +
+      ' — and every runner-up town — sent straight to your inbox.';
+
+    var matchField = document.getElementById('quiz-match-field');
+    var answersField = document.getElementById('quiz-answers-field');
+    if (matchField) matchField.value = top.name + (runnerUp ? ' (runner-up: ' + runnerUp.name + ')' : '');
+    if (answersField) {{
+      answersField.value = [
+        'Saturday: ' + picked.q1.label,
+        'Commute: ' + picked.q2.label,
+        'Priority: ' + picked.q3.label,
+        'Budget: ' + picked.q4.label,
+      ].join(' | ');
+    }}
+  }}
+
+  renderQuestion();
+}})();
+</script>
+"""
+    breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Neighborhood Quiz", None)])
+    page(
+        "Neighborhood Quiz | Which Northern Colorado Town Fits You? | Signature Property Collection",
+        "Take our free 4-question quiz to find which Northern Colorado neighborhood "
+        "matches your lifestyle, commute, and budget.",
+        "/neighborhood-quiz.html", None, body,
+        schema_extra=[breadcrumbs],
+    )
 
 
 def build_nav_pages():
@@ -3901,6 +4250,52 @@ def build_legal():
          "/thank-you.html", None, thank_you_body)
 
 
+def build_rss_feed():
+    """Real RSS 2.0 feed of the blog, regenerated on every build.
+    2026-08-12: this is the exact input Mailchimp's own RSS-to-Email
+    campaign feature (Campaigns -> Create -> RSS) needs to auto-send new
+    posts as an email — a free, built-in Mailchimp feature that makes
+    AgentFire's paid "RSS To Mailchimp" addon ($400 setup) unnecessary.
+    Christine still needs to set up the actual RSS campaign in her
+    Mailchimp account and point it at this URL; this just builds the feed
+    the campaign reads from."""
+    def _rfc822(date_str):
+        try:
+            d = datetime.date.fromisoformat(date_str)
+        except (TypeError, ValueError):
+            d = datetime.date.today()
+        return d.strftime("%a, %d %b %Y 00:00:00 +0000")
+
+    items = []
+    for post in BLOG:
+        link = f"{SITE['domain']}/blog/{post['slug']}.html"
+        excerpt = (post.get("meta") or " ".join(post.get("paragraphs", []))[:300]).strip()
+        items.append(f"""  <item>
+    <title>{esc(post['title'])}</title>
+    <link>{link}</link>
+    <guid isPermaLink="true">{link}</guid>
+    <pubDate>{_rfc822(post.get('date'))}</pubDate>
+    <description>{esc(excerpt)}</description>
+  </item>""")
+
+    last_build = datetime.date.today().strftime("%a, %d %b %Y 00:00:00 +0000")
+    rss = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>{esc(SITE['name'])} Blog</title>
+  <link>{SITE['domain']}/blog/index.html</link>
+  <description>Buyer and seller advice, market notes, and local insight from {esc(SITE['agent'])}.</description>
+  <language>en-us</language>
+  <lastBuildDate>{last_build}</lastBuildDate>
+{chr(10).join(items)}
+</channel>
+</rss>
+"""
+    with open(os.path.join(OUT, "feed.xml"), "w") as f:
+        f.write(rss)
+    print("wrote /feed.xml")
+
+
 def build_redirects_and_meta():
     # sitemap
     paths = ["/index.html", "/communities/index.html", "/about.html", "/buyers.html",
@@ -3919,7 +4314,8 @@ def build_redirects_and_meta():
     paths += ["/relocation.html", "/expired-listings.html", "/free-home-valuation.html",
               "/lifestyle-search.html", "/listing-video-portfolio.html",
               "/past-sales.html", "/mortgage-calculator.html",
-              "/search-homes.html", "/current-listings.html"]
+              "/search-homes.html", "/current-listings.html",
+              "/neighborhood-quiz.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
     # discover and index them; everything else is unaffected.
@@ -4017,8 +4413,10 @@ def build_llms_txt(paths):
         "- [Mortgage Calculator](/mortgage-calculator.html)",
         "- [Past Sales](/past-sales.html)",
         "- [Lifestyle Home Search](/lifestyle-search.html)",
+        "- [Neighborhood Quiz — Find Your Northern Colorado Match](/neighborhood-quiz.html)",
         "- [Listing Video Portfolio](/listing-video-portfolio.html)",
         "- [Expired Listings](/expired-listings.html)",
+        "- [Blog RSS Feed](/feed.xml)",
     ])
     faq_lines = "\n\n".join(f"**{q}**\n{a}" for q, a in HOME_FAQ)
     content = f"""# {SITE['name']}
@@ -4115,6 +4513,8 @@ if __name__ == "__main__":
     build_market_topic_pages()
     build_subdivision_pages()
     build_blog()
+    build_rss_feed()
+    build_neighborhood_quiz()
     build_nav_pages()
     build_search_homes()
     build_current_listings()

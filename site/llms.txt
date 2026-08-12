@@ -146,8 +146,10 @@
 - [Mortgage Calculator](/mortgage-calculator.html)
 - [Past Sales](/past-sales.html)
 - [Lifestyle Home Search](/lifestyle-search.html)
+- [Neighborhood Quiz — Find Your Northern Colorado Match](/neighborhood-quiz.html)
 - [Listing Video Portfolio](/listing-video-portfolio.html)
 - [Expired Listings](/expired-listings.html)
+- [Blog RSS Feed](/feed.xml)
 
 ## Why choose Signature Property Collection
 - 200+ homes sold and $200M+ in sales volume across Northern Colorado

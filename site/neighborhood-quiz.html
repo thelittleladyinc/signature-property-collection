@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neighborhood Quiz | Which Northern Colorado Town Fits You? | Signature Property Collection</title>
+<meta name="description" content="Take our free 4-question quiz to find which Northern Colorado neighborhood matches your lifestyle, commute, and budget.">
+<link rel="canonical" href="https://signaturepropertycollection.com/neighborhood-quiz.html">
+<meta property="og:title" content="Neighborhood Quiz | Which Northern Colorado Town Fits You? | Signature Property Collection">
+<meta property="og:description" content="Take our free 4-question quiz to find which Northern Colorado neighborhood matches your lifestyle, commute, and budget.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://signaturepropertycollection.com/neighborhood-quiz.html">
+<meta property="og:image" content="https://signaturepropertycollection.com/assets/img/logo-full.png">
+<meta property="og:updated_time" content="2026-08-12">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Neighborhood Quiz | Which Northern Colorado Town Fits You? | Signature Property Collection">
+<meta name="twitter:description" content="Take our free 4-question quiz to find which Northern Colorado neighborhood matches your lifestyle, commute, and budget.">
+<meta name="last-modified" content="2026-08-12">
+<link rel="icon" href="/assets/img/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#141415">
+<link rel="stylesheet" href="/assets/css/style.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/index.html", "image": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "hello@signaturepropertycollection.com", "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady"], "dateModified": "2026-08-12", "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://signaturepropertycollection.com/index.html"}, {"@type": "ListItem", "position": 2, "name": "Neighborhood Quiz"}]}</script>
+
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <div class="brand">
+      <a href="/index.html"><img class="brand-logo" src="/assets/img/logo-full.png" alt="Signature Property Collection"></a>
+      <span class="brokerage">LPT Realty</span>
+    </div>
+    <nav class="primary-nav">
+      <a href="/communities/index.html">Communities</a>
+      <a href="/search-homes.html">Search Homes</a>
+      <a href="/current-listings.html">Current Listings</a>
+      <a href="/about.html">About</a>
+      <a href="/buyers.html">Buy</a>
+      <a href="/sellers.html">Sell</a>
+      <a href="/testimonials.html">Testimonials</a>
+      <a href="/contact.html">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" style="padding:90px 0 50px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Find Your Fit</span>
+    <h1>Which Northern Colorado Neighborhood Matches You?</h1>
+    <p class="lede">Four quick questions, one real answer — matched against the same
+    towns Christine Gwinnup shows clients every day, not a generic quiz template.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap quiz-widget">
+    <div class="quiz-progress" id="quiz-progress"></div>
+    <div id="quiz-question-container"></div>
+    <div id="quiz-result-container" class="quiz-result" style="display:none">
+      <span class="eyebrow match-eyebrow">Your Best Match</span>
+      <h2 class="match-name" id="quiz-match-name"></h2>
+      <p class="lede match-blurb" id="quiz-match-blurb"></p>
+      <p class="quiz-runner-up" id="quiz-runner-up" style="display:none"></p>
+      <div class="btn-row" style="justify-content:center">
+        <a class="btn btn-dark" id="quiz-explore-link" href="/communities/index.html">Explore This Town</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" id="quiz-search-link" href="/search-homes.html">See Homes For Sale</a>
+      </div>
+      <h3 style="margin-top:48px">Want Your Full Personalized Report?</h3>
+      <p class="lede" id="quiz-report-lede">Get a curated list of homes matched to your
+      answers — and every runner-up town — sent straight to your inbox.</p>
+      <form class="lead-form" name="neighborhood-quiz" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name" value="neighborhood-quiz">
+      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <input type="text" name="name" placeholder="Full Name" required>
+      <input type="email" name="email" placeholder="Email" required>
+      <input type="tel" name="phone" placeholder="Phone">
+      <input type="hidden" name="quiz_match" id="quiz-match-field">
+      <input type="hidden" name="quiz_answers" id="quiz-answers-field">
+      <label class="consent">
+        <input type="checkbox" required>
+        I agree to receive marketing communication via call, text, or similar automated
+        means from Signature Property Collection. Consent is not a condition of purchase. Msg/data rates
+        may apply. Reply STOP to unsubscribe.
+      </label>
+      <button class="btn btn-dark" type="submit">Get My Full Match Report</button>
+    </form>
+    </div>
+  </div>
+</section>
+<script>
+(function () {
+  var CITIES = [{"name": "Loveland", "url": "/communities/larimer/loveland.html", "views": ["lake", "mountain"], "commute": "moderate", "priorities": ["schools", "new-build", "acreage"], "lifestyle": ["golf-lake", "hiking-mountain"], "blurb": "Loveland is home base for us \u2014 lakefront living at Boyd Lake, golf at Mariana Butte and The Olde Course, foothill views, and a walkable Downtown arts district, all in one town."}, {"name": "Berthoud", "url": "/communities/larimer/berthoud.html", "views": ["farmland", "mountain"], "commute": "moderate", "priorities": ["acreage", "schools"], "lifestyle": ["small-town", "hiking-mountain"], "blurb": "Berthoud is small-town Colorado done right \u2014 quiet, acreage-friendly, and still a short drive to Loveland and Longmont."}, {"name": "Masonville", "url": "/communities/larimer/masonville.html", "views": ["mountain", "farmland"], "commute": "far", "priorities": ["acreage"], "lifestyle": ["hiking-mountain", "small-town"], "blurb": "Masonville is foothill acreage country \u2014 unincorporated, private, and about as much space and quiet as Northern Colorado gets."}, {"name": "Fort Collins", "url": "/communities/larimer/fort-collins.html", "views": ["downtown", "mountain"], "commute": "moderate", "priorities": ["walkable", "schools"], "lifestyle": ["culture-dining", "hiking-mountain"], "blurb": "Fort Collins pairs a genuinely walkable Old Town \u2014 breweries, restaurants, live music \u2014 with CSU energy and foothill trails minutes away."}, {"name": "Windsor", "url": "/communities/larimer/windsor.html", "views": ["lake", "farmland"], "commute": "moderate", "priorities": ["new-build", "schools"], "lifestyle": ["golf-lake", "small-town"], "blurb": "Windsor centers on its own lake and a fast-growing downtown, with new-build communities that suit families well."}, {"name": "Timnath", "url": "/communities/larimer/timnath.html", "views": ["farmland", "lake"], "commute": "moderate", "priorities": ["new-build", "schools"], "lifestyle": ["small-town", "golf-lake"], "blurb": "Timnath is one of the fastest-growing master-planned communities in Northern Colorado \u2014 new construction, top schools, and easy access to Fort Collins."}, {"name": "Wellington", "url": "/communities/larimer/wellington.html", "views": ["farmland"], "commute": "far", "priorities": ["new-build", "schools"], "lifestyle": ["small-town"], "blurb": "Wellington offers small-town, wide-open-sky living just north of Fort Collins, with some of the region's most attainable new-build pricing."}, {"name": "Erie", "url": "/communities/weld/erie.html", "views": ["farmland", "downtown"], "commute": "close", "priorities": ["schools", "acreage"], "lifestyle": ["small-town", "culture-dining"], "blurb": "Erie blends small-town charm (yes, you can keep chickens) with a genuinely commutable location between Boulder and Denver."}, {"name": "Greeley", "url": "/communities/weld/greeley.html", "views": ["farmland"], "commute": "far", "priorities": ["acreage", "schools"], "lifestyle": ["small-town"], "blurb": "Greeley is Northern Colorado's most attainable price point \u2014 agricultural roots, real community, and room to spread out."}, {"name": "Boulder", "url": "/communities/boulder/boulder.html", "views": ["downtown", "mountain"], "commute": "close", "priorities": ["walkable"], "lifestyle": ["culture-dining", "hiking-mountain"], "blurb": "Boulder is unmatched for walkable culture and trailhead access straight from the Flatirons \u2014 a true university-town-meets-outdoor-capital."}, {"name": "Lafayette", "url": "/communities/boulder/lafayette.html", "views": ["downtown", "farmland"], "commute": "close", "priorities": ["schools", "walkable"], "lifestyle": ["culture-dining"], "blurb": "Lafayette gives you Boulder-adjacent schools and a walkable downtown at a more attainable price than Boulder itself."}, {"name": "Louisville", "url": "/communities/boulder/louisville.html", "views": ["downtown"], "commute": "close", "priorities": ["schools", "walkable"], "lifestyle": ["culture-dining"], "blurb": "Louisville consistently ranks among the best small towns in America \u2014 top schools, a genuine Main Street, and quick access to Boulder."}, {"name": "Nederland", "url": "/communities/boulder/nederland.html", "views": ["mountain"], "commute": "far", "priorities": ["acreage"], "lifestyle": ["hiking-mountain", "small-town"], "blurb": "Nederland is mountain living, full stop \u2014 a small, tight-knit town above Boulder with trails out your back door."}];
+  var QUESTIONS = [{"key": "q1", "prompt": "What's your idea of a perfect Saturday?", "options": [{"label": "Hiking a mountain trail", "views": ["mountain"], "lifestyle": ["hiking-mountain"]}, {"label": "Boating or fishing on the lake", "views": ["lake"], "lifestyle": ["golf-lake"]}, {"label": "Wandering a walkable downtown for coffee & shopping", "views": ["downtown"], "lifestyle": ["culture-dining"]}, {"label": "Working on a hobby farm or acreage project", "views": ["farmland"], "lifestyle": ["small-town"]}]}, {"key": "q2", "prompt": "How close do you want to be to Denver or Boulder?", "options": [{"label": "Right in it, or very close", "commute": "close"}, {"label": "A comfortable 20\u201340 minute drive", "commute": "moderate"}, {"label": "As far as reasonably possible \u2014 I want space", "commute": "far"}]}, {"key": "q3", "prompt": "What matters most in your next neighborhood?", "options": [{"label": "Top-rated schools & family amenities", "priorities": ["schools"]}, {"label": "Privacy, acreage, and room to spread out", "priorities": ["acreage"]}, {"label": "Walkability \u2014 restaurants and shops nearby", "priorities": ["walkable"]}, {"label": "A newer build with modern HOA amenities", "priorities": ["new-build"]}]}, {"key": "q4", "prompt": "What's your target price range?", "options": [{"label": "Under $700K", "budget": "entry"}, {"label": "$700K \u2013 $1.2M", "budget": "mid"}, {"label": "$1.2M \u2013 $2M", "budget": "upper"}, {"label": "$2M+", "budget": "luxury"}]}];
+  var BUDGET_PARAMS = {"entry": "noFloor=true", "mid": "noFloor=true&minPrice=700000", "upper": "minPrice=1200000", "luxury": "minPrice=2000000"};
+  var answers = {};
+  var current = 0;
+
+  var progressEl = document.getElementById('quiz-progress');
+  var qContainer = document.getElementById('quiz-question-container');
+  var resultContainer = document.getElementById('quiz-result-container');
+
+  function renderProgress() {
+    progressEl.innerHTML = QUESTIONS.map(function (_, i) {
+      return '<div class="quiz-progress-dot' + (i < current ? ' done' : '') + '"></div>';
+    }).join('');
+  }
+
+  function renderQuestion() {
+    renderProgress();
+    var q = QUESTIONS[current];
+    var selected = answers[q.key];
+    var optsHtml = q.options.map(function (opt, i) {
+      var cls = 'quiz-option' + (selected === i ? ' selected' : '');
+      return '<button type="button" class="' + cls + '" data-index="' + i + '">' + opt.label + '</button>';
+    }).join('');
+    qContainer.innerHTML =
+      '<div class="quiz-question"><h3>' + q.prompt + '</h3>' +
+      '<div class="quiz-options">' + optsHtml + '</div>' +
+      '<div class="quiz-nav">' +
+      '<button type="button" class="btn btn-outline" id="quiz-back" style="border-color:#141415;color:#141415"' +
+      (current === 0 ? ' disabled' : '') + '>Back</button>' +
+      '<button type="button" class="btn btn-dark" id="quiz-next"' +
+      (selected === undefined ? ' disabled' : '') + '>' +
+      (current === QUESTIONS.length - 1 ? 'See My Match' : 'Next') + '</button>' +
+      '</div></div>';
+
+    qContainer.querySelectorAll('.quiz-option').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        answers[q.key] = parseInt(btn.dataset.index, 10);
+        renderQuestion();
+      });
+    });
+    document.getElementById('quiz-back').addEventListener('click', function () {
+      if (current > 0) { current -= 1; renderQuestion(); }
+    });
+    document.getElementById('quiz-next').addEventListener('click', function () {
+      if (answers[q.key] === undefined) return;
+      if (current < QUESTIONS.length - 1) { current += 1; renderQuestion(); }
+      else { showResults(); }
+    });
+  }
+
+  function scoreCity(city, picked) {
+    var score = 0;
+    if (picked.q1.views && city.views.indexOf(picked.q1.views[0]) !== -1) score += 2;
+    if (picked.q1.lifestyle && city.lifestyle.indexOf(picked.q1.lifestyle[0]) !== -1) score += 2;
+    if (picked.q2.commute === city.commute) score += 2;
+    if (picked.q3.priorities && city.priorities.indexOf(picked.q3.priorities[0]) !== -1) score += 2;
+    return score;
+  }
+
+  function showResults() {
+    var picked = {
+      q1: QUESTIONS[0].options[answers.q1],
+      q2: QUESTIONS[1].options[answers.q2],
+      q3: QUESTIONS[2].options[answers.q3],
+      q4: QUESTIONS[3].options[answers.q4],
+    };
+    var ranked = CITIES.map(function (c) { return { city: c, score: scoreCity(c, picked) }; })
+      .sort(function (a, b) { return b.score - a.score; });
+    var top = ranked[0].city;
+    var runnerUp = ranked[1] ? ranked[1].city : null;
+    var budgetKey = picked.q4.budget;
+    var searchQs = BUDGET_PARAMS[budgetKey] + '&cities=' + encodeURIComponent(top.name);
+
+    qContainer.style.display = 'none';
+    progressEl.style.display = 'none';
+    resultContainer.style.display = '';
+
+    document.getElementById('quiz-match-name').textContent = top.name;
+    document.getElementById('quiz-match-blurb').textContent = top.blurb;
+    var runnerUpEl = document.getElementById('quiz-runner-up');
+    if (runnerUp) {
+      runnerUpEl.textContent = 'Also worth a look: ' + runnerUp.name;
+      runnerUpEl.style.display = '';
+    }
+    document.getElementById('quiz-explore-link').href = top.url;
+    document.getElementById('quiz-search-link').href = '/search-homes.html?' + searchQs;
+    document.getElementById('quiz-report-lede').textContent =
+      'Get a curated list of homes in ' + top.name +
+      ' — and every runner-up town — sent straight to your inbox.';
+
+    var matchField = document.getElementById('quiz-match-field');
+    var answersField = document.getElementById('quiz-answers-field');
+    if (matchField) matchField.value = top.name + (runnerUp ? ' (runner-up: ' + runnerUp.name + ')' : '');
+    if (answersField) {
+      answersField.value = [
+        'Saturday: ' + picked.q1.label,
+        'Commute: ' + picked.q2.label,
+        'Priority: ' + picked.q3.label,
+        'Budget: ' + picked.q4.label,
+      ].join(' | ');
+    }
+  }
+
+  renderQuestion();
+})();
+</script>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <h4>Signature Property Collection</h4>
+        <p style="max-width:340px;color:rgba(255,255,255,.7);line-height:1.6">
+          Christine Gwinnup &middot; LPT Realty<br>
+          Luxury real estate across Loveland, Berthoud, Masonville, and the
+          Larimer, Weld &amp; Boulder County Front Range.
+        </p>
+      </div>
+      <div>
+        <h4>Communities</h4>
+        <ul><li><a href="/communities/larimer.html">Larimer County</a></li>
+        <li><a href="/communities/weld.html">Weld County</a></li>
+        <li><a href="/communities/boulder.html">Boulder County</a></li>
+        <li><a href="/communities/broomfield.html">Broomfield County</a></li>
+        <li><a href="/communities/jefferson.html">Jefferson County</a></li>
+        <li><a href="/communities/denver.html">Denver County</a></li>
+        <li><a href="/communities/arapahoe.html">Arapahoe County</a></li>
+        <li><a href="/communities/adams.html">Adams County</a></li></ul>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="/search-homes.html">Search Homes</a></li>
+          <li><a href="/current-listings.html">Current Listings</a></li>
+          <li><a href="/blog/index.html">Blog</a></li>
+          <li><a href="/guides/buyers-guide.html">Buyer's Guide</a></li>
+          <li><a href="/guides/sellers-guide.html">Seller's Guide</a></li>
+          <li><a href="/guides/buy-like-a-pro.html">11 Tips To Buy Like A Pro</a></li><li><a href="/guides/upsizing-into-a-new-home.html">The Definitive Guide To Upsizing Into A New Home</a></li><li><a href="/guides/sell-your-home-fast.html">Unlocking Maximum Value From Your Home Sale</a></li>
+          <li><a href="/guides/rent-to-own-homes-northern-colorado.html">Rent-To-Own Homes in Northern Colorado: How It Actually Works</a></li><li><a href="/guides/multi-generational-homes-northern-colorado.html">Multi-Generational Homes For Sale in Northern Colorado: Find Your Family's Fit</a></li><li><a href="/guides/cost-to-develop-raw-land-colorado.html">What's The Real Cost To Develop Raw Land in Colorado?</a></li><li><a href="/guides/best-places-to-retire-in-northern-colorado.html">Best Places to Retire in Northern Colorado: A Community-by-Community Guide</a></li>
+          <li><a href="/relocation.html">Relocation</a></li>
+          <li><a href="/free-home-valuation.html">Free Home Valuation</a></li>
+          <li><a href="/mortgage-calculator.html">Mortgage Calculator</a></li>
+          <li><a href="/past-sales.html">Past Sales</a></li>
+          <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
+          <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
+          <li><a href="/neighborhood-quiz.html">Neighborhood Quiz</a></li>
+          <li><a href="/expired-listings.html">Expired Listings</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Connect</h4>
+        <ul>
+          <li>303-709-4262</li>
+          <li>hello@signaturepropertycollection.com</li>
+          <li>2411 Glade Rd, Loveland, CO 80538</li>
+          <li><a href="https://www.facebook.com/thelittleladysellshomes/" target="_blank" rel="noopener">Facebook</a></li>
+        <li><a href="https://www.instagram.com/thelittleladysellshomes/" target="_blank" rel="noopener">Instagram</a></li>
+        <li><a href="https://www.linkedin.com/in/thelittleladysellshomes/" target="_blank" rel="noopener">LinkedIn</a></li>
+        <li><a href="https://www.youtube.com/@thelittleladysellshomes" target="_blank" rel="noopener">YouTube</a></li>
+        <li><a href="https://www.tiktok.com/@thelittleladysellshomes" target="_blank" rel="noopener">TikTok</a></li>
+        <li><a href="https://www.pinterest.com/THELITTLELADYSELLSHOMES/" target="_blank" rel="noopener">Pinterest</a></li>
+        <li><a href="https://www.zillow.com/profile/TheLittleLady" target="_blank" rel="noopener">Zillow</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2026 Signature Property Collection &middot; Christine Gwinnup, LPT Realty. All information deemed reliable but not guaranteed.
+      &middot; <a href="/privacy-policy.html" style="text-decoration:underline">Privacy Policy</a>
+      &middot; <a href="/accessibility.html" style="text-decoration:underline">Accessibility</a>
+      &middot; <button type="button" class="qr-share-btn" onclick="var i=document.getElementById('qr-img');if(!i.src)i.src=i.dataset.src;document.getElementById('qr-overlay').classList.add('open');document.getElementById('qr-close-btn').focus()">Share This Page (QR Code)</button></span>
+      <span>Built by Claude for Christine Gwinnup</span>
+    </div>
+  </div>
+</footer>
+<div class="lb-overlay" id="qr-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-heading"
+  onclick="if (event.target === this) this.classList.remove('open')">
+  <div class="lb-box" style="text-align:center;max-width:340px">
+    <button type="button" id="qr-close-btn" class="lb-close" aria-label="Close"
+      onclick="document.getElementById('qr-overlay').classList.remove('open')">&times;</button>
+    <h3 id="qr-heading">Share This Page</h3>
+    <p class="search-status" style="margin-top:0">Scan with a phone camera to open this exact
+    page &mdash; handy for yard signs, flyers, and business cards.</p>
+    <img id="qr-img" data-src="/assets/qr/neighborhood-quiz.svg" alt="QR code linking to https://signaturepropertycollection.com/neighborhood-quiz.html" width="220" height="220" style="margin:12px auto;display:block">
+    <p style="word-break:break-all;font-size:13px;color:var(--gray)">https://signaturepropertycollection.com/neighborhood-quiz.html</p>
+  </div>
+</div>
+<script>
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { document.getElementById('qr-overlay').classList.remove('open'); }
+});
+</script>
+</body>
+</html>

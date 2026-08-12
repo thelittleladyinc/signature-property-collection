@@ -24,6 +24,7 @@ const SOURCE_LABELS = {
   "free-home-valuation": "Signature Property Collection - Free Home Valuation",
   "lifestyle-search": "Signature Property Collection - Lifestyle Search",
   "listing-inquiry": "Signature Property Collection - Listing Inquiry (Current Listings page)",
+  "neighborhood-quiz": "Signature Property Collection - Neighborhood Quiz",
 };
 
 function splitName(fullName) {
@@ -63,6 +64,14 @@ exports.handler = async (event) => {
       body.tags.push(data.inquiry_type === "Tour" ? "Tour Request" : "Listing Question");
     } else if (data.address) {
       body.notes = `Requested valuation for: ${data.address}`;
+    } else if (data.quiz_match) {
+      // From the Neighborhood Quiz (build_neighborhood_quiz() in build.py) —
+      // quiz_match is the top city match (+ runner-up), quiz_answers is a
+      // readable summary of what they picked, so the lead lands in Lofty
+      // with real context instead of just a name/email.
+      body.notes = `Neighborhood Quiz match: ${data.quiz_match}` +
+        (data.quiz_answers ? ` — ${data.quiz_answers}` : "");
+      body.tags.push("Neighborhood Quiz");
     }
 
     const res = await fetch(`${LOFTY_BASE_URL}/leads`, {
