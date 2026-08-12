@@ -45,6 +45,20 @@ GUIDES = _load_json("guides.json")
 LEGAL = _load_json("legal.json")
 BLOG = _load_json("blog.json")  # 60 posts migrated from the live site's blog
 
+# Old AgentFire/WordPress URL -> new site path, for anything printed,
+# bookmarked, or otherwise pointing at a URL that must keep working exactly
+# as-is after DNS cuts over — a 301 redirect, not a rename of our own page,
+# so our own clean URL structure is untouched. Seeded 2026-08-12: Christine
+# has real printed magazines with a QR code pointing at the live site's
+# expired-listings page at its exact old WordPress URL
+# (signaturepropertycollection.com/expiredlisting/ — confirmed via
+# notes/page_urls.txt, captured from the live site). Add more entries here
+# as the AgentFire audit turns up other URLs that need to keep working.
+LEGACY_URL_REDIRECTS = {
+    "/expiredlisting/": "/expired-listings.html",
+    "/expiredlisting": "/expired-listings.html",
+}
+
 # Display name (as used in COUNTIES[]["cities"]) -> CITY_CONTENT data key.
 # Only cities with real captured content get a linked sub-page; the rest
 # stay as plain pills on the county page.
@@ -939,7 +953,7 @@ HOME_FAQ = [
     ("Who is the best luxury real estate agent in Loveland, Berthoud, and Masonville?",
      f"As of {BUILD_DATE}, {SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a "
      f"luxury real estate agent based in Loveland, serving Berthoud, Masonville, and the "
-     f"rest of Larimer County with 100+ closed transactions and expertise in luxury "
+     f"rest of Larimer County with 200+ homes sold and expertise in luxury "
      f"marketing and negotiation."),
     ("What areas does Signature Property Collection serve?",
      f"{SITE['agent']} and {SITE['name']} serve Northern Colorado's Larimer, Weld, and "
@@ -1248,7 +1262,7 @@ def build_home():
 <section class="tight">
   <div class="wrap">
     <span class="eyebrow">{SITE['agent']}</span>
-    <h2 class="section-title">With 100+ closed transactions and $40M+ in sales volume</h2>
+    <h2 class="section-title">With 200+ homes sold and $200M+ in sales volume</h2>
     <p class="lede">Award-winning service and expertise in luxury marketing and negotiation —
     {SITE['agent']} and Signature Property Collection are redefining real estate excellence across
     Northern Colorado. Whether you're buying, selling, or relocating, we deliver unmatched
@@ -1668,8 +1682,8 @@ def build_city_pages():
             faq_pairs = [
                 (f"Who is the best real estate agent in {city}, CO?",
                  f"{SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a luxury real "
-                 f"estate agent serving {city} and the rest of {c['name']} — with 100+ closed "
-                 f"transactions across Northern Colorado's Larimer, Weld, and Boulder County "
+                 f"estate agent serving {city} and the rest of {c['name']} — with 200+ homes "
+                 f"sold across Northern Colorado's Larimer, Weld, and Boulder County "
                  f"Front Range."),
                 (f"Does {SITE['agent']} work with buyers and sellers in {city}?",
                  f"Yes. {SITE['agent']} represents both buyers and sellers in {city}, across "
@@ -1742,7 +1756,7 @@ def build_about():
     </div>
     <div class="card">
       <h3>By The Numbers</h3>
-      <p>100+ Closed Transactions &amp; $40M+ in Sales Volume<br>
+      <p>200+ Homes Sold &amp; $200M+ in Sales Volume<br>
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
@@ -3391,7 +3405,7 @@ def build_nav_pages():
     <span class="eyebrow" style="color:var(--dusty-rose)">The Track Record</span>
     <h1>Past Sales In Northern Colorado</h1>
     <p class="lede">From luxury estates to acreage properties and everything in between,
-    {SITE['agent']} has closed 100+ transactions across Northern Colorado — delivering
+    {SITE['agent']} has sold 200+ homes across Northern Colorado — delivering
     top-dollar results and seamless transactions for clients throughout the Front Range.</p>
     <p class="lede">Looking for current inventory? <a href="/search-homes.html"
     style="text-decoration:underline">Search live, active IRES MLS listings</a> across
@@ -3941,8 +3955,12 @@ def build_redirects_and_meta():
     with open(os.path.join(OUT, "robots.txt"), "w") as f:
         f.write(robots)
 
-    # simple redirect so "/" works
-    redirects = "/  /index.html  200\n"
+    # simple redirect so "/" works, plus any legacy AgentFire/WordPress URLs
+    # that need to keep resolving exactly as printed/bookmarked (see
+    # LEGACY_URL_REDIRECTS above for why — e.g. a printed magazine QR code).
+    redirect_lines = ["/  /index.html  200"]
+    redirect_lines += [f"{old}  {new}  301" for old, new in LEGACY_URL_REDIRECTS.items()]
+    redirects = "\n".join(redirect_lines) + "\n"
     with open(os.path.join(OUT, "_redirects"), "w") as f:
         f.write(redirects)
 
@@ -4007,7 +4025,7 @@ def build_llms_txt(paths):
 
 > {SITE['agent']} is a luxury real estate agent with {SITE['brokerage']}, serving
 > Northern Colorado's Larimer, Weld, and Boulder County Front Range — with priority
-> focus on Loveland, Berthoud, Masonville, and Fort Collins. 100+ closed transactions, $40M+ in sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
+> focus on Loveland, Berthoud, Masonville, and Fort Collins. 200+ homes sold, $200M+ in sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
 > Phone: {SITE['phone']}. Email: {SITE['email']}.
 > Last updated: {BUILD_DATE}.
 
@@ -4041,7 +4059,7 @@ def build_llms_txt(paths):
 {tool_lines}
 
 ## Why choose Signature Property Collection
-- 100+ closed transactions and $40M+ in sales volume across Northern Colorado
+- 200+ homes sold and $200M+ in sales volume across Northern Colorado
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
 - Certified Negotiation Specialist and Luxury Home Marketing Expert
 - Serves first-time buyers, luxury buyers, sellers, investors, and relocation clients
