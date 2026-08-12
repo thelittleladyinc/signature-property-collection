@@ -357,6 +357,20 @@ _LISTING_VIDEO_ENTRIES = [
     # showcase on past-sales.html.
     (["913 green mountain dr", "913 green mountain drive"],
      "e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", "sold"),
+    # 2026-08-12: Christine flagged that Gold Stone Creek Ct and 41st Ave
+    # both have real videos -- the public YouTube search I'd used to build
+    # this list missed both (neither surfaced even with the exact address
+    # in the query). Found by searching Christine's own channel directly
+    # (youtube.com/@thelittleladysellshomes/search), which covers all 223
+    # of her uploads instead of just the ~31 embedded in the Listings Video
+    # Portfolio page. Same fix applied for 1082 Lilac Ct, which a public
+    # search also missed but a channel search for "Lilac" surfaced cleanly.
+    (["45920 gold stone creek ct", "45920 gold stone creek court"],
+     "Dr5RN8_VfbU", "Custom Ranch Home with 4000+ Sq Ft — 45920 Gold Stone Creek Ct", "live"),
+    (["616 41st ave", "616 41st avenue"],
+     "MLbFLWZc-j4", "Why This Corner Lot in Greeley Stands Out — 616 41st Ave Tour", "live"),
+    (["1082 lilac ct", "1082 lilac court"],
+     "06q7rZAWEaY", "Inside This 4-Bedroom Broomfield Home — 1082 Lilac Ct Tour", "live"),
 ]
 LISTING_VIDEOS = {addr: (vid, title) for addrs, vid, title, _status in _LISTING_VIDEO_ENTRIES for addr in addrs}
 
