@@ -337,8 +337,16 @@ _LISTING_VIDEO_ENTRIES = [
      "oNZBc-MxzUg", "Stunning Home for Sale — 4986 Stuart St, Denver (Tennyson Art District)", "sold"),
     (["5705 snow mesa dr", "5705 snow mesa drive"],
      "MDfyzESb1Yk", 'Why Is Loveland, CO Called the "Sweetheart City"? — 5705 Snow Mesa Dr', "sold"),
+    # 2026-08-12: kdR6wbWPMQU (the previous ID here) turned out to be a
+    # 27-second vertical Short, not a proper listing tour -- Christine
+    # flagged the format ("the video is a reel"). Replaced with the real
+    # horizontal ~1:27 tour from her channel, confirmed by cross-referencing
+    # thelittleladysellshomes.com's Listings Video Portfolio + a YouTube
+    # search for this address: the video's own description opens with
+    # "Looking for a newer home in Windsor, Colorado... Welcome to 945
+    # Maplebrook...".
     (["945 maplebrook dr", "945 maplebrook drive"],
-     "kdR6wbWPMQU", "Windsor, Colorado Living — 945 Maplebrook Dr Tour", "live"),
+     "SAZceZQJrAs", "Is This the Cutest Home in Windsor, Colorado? — 945 Maplebrook Dr Tour", "live"),
     (["475 homestead ln", "475 homestead lane"],
      "6Hrdv6LZIDM", "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)", "sold"),
     # Confirmed 2026-08-11 (after an earlier back-and-forth): 913 Green
