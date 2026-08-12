@@ -29,6 +29,26 @@ const {
 
 const TIME_BUDGET_MS = 20000; // leave headroom under the 30s function limit
 const PAGE_SIZE = 50; // kept small since $expand=Media makes each record heavy
+// 2026-08-12 (rate-limit fix): MLS Grid suspended API access today (and
+// several times before, per notify@mlsgrid.com emails going back to
+// mid-July) for exceeding their request-rate limits. Their own numbers:
+// warning at >4 requests/sec at any instant or >7200/hour, temporary
+// suspension at >6 req/sec or >18000/hour. This loop was firing requests
+// back-to-back with zero delay -- a single bootstrap run was measured
+// fetching 140 pages inside the 20s time budget, i.e. ~7 req/sec sustained,
+// already past the "warning" line on its own; stacked with anything else
+// hitting the same token in the same window (a manual "Run now", overlapping
+// invocations, etc.) it's easy to blow past the suspension threshold, which
+// is exactly what happened (MLS Grid logged 13 req/sec for this hour).
+// Suspension is temporary and self-clears once usage drops back under the
+// limit for a while, but it stalls the sync in the meantime, so the real
+// fix is to just never send requests that fast. A fixed delay between pages
+// keeps this comfortably under every limit above (roughly 1.4 req/sec) at
+// the cost of fewer pages per 15-minute run -- the bootstrap pass just takes
+// a few more cycles to finish, which is fine; nothing here is time-critical
+// beyond IDX Rule 12's 12-hour refresh requirement.
+const REQUEST_DELAY_MS = 700;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function statusClause() {
   return "(" + REPLICATED_STATUSES.map((s) => `StandardStatus eq '${s}'`).join(" or ") + ")";
@@ -88,6 +108,11 @@ exports.handler = async () => {
   // is visible from the browser instead of only in Netlify's own function
   // logs, which we don't have a way to read directly.
   let lastRunError = null;
+  // 2026-08-12: tracks whether this run ended because MLS Grid rejected a
+  // request (4xx/5xx), as opposed to running out of time budget or a
+  // network-level exception. Used below to decide whether it's safe to
+  // save `requestUrl` as next run's resume cursor.
+  let httpErrorOccurred = false;
 
   try {
     while (requestUrl) {
@@ -97,11 +122,19 @@ exports.handler = async () => {
         break;
       }
 
+      if (pagesFetched > 0) {
+        // Throttle: see REQUEST_DELAY_MS comment above. Skipped before the
+        // very first request of the run (no prior request to space out
+        // from) so it doesn't eat into the time budget for nothing.
+        await sleep(REQUEST_DELAY_MS);
+      }
+
       const res = await fetch(requestUrl, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         lastRunError = `MLS Grid ${res.status}: ${text.slice(0, 500)}`;
         console.error(`sync-listings: ${lastRunError}`);
+        httpErrorOccurred = true;
         break;
       }
       const json = await res.json();
@@ -134,10 +167,22 @@ exports.handler = async () => {
   }
 
   const passComplete = !requestUrl;
+  // 2026-08-12: previously this always saved `requestUrl` as the resume
+  // cursor, including when it was the exact URL MLS Grid just rejected
+  // with a 4xx (e.g. the WaterfrontFeatures $select bug). That poisoned
+  // cursor then got replayed on every subsequent run forever — bypassing
+  // the fresh query this code builds from the current SELECT_FIELDS/filter
+  // — which is why fixing the underlying field bug in _mls-shared.js never
+  // actually took effect in production. On an HTTP rejection specifically,
+  // we now discard the cursor instead, so the next run rebuilds a brand
+  // new request from scratch using whatever the code currently asks for.
+  // (A time-budget break or network exception still resumes from
+  // `requestUrl` as before — those aren't proof the query itself is bad.)
+  const cursorToSave = httpErrorOccurred ? null : requestUrl;
   await store.setJSON(LISTINGS_KEY, listingsById);
   await store.setJSON(SYNC_STATE_KEY, {
     bootstrapped: state.bootstrapped || passComplete,
-    cursor: requestUrl,
+    cursor: cursorToSave,
     lastModified: passComplete ? maxModTimestampThisPass : state.lastModified,
     lastRunAt: new Date().toISOString(),
     lastRunPagesFetched: pagesFetched,

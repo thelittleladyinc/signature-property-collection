@@ -28,13 +28,52 @@ const BASE_URL = "https://api.mlsgrid.com/v2/Property";
 // past the earlier ListPrice/City $filter fix). WaterfrontYN plus the
 // PublicRemarks keyword check in matchesQuery() below is still enough to
 // flag waterfront listings without it.
+//
+// 2026-08-12 (second pass): once WaterfrontFeatures was fixed and the
+// poisoned resume-cursor bug in sync-listings.js was also fixed (see that
+// file's 2026-08-12 comments), the sync got further and hit a SECOND
+// invalid-select-field 400, this time on ListOfficeName -- "The field
+// 'ListOfficeName' does not exist or is unable to be retrieved" for this
+// same IRES feed. Pulled here too. This is a real gap: IDX Rule 24 wants
+// the listing brokerage shown per listing, and right now officeName will
+// just be null (the UI already drops it cleanly via .filter(Boolean) in
+// the compliance line, so nothing breaks -- it just won't show a per-
+// listing office name until we hear back from IRES's Data Feed team,
+// RETS@iresmls.com, on what field (if any) actually exposes it on this
+// feed. ListAgentFullName/phone/email are unaffected and still display.
+//
+// 2026-08-12 (third pass): same story again, this time ListAgentDirectPhone
+// -- "The field 'ListAgentDirectPhone' does not exist or is unable to be
+// retrieved." Pulled here too.
+//
+// 2026-08-12 (fourth pass, final): rather than keep discovering these one
+// per 15-minute sync cycle, tested the exact request shape sync-listings.js
+// sends (same $filter/$select/$expand/$top/$orderby) directly against MLS
+// Grid's live API with MLSGRID_API_TOKEN, iterating on each 400 until it
+// returned 200. ListAgentEmail was also rejected -- "The field
+// 'ListAgentEmail' does not exist or is unable to be retrieved" -- and
+// after removing it too, the request succeeded end-to-end: 200 OK, real
+// listings with real addresses/prices/photos, @odata.nextLink present for
+// pagination. This is now a confirmed-working field list, not a guess.
+//
+// Net effect: this IRES feed exposes ListAgentFullName but neither
+// ListAgentDirectPhone nor ListAgentEmail -- no per-listing agent contact
+// info comes through at all, only their name. IDX Rule 24's "contact"
+// requirement isn't fully satisfiable from this feed as a result; the
+// site's own "Ask A Question" / "Request A Tour" buttons on each listing
+// card (which route through this site's contact form, not the MLS data)
+// are the practical substitute. Same open item as ListOfficeName above:
+// worth asking IRES's Data Feed team (RETS@iresmls.com) whether any of
+// these three fields (office name, agent phone, agent email) are available
+// under a different field name on this feed, since none of the "obvious"
+// RESO Data Dictionary names for them work here.
 const SELECT_FIELDS = [
   "ListingId", "ListingKey", "StandardStatus", "ListPrice",
   "BedroomsTotal", "BathroomsTotalInteger", "LivingArea",
   "StreetNumber", "StreetName", "StreetSuffix", "City", "StateOrProvince", "PostalCode",
   "PublicRemarks", "PropertyType", "PropertySubType", "SubdivisionName",
   "WaterfrontYN",
-  "ListOfficeName", "ListAgentFullName", "ListAgentDirectPhone", "ListAgentEmail",
+  "ListAgentFullName",
   "CoListAgentFullName", "ModificationTimestamp", "MlgCanView",
 ].join(",");
 
@@ -70,13 +109,18 @@ const SYNC_STATE_KEY = "sync-state.json";
 // — same pattern as MLSGRID_API_TOKEN, never passed through this codebase.
 // If those two env vars aren't set yet, this still tries the zero-config
 // path first, in case Netlify's auto-injection starts working on its own.
-function getBlobStore(getStoreFn) {
+// storeName defaults to BLOB_STORE_NAME (the MLS listings store) so every
+// existing caller (sync-listings.js, listings-search.js) is unaffected;
+// nearby-places.js passes its own store name to keep its distance-lookup
+// cache separate from the listings data.
+function getBlobStore(getStoreFn, storeName) {
   const siteID = process.env.BLOBS_SITE_ID;
   const token = process.env.BLOBS_TOKEN;
+  const name = storeName || BLOB_STORE_NAME;
   if (siteID && token) {
-    return getStoreFn(BLOB_STORE_NAME, { siteID, token });
+    return getStoreFn(name, { siteID, token });
   }
-  return getStoreFn(BLOB_STORE_NAME);
+  return getStoreFn(name);
 }
 
 function mapListing(item) {
