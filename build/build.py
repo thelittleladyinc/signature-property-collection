@@ -1908,16 +1908,24 @@ def build_city_pages():
                     f"real time, not a stale snapshot — or reach out and we'll send you a "
                     f"curated list matched to what you're looking for."
                 )
-                widget_html, widget_js = _fancy_search_widget(f"fs-{data_slug}", fixed_city=city)
+                # 2026-08-13 (Christine's request, applied here after
+                # search-homes.html): same fix as that page -- no more
+                # $950K floor hiding real inventory, no more "go search
+                # somewhere else" copy. price_floor=0/always_no_floor=True
+                # matches search-homes.html's config exactly (see that
+                # function's docstring for why both are needed together).
+                widget_html, widget_js = _fancy_search_widget(
+                    f"fs-{data_slug}", fixed_city=city, price_floor=0, always_no_floor=True,
+                )
+                county_cities_qs = urllib.parse.quote(",".join(c["cities"]))
                 search_widget_block = f"""<section class="tight">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Live Inventory, $950K+</span>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
     <h2 class="section-title">Search Homes In {esc(city)}</h2>
-    <p class="lede">Real, active {esc(city)} listings from IRES MLS — filter by price, beds,
-    and baths and the results update instantly.</p>
-    <p class="search-status" style="margin-top:0">This search covers {esc(SITE['agent'])}'s
-    luxury-focused $950K+ market. Looking for {esc(city)} homes under $950,000?
-    <a href="https://www.thelittleladysellshomes.com/search-northern-colorado-homes-for-sale" target="_blank" rel="noopener" style="text-decoration:underline">Search the full range on The Little Lady Sells Homes</a>.</p>
+    <p class="lede">Every active {esc(city)} listing from IRES MLS, any price range —
+    updated every 15 minutes, not a stale snapshot. Filter by price, beds, and baths
+    below, or <a href="/search-homes.html?cities={county_cities_qs}" style="text-decoration:underline">search
+    all of {esc(c['name'])} at once</a>.</p>
     {widget_html}
   </div>
 </section>

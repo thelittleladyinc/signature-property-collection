@@ -74,25 +74,24 @@
 </section>
 <section class="tight">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Live Inventory, $950K+</span>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
     <h2 class="section-title">Search Homes In Red Feather Lakes</h2>
-    <p class="lede">Real, active Red Feather Lakes listings from IRES MLS — filter by price, beds,
-    and baths and the results update instantly.</p>
-    <p class="search-status" style="margin-top:0">This search covers Christine Gwinnup's
-    luxury-focused $950K+ market. Looking for Red Feather Lakes homes under $950,000?
-    <a href="https://www.thelittleladysellshomes.com/search-northern-colorado-homes-for-sale" target="_blank" rel="noopener" style="text-decoration:underline">Search the full range on The Little Lady Sells Homes</a>.</p>
+    <p class="lede">Every active Red Feather Lakes listing from IRES MLS, any price range —
+    updated every 15 minutes, not a stale snapshot. Filter by price, beds, and baths
+    below, or <a href="/search-homes.html?cities=Fort%20Collins%2CLoveland%2CBerthoud%2CMasonville%2CWindsor%2CTimnath%2CWellington%2CRed%20Feather%20Lakes" style="text-decoration:underline">search
+    all of Larimer County at once</a>.</p>
     <div class="fs-widget">
     <form id="fs-red-feather-lakes-form">
       <input type="hidden" name="city" value="Red Feather Lakes">
       <div class="fs-row" style="margin-top:22px">
         <div class="fs-block" style="flex:1 1 320px">
           <span class="fs-label">Price Range</span>
-          <div class="fs-price-values"><span id="fs-red-feather-lakes-min-label">$950,000</span><span>&mdash;</span><span id="fs-red-feather-lakes-max-label">$5,000,000+</span></div>
+          <div class="fs-price-values"><span id="fs-red-feather-lakes-min-label">$0</span><span>&mdash;</span><span id="fs-red-feather-lakes-max-label">$5,000,000+</span></div>
           <div class="fs-slider">
             <div class="fs-slider-track"></div>
             <div class="fs-slider-range" id="fs-red-feather-lakes-range-fill"></div>
-            <input type="range" id="fs-red-feather-lakes-min-range" min="950000" max="5000000" step="25000" value="950000" aria-label="Minimum price">
-            <input type="range" id="fs-red-feather-lakes-max-range" min="950000" max="5000000" step="25000" value="5000000" aria-label="Maximum price">
+            <input type="range" id="fs-red-feather-lakes-min-range" min="0" max="5000000" step="25000" value="0" aria-label="Minimum price">
+            <input type="range" id="fs-red-feather-lakes-max-range" min="0" max="5000000" step="25000" value="5000000" aria-label="Maximum price">
           </div>
         </div>
         <div class="fs-block">
@@ -149,6 +148,8 @@
   var wid = "fs-red-feather-lakes";
   var fixedCity = "Red Feather Lakes";
   var supportDeepLinks = false;
+  var alwaysNoFloor = true;
+  var countyCityMap = {};
   var form = document.getElementById(wid + '-form');
   var resultsEl = document.getElementById(wid + '-results');
   var statusEl = document.getElementById(wid + '-status');
@@ -163,6 +164,8 @@
   var maxPriceInput = document.getElementById(wid + '-maxPrice');
   var bedsInput = document.getElementById(wid + '-beds');
   var bathsInput = document.getElementById(wid + '-baths');
+  var citySelect = document.getElementById(wid + '-city');
+  var countySelect = document.getElementById(wid + '-county');
   var CEILING = 5000000;
   var skip = 0;
   var TOP = 12;
@@ -304,6 +307,25 @@
     wirePills(g, g.dataset.field === 'beds' ? bedsInput : bathsInput);
   });
 
+  // ---- County -> City cascade: picking a county narrows the City dropdown
+  // to just that county's cities (plus "All Cities In <County>"); leaving
+  // City on "All" while a county is picked searches every city in that
+  // county at once via listings-search.js's existing `cities` param. ----
+  var allCityOptionsHtml = citySelect ? citySelect.innerHTML : '';
+  if (countySelect && citySelect) {
+    countySelect.addEventListener('change', function () {
+      var slug = countySelect.value;
+      citySelect.value = '';
+      if (!slug) {
+        citySelect.innerHTML = allCityOptionsHtml;
+        return;
+      }
+      var cities = countyCityMap[slug] || [];
+      citySelect.innerHTML = '<option value="">All Cities</option>' +
+        cities.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    });
+  }
+
   var urlParams = supportDeepLinks ? new URLSearchParams(window.location.search) : new URLSearchParams('');
 
   function paramsFromForm() {
@@ -314,10 +336,15 @@
       if (v) p[k] = v;
     });
     if (fixedCity) p.city = fixedCity;
+    if (!p.city && countySelect && countySelect.value) {
+      var selCities = countyCityMap[countySelect.value] || [];
+      if (selCities.length) p.cities = selCities.join(',');
+    }
+    if (alwaysNoFloor) p.noFloor = 'true';
     if (supportDeepLinks) {
       if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
       if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
-      if (urlParams.get('cities')) p.cities = urlParams.get('cities');
+      if (urlParams.get('cities') && !p.cities) p.cities = urlParams.get('cities');
       if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
     }
     return p;
