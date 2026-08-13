@@ -123,11 +123,32 @@ function getBlobStore(getStoreFn, storeName) {
   return getStoreFn(name);
 }
 
+// 2026-08-13 (payload-size fix): measured live production data and found
+// the replicated dataset (~15,463 listings) was averaging ~29 photo URLs
+// per listing (max seen: 50), and that the `photos` array alone accounted
+// for roughly three-quarters of each listing's stored JSON size --
+// extrapolated to ~117MB for the whole LISTINGS_KEY blob. sync-listings.js
+// reads, holds in memory, and re-writes that ENTIRE blob as one JSON
+// document on every single 15-minute run (even incremental ones only touch
+// a handful of records, but the final store.setJSON call always sends the
+// full accumulated object) -- a strong match for the exact-round-number
+// 60000ms/1024MB ceilings observed in production logs, i.e. the sync was
+// very plausibly failing to complete under real memory/time limits because
+// of this, independent of the network-timeout fix in sync-listings.js.
+// MLS Grid's own Media ordering puts the primary/cover photo first, so
+// capping here keeps photo #1 (used everywhere as the cover) plus a
+// generous gallery, while cutting the worst-case per-listing photo count
+// (and therefore payload) by roughly 5x. 12 is plenty for the card-gallery
+// UI on the site today; raise this (and consider moving to an on-demand
+// per-listing detail fetch, the pattern already used in Christine's
+// Expired-Luxury app) if a bigger in-card gallery is ever wanted.
+const MAX_STORED_PHOTOS = 12;
+
 function mapListing(item) {
   const address = [item.StreetNumber, item.StreetName, item.StreetSuffix]
     .filter(Boolean).join(" ");
   const media = Array.isArray(item.Media) ? item.Media : [];
-  const photos = media.map((m) => m && m.MediaURL).filter(Boolean);
+  const photos = media.map((m) => m && m.MediaURL).filter(Boolean).slice(0, MAX_STORED_PHOTOS);
   const photo = photos.length ? photos[0] : null;
 
   return {
@@ -227,6 +248,7 @@ module.exports = {
   BLOB_STORE_NAME,
   LISTINGS_KEY,
   SYNC_STATE_KEY,
+  MAX_STORED_PHOTOS,
   mapListing,
   matchesQuery,
 };

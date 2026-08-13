@@ -86,7 +86,7 @@
 const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES,
-  LISTINGS_KEY, SYNC_STATE_KEY, AGENT_SURNAME, mapListing, getBlobStore,
+  LISTINGS_KEY, SYNC_STATE_KEY, AGENT_SURNAME, MAX_STORED_PHOTOS, mapListing, getBlobStore,
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
 
@@ -300,6 +300,27 @@ exports.handler = async () => {
   };
 
   let listingsById = (await store.get(LISTINGS_KEY, { type: "json" })) || {};
+
+  // 2026-08-13 (payload-size fix, one-time catch-up): mapListing() now caps
+  // newly-fetched listings to MAX_STORED_PHOTOS, but that only shrinks
+  // records as the normal crawl happens to touch them -- at the current
+  // incremental pace that could take weeks to reach every already-stored
+  // listing. Trimming every already-oversized entry here instead (pure
+  // in-memory array slicing, zero MLS Grid requests, effectively free) means
+  // the very next successful write already reflects the full size win
+  // instead of waiting on the slow crawl. Safe to leave in permanently: a
+  // no-op once nothing is left oversized.
+  let trimmedOversizedPhotos = 0;
+  for (const listing of Object.values(listingsById)) {
+    if (Array.isArray(listing.photos) && listing.photos.length > MAX_STORED_PHOTOS) {
+      listing.photos = listing.photos.slice(0, MAX_STORED_PHOTOS);
+      listing.photo = listing.photos[0] || listing.photo;
+      trimmedOversizedPhotos += 1;
+    }
+  }
+  if (trimmedOversizedPhotos) {
+    console.log(`sync-listings: trimmed oversized photo arrays on ${trimmedOversizedPhotos} already-stored listing(s) down to ${MAX_STORED_PHOTOS} each.`);
+  }
 
   let lastRunError = null;
   let httpErrorOccurred = false;
