@@ -45,7 +45,7 @@
 const { getStore } = require("@netlify/blobs");
 const {
   LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery, getBlobStore,
-} = require("./_mls-shared");
+} = require("./lib/_mls-shared");
 
 exports.handler = async (event) => {
   const store = getBlobStore(getStore);

@@ -30,7 +30,7 @@
 //   this means the same listing being viewed by 50 different buyers costs
 //   Google API quota exactly once, not 50 times.
 const { getStore } = require("@netlify/blobs");
-const { getBlobStore } = require("./_mls-shared");
+const { getBlobStore } = require("./lib/_mls-shared");
 
 const NEARBY_STORE_NAME = "nearby-places-cache";
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days

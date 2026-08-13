@@ -69,8 +69,8 @@ const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES,
   LISTINGS_KEY, SYNC_STATE_KEY, AGENT_SURNAME, mapListing, getBlobStore,
-} = require("./_mls-shared");
-const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./_cloudinary");
+} = require("./lib/_mls-shared");
+const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
 
 const TIME_BUDGET_MS = 20000; // leave headroom under the 30s function limit
 const PAGE_SIZE = 50; // kept small since $expand=Media makes each record heavy
