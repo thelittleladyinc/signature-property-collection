@@ -241,7 +241,8 @@
         'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
         'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
     } else if (photos.length) {
-      top = '<img src="' + esc(photos[0]) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">';
+      top = '<img src="' + esc(photos[0]) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+        'onerror="this.onerror=null;this.style.background=\'#eee\';this.style.aspectRatio=\'4/3\';this.removeAttribute(\'src\')">';
     } else {
       top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
     }

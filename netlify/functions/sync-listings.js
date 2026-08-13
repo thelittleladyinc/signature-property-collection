@@ -65,40 +65,15 @@
 // effectively free once each one is cached (cacheCoverPhotoIfHers no-ops
 // immediately for anything already on Cloudinary, so this only costs real
 // MLS Grid requests for the ones not yet cached).
-//
-// 2026-08-13 (hang + photo-429 fix): two related bugs found after the
-// Cloudinary-credential fix went live. (1) The two direct fetch() calls to
-// MLS Grid's $filter endpoint below had NO timeout — only the photo
-// download in _cloudinary.js did. TIME_BUDGET_MS is only checked *between*
-// loop iterations, so one slow or hung MLS Grid response could sail past
-// the intended 20s budget with nothing to stop it, consistent with the
-// exact, suspiciously-round 60000ms durations observed in the function
-// logs (a platform-level kill, not the code finishing naturally). Fixed by
-// giving every direct MLS Grid fetch the same AbortSignal.timeout() guard
-// _cloudinary.js already uses for the photo fetch. (2) A 429 on the PHOTO
-// fetch (media.mlsgrid.com, inside cacheCoverPhotoIfHers) was only ever
-// logged with console.warn — it never opened the SUSPENSION_KEY circuit
-// breaker the listing-query 429 does, even though both endpoints share the
-// exact same MLS Grid account/token and rate limit. That meant a handful of
-// already-429'd cover photos got retried every single 15-minute run
-// forever with zero backoff. Fixed by having a photo-fetch 429 open the
-// same circuit breaker as a listing-query 429.
 const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES,
-  LISTINGS_KEY, SYNC_STATE_KEY, AGENT_SURNAME, MAX_STORED_PHOTOS, mapListing, getBlobStore,
+  LISTINGS_KEY, SYNC_STATE_KEY, AGENT_SURNAME, mapListing, getBlobStore,
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
 
 const TIME_BUDGET_MS = 20000; // leave headroom under the 30s function limit
 const PAGE_SIZE = 50; // kept small since $expand=Media makes each record heavy
-// 2026-08-13 (hang fix): guards every direct MLS Grid $filter fetch below
-// (the photo fetch in _cloudinary.js already has its own 10s guard). Kept
-// comfortably under TIME_BUDGET_MS so a single slow response still leaves
-// room for the code's own budget check to end the run cleanly and save
-// progress, instead of a hung request silently eating the whole invocation
-// until an external platform timeout kills it.
-const FETCH_TIMEOUT_MS = 12000;
 // 2026-08-12 (rate-limit fix): MLS Grid suspended API access today (and
 // several times before, per notify@mlsgrid.com emails going back to
 // mid-July) for exceeding their request-rate limits. Their own numbers:
@@ -186,52 +161,70 @@ function isHerListing(mapped) {
   return agent.includes(surname) || coAgent.includes(surname);
 }
 
-// Permanently re-hosts a listing's cover photo on Cloudinary the first
-// time it's seen. Safe to call every time this listing is processed —
-// it no-ops immediately if already cached, and no-ops (falls back to the
-// raw, eventually-expiring MLS Grid URL) if Cloudinary env vars aren't
-// set yet, so nothing breaks before Christine adds them in Netlify.
+// 2026-08-13 (full-gallery cache): originally this only cached photos[0]
+// (the card thumbnail). But Current Listings' "View All N Photos" lightbox
+// pulls from the full photos[] array, so every photo past the cover was
+// still a raw, eventually-expiring MLS Grid URL — the gallery button worked
+// but every photo inside it 403'd once the signed URL's short TTL passed.
+// Extends the same proven pattern (download bytes with the Bearer token,
+// hand Cloudinary a Buffer) to every photo, not just the first.
 //
-// Returns { suspended: true } when MLS Grid 429'd the photo fetch itself —
-// same account/token as the listing query, so callers treat this exactly
-// like a listing-query 429: open the shared circuit breaker and stop
-// making new MLS Grid requests for the cooldown window, rather than
-// retrying the same already-429'd photo again on the very next run.
-async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, store) {
-  if (!mapped.photo || !isHerListing(mapped)) return {};
-  if (previouslyStored && previouslyStored.cloudinaryPhoto) {
-    // Already cached from an earlier run — reuse it, no MLS Grid or
-    // Cloudinary call needed. (We intentionally never re-check whether the
-    // source photo changed; re-caching automatically isn't worth the extra
-    // MLS Grid requests for a handful of listings whose cover photo rarely
-    // changes after the initial upload. A future manual "recache" admin
-    // action could force this if it's ever actually needed.)
-    mapped.cloudinaryPhoto = previouslyStored.cloudinaryPhoto;
-    mapped.photo = previouslyStored.cloudinaryPhoto;
-    if (mapped.photos && mapped.photos.length) mapped.photos[0] = previouslyStored.cloudinaryPhoto;
-    return {};
-  }
-  if (!isCloudinaryConfigured()) return {}; // fall back to the raw MLS Grid URL
-  try {
-    const publicId = `spc-listings/${mapped.listingId}/cover`;
-    const secureUrl = await cachePhotoToCloudinary(mapped.photo, token, publicId);
-    if (secureUrl) {
-      mapped.cloudinaryPhoto = secureUrl;
-      mapped.photo = secureUrl;
-      if (mapped.photos && mapped.photos.length) mapped.photos[0] = secureUrl;
+// Bounded per call by CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN + the remaining
+// time budget, since a brand-new listing can have up to MAX_STORED_PHOTOS
+// (12) photos to cache and each one is a real download+upload round trip —
+// doing all 12 in one invocation risks blowing Netlify's function time
+// limit. Whatever isn't reached this run picks up next run: already-cached
+// slots (tracked per-index in previouslyStored.cloudinaryPhotos) are never
+// re-uploaded, so this safely converges over a few runs to every photo
+// being permanently hosted, without ever re-doing finished work.
+const CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN = 4;
+
+// Permanently re-hosts a listing's photos (cover + full gallery) on
+// Cloudinary, a few at a time until all are cached. Safe to call every time
+// this listing is processed — already-cached photos are skipped instantly,
+// and it no-ops (falls back to the raw, eventually-expiring MLS Grid URLs)
+// if Cloudinary env vars aren't set yet, so nothing breaks before Christine
+// adds them in Netlify. Returns the number of photos newly cached this call
+// (for the caller's run-summary counters).
+async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt) {
+  if (!mapped.photos || !mapped.photos.length || !isHerListing(mapped)) return 0;
+  if (!isCloudinaryConfigured()) return 0; // fall back to the raw MLS Grid URLs
+
+  const already = (previouslyStored && Array.isArray(previouslyStored.cloudinaryPhotos))
+    ? previouslyStored.cloudinaryPhotos.slice()
+    : (previouslyStored && previouslyStored.cloudinaryPhoto ? [previouslyStored.cloudinaryPhoto] : []);
+  const cloudinaryPhotos = mapped.photos.map((_, i) => already[i] || null);
+  let uploadedThisCall = 0;
+
+  for (let i = 0; i < mapped.photos.length; i += 1) {
+    if (cloudinaryPhotos[i]) continue; // already cached from an earlier run
+    if (uploadedThisCall >= CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN) break;
+    if (startedAt && Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
+    try {
+      const publicId = `spc-listings/${mapped.listingId}/photo-${i}`;
+      const secureUrl = await cachePhotoToCloudinary(mapped.photos[i], token, publicId);
+      if (secureUrl) {
+        cloudinaryPhotos[i] = secureUrl;
+        uploadedThisCall += 1;
+      }
+    } catch (err) {
+      // Don't let one photo failing break the rest — the listing still gets
+      // stored with that slot's (eventually-expiring) raw MLS Grid photo,
+      // and this just retries that slot on a later run.
+      console.warn(`sync-listings: Cloudinary cache failed for ${mapped.listingId} photo ${i}: ${err && err.message}`);
     }
-    return {};
-  } catch (err) {
-    // Don't let a photo-caching failure break the sync — the listing still
-    // gets stored with its (eventually-expiring) raw MLS Grid photo, and
-    // this just retries on the next run (unless it was a 429 — see below).
-    console.warn(`sync-listings: Cloudinary cache failed for ${mapped.listingId}: ${err && err.message}`);
-    if (err && err.status === 429) {
-      await markSuspended(store, SUSPENSION_COOLDOWN_MS);
-      return { suspended: true };
-    }
-    return {};
   }
+
+  if (cloudinaryPhotos.some(Boolean)) {
+    mapped.cloudinaryPhotos = cloudinaryPhotos;
+    mapped.cloudinaryPhoto = cloudinaryPhotos[0] || undefined; // back-compat with older stored records
+    // Serve whichever photos are cached so far; any not-yet-cached slot
+    // falls back to its raw MLS Grid URL rather than being dropped, so the
+    // gallery's photo count never shrinks while caching is still catching up.
+    mapped.photos = mapped.photos.map((raw, i) => cloudinaryPhotos[i] || raw);
+    mapped.photo = mapped.photos[0];
+  }
+  return uploadedThisCall;
 }
 
 // Fetches one listing by ListingId, verifies MLS Grid actually honored the
@@ -242,7 +235,7 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, store) {
 // priority pass (Christine's own listings, below) and the refresh sweep
 // (everyone else's stale listings, below) so both go through identical
 // logic.
-async function refreshOneListing(listingId, listingsById, store, token) {
+async function refreshOneListing(listingId, listingsById, store, token, startedAt) {
   const qs = new URLSearchParams({
     "$filter": `ListingId eq '${listingId}' and MlgCanView eq true`,
     "$select": SELECT_FIELDS,
@@ -251,7 +244,6 @@ async function refreshOneListing(listingId, listingsById, store, token) {
   });
   const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (res.status === 429) {
     await markSuspended(store, SUSPENSION_COOLDOWN_MS);
@@ -268,12 +260,10 @@ async function refreshOneListing(listingId, listingsById, store, token) {
     return { removed: true };
   }
   const previouslyStored = listingsById[mapped.listingId];
-  const photoResult = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, store);
-  const justCached = !!mapped.cloudinaryPhoto && (!previouslyStored || !previouslyStored.cloudinaryPhoto);
+  const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt);
   mapped.photosRefreshedAt = new Date().toISOString();
   listingsById[mapped.listingId] = mapped;
-  if (photoResult.suspended) return { refreshed: true, cached: justCached, suspended: true };
-  return { refreshed: true, cached: justCached };
+  return { refreshed: true, cached: photosCached > 0, photosCached };
 }
 
 exports.handler = async () => {
@@ -301,27 +291,6 @@ exports.handler = async () => {
 
   let listingsById = (await store.get(LISTINGS_KEY, { type: "json" })) || {};
 
-  // 2026-08-13 (payload-size fix, one-time catch-up): mapListing() now caps
-  // newly-fetched listings to MAX_STORED_PHOTOS, but that only shrinks
-  // records as the normal crawl happens to touch them -- at the current
-  // incremental pace that could take weeks to reach every already-stored
-  // listing. Trimming every already-oversized entry here instead (pure
-  // in-memory array slicing, zero MLS Grid requests, effectively free) means
-  // the very next successful write already reflects the full size win
-  // instead of waiting on the slow crawl. Safe to leave in permanently: a
-  // no-op once nothing is left oversized.
-  let trimmedOversizedPhotos = 0;
-  for (const listing of Object.values(listingsById)) {
-    if (Array.isArray(listing.photos) && listing.photos.length > MAX_STORED_PHOTOS) {
-      listing.photos = listing.photos.slice(0, MAX_STORED_PHOTOS);
-      listing.photo = listing.photos[0] || listing.photo;
-      trimmedOversizedPhotos += 1;
-    }
-  }
-  if (trimmedOversizedPhotos) {
-    console.log(`sync-listings: trimmed oversized photo arrays on ${trimmedOversizedPhotos} already-stored listing(s) down to ${MAX_STORED_PHOTOS} each.`);
-  }
-
   let lastRunError = null;
   let httpErrorOccurred = false;
   let coverPhotosCached = 0;
@@ -340,22 +309,30 @@ exports.handler = async () => {
   // ---- Priority pass: Christine's own listings, independent of bootstrap
   // progress (see the 2026-08-13 file-level comment above for why this
   // exists) ----
+  // Not-yet-fully-cached means either no cloudinaryPhotos record at all, or
+  // one that doesn't yet cover every photo in the listing's current photos
+  // array (a partial result from an earlier run's time budget, or a photo
+  // count that's grown since the last cache pass).
+  const isFullyCached = (l) => Array.isArray(l.cloudinaryPhotos)
+    && Array.isArray(l.photos)
+    && l.cloudinaryPhotos.length >= l.photos.length
+    && l.cloudinaryPhotos.slice(0, l.photos.length).every(Boolean);
   const herPendingIds = Object.values(listingsById)
-    .filter((l) => l.listingId && isHerListing(l) && !l.cloudinaryPhoto)
+    .filter((l) => l.listingId && isHerListing(l) && !isFullyCached(l))
     .map((l) => l.listingId);
 
   for (const listingId of herPendingIds) {
     if (Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
     await throttle();
     try {
-      const result = await refreshOneListing(listingId, listingsById, store, token);
+      const result = await refreshOneListing(listingId, listingsById, store, token, startedAt);
       if (result.suspended) {
         lastRunError = "MLS Grid 429: rate limited during priority pass — suspension circuit breaker opened for 5 minutes";
         console.error(`sync-listings: ${lastRunError}`);
         httpErrorOccurred = true;
         break;
       }
-      if (result.cached) coverPhotosCached += 1;
+      if (result.cached) coverPhotosCached += (result.photosCached || 1);
     } catch (err) {
       console.warn(`sync-listings: priority pass failed for ${listingId}: ${err && err.message}`);
     }
@@ -393,10 +370,7 @@ exports.handler = async () => {
 
         await throttle();
 
-        const res = await fetch(requestUrl, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        });
+        const res = await fetch(requestUrl, { headers: { Authorization: `Bearer ${token}` } });
         if (res.status === 429) {
           // Same account-wide suspension Listing-Engine's mls.js guards
           // against — open the circuit breaker so neither this run's
@@ -431,19 +405,8 @@ exports.handler = async () => {
           if (mapped.listingId) {
             const previouslyStored = listingsById[mapped.listingId];
             if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
-              const photoResult = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, store);
-              if (mapped.cloudinaryPhoto && (!previouslyStored || !previouslyStored.cloudinaryPhoto)) {
-                coverPhotosCached += 1;
-              }
-              if (photoResult.suspended) {
-                lastRunError = "MLS Grid 429: rate limited fetching a cover photo — suspension circuit breaker opened for 5 minutes";
-                console.error(`sync-listings: ${lastRunError}`);
-                mapped.photosRefreshedAt = new Date().toISOString();
-                listingsById[mapped.listingId] = mapped;
-                httpErrorOccurred = true;
-                requestUrl = null;
-                break;
-              }
+              const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt);
+              coverPhotosCached += photosCached;
             }
             mapped.photosRefreshedAt = new Date().toISOString();
             listingsById[mapped.listingId] = mapped;
@@ -454,7 +417,6 @@ exports.handler = async () => {
           }
         }
 
-        if (httpErrorOccurred) break;
         requestUrl = json["@odata.nextLink"] || null;
       }
     }
@@ -488,7 +450,7 @@ exports.handler = async () => {
         if (touchedThisRun.has(staleListing.listingId)) continue;
         await throttle();
         try {
-          const result = await refreshOneListing(staleListing.listingId, listingsById, store, token);
+          const result = await refreshOneListing(staleListing.listingId, listingsById, store, token, startedAt);
           if (result.suspended) {
             console.error("sync-listings: refresh sweep hit 429 — suspension circuit breaker opened, stopping sweep.");
             break;

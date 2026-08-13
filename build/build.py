@@ -572,7 +572,8 @@ def _listing_showcase_js_helpers():
         'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
         'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
     }} else if (photos.length) {{
-      top = '<img src="' + esc(photos[0]) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">';
+      top = '<img src="' + esc(photos[0]) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+        'onerror="this.onerror=null;this.style.background=\\'#eee\\';this.style.aspectRatio=\\'4/3\\';this.removeAttribute(\\'src\\')">';
     }} else {{
       top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
     }}
@@ -694,7 +695,8 @@ def _live_feed_widget(anchor_id, api_params, empty_note=None):
 {_nearby_places_js_helpers()}
       function cardHtml(l) {{
         var img = l.photo
-          ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">'
+          ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+            'onerror="this.onerror=null;this.style.background=\\'#eee\\';this.style.aspectRatio=\\'4/3\\';this.removeAttribute(\\'src\\')">'
           : '<div style="aspect-ratio:4/3;background:#eee"></div>';
         var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
         var meta = esc([
@@ -942,7 +944,8 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
 {_nearby_places_js_helpers()}
   function cardHtml(l) {{
     var img = l.photo
-      ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">'
+      ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+        'onerror="this.onerror=null;this.style.background=\\'#eee\\';this.style.aspectRatio=\\'4/3\\';this.removeAttribute(\\'src\\')">'
       : '<div style="aspect-ratio:4/3;background:#eee"></div>';
     var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
     var meta = esc([
@@ -4531,7 +4534,19 @@ def build_current_listings():
   var lastFocused = null;
 
   function renderGallery() {
-    document.getElementById('gallery-img').src = galleryState.photos[galleryState.index];
+    var img = document.getElementById('gallery-img');
+    // Reset any broken-photo styling from a previous slide before loading
+    // this one, so a working photo isn't hidden behind leftover fallback
+    // background/aspect-ratio from a prior onerror.
+    img.style.background = '';
+    img.style.aspectRatio = '';
+    img.onerror = function () {
+      this.onerror = null;
+      this.removeAttribute('src');
+      this.style.background = '#eee';
+      this.style.aspectRatio = '4/3';
+    };
+    img.src = galleryState.photos[galleryState.index];
     document.getElementById('gallery-counter').textContent =
       (galleryState.index + 1) + ' / ' + galleryState.photos.length;
   }

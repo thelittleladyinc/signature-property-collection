@@ -274,7 +274,8 @@
         'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
         'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
     } else if (photos.length) {
-      top = '<img src="' + esc(photos[0]) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">';
+      top = '<img src="' + esc(photos[0]) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+        'onerror="this.onerror=null;this.style.background=\'#eee\';this.style.aspectRatio=\'4/3\';this.removeAttribute(\'src\')">';
     } else {
       top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
     }
@@ -342,7 +343,19 @@
   var lastFocused = null;
 
   function renderGallery() {
-    document.getElementById('gallery-img').src = galleryState.photos[galleryState.index];
+    var img = document.getElementById('gallery-img');
+    // Reset any broken-photo styling from a previous slide before loading
+    // this one, so a working photo isn't hidden behind leftover fallback
+    // background/aspect-ratio from a prior onerror.
+    img.style.background = '';
+    img.style.aspectRatio = '';
+    img.onerror = function () {
+      this.onerror = null;
+      this.removeAttribute('src');
+      this.style.background = '#eee';
+      this.style.aspectRatio = '4/3';
+    };
+    img.src = galleryState.photos[galleryState.index];
     document.getElementById('gallery-counter').textContent =
       (galleryState.index + 1) + ' / ' + galleryState.photos.length;
   }

@@ -273,7 +273,8 @@
 
   function cardHtml(l) {
     var img = l.photo
-      ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy">'
+      ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+        'onerror="this.onerror=null;this.style.background=\'#eee\';this.style.aspectRatio=\'4/3\';this.removeAttribute(\'src\')">'
       : '<div style="aspect-ratio:4/3;background:#eee"></div>';
     var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
     var meta = esc([
