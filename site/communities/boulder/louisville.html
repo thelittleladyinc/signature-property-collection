@@ -32,7 +32,10 @@
 <header class="site-header">
   <div class="wrap">
     <div class="brand">
-      <a href="/index.html"><img class="brand-logo" src="/assets/img/logo-full.png" alt="Signature Property Collection"></a>
+      <a href="/index.html" class="brand-wordmark">
+        <img class="brand-logo" src="/assets/img/logo.png" alt="Signature Property Collection">
+        <span class="brand-sub">Property Collection</span>
+      </a>
       <img class="brokerage-logo" src="/assets/img/lpt-logo.png" alt="LPT Realty">
     </div>
     <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
@@ -164,6 +167,45 @@
       participants of the MLS where the listing is filed.</p>
     </div>
   </div>
+
+  <div class="lb-overlay" id="gallery-overlay" role="dialog" aria-modal="true" aria-label="Listing photo gallery" onclick="if (event.target === this) closeGallery()">
+    <div class="lb-box lb-box-media">
+      <button type="button" class="lb-close" onclick="closeGallery()" aria-label="Close photo gallery">&times;</button>
+      <img id="gallery-img" src="" alt="Listing photo">
+      <div class="gallery-nav">
+        <button type="button" onclick="galleryNav(-1)">&larr; Prev</button>
+        <span id="gallery-counter"></span>
+        <button type="button" onclick="galleryNav(1)">Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lb-overlay" id="inquiry-overlay" role="dialog" aria-modal="true" aria-labelledby="inquiry-heading" onclick="if (event.target === this) closeInquiry()">
+    <div class="lb-box">
+      <button type="button" class="lb-close" onclick="closeInquiry()" aria-label="Close">&times;</button>
+      <h3 id="inquiry-heading">Ask A Question</h3>
+      <p id="inquiry-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
+      <form class="lead-form" name="listing-inquiry" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name" value="listing-inquiry">
+      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <input type="text" name="name" placeholder="Full Name" required>
+      <input type="email" name="email" placeholder="Email" required>
+      <input type="tel" name="phone" placeholder="Phone">
+      
+      <input type="hidden" name="listing_address" id="li-address">
+      <input type="hidden" name="listing_mls" id="li-mls">
+      <input type="hidden" name="inquiry_type" id="li-kind">
+      <textarea name="message" placeholder="Your message (optional)" rows="3"></textarea>
+      <label class="consent">
+        <input type="checkbox" required>
+        I agree to receive marketing communication via call, text, or similar automated
+        means from Signature Property Collection. Consent is not a condition of purchase. Msg/data rates
+        may apply. Reply STOP to unsubscribe.
+      </label>
+      <button class="btn btn-dark" type="submit">Send My Message</button>
+    </form>
+    </div>
+  </div>
   </div>
 </section>
 <script>
@@ -193,14 +235,12 @@
   var skip = 0;
   var TOP = 12;
 
+  var LISTING_VIDEOS = {"32 victoria dr": {"id": "9aIGz-SvCtI", "title": "Affordable Luxury at 32 Victoria Dr \u2014 Johnstown Home Tour"}, "32 victoria drive": {"id": "9aIGz-SvCtI", "title": "Affordable Luxury at 32 Victoria Dr \u2014 Johnstown Home Tour"}, "16225 county road 98": {"id": "N57_J3llZCQ", "title": "45 Acres + Heated Shop \u2014 Custom Colorado Ranch, No HOA | 16225 County Road 98"}, "16225 county rd 98": {"id": "N57_J3llZCQ", "title": "45 Acres + Heated Shop \u2014 Custom Colorado Ranch, No HOA | 16225 County Road 98"}, "929 independent ave": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "929 w independent ave": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "929 west independent ave": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "929 independent avenue": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "929 w independent avenue": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "294 gila trail": {"id": "JvtRGf01JXU", "title": "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail"}, "294 gila trl": {"id": "JvtRGf01JXU", "title": "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail"}, "39243 boulevard e": {"id": "L-uEVzq1bv4", "title": "Eaton, CO Home Under $400K \u2014 39243 Boulevard E"}, "39243 blvd e": {"id": "L-uEVzq1bv4", "title": "Eaton, CO Home Under $400K \u2014 39243 Boulevard E"}, "1110 quitman st": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "1110 s quitman st": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "1110 south quitman st": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "1110 quitman street": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "1110 s quitman street": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "45615 county rd 27": {"id": "dVonJhu_zCo", "title": "Dream Ranch on 20 Acres \u2014 45615 County Rd 27, Pierce CO"}, "45615 county road 27": {"id": "dVonJhu_zCo", "title": "Dream Ranch on 20 Acres \u2014 45615 County Rd 27, Pierce CO"}, "504 graefe ave": {"id": "eiFurERq_As", "title": "Charming Home for Sale at 504 Graefe Ave, Ault CO"}, "504 graefe avenue": {"id": "eiFurERq_As", "title": "Charming Home for Sale at 504 Graefe Ave, Ault CO"}, "1316 cimarron cir": {"id": "xWcrj6foJ-Q", "title": "Aspen Meadows Ranch Home in Eaton, CO \u2014 1316 Cimarron Cir"}, "1316 cimarron circle": {"id": "xWcrj6foJ-Q", "title": "Aspen Meadows Ranch Home in Eaton, CO \u2014 1316 Cimarron Cir"}, "4986 stuart st": {"id": "oNZBc-MxzUg", "title": "Stunning Home for Sale \u2014 4986 Stuart St, Denver (Tennyson Art District)"}, "4986 stuart street": {"id": "oNZBc-MxzUg", "title": "Stunning Home for Sale \u2014 4986 Stuart St, Denver (Tennyson Art District)"}, "5705 snow mesa dr": {"id": "MDfyzESb1Yk", "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? \u2014 5705 Snow Mesa Dr"}, "5705 snow mesa drive": {"id": "MDfyzESb1Yk", "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? \u2014 5705 Snow Mesa Dr"}, "945 maplebrook dr": {"id": "SAZceZQJrAs", "title": "Is This the Cutest Home in Windsor, Colorado? \u2014 945 Maplebrook Dr Tour"}, "945 maplebrook drive": {"id": "SAZceZQJrAs", "title": "Is This the Cutest Home in Windsor, Colorado? \u2014 945 Maplebrook Dr Tour"}, "475 homestead ln": {"id": "6Hrdv6LZIDM", "title": "Tour This Stunning Johnstown Home \u2014 475 Homestead Ln (Johnstown Farms)"}, "475 homestead lane": {"id": "6Hrdv6LZIDM", "title": "Tour This Stunning Johnstown Home \u2014 475 Homestead Ln (Johnstown Farms)"}, "913 green mountain dr": {"id": "e-_3Qs3liQ0", "title": "Inside a $1.35M Luxury Home in Small-Town Colorado \u2014 913 Green Mountain Dr, Erie"}, "913 green mountain drive": {"id": "e-_3Qs3liQ0", "title": "Inside a $1.35M Luxury Home in Small-Town Colorado \u2014 913 Green Mountain Dr, Erie"}, "45920 gold stone creek ct": {"id": "Dr5RN8_VfbU", "title": "Custom Ranch Home with 4000+ Sq Ft \u2014 45920 Gold Stone Creek Ct"}, "45920 gold stone creek court": {"id": "Dr5RN8_VfbU", "title": "Custom Ranch Home with 4000+ Sq Ft \u2014 45920 Gold Stone Creek Ct"}, "616 41st ave": {"id": "MLbFLWZc-j4", "title": "Why This Corner Lot in Greeley Stands Out \u2014 616 41st Ave Tour"}, "616 41st avenue": {"id": "MLbFLWZc-j4", "title": "Why This Corner Lot in Greeley Stands Out \u2014 616 41st Ave Tour"}, "1082 lilac ct": {"id": "06q7rZAWEaY", "title": "Inside This 4-Bedroom Broomfield Home \u2014 1082 Lilac Ct Tour"}, "1082 lilac court": {"id": "06q7rZAWEaY", "title": "Inside This 4-Bedroom Broomfield Home \u2014 1082 Lilac Ct Tour"}};
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
-  }
-  function fmtPrice(n) {
-    if (n == null) return 'Price N/A';
-    return '$' + Number(n).toLocaleString('en-US');
   }
 
   function nearbyToggleHtml(addr) {
@@ -272,30 +312,207 @@
     }).join('') + '</ul>';
   }
 
-  function cardHtml(l) {
-    var img = l.photo
-      ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
-        'onerror="this.onerror=null;this.style.background=\'#eee\';this.style.aspectRatio=\'4/3\';this.removeAttribute(\'src\')">'
-      : '<div style="aspect-ratio:4/3;background:#eee"></div>';
+  function fmtPrice(n) {
+    if (n == null) return 'Price N/A';
+    return '$' + Number(n).toLocaleString('en-US');
+  }
+
+  function matchVideo(l) {
+    if (!l.address) return null;
+    var key = String(l.address).toLowerCase().trim();
+    return LISTING_VIDEOS[key] || null;
+  }
+
+  // Normalizes MLS Grid's raw StandardStatus (whatever exact wording IRES
+  // uses — "Active", "Active Under Contract", "Pending", etc., see
+  // MINE_STATUSES in listings-search.js) into a plain-language badge. Only
+  // "Active" itself is treated as available-to-tour; anything else with
+  // "contract" or "pending" in it is shown as Under Contract and loses the
+  // Request A Tour button (touring a home already under contract isn't
+  // normally something to invite, though Ask A Question stays available).
+  function statusInfo(status) {
+    var s = String(status || '').toLowerCase();
+    if (s === 'active') return { label: 'Active', cls: 'status-active', tourable: true };
+    if (s.indexOf('contract') !== -1 || s.indexOf('pending') !== -1) {
+      return { label: 'Under Contract', cls: 'status-pending', tourable: false };
+    }
+    return { label: status || 'Status Unknown', cls: 'status-other', tourable: false };
+  }
+
+  function mediaHtml(l, full) {
+    var video = matchVideo(l);
+    // 2026-08-13 (performance fix): the API now sends only the cover photo
+    // (l.photo) plus a photoCount, not the full photos[] array — see the
+    // listingId block in listings-search.js. The full gallery is fetched
+    // on demand, only if/when "View All N Photos" is actually clicked
+    // (openGallery below), instead of every card shipping every photo's
+    // URL whether anyone ever opens the gallery or not.
+    var cover = l.photo || null;
+    var photoCount = typeof l.photoCount === 'number' ? l.photoCount : (cover ? 1 : 0);
+    var top;
+    if (video) {
+      top = '<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/' +
+        esc(video.id) + '" title="' + esc(video.title) + '" loading="lazy" allow="accelerometer; autoplay; ' +
+        'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
+        'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
+    } else if (cover) {
+      top = '<img src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+        'onerror="this.onerror=null;this.style.background=\'#eee\';this.style.aspectRatio=\'4/3\';this.removeAttribute(\'src\')">';
+    } else {
+      top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
+    }
+    // 2026-08-13 (Christine's request): a small text pill already existed
+    // in the card body below the photo (see badgeHtml in listingCardHtml),
+    // but she asked for something more visually prominent for under-contract
+    // listings specifically -- so this adds a bold ribbon banner across the
+    // top of the photo itself. Deliberately only for the "under contract /
+    // pending" case (statusInfo's status-pending class), not Active -- an
+    // active listing doesn't need a callout, it's the default expectation.
+    var ribbonBadge = statusInfo(l.status);
+    var ribbon = ribbonBadge.cls === 'status-pending'
+      ? '<div class="listing-ribbon">Under Contract</div>' : '';
+    if (!full) return '<div class="listing-media">' + ribbon + top + '</div>';
+    var links = '';
+    if (video) {
+      links += '<a class="media-link" href="https://www.youtube.com/watch?v=' + esc(video.id) +
+        '" target="_blank" rel="noopener">Watch Full Video Tour \u2197</a>';
+    }
+    if (photoCount > 1) {
+      links += '<button type="button" class="media-link" onclick="openGallery(this)" data-listing-id="' +
+        esc(l.listingId || '') + '">View All ' + photoCount + ' Photos</button>';
+    }
+    return '<div class="listing-media">' + ribbon + top + (links ? '<div class="media-links">' + links + '</div>' : '') + '</div>';
+  }
+
+  function listingCardHtml(l, full) {
     var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
     var meta = esc([
       l.beds ? l.beds + ' bd' : null,
       l.baths ? l.baths + ' ba' : null,
       l.sqft ? Number(l.sqft).toLocaleString() + ' sqft' : null,
     ].filter(Boolean).join(' \u00b7 '));
-    var remarks = l.remarks ? esc(l.remarks.slice(0, 140) + (l.remarks.length > 140 ? '\u2026' : '')) : '';
     var compliance = esc([l.officeName, l.listingId ? ('MLS# ' + l.listingId) : null, l.agentPhone || l.agentEmail, l.status]
       .filter(Boolean).join(' \u00b7 '));
-    return '<div class="listing-card">' + img +
+    var badge = statusInfo(l.status);
+    var badgeHtml = '<span class="listing-status-badge ' + badge.cls + '">' + esc(badge.label) + '</span>';
+    var actions;
+    if (full) {
+      var tourBtn = badge.tourable
+        ? ('<button type="button" class="btn btn-dark" onclick="openListingInquiry(this)" data-address="' + addr +
+           '" data-mls="' + esc(l.listingId || '') + '" data-kind="Tour">Request A Tour</button>')
+        : '';
+      actions = '<div class="listing-actions">' +
+        '<button type="button" class="btn btn-outline" style="border-color:#141415;color:#141415" ' +
+        'onclick="openListingInquiry(this)" data-address="' + addr + '" data-mls="' + esc(l.listingId || '') +
+        '" data-kind="Question">Ask A Question</button>' + tourBtn +
+        '</div>';
+    } else {
+      actions = '<p class="listing-address" style="margin-top:10px">' +
+        '<a href="/current-listings.html" style="text-decoration:underline">View Full Details &amp; Ask A Question &rarr;</a></p>';
+    }
+    return '<div class="listing-card">' + mediaHtml(l, full) +
       '<div class="listing-body">' +
+      badgeHtml +
       '<p class="listing-price">' + esc(fmtPrice(l.price)) + '</p>' +
       '<p class="listing-meta">' + meta + '</p>' +
       '<p class="listing-address">' + addr + '</p>' +
-      (remarks ? '<p class="listing-address" style="color:#4a4a4c">' + remarks + '</p>' : '') +
       '<p class="listing-compliance">' + compliance + '</p>' +
+      actions +
       nearbyToggleHtml(addr) +
       '</div></div>';
   }
+
+  // ---- Photo gallery + Ask A Question / Request A Tour modals ----
+  // 2026-08-13 (buyer-walkthrough fix): identical to build_current_listings()'s
+  // copy of this same block -- listingCardHtml(l, true) (in the shared
+  // helpers above) hardcodes onclick="openGallery(this)" /
+  // onclick="openListingInquiry(this)", so these have to stay attached to
+  // window under these exact names, matching the modal markup this widget
+  // now also renders (see form_html above).
+  var galleryState = { photos: [], index: 0 };
+  var lastFocused = null;
+
+  function renderGallery() {
+    var img = document.getElementById('gallery-img');
+    img.style.background = '';
+    img.style.aspectRatio = '';
+    img.onerror = function () {
+      this.onerror = null;
+      this.removeAttribute('src');
+      this.style.background = '#eee';
+      this.style.aspectRatio = '4/3';
+    };
+    img.src = galleryState.photos[galleryState.index];
+    document.getElementById('gallery-counter').textContent =
+      (galleryState.index + 1) + ' / ' + galleryState.photos.length;
+  }
+
+  window.openGallery = function (btn) {
+    var listingId = btn.dataset.listingId || '';
+    if (!listingId) return;
+    lastFocused = btn;
+    var overlay = document.getElementById('gallery-overlay');
+    var counterEl = document.getElementById('gallery-counter');
+    var img = document.getElementById('gallery-img');
+    galleryState.photos = [];
+    galleryState.index = 0;
+    img.removeAttribute('src');
+    img.style.background = '#eee';
+    img.style.aspectRatio = '4/3';
+    counterEl.textContent = 'Loading\u2026';
+    overlay.classList.add('open');
+    overlay.querySelector('.lb-close').focus();
+    fetch('/.netlify/functions/listings-search?listingId=' + encodeURIComponent(listingId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var photos = (data && data.photos) || [];
+        if (!photos.length) {
+          counterEl.textContent = 'No photos available';
+          return;
+        }
+        galleryState.photos = photos;
+        galleryState.index = 0;
+        renderGallery();
+      })
+      .catch(function () {
+        counterEl.textContent = 'Couldn\u2019t load photos \u2014 please try again';
+      });
+  };
+  window.galleryNav = function (dir) {
+    var n = galleryState.photos.length;
+    if (!n) return;
+    galleryState.index = (galleryState.index + dir + n) % n;
+    renderGallery();
+  };
+  window.closeGallery = function () {
+    document.getElementById('gallery-overlay').classList.remove('open');
+    if (lastFocused) { lastFocused.focus(); lastFocused = null; }
+  };
+
+  window.openListingInquiry = function (btn) {
+    var address = btn.dataset.address || '';
+    var mls = btn.dataset.mls || '';
+    var kind = btn.dataset.kind || 'Question';
+    document.getElementById('li-address').value = address;
+    document.getElementById('li-mls').value = mls;
+    document.getElementById('li-kind').value = kind;
+    document.getElementById('inquiry-heading').textContent =
+      kind === 'Tour' ? 'Request A Tour' : 'Ask A Question';
+    document.getElementById('inquiry-subheading').textContent =
+      'Regarding: ' + address + (mls ? ' (MLS# ' + mls + ')' : '');
+    lastFocused = btn;
+    var overlay = document.getElementById('inquiry-overlay');
+    overlay.classList.add('open');
+    overlay.querySelector('.lb-close').focus();
+  };
+  window.closeInquiry = function () {
+    document.getElementById('inquiry-overlay').classList.remove('open');
+    if (lastFocused) { lastFocused.focus(); lastFocused = null; }
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeGallery(); closeInquiry(); }
+  });
 
   // ---- Price slider: two overlapping range inputs, kept from crossing,
   // painted as one filled bar between the two thumbs. ----
@@ -400,7 +617,7 @@
         } else {
           statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
         }
-        resultsEl.insertAdjacentHTML('beforeend', listings.map(cardHtml).join(''));
+        resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) { return listingCardHtml(l, true); }).join(''));
         skip += listings.length;
         loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
         if (fetchedAtEl) {

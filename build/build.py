@@ -894,6 +894,37 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
 
     floor, ceiling, step = price_floor, _FS_PRICE_CEILING, _FS_PRICE_STEP
 
+    # 2026-08-13 (buyer-walkthrough fix): every card this widget renders used
+    # to be a dead end -- a photo, a price, and text, with no way to act on
+    # it (confirmed via a live click-through audit: the only interactive
+    # element per card was the "Distance To Grocery/Schools/Parks" toggle).
+    # Current Listings already solved this exact problem for Christine's own
+    # mine=true listings (a photo-gallery lightbox + Ask A Question/Request A
+    # Tour modal, see _listing_showcase_js_helpers()/build_current_listings())
+    # -- this reuses that same, already-shipped system here instead of a
+    # second bespoke one, so every page built on this widget (Search Homes
+    # and every priority-city page's embedded search) gets the same
+    # clickable, functional cards. Safe to reuse as-is for general (non-mine)
+    # results: listings-search.js's PUBLIC_STATUSES is Active-only for
+    # mine=false, so statusInfo() always resolves tourable=true here, and the
+    # on-demand photo/gallery + inquiry endpoints were already written
+    # generically (keyed by listingId, not by mine=true/false).
+    # Reuses the exact same element ids as build_current_listings()'s modal
+    # markup (gallery-overlay/inquiry-overlay/li-address/etc, all global, not
+    # wid-prefixed) on purpose: _listing_showcase_js_helpers()'s
+    # listingCardHtml() hardcodes onclick="openGallery(this)" /
+    # onclick="openListingInquiry(this)" and those functions in turn hardcode
+    # these same ids -- reusing them here means this widget's modal wiring
+    # works with zero changes to that shared helper. Safe because no page
+    # ever embeds this widget more than once (Search Homes: one call;
+    # each priority-city page: one call), so there's never a second set of
+    # these ids on the same page to collide with.
+    inquiry_extra_fields = """
+      <input type="hidden" name="listing_address" id="li-address">
+      <input type="hidden" name="listing_mls" id="li-mls">
+      <input type="hidden" name="inquiry_type" id="li-kind">
+      <textarea name="message" placeholder="Your message (optional)" rows="3"></textarea>"""
+
     form_html = f"""<div class="fs-widget">
     <form id="{wid}-form">
       {geo_row_html}
@@ -926,6 +957,27 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
       <button type="button" id="{wid}-load-more" class="btn btn-outline" style="border-color:#141415;color:#141415;cursor:pointer;display:none">Load More Listings</button>
     </div>
     {_mls_disclaimer_html(fetched_at_id=wid + "-fetched-at")}
+  </div>
+
+  <div class="lb-overlay" id="gallery-overlay" role="dialog" aria-modal="true" aria-label="Listing photo gallery" onclick="if (event.target === this) closeGallery()">
+    <div class="lb-box lb-box-media">
+      <button type="button" class="lb-close" onclick="closeGallery()" aria-label="Close photo gallery">&times;</button>
+      <img id="gallery-img" src="" alt="Listing photo">
+      <div class="gallery-nav">
+        <button type="button" onclick="galleryNav(-1)">&larr; Prev</button>
+        <span id="gallery-counter"></span>
+        <button type="button" onclick="galleryNav(1)">Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lb-overlay" id="inquiry-overlay" role="dialog" aria-modal="true" aria-labelledby="inquiry-heading" onclick="if (event.target === this) closeInquiry()">
+    <div class="lb-box">
+      <button type="button" class="lb-close" onclick="closeInquiry()" aria-label="Close">&times;</button>
+      <h3 id="inquiry-heading">Ask A Question</h3>
+      <p id="inquiry-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
+      {_tool_lead_form("listing-inquiry", "Send My Message", extra_fields=inquiry_extra_fields)}
+    </div>
   </div>"""
 
     fixed_city_js = json.dumps(fixed_city) if fixed_city else "null"
@@ -959,40 +1011,98 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
   var skip = 0;
   var TOP = 12;
 
-  function esc(s) {{
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {{
-      return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[c];
-    }});
+{_listing_showcase_js_helpers()}
+  // ---- Photo gallery + Ask A Question / Request A Tour modals ----
+  // 2026-08-13 (buyer-walkthrough fix): identical to build_current_listings()'s
+  // copy of this same block -- listingCardHtml(l, true) (in the shared
+  // helpers above) hardcodes onclick="openGallery(this)" /
+  // onclick="openListingInquiry(this)", so these have to stay attached to
+  // window under these exact names, matching the modal markup this widget
+  // now also renders (see form_html above).
+  var galleryState = {{ photos: [], index: 0 }};
+  var lastFocused = null;
+
+  function renderGallery() {{
+    var img = document.getElementById('gallery-img');
+    img.style.background = '';
+    img.style.aspectRatio = '';
+    img.onerror = function () {{
+      this.onerror = null;
+      this.removeAttribute('src');
+      this.style.background = '#eee';
+      this.style.aspectRatio = '4/3';
+    }};
+    img.src = galleryState.photos[galleryState.index];
+    document.getElementById('gallery-counter').textContent =
+      (galleryState.index + 1) + ' / ' + galleryState.photos.length;
   }}
-  function fmtPrice(n) {{
-    if (n == null) return 'Price N/A';
-    return '$' + Number(n).toLocaleString('en-US');
-  }}
-{_nearby_places_js_helpers()}
-  function cardHtml(l) {{
-    var img = l.photo
-      ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
-        'onerror="this.onerror=null;this.style.background=\\'#eee\\';this.style.aspectRatio=\\'4/3\\';this.removeAttribute(\\'src\\')">'
-      : '<div style="aspect-ratio:4/3;background:#eee"></div>';
-    var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
-    var meta = esc([
-      l.beds ? l.beds + ' bd' : null,
-      l.baths ? l.baths + ' ba' : null,
-      l.sqft ? Number(l.sqft).toLocaleString() + ' sqft' : null,
-    ].filter(Boolean).join(' \\u00b7 '));
-    var remarks = l.remarks ? esc(l.remarks.slice(0, 140) + (l.remarks.length > 140 ? '\\u2026' : '')) : '';
-    var compliance = esc([l.officeName, l.listingId ? ('MLS# ' + l.listingId) : null, l.agentPhone || l.agentEmail, l.status]
-      .filter(Boolean).join(' \\u00b7 '));
-    return '<div class="listing-card">' + img +
-      '<div class="listing-body">' +
-      '<p class="listing-price">' + esc(fmtPrice(l.price)) + '</p>' +
-      '<p class="listing-meta">' + meta + '</p>' +
-      '<p class="listing-address">' + addr + '</p>' +
-      (remarks ? '<p class="listing-address" style="color:#4a4a4c">' + remarks + '</p>' : '') +
-      '<p class="listing-compliance">' + compliance + '</p>' +
-      nearbyToggleHtml(addr) +
-      '</div></div>';
-  }}
+
+  window.openGallery = function (btn) {{
+    var listingId = btn.dataset.listingId || '';
+    if (!listingId) return;
+    lastFocused = btn;
+    var overlay = document.getElementById('gallery-overlay');
+    var counterEl = document.getElementById('gallery-counter');
+    var img = document.getElementById('gallery-img');
+    galleryState.photos = [];
+    galleryState.index = 0;
+    img.removeAttribute('src');
+    img.style.background = '#eee';
+    img.style.aspectRatio = '4/3';
+    counterEl.textContent = 'Loading\\u2026';
+    overlay.classList.add('open');
+    overlay.querySelector('.lb-close').focus();
+    fetch('/.netlify/functions/listings-search?listingId=' + encodeURIComponent(listingId))
+      .then(function (r) {{ return r.json(); }})
+      .then(function (data) {{
+        var photos = (data && data.photos) || [];
+        if (!photos.length) {{
+          counterEl.textContent = 'No photos available';
+          return;
+        }}
+        galleryState.photos = photos;
+        galleryState.index = 0;
+        renderGallery();
+      }})
+      .catch(function () {{
+        counterEl.textContent = 'Couldn\\u2019t load photos \\u2014 please try again';
+      }});
+  }};
+  window.galleryNav = function (dir) {{
+    var n = galleryState.photos.length;
+    if (!n) return;
+    galleryState.index = (galleryState.index + dir + n) % n;
+    renderGallery();
+  }};
+  window.closeGallery = function () {{
+    document.getElementById('gallery-overlay').classList.remove('open');
+    if (lastFocused) {{ lastFocused.focus(); lastFocused = null; }}
+  }};
+
+  window.openListingInquiry = function (btn) {{
+    var address = btn.dataset.address || '';
+    var mls = btn.dataset.mls || '';
+    var kind = btn.dataset.kind || 'Question';
+    document.getElementById('li-address').value = address;
+    document.getElementById('li-mls').value = mls;
+    document.getElementById('li-kind').value = kind;
+    document.getElementById('inquiry-heading').textContent =
+      kind === 'Tour' ? 'Request A Tour' : 'Ask A Question';
+    document.getElementById('inquiry-subheading').textContent =
+      'Regarding: ' + address + (mls ? ' (MLS# ' + mls + ')' : '');
+    lastFocused = btn;
+    var overlay = document.getElementById('inquiry-overlay');
+    overlay.classList.add('open');
+    overlay.querySelector('.lb-close').focus();
+  }};
+  window.closeInquiry = function () {{
+    document.getElementById('inquiry-overlay').classList.remove('open');
+    if (lastFocused) {{ lastFocused.focus(); lastFocused = null; }}
+  }};
+
+  document.addEventListener('keydown', function (e) {{
+    if (e.key === 'Escape') {{ closeGallery(); closeInquiry(); }}
+  }});
 
   // ---- Price slider: two overlapping range inputs, kept from crossing,
   // painted as one filled bar between the two thumbs. ----
@@ -1097,7 +1207,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
         }} else {{
           statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
         }}
-        resultsEl.insertAdjacentHTML('beforeend', listings.map(cardHtml).join(''));
+        resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) {{ return listingCardHtml(l, true); }}).join(''));
         skip += listings.length;
         loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
         if (fetchedAtEl) {{
@@ -1452,7 +1562,10 @@ def header_html(active=None):
     return f"""<header class="site-header">
   <div class="wrap">
     <div class="brand">
-      <a href="/index.html"><img class="brand-logo" src="/assets/img/logo-full.png" alt="{SITE['name']}"></a>
+      <a href="/index.html" class="brand-wordmark">
+        <img class="brand-logo" src="/assets/img/logo.png" alt="{SITE['name']}">
+        <span class="brand-sub">Property Collection</span>
+      </a>
       <img class="brokerage-logo" src="/assets/img/lpt-logo.png" alt="{SITE['brokerage']}">
     </div>
     <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">

@@ -63,9 +63,24 @@ a { color: inherit; text-decoration: none; }
 }
 .site-header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand { display: flex; align-items: center; gap: 14px; }
-.brand-logo { height: 34px; width: auto; display: block; filter: brightness(0) invert(1); }
+/* 2026-08-14 (logo overlap fix): logo-full.png bakes the cursive
+   "Signature" script and the "PROPERTY COLLECTION" line into one flattened
+   image, with the script's loops intentionally dipping down over the text
+   below it -- a fine effect at full letterhead size, but at this header's
+   34px height the whole thing compresses into an unreadable jumble (the
+   "PROPERTY COLLECTION" line becomes a few illegible pixels the script
+   swoops right through). Fixed by using logo.png -- the same real script
+   mark, just without the subtext baked in -- and rebuilding "Property
+   Collection" as real, crisp HTML text underneath it. Two separate flex
+   items can never visually overlap regardless of how far the script's
+   loops swing, and real text stays sharp at any zoom level instead of
+   degrading like a scaled-down raster image. logo-full.png is untouched
+   everywhere else (OG/social share images), since a single self-contained
+   image is the right call there. */
+.brand-wordmark { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.brand-logo { height: 26px; width: auto; display: block; filter: brightness(0) invert(1); }
 .brand-mark { font-family: var(--font-script); font-size: 30px; line-height: 1; color: var(--white); }
-.brand-sub { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; opacity: .9; }
+.brand-sub { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; opacity: .9; white-space: nowrap; color: var(--white); }
 .brokerage { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; border-left: 1px solid rgba(255,255,255,.5); padding-left: 14px; margin-left: 4px; opacity: .95; }
 /* 2026-08-13: replaced the plain-text "LPT Realty" brokerage label in the
    header with the real LPT Realty logo (transparent PNG, any-color source
