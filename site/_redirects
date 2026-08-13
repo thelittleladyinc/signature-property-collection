@@ -1,3 +1,4 @@
 /  /index.html  200
+/status  /.netlify/functions/site-health  200
 /expiredlisting/  /expired-listings.html  301
 /expiredlisting  /expired-listings.html  301

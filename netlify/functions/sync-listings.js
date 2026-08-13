@@ -72,6 +72,20 @@ const {
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
 
+// 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
+// her own listings are still all serving raw MLS Grid URLs. cacheCoverPhoto
+// IfHers below has always swallowed the real reason into a console.warn
+// that neither of us can see (Netlify function logs aren't reachable from
+// here) — so this has been unfalsifiable from outside Netlify's dashboard.
+// Fix: capture the real error (or "not_configured" if the three env vars
+// still aren't all set) into this module-scope variable, reset at the top
+// of every invocation, and surface it through SYNC_STATE_KEY -> the
+// listings-search.js ?debug=true endpoint. Module scope is safe here
+// specifically because it's explicitly reset first thing in the handler
+// below -- a warm-started Netlify Function reusing this module between
+// invocations would otherwise leak a stale error from a previous run.
+let _lastCloudinaryError = null;
+
 // 2026-08-13 (real timeout found in Netlify's own Observability logs):
 // this used to be 20000 on the assumption of a 30s function limit — that
 // assumption was wrong. Live logs showed sync-listings POST requests
@@ -242,7 +256,12 @@ const CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN = 4;
 // (for the caller's run-summary counters).
 async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt) {
   if (!mapped.photos || !mapped.photos.length || !isHerListing(mapped)) return 0;
-  if (!isCloudinaryConfigured()) return 0; // fall back to the raw MLS Grid URLs
+  if (!isCloudinaryConfigured()) {
+    _lastCloudinaryError = "not_configured: one or more of CLOUDINARY_CLOUD_NAME/" +
+      "CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET isn't set (or isn't visible to " +
+      "scheduled functions yet -- a fresh deploy after adding them sometimes helps)";
+    return 0; // fall back to the raw MLS Grid URLs
+  }
 
   const already = (previouslyStored && Array.isArray(previouslyStored.cloudinaryPhotos))
     ? previouslyStored.cloudinaryPhotos.slice()
@@ -265,7 +284,9 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt)
       // Don't let one photo failing break the rest — the listing still gets
       // stored with that slot's (eventually-expiring) raw MLS Grid photo,
       // and this just retries that slot on a later run.
-      console.warn(`sync-listings: Cloudinary cache failed for ${mapped.listingId} photo ${i}: ${err && err.message}`);
+      const msg = `${mapped.listingId} photo ${i}: ${(err && err.message) || "unknown error"}`;
+      console.warn(`sync-listings: Cloudinary cache failed for ${msg}`);
+      _lastCloudinaryError = msg.slice(0, 300);
     }
   }
 
@@ -329,6 +350,7 @@ exports.handler = async () => {
 
   const store = getBlobStore(getStore);
   const startedAt = Date.now();
+  _lastCloudinaryError = null; // see the 2026-08-13 diagnostics note above
 
   const suspendedUntil = await readSuspension(store);
   if (suspendedUntil) {
@@ -504,6 +526,7 @@ exports.handler = async () => {
           lastRunCoverPhotosCached: coverPhotosCached,
           lastRunStaleListingsRefreshed: staleListingsRefreshed,
           lastRunError: null,
+          lastCloudinaryError: _lastCloudinaryError,
         });
       }
     }
@@ -583,6 +606,7 @@ exports.handler = async () => {
     lastRunCoverPhotosCached: coverPhotosCached,
     lastRunStaleListingsRefreshed: staleListingsRefreshed,
     lastRunError,
+    lastCloudinaryError: _lastCloudinaryError,
   });
 
   console.log(

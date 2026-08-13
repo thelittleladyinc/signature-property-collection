@@ -72,11 +72,10 @@
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Current Listings</span>
-    <h1>Christine Gwinnup's Active Listings</h1>
-    <p class="lede">Christine Gwinnup's own current inventory, pulled live from IRES
-    MLS — with a real video tour wherever one exists for that exact home. Not a curated
-    archive: every listing's status badge (Active or Under Contract) reflects MLS in
-    real time.</p>
+    <h1>Christine Gwinnup's Current Listings</h1>
+    <p class="lede">Christine Gwinnup's own portfolio, shown exactly as it stands
+    today — verified in real time against IRES MLS, status included, with a real
+    video tour wherever one exists for that exact home.</p>
   </div>
 </section>
 <section>
@@ -286,7 +285,17 @@
     } else {
       top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
     }
-    if (!full) return '<div class="listing-media">' + top + '</div>';
+    // 2026-08-13 (Christine's request): a small text pill already existed
+    // in the card body below the photo (see badgeHtml in listingCardHtml),
+    // but she asked for something more visually prominent for under-contract
+    // listings specifically -- so this adds a bold ribbon banner across the
+    // top of the photo itself. Deliberately only for the "under contract /
+    // pending" case (statusInfo's status-pending class), not Active -- an
+    // active listing doesn't need a callout, it's the default expectation.
+    var ribbonBadge = statusInfo(l.status);
+    var ribbon = ribbonBadge.cls === 'status-pending'
+      ? '<div class="listing-ribbon">Under Contract</div>' : '';
+    if (!full) return '<div class="listing-media">' + ribbon + top + '</div>';
     var links = '';
     if (video) {
       links += '<a class="media-link" href="https://www.youtube.com/watch?v=' + esc(video.id) +
@@ -296,7 +305,7 @@
       links += '<button type="button" class="media-link" onclick="openGallery(this)" data-listing-id="' +
         esc(l.listingId || '') + '">View All ' + photoCount + ' Photos</button>';
     }
-    return '<div class="listing-media">' + top + (links ? '<div class="media-links">' + links + '</div>' : '') + '</div>';
+    return '<div class="listing-media">' + ribbon + top + (links ? '<div class="media-links">' + links + '</div>' : '') + '</div>';
   }
 
   function listingCardHtml(l, full) {

@@ -594,7 +594,17 @@ def _listing_showcase_js_helpers():
     }} else {{
       top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
     }}
-    if (!full) return '<div class="listing-media">' + top + '</div>';
+    // 2026-08-13 (Christine's request): a small text pill already existed
+    // in the card body below the photo (see badgeHtml in listingCardHtml),
+    // but she asked for something more visually prominent for under-contract
+    // listings specifically -- so this adds a bold ribbon banner across the
+    // top of the photo itself. Deliberately only for the "under contract /
+    // pending" case (statusInfo's status-pending class), not Active -- an
+    // active listing doesn't need a callout, it's the default expectation.
+    var ribbonBadge = statusInfo(l.status);
+    var ribbon = ribbonBadge.cls === 'status-pending'
+      ? '<div class="listing-ribbon">Under Contract</div>' : '';
+    if (!full) return '<div class="listing-media">' + ribbon + top + '</div>';
     var links = '';
     if (video) {{
       links += '<a class="media-link" href="https://www.youtube.com/watch?v=' + esc(video.id) +
@@ -604,7 +614,7 @@ def _listing_showcase_js_helpers():
       links += '<button type="button" class="media-link" onclick="openGallery(this)" data-listing-id="' +
         esc(l.listingId || '') + '">View All ' + photoCount + ' Photos</button>';
     }}
-    return '<div class="listing-media">' + top + (links ? '<div class="media-links">' + links + '</div>' : '') + '</div>';
+    return '<div class="listing-media">' + ribbon + top + (links ? '<div class="media-links">' + links + '</div>' : '') + '</div>';
   }}
 
   function listingCardHtml(l, full) {{
@@ -1235,7 +1245,18 @@ def _instagram_feed_section():
         # inner fallback link) rather than an empty blockquote -- this is
         # real, crawlable, accessible content before/without embed.js, not
         # just a blank box waiting on JS.
-        return f"""<blockquote class="instagram-media" data-instgrm-captioned
+        # 2026-08-13 (Christine's request, sizing looked "off"): Instagram's
+        # embed.js sizes each iframe to that exact post's real aspect ratio
+        # once it loads -- a landscape video renders short and wide, a
+        # portrait Reel renders tall and narrow, no two posts match. The
+        # .instagram-embed-wrap below gives every card the same fixed
+        # height with overflow:hidden and centers the embed inside it, so
+        # the row reads as a clean uniform grid instead of jagged mismatched
+        # card heights -- the trade-off is a very tall Reel gets vertically
+        # cropped rather than shown in full (still fully viewable via the
+        # "view on Instagram" link/caption).
+        return f"""<div class="instagram-embed-wrap">
+      <blockquote class="instagram-media" data-instgrm-captioned
         data-instgrm-permalink="{post['url']}" data-instgrm-version="14"
         style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
         max-width:400px;min-height:420px;width:100%;">
@@ -1244,7 +1265,8 @@ def _instagram_feed_section():
           style="text-decoration:none;color:var(--charcoal);font-size:14px">
           {esc(post['label'])} &mdash; view on Instagram &rarr;</a>
         </div>
-      </blockquote>"""
+      </blockquote>
+      </div>"""
 
     cards = "\n      ".join(_card(p) for p in INSTAGRAM_FEED_POSTS)
     return f"""<section class="tight" id="instagram-feed-section">
@@ -4869,11 +4891,10 @@ def build_current_listings():
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Current Listings</span>
-    <h1>{esc(SITE['agent'])}'s Active Listings</h1>
-    <p class="lede">{esc(SITE['agent'])}'s own current inventory, pulled live from IRES
-    MLS — with a real video tour wherever one exists for that exact home. Not a curated
-    archive: every listing's status badge (Active or Under Contract) reflects MLS in
-    real time.</p>
+    <h1>{esc(SITE['agent'])}'s Current Listings</h1>
+    <p class="lede">{esc(SITE['agent'])}'s own portfolio, shown exactly as it stands
+    today — verified in real time against IRES MLS, status included, with a real
+    video tour wherever one exists for that exact home.</p>
   </div>
 </section>
 <section>
@@ -5124,6 +5145,10 @@ def build_redirects_and_meta():
     # that need to keep resolving exactly as printed/bookmarked (see
     # LEGACY_URL_REDIRECTS above for why — e.g. a printed magazine QR code).
     redirect_lines = ["/  /index.html  200"]
+    # 2026-08-13: a clean, bookmarkable /status URL for the site-health
+    # function (200 = proxy/rewrite, not a redirect, so the address bar
+    # stays "/status" instead of jumping to the raw .netlify/functions path).
+    redirect_lines += ["/status  /.netlify/functions/site-health  200"]
     redirect_lines += [f"{old}  {new}  301" for old, new in LEGACY_URL_REDIRECTS.items()]
     redirects = "\n".join(redirect_lines) + "\n"
     with open(os.path.join(OUT, "_redirects"), "w") as f:

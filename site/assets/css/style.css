@@ -190,6 +190,15 @@ h2.section-title {
 .section-dark .eyebrow { color: var(--dusty-rose); }
 
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 52px; }
+/* 2026-08-13: uniform card height for Instagram embeds -- see the
+   _instagram_feed_section() comment in build.py for why these vary in
+   native size (landscape video vs. portrait Reel) and why cropping to a
+   fixed height beats a jagged grid. */
+.instagram-embed-wrap {
+  width: 100%; max-width: 400px; height: 560px; overflow: hidden;
+  border-radius: 8px; display: flex; align-items: flex-start; justify-content: center;
+}
+.instagram-embed-wrap > .instagram-media { margin: 0 auto !important; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
 @media (max-width: 900px) {
   .grid-3 { grid-template-columns: 1fr; }
@@ -386,6 +395,11 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .listing-status-badge.status-active { background: #3f6b52; }
 .listing-status-badge.status-pending { background: #b7791f; }
 .listing-status-badge.status-other { background: #6a6a6c; }
+/* 2026-08-13: prominent banner across the photo for under-contract listings
+   (Christine's request — the small pill badge above wasn't visible enough).
+   .listing-media already has position:relative (see below) so this anchors
+   to the photo, not the whole card. */
+.listing-ribbon { position: absolute; top: 0; left: 0; right: 0; z-index: 2; background: #b7791f; color: var(--white); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; text-align: center; padding: 9px 12px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
 .listing-card .listing-price { font-family: var(--font-serif); font-size: 22px; margin: 0 0 4px; }
 .listing-card .listing-meta { color: #4a4a4c; font-size: 14px; margin: 0 0 8px; }
 .listing-card .listing-address { font-size: 14px; color: #6a6a6c; margin: 0 0 10px; }

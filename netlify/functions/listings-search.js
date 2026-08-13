@@ -176,6 +176,15 @@ exports.handler = async (event) => {
         totalListingsStored: state.totalListingsStored ?? null,
         lastModified: state.lastModified || null,
         lastRunError: state.lastRunError || null,
+        // 2026-08-13: surfaces why Cloudinary caching isn't kicking in for
+        // Christine's own listings even after the env vars are added --
+        // see the diagnostics note in sync-listings.js. lastRunCoverPhotos
+        // Cached being 0 run after run alongside a non-null
+        // lastCloudinaryError means the env vars aren't taking effect (or
+        // are wrong); a real error message here means they ARE configured
+        // but the actual Cloudinary/MLS Grid call is failing.
+        lastRunCoverPhotosCached: state.lastRunCoverPhotosCached ?? null,
+        lastCloudinaryError: state.lastCloudinaryError || null,
       };
     }
     return {
