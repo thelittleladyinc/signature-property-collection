@@ -764,7 +764,8 @@ _FS_PRICE_CEILING = 5000000
 _FS_PRICE_STEP = 25000
 
 
-def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_links=False):
+def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_links=False,
+                          price_floor=_FS_PRICE_FLOOR, always_no_floor=False, counties=None):
     """Interactive live-search widget: dual-handle price slider + pill-button
     beds/baths filters, replacing the old plain dropdown/number-box search
     form (Christine's request 2026-08-11 — 'a slider and more fancy ways
@@ -785,9 +786,32 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     reads ?city=&minPrice=&subdivision=&waterfront=true&cities=&noFloor=true
     from the URL on load — the deep-link contract other pages (subdivision
     guides, the homepage map popup) already link into. City-page instances
-    don't need this since they're not a deep-link target themselves."""
+    don't need this since they're not a deep-link target themselves.
+
+    price_floor: slider's minimum handle position (defaults to the site's
+    $950K luxury floor). Pass 0 for a widget that should search the full
+    market, not just the luxury tier — see search-homes.html (2026-08-13,
+    Christine's request): the hardcoded floor was silently hiding
+    non-luxury inventory from the page meant to capture general search
+    traffic, and its "go search somewhere else" copy was working against
+    that goal, not for it.
+
+    always_no_floor: when True, every search this widget runs sends
+    noFloor=true to listings-search.js regardless of where the slider
+    happens to sit — needed alongside price_floor=0 because matchesQuery()
+    in _mls-shared.js enforces LUXURY_PRICE_FLOOR unless that flag is
+    explicitly set; a $0 minimum on the slider doesn't imply it on its own.
+
+    counties: optional list of {"slug", "name", "cities"} dicts (a subset
+    of COUNTIES) — when given (and fixed_city is None), renders a County
+    dropdown next to City that narrows City's own options and, when a
+    county is picked with City left on "All", searches every city in that
+    county at once via listings-search.js's existing `cities` param
+    (already supported server-side — no backend change needed)."""
 
     city_field_html = ""
+    county_field_html = ""
+    county_city_map_js = "{}"
     if fixed_city:
         city_field_html = f'<input type="hidden" name="city" value="{esc(fixed_city)}">'
     else:
@@ -801,6 +825,28 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
             {city_options}
           </select>
         </div>"""
+        if counties:
+            county_options = "\n            ".join(
+                f'<option value="{esc(c["slug"])}">{esc(c["name"])}</option>' for c in counties
+            )
+            county_field_html = f"""<div class="fs-block" style="flex:1 1 200px;min-width:180px">
+          <span class="fs-label">County</span>
+          <select id="{wid}-county" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
+            <option value="">All Counties</option>
+            {county_options}
+          </select>
+        </div>"""
+            county_city_map_js = json.dumps({c["slug"]: c["cities"] for c in counties})
+
+    if fixed_city:
+        geo_row_html = city_field_html
+    elif county_field_html:
+        geo_row_html = f"""<div class="fs-row">
+        {county_field_html}
+        {city_field_html}
+      </div>"""
+    else:
+        geo_row_html = city_field_html
 
     def _pill_group(field, options):
         btns = "\n          ".join(
@@ -817,15 +863,15 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     beds_group = _pill_group("beds", [("", "Any"), ("1", "1+"), ("2", "2+"), ("3", "3+"), ("4", "4+"), ("5", "5+")])
     baths_group = _pill_group("baths", [("", "Any"), ("1", "1+"), ("2", "2+"), ("3", "3+"), ("4", "4+")])
 
-    floor, ceiling, step = _FS_PRICE_FLOOR, _FS_PRICE_CEILING, _FS_PRICE_STEP
+    floor, ceiling, step = price_floor, _FS_PRICE_CEILING, _FS_PRICE_STEP
 
     form_html = f"""<div class="fs-widget">
     <form id="{wid}-form">
-      {city_field_html}
+      {geo_row_html}
       <div class="fs-row" style="margin-top:{'22px' if fixed_city else '24px'}">
         <div class="fs-block" style="flex:1 1 320px">
           <span class="fs-label">Price Range</span>
-          <div class="fs-price-values"><span id="{wid}-min-label">$950,000</span><span>&mdash;</span><span id="{wid}-max-label">$5,000,000+</span></div>
+          <div class="fs-price-values"><span id="{wid}-min-label">${floor:,}</span><span>&mdash;</span><span id="{wid}-max-label">$5,000,000+</span></div>
           <div class="fs-slider">
             <div class="fs-slider-track"></div>
             <div class="fs-slider-range" id="{wid}-range-fill"></div>
@@ -855,12 +901,15 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
 
     fixed_city_js = json.dumps(fixed_city) if fixed_city else "null"
     deep_links_js = "true" if support_deep_links else "false"
+    always_no_floor_js = "true" if always_no_floor else "false"
 
     js = f"""<script>
 (function () {{
   var wid = {json.dumps(wid)};
   var fixedCity = {fixed_city_js};
   var supportDeepLinks = {deep_links_js};
+  var alwaysNoFloor = {always_no_floor_js};
+  var countyCityMap = {county_city_map_js};
   var form = document.getElementById(wid + '-form');
   var resultsEl = document.getElementById(wid + '-results');
   var statusEl = document.getElementById(wid + '-status');
@@ -875,6 +924,8 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
   var maxPriceInput = document.getElementById(wid + '-maxPrice');
   var bedsInput = document.getElementById(wid + '-beds');
   var bathsInput = document.getElementById(wid + '-baths');
+  var citySelect = document.getElementById(wid + '-city');
+  var countySelect = document.getElementById(wid + '-county');
   var CEILING = {ceiling};
   var skip = 0;
   var TOP = 12;
@@ -947,6 +998,25 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     wirePills(g, g.dataset.field === 'beds' ? bedsInput : bathsInput);
   }});
 
+  // ---- County -> City cascade: picking a county narrows the City dropdown
+  // to just that county's cities (plus "All Cities In <County>"); leaving
+  // City on "All" while a county is picked searches every city in that
+  // county at once via listings-search.js's existing `cities` param. ----
+  var allCityOptionsHtml = citySelect ? citySelect.innerHTML : '';
+  if (countySelect && citySelect) {{
+    countySelect.addEventListener('change', function () {{
+      var slug = countySelect.value;
+      citySelect.value = '';
+      if (!slug) {{
+        citySelect.innerHTML = allCityOptionsHtml;
+        return;
+      }}
+      var cities = countyCityMap[slug] || [];
+      citySelect.innerHTML = '<option value="">All Cities</option>' +
+        cities.map(function (c) {{ return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }}).join('');
+    }});
+  }}
+
   var urlParams = supportDeepLinks ? new URLSearchParams(window.location.search) : new URLSearchParams('');
 
   function paramsFromForm() {{
@@ -957,10 +1027,15 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
       if (v) p[k] = v;
     }});
     if (fixedCity) p.city = fixedCity;
+    if (!p.city && countySelect && countySelect.value) {{
+      var selCities = countyCityMap[countySelect.value] || [];
+      if (selCities.length) p.cities = selCities.join(',');
+    }}
+    if (alwaysNoFloor) p.noFloor = 'true';
     if (supportDeepLinks) {{
       if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
       if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
-      if (urlParams.get('cities')) p.cities = urlParams.get('cities');
+      if (urlParams.get('cities') && !p.cities) p.cities = urlParams.get('cities');
       if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
     }}
     return p;
@@ -4240,34 +4315,49 @@ def build_search_homes():
     ONE THING STILL NEEDED FROM CHRISTINE: Rule 25 requires an actual
     MLS-Grid-approved IRES icon/logo on this page, not just text. Swap the
     text badge below for the real logo image once she has it (ask IRES's
-    Data Feed team, RETS@iresmls.com, for the approved asset)."""
+    Data Feed team, RETS@iresmls.com, for the approved asset).
 
-    search_cities = sorted({
-        city for county in COUNTIES if county.get("priority") for city in county["cities"]
-    })
+    2026-08-13 rework (Christine's request): this page used to hardcode a
+    $950K search floor and lead with "Looking for homes under $950,000? Go
+    search somewhere else" -- copy that actively worked against the page's
+    own job of capturing search traffic, and a floor that hid real
+    inventory no matter what a visitor actually typed into the price
+    slider. Now: price_floor=0/always_no_floor=True on the widget searches
+    the full market top to bottom, the intro paragraph makes the case for
+    using this search instead of deflecting people off it, and a County
+    dropdown (priority_counties, backed by COUNTIES' existing per-county
+    city lists -- no MLS Grid field changes needed) sits next to City so
+    someone can search "all of Larimer County" in one click instead of
+    picking cities one at a time."""
+
+    priority_counties = [c for c in COUNTIES if c.get("priority")]
+    search_cities = sorted({city for county in priority_counties for city in county["cities"]})
+    county_names = [c["name"].replace(" County", "") for c in priority_counties]
     widget_html, widget_js = _fancy_search_widget(
-        "fs", search_cities=search_cities, support_deep_links=True
+        "fs", search_cities=search_cities, support_deep_links=True,
+        price_floor=0, always_no_floor=True, counties=priority_counties,
     )
 
     body = f"""
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Live Inventory, $950K+</span>
-    <h1>Search Northern Colorado Luxury Homes</h1>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
+    <h1>Search Northern Colorado Homes For Sale</h1>
     <p class="lede">Real, active listings from IRES MLS — updated live, not a stale
-    snapshot. Search Larimer, Weld, and Boulder County's $950K+ luxury market by city,
-    price, beds, and baths.</p>
+    snapshot. Search all of {', '.join(county_names[:-1])} and {county_names[-1]} County
+    at once, or narrow to a single city, then set your own price range from starter
+    homes to multimillion-dollar estates.</p>
   </div>
 </section>
 <section>
   <div class="wrap">
-    <p class="search-status" style="margin-top:0">Looking for homes under $950,000? Signature
-    Property Collection is {esc(SITE['agent'])}'s luxury-focused site. For the full range of
-    Northern Colorado listings — including homes under $950K —
-    <a href="https://www.thelittleladysellshomes.com/search-northern-colorado-homes-for-sale" target="_blank" rel="noopener" style="text-decoration:underline">search The Little Lady Sells Homes</a>,
-    {esc(SITE['agent'].split()[0])}'s primary local search site. Looking specifically for
-    {esc(SITE['agent'].split()[0])}'s own listings, with video tours where available?
-    <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
+    <p class="search-status" style="margin-top:0">Signature Property Collection pulls
+    directly from IRES — the MLS of record for {', '.join(county_names[:-1])} and
+    {county_names[-1]} County — so every listing below is real, current inventory
+    refreshed every 15 minutes, not a cached copy from somewhere else. Search an entire
+    county in one click, or pick a city and dial in your price, beds, and baths. Looking
+    specifically for {esc(SITE['agent'].split()[0])}'s own listings, with video tours
+    where available? <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
     {widget_html}
   </div>
 </section>
@@ -4275,9 +4365,9 @@ def build_search_homes():
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Search Homes", None)])
     page(
-        "Search Northern Colorado Luxury Homes $950K+ | Live IRES MLS Listings | Signature Property Collection",
-        "Search live, active $950K+ IRES MLS listings across Larimer, Weld, and Boulder "
-        "County — filter by city, price, beds, and baths.",
+        "Search Northern Colorado Homes For Sale | Live IRES MLS Listings | Signature Property Collection",
+        "Search live, active IRES MLS listings across Larimer, Weld, and Boulder County "
+        "— by county or city, any price range, beds, and baths. Updated every 15 minutes.",
         "/search-homes.html", "Search Homes", body, schema_extra=[breadcrumbs],
     )
 

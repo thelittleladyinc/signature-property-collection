@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Search Northern Colorado Luxury Homes $950K+ | Live IRES MLS Listings | Signature Property Collection</title>
-<meta name="description" content="Search live, active $950K+ IRES MLS listings across Larimer, Weld, and Boulder County — filter by city, price, beds, and baths.">
+<title>Search Northern Colorado Homes For Sale | Live IRES MLS Listings | Signature Property Collection</title>
+<meta name="description" content="Search live, active IRES MLS listings across Larimer, Weld, and Boulder County — by county or city, any price range, beds, and baths. Updated every 15 minutes.">
 <link rel="canonical" href="https://signaturepropertycollection.com/search-homes.html">
-<meta property="og:title" content="Search Northern Colorado Luxury Homes $950K+ | Live IRES MLS Listings | Signature Property Collection">
-<meta property="og:description" content="Search live, active $950K+ IRES MLS listings across Larimer, Weld, and Boulder County — filter by city, price, beds, and baths.">
+<meta property="og:title" content="Search Northern Colorado Homes For Sale | Live IRES MLS Listings | Signature Property Collection">
+<meta property="og:description" content="Search live, active IRES MLS listings across Larimer, Weld, and Boulder County — by county or city, any price range, beds, and baths. Updated every 15 minutes.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://signaturepropertycollection.com/search-homes.html">
 <meta property="og:image" content="https://signaturepropertycollection.com/assets/img/logo-full.png">
 <meta property="og:updated_time" content="2026-08-12">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Search Northern Colorado Luxury Homes $950K+ | Live IRES MLS Listings | Signature Property Collection">
-<meta name="twitter:description" content="Search live, active $950K+ IRES MLS listings across Larimer, Weld, and Boulder County — filter by city, price, beds, and baths.">
+<meta name="twitter:title" content="Search Northern Colorado Homes For Sale | Live IRES MLS Listings | Signature Property Collection">
+<meta name="twitter:description" content="Search live, active IRES MLS listings across Larimer, Weld, and Boulder County — by county or city, any price range, beds, and baths. Updated every 15 minutes.">
 <meta name="last-modified" content="2026-08-12">
 <link rel="icon" href="/assets/img/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32x32.png">
@@ -49,25 +49,36 @@
 
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Live Inventory, $950K+</span>
-    <h1>Search Northern Colorado Luxury Homes</h1>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
+    <h1>Search Northern Colorado Homes For Sale</h1>
     <p class="lede">Real, active listings from IRES MLS — updated live, not a stale
-    snapshot. Search Larimer, Weld, and Boulder County's $950K+ luxury market by city,
-    price, beds, and baths.</p>
+    snapshot. Search all of Larimer, Weld and Boulder County
+    at once, or narrow to a single city, then set your own price range from starter
+    homes to multimillion-dollar estates.</p>
   </div>
 </section>
 <section>
   <div class="wrap">
-    <p class="search-status" style="margin-top:0">Looking for homes under $950,000? Signature
-    Property Collection is Christine Gwinnup's luxury-focused site. For the full range of
-    Northern Colorado listings — including homes under $950K —
-    <a href="https://www.thelittleladysellshomes.com/search-northern-colorado-homes-for-sale" target="_blank" rel="noopener" style="text-decoration:underline">search The Little Lady Sells Homes</a>,
-    Christine's primary local search site. Looking specifically for
-    Christine's own listings, with video tours where available?
-    <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
+    <p class="search-status" style="margin-top:0">Signature Property Collection pulls
+    directly from IRES — the MLS of record for Larimer, Weld and
+    Boulder County — so every listing below is real, current inventory
+    refreshed every 15 minutes, not a cached copy from somewhere else. Search an entire
+    county in one click, or pick a city and dial in your price, beds, and baths. Looking
+    specifically for Christine's own listings, with video tours
+    where available? <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
     <div class="fs-widget">
     <form id="fs-form">
-      <div class="fs-block" style="flex:1 1 200px;min-width:180px">
+      <div class="fs-row">
+        <div class="fs-block" style="flex:1 1 200px;min-width:180px">
+          <span class="fs-label">County</span>
+          <select id="fs-county" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
+            <option value="">All Counties</option>
+            <option value="larimer">Larimer County</option>
+            <option value="weld">Weld County</option>
+            <option value="boulder">Boulder County</option>
+          </select>
+        </div>
+        <div class="fs-block" style="flex:1 1 200px;min-width:180px">
           <span class="fs-label">City</span>
           <select id="fs-city" name="city" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
             <option value="">All Cities</option>
@@ -97,15 +108,16 @@
             <option value="Windsor">Windsor</option>
           </select>
         </div>
+      </div>
       <div class="fs-row" style="margin-top:24px">
         <div class="fs-block" style="flex:1 1 320px">
           <span class="fs-label">Price Range</span>
-          <div class="fs-price-values"><span id="fs-min-label">$950,000</span><span>&mdash;</span><span id="fs-max-label">$5,000,000+</span></div>
+          <div class="fs-price-values"><span id="fs-min-label">$0</span><span>&mdash;</span><span id="fs-max-label">$5,000,000+</span></div>
           <div class="fs-slider">
             <div class="fs-slider-track"></div>
             <div class="fs-slider-range" id="fs-range-fill"></div>
-            <input type="range" id="fs-min-range" min="950000" max="5000000" step="25000" value="950000" aria-label="Minimum price">
-            <input type="range" id="fs-max-range" min="950000" max="5000000" step="25000" value="5000000" aria-label="Maximum price">
+            <input type="range" id="fs-min-range" min="0" max="5000000" step="25000" value="0" aria-label="Minimum price">
+            <input type="range" id="fs-max-range" min="0" max="5000000" step="25000" value="5000000" aria-label="Maximum price">
           </div>
         </div>
         <div class="fs-block">
@@ -162,6 +174,8 @@
   var wid = "fs";
   var fixedCity = null;
   var supportDeepLinks = true;
+  var alwaysNoFloor = true;
+  var countyCityMap = {"larimer": ["Fort Collins", "Loveland", "Berthoud", "Masonville", "Windsor", "Timnath", "Wellington", "Red Feather Lakes"], "weld": ["Greeley", "Windsor", "Severance", "Eaton", "Ault", "Johnstown", "Milliken", "Firestone", "Frederick", "Dacono", "Fort Lupton", "Mead", "Erie"], "boulder": ["Boulder", "Lafayette", "Louisville", "Nederland"]};
   var form = document.getElementById(wid + '-form');
   var resultsEl = document.getElementById(wid + '-results');
   var statusEl = document.getElementById(wid + '-status');
@@ -176,6 +190,8 @@
   var maxPriceInput = document.getElementById(wid + '-maxPrice');
   var bedsInput = document.getElementById(wid + '-beds');
   var bathsInput = document.getElementById(wid + '-baths');
+  var citySelect = document.getElementById(wid + '-city');
+  var countySelect = document.getElementById(wid + '-county');
   var CEILING = 5000000;
   var skip = 0;
   var TOP = 12;
@@ -317,6 +333,25 @@
     wirePills(g, g.dataset.field === 'beds' ? bedsInput : bathsInput);
   });
 
+  // ---- County -> City cascade: picking a county narrows the City dropdown
+  // to just that county's cities (plus "All Cities In <County>"); leaving
+  // City on "All" while a county is picked searches every city in that
+  // county at once via listings-search.js's existing `cities` param. ----
+  var allCityOptionsHtml = citySelect ? citySelect.innerHTML : '';
+  if (countySelect && citySelect) {
+    countySelect.addEventListener('change', function () {
+      var slug = countySelect.value;
+      citySelect.value = '';
+      if (!slug) {
+        citySelect.innerHTML = allCityOptionsHtml;
+        return;
+      }
+      var cities = countyCityMap[slug] || [];
+      citySelect.innerHTML = '<option value="">All Cities</option>' +
+        cities.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    });
+  }
+
   var urlParams = supportDeepLinks ? new URLSearchParams(window.location.search) : new URLSearchParams('');
 
   function paramsFromForm() {
@@ -327,10 +362,15 @@
       if (v) p[k] = v;
     });
     if (fixedCity) p.city = fixedCity;
+    if (!p.city && countySelect && countySelect.value) {
+      var selCities = countyCityMap[countySelect.value] || [];
+      if (selCities.length) p.cities = selCities.join(',');
+    }
+    if (alwaysNoFloor) p.noFloor = 'true';
     if (supportDeepLinks) {
       if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
       if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
-      if (urlParams.get('cities')) p.cities = urlParams.get('cities');
+      if (urlParams.get('cities') && !p.cities) p.cities = urlParams.get('cities');
       if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
     }
     return p;
