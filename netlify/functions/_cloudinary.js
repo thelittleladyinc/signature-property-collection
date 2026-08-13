@@ -79,7 +79,24 @@ async function cachePhotoToCloudinary(mediaUrl, token, publicId) {
     // photos, not an internal admin tool.
     flags: "strip_profile",
   });
-  return result.secure_url || null;
+  if (!result.secure_url) return null;
+  // 2026-08-13 (speed): MLS Grid's original photos are often several
+  // megabytes and always plain JPEG. result.secure_url above points at
+  // that untouched master -- fine to keep as the stored original, but not
+  // what visitors should actually download. Build the delivery URL with
+  // Cloudinary's automatic optimization instead: f_auto serves WebP/AVIF
+  // to browsers that support it (falls back to JPEG otherwise), q_auto
+  // picks the smallest quality level that still looks right, and capping
+  // width at 1600 is plenty for any card or gallery view on this site
+  // (nothing here displays a photo larger than that). Cloudinary generates
+  // this derivative once on first request and caches it at their CDN edge
+  // -- it costs nothing extra per view, it just means every visitor gets a
+  // much lighter image than MLS Grid's original.
+  return cloudinary.url(publicId, {
+    secure: true,
+    resource_type: "image",
+    transformation: [{ quality: "auto", fetch_format: "auto", width: 1600, crop: "limit" }],
+  });
 }
 
 module.exports = { cachePhotoToCloudinary, isCloudinaryConfigured, MIN_IMAGE_SIZE_BYTES };

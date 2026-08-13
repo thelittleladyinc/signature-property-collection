@@ -347,6 +347,15 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 
 /* ---------- Listing media links + inquiry CTAs (Current Listings) ---------- */
 .listing-media { position: relative; }
+/* 2026-08-13: .video-embed's own default box is 16:9 (padding-top: 56.25%),
+   shorter/wider than .listing-card img's 4:3 box above -- so a row mixing
+   video-thumbnail and photo-only listings rendered visibly different card
+   heights, pushing price/address text to a different vertical position
+   depending on which one a given card happened to have. Force video embeds
+   to the same 4:3 box (and drop the border-radius/shadow the standalone
+   .video-embed usage on the video-tour pages wants but which looked out of
+   place against a plain photo here) so every card in the grid lines up. */
+.listing-card .video-embed { padding-top: 75%; border-radius: 0; box-shadow: none; }
 .media-links { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 20px 0; }
 .media-link { background: none; border: none; padding: 0; margin: 0; font-family: var(--font-sans); font-size: 13px; color: var(--deep-mauve); text-decoration: underline; cursor: pointer; }
 .listing-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
