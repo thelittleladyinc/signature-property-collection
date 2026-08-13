@@ -140,31 +140,49 @@ NAV = [
     ("Contact", "/contact.html"),
 ]
 
+# 2026-08-13 (Christine's request, live-site walkthrough): the "cities"
+# lists below used to only cover a handful of well-known towns per county
+# (e.g. Boulder County had just 4 -- Boulder, Lafayette, Louisville,
+# Nederland -- when it actually has 10 incorporated municipalities), which
+# meant the Search Homes CITY dropdown was missing real towns a buyer might
+# search for. Expanded every county's list to its full set of incorporated
+# cities/towns, sourced from each county government's own site (Larimer,
+# Boulder, Weld, Adams) or Jefferson/Arapahoe county profiles + Wikipedia's
+# List of municipalities in Colorado, cross-checked 2026-08-13. Cities added
+# here without a CITY_DATA_SLUG entry safely render as plain (non-linked)
+# pills on county pages and as filter-only options in Search Homes -- see
+# _city_url()'s fallback and CITY_DATA_SLUG's own comment above -- so this
+# doesn't require writing new content pages for every small town, just
+# widens what people can actually search/filter by.
 COUNTIES = [
     {
         "slug": "larimer", "name": "Larimer County",
         "priority": True,
-        "cities": ["Fort Collins", "Loveland", "Berthoud", "Masonville", "Windsor",
-                   "Timnath", "Wellington", "Red Feather Lakes"],
-        "blurb": "Larimer County is home base — Loveland, Berthoud, Masonville and "
+        "cities": ["Fort Collins", "Loveland", "Estes Park", "Berthoud", "Masonville",
+                   "Windsor", "Timnath", "Wellington", "Laporte", "Red Feather Lakes"],
+        "blurb": "Larimer County is home base — Loveland, Berthoud, Estes Park and "
                  "Fort Collins, from foothill acreage to Old Town lofts and everything "
                  "along the Cache la Poudre River.",
     },
     {
         "slug": "weld", "name": "Weld County",
         "priority": True,
-        "cities": ["Greeley", "Windsor", "Severance", "Eaton", "Ault", "Johnstown",
-                   "Milliken", "Firestone", "Frederick", "Dacono", "Fort Lupton", "Mead",
-                   "Erie"],
+        "cities": ["Greeley", "Windsor", "Evans", "Severance", "Eaton", "Ault",
+                   "Johnstown", "Milliken", "Firestone", "Frederick", "Dacono",
+                   "Fort Lupton", "Mead", "Erie", "Platteville", "Kersey", "LaSalle",
+                   "Gilcrest", "Hudson", "Keenesburg", "Lochbuie", "Nunn", "Pierce",
+                   "Garden City", "Grover", "New Raymer"],
         "blurb": "Weld County's growth corridor along the South Platte — new builds, "
                  "acreage, and small-town value minutes from Fort Collins and Greeley.",
     },
     {
         "slug": "boulder", "name": "Boulder County",
         "priority": True,
-        "cities": ["Boulder", "Lafayette", "Louisville", "Nederland"],
+        "cities": ["Boulder", "Longmont", "Lafayette", "Louisville", "Superior",
+                   "Nederland", "Lyons", "Jamestown", "Ward"],
         "blurb": "Boulder County's foothill and university-town living — Boulder, "
-                 "Lafayette, Louisville, and mountain retreats around Nederland.",
+                 "Longmont, Lafayette, Louisville, and mountain retreats around "
+                 "Nederland.",
     },
     {
         "slug": "broomfield", "name": "Broomfield County",
@@ -176,7 +194,9 @@ COUNTIES = [
     {
         "slug": "jefferson", "name": "Jefferson County",
         "priority": False,
-        "cities": ["Golden", "Lakewood", "Arvada", "Wheat Ridge", "Evergreen"],
+        "cities": ["Golden", "Lakewood", "Arvada", "Wheat Ridge", "Evergreen",
+                   "Conifer", "Morrison", "Genesee", "Edgewater", "Bow Mar",
+                   "Lakeside", "Mountain View"],
         "blurb": "Jefferson County's foothill charm — Golden, Lakewood, Arvada, and "
                  "mountain-view living along the Front Range.",
     },
@@ -190,14 +210,16 @@ COUNTIES = [
     {
         "slug": "arapahoe", "name": "Arapahoe County",
         "priority": False,
-        "cities": ["Aurora", "Centennial", "Littleton"],
+        "cities": ["Aurora", "Centennial", "Littleton", "Englewood",
+                   "Greenwood Village", "Cherry Hills Village", "Glendale", "Sheridan"],
         "blurb": "Arapahoe County's established suburbs — Aurora, Centennial, and "
                  "Littleton.",
     },
     {
         "slug": "adams", "name": "Adams County",
         "priority": False,
-        "cities": ["Thornton", "Northglenn", "Brighton"],
+        "cities": ["Thornton", "Northglenn", "Brighton", "Commerce City",
+                   "Federal Heights", "Westminster", "Bennett"],
         "blurb": "Adams County's growing communities north and east of Denver — "
                  "Thornton, Northglenn, and Brighton.",
     },
@@ -1350,7 +1372,7 @@ def _leaflet_lazy_loader_extra():
 def _instagram_feed_section():
     handle_url = SITE["social"].get("Instagram", "")
 
-    def _card(post):
+    def _card(post, idx):
         # Mirrors Instagram's own official oEmbed markup shape (blockquote +
         # inner fallback link) rather than an empty blockquote -- this is
         # real, crawlable, accessible content before/without embed.js, not
@@ -1365,7 +1387,19 @@ def _instagram_feed_section():
         # card heights -- the trade-off is a very tall Reel gets vertically
         # cropped rather than shown in full (still fully viewable via the
         # "view on Instagram" link/caption).
-        return f"""<div class="instagram-embed-wrap">
+        # 2026-08-13 (audit fix): confirmed live -- the 3rd post
+        # (reel/DaI30cygZnI) renders as a totally blank white box, not this
+        # fallback link. That's Instagram's embed.js successfully replacing
+        # the blockquote with an iframe that then fails to render (the post
+        # itself is no longer embeddable on Instagram's end -- deleted,
+        # archived, or made private; nothing wrong on our side to fix in
+        # the markup itself). Since embed.js overwrites this fallback
+        # unconditionally, a dead post used to mean permanent blank space
+        # with no way back to the link. data-ig-fallback-idx here lets the
+        # watchdog script below snapshot this exact markup before embed.js
+        # touches it, then restore it if the resulting embed never actually
+        # renders anything -- see the IG_EMBED_FALLBACK_WATCHDOG script.
+        return f"""<div class="instagram-embed-wrap" data-ig-fallback-idx="{idx}">
       <blockquote class="instagram-media" data-instgrm-captioned
         data-instgrm-permalink="{post['url']}" data-instgrm-version="14"
         style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
@@ -1378,7 +1412,7 @@ def _instagram_feed_section():
       </blockquote>
       </div>"""
 
-    cards = "\n      ".join(_card(p) for p in INSTAGRAM_FEED_POSTS)
+    cards = "\n      ".join(_card(p, i) for i, p in enumerate(INSTAGRAM_FEED_POSTS))
     return f"""<section class="tight" id="instagram-feed-section">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Follow Along</span>
@@ -1402,12 +1436,40 @@ def _instagram_feed_section():
   // before scrolling anyway.
   var target = document.getElementById('instagram-feed-section');
   if (!target) return;
+
+  // 2026-08-13 (audit fix): snapshot every card's original fallback
+  // markup *before* embed.js can overwrite it -- embed.js replaces the
+  // blockquote unconditionally whether or not the post actually renders,
+  // so without this a dead/deleted/private post just leaves permanent
+  // blank space with nothing to fall back to.
+  var wraps = target.querySelectorAll('[data-ig-fallback-idx]');
+  var snapshots = {{}};
+  wraps.forEach(function (w) {{ snapshots[w.getAttribute('data-ig-fallback-idx')] = w.innerHTML; }});
+
+  function watchdog() {{
+    // Give embed.js time to fetch + render each post, then check whether
+    // anything actually painted. A successful embed replaces the
+    // blockquote with an iframe with real height; a dead post either
+    // leaves no iframe or leaves one with ~0 rendered height.
+    setTimeout(function () {{
+      wraps.forEach(function (w) {{
+        var idx = w.getAttribute('data-ig-fallback-idx');
+        var frame = w.querySelector('iframe');
+        var rendered = frame && frame.offsetHeight > 60;
+        if (!rendered && snapshots[idx]) {{
+          w.innerHTML = snapshots[idx];
+        }}
+      }});
+    }}, 4000);
+  }}
+
   function loadEmbed() {{
     if (document.getElementById('ig-embed-script')) return;
     var s = document.createElement('script');
     s.id = 'ig-embed-script';
     s.async = true;
     s.src = 'https://www.instagram.com/embed.js';
+    s.onload = watchdog;
     document.body.appendChild(s);
   }}
   if ('IntersectionObserver' in window) {{
@@ -4422,7 +4484,7 @@ def build_nav_pages():
 </section>
 <section>
   <div class="wrap grid-2">
-    <div class="grid-3" style="grid-template-columns:1fr 1fr">
+    <div class="grid-2col">
       {points_html}
     </div>
     {_tool_lead_form("free-home-valuation", "Get My Free Valuation",
@@ -4803,7 +4865,15 @@ def build_search_homes():
     dropdown (priority_counties, backed by COUNTIES' existing per-county
     city lists -- no MLS Grid field changes needed) sits next to City so
     someone can search "all of Larimer County" in one click instead of
-    picking cities one at a time."""
+    picking cities one at a time.
+
+    2026-08-13 audit fix: the paragraph directly under the hero used to
+    restate the exact same "pulls from IRES MLS / updated every 15 minutes
+    / not a stale snapshot" claim the hero <p class="lede"> right above it
+    already made -- two paragraphs back to back saying the same thing
+    before a visitor even reached the search form. Trimmed the second
+    paragraph down to the part that wasn't redundant: the actionable
+    county-vs-city tip and the Current Listings cross-link."""
 
     priority_counties = [c for c in COUNTIES if c.get("priority")]
     search_cities = sorted({city for county in priority_counties for city in county["cities"]})
@@ -4826,13 +4896,10 @@ def build_search_homes():
 </section>
 <section>
   <div class="wrap">
-    <p class="search-status" style="margin-top:0">Signature Property Collection pulls
-    directly from IRES — the MLS of record for {', '.join(county_names[:-1])} and
-    {county_names[-1]} County — so every listing below is real, current inventory
-    refreshed every 15 minutes, not a cached copy from somewhere else. Search an entire
-    county in one click, or pick a city and dial in your price, beds, and baths. Looking
-    specifically for {esc(SITE['agent'].split()[0])}'s own listings, with video tours
-    where available? <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
+    <p class="search-status" style="margin-top:0">Search an entire county in one click,
+    or pick a city and dial in your price, beds, and baths below. Looking specifically
+    for {esc(SITE['agent'].split()[0])}'s own listings, with video tours where available?
+    <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
     {widget_html}
   </div>
 </section>

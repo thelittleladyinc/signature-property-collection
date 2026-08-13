@@ -167,7 +167,7 @@
     <p class="lede">Straight from Christine Gwinnup's own Instagram &mdash; new listings, video
     tours, and the real day-to-day of selling Northern Colorado real estate.</p>
     <div class="grid-3" style="justify-items:center">
-      <div class="instagram-embed-wrap">
+      <div class="instagram-embed-wrap" data-ig-fallback-idx="0">
       <blockquote class="instagram-media" data-instgrm-captioned
         data-instgrm-permalink="https://www.instagram.com/reel/DagBahKAUhu/" data-instgrm-version="14"
         style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
@@ -179,7 +179,7 @@
         </div>
       </blockquote>
       </div>
-      <div class="instagram-embed-wrap">
+      <div class="instagram-embed-wrap" data-ig-fallback-idx="1">
       <blockquote class="instagram-media" data-instgrm-captioned
         data-instgrm-permalink="https://www.instagram.com/reel/DaNwBQSuTaN/" data-instgrm-version="14"
         style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
@@ -191,7 +191,7 @@
         </div>
       </blockquote>
       </div>
-      <div class="instagram-embed-wrap">
+      <div class="instagram-embed-wrap" data-ig-fallback-idx="2">
       <blockquote class="instagram-media" data-instgrm-captioned
         data-instgrm-permalink="https://www.instagram.com/reel/DaI30cygZnI/" data-instgrm-version="14"
         style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
@@ -218,12 +218,40 @@
   // before scrolling anyway.
   var target = document.getElementById('instagram-feed-section');
   if (!target) return;
+
+  // 2026-08-13 (audit fix): snapshot every card's original fallback
+  // markup *before* embed.js can overwrite it -- embed.js replaces the
+  // blockquote unconditionally whether or not the post actually renders,
+  // so without this a dead/deleted/private post just leaves permanent
+  // blank space with nothing to fall back to.
+  var wraps = target.querySelectorAll('[data-ig-fallback-idx]');
+  var snapshots = {};
+  wraps.forEach(function (w) { snapshots[w.getAttribute('data-ig-fallback-idx')] = w.innerHTML; });
+
+  function watchdog() {
+    // Give embed.js time to fetch + render each post, then check whether
+    // anything actually painted. A successful embed replaces the
+    // blockquote with an iframe with real height; a dead post either
+    // leaves no iframe or leaves one with ~0 rendered height.
+    setTimeout(function () {
+      wraps.forEach(function (w) {
+        var idx = w.getAttribute('data-ig-fallback-idx');
+        var frame = w.querySelector('iframe');
+        var rendered = frame && frame.offsetHeight > 60;
+        if (!rendered && snapshots[idx]) {
+          w.innerHTML = snapshots[idx];
+        }
+      });
+    }, 4000);
+  }
+
   function loadEmbed() {
     if (document.getElementById('ig-embed-script')) return;
     var s = document.createElement('script');
     s.id = 'ig-embed-script';
     s.async = true;
     s.src = 'https://www.instagram.com/embed.js';
+    s.onload = watchdog;
     document.body.appendChild(s);
   }
   if ('IntersectionObserver' in window) {

@@ -84,13 +84,10 @@
 </section>
 <section>
   <div class="wrap">
-    <p class="search-status" style="margin-top:0">Signature Property Collection pulls
-    directly from IRES — the MLS of record for Larimer, Weld and
-    Boulder County — so every listing below is real, current inventory
-    refreshed every 15 minutes, not a cached copy from somewhere else. Search an entire
-    county in one click, or pick a city and dial in your price, beds, and baths. Looking
-    specifically for Christine's own listings, with video tours
-    where available? <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
+    <p class="search-status" style="margin-top:0">Search an entire county in one click,
+    or pick a city and dial in your price, beds, and baths below. Looking specifically
+    for Christine's own listings, with video tours where available?
+    <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
     <div class="fs-widget">
     <form id="fs-form">
       <div class="fs-row">
@@ -113,22 +110,42 @@
             <option value="Dacono">Dacono</option>
             <option value="Eaton">Eaton</option>
             <option value="Erie">Erie</option>
+            <option value="Estes Park">Estes Park</option>
+            <option value="Evans">Evans</option>
             <option value="Firestone">Firestone</option>
             <option value="Fort Collins">Fort Collins</option>
             <option value="Fort Lupton">Fort Lupton</option>
             <option value="Frederick">Frederick</option>
+            <option value="Garden City">Garden City</option>
+            <option value="Gilcrest">Gilcrest</option>
             <option value="Greeley">Greeley</option>
+            <option value="Grover">Grover</option>
+            <option value="Hudson">Hudson</option>
+            <option value="Jamestown">Jamestown</option>
             <option value="Johnstown">Johnstown</option>
+            <option value="Keenesburg">Keenesburg</option>
+            <option value="Kersey">Kersey</option>
+            <option value="LaSalle">LaSalle</option>
             <option value="Lafayette">Lafayette</option>
+            <option value="Laporte">Laporte</option>
+            <option value="Lochbuie">Lochbuie</option>
+            <option value="Longmont">Longmont</option>
             <option value="Louisville">Louisville</option>
             <option value="Loveland">Loveland</option>
+            <option value="Lyons">Lyons</option>
             <option value="Masonville">Masonville</option>
             <option value="Mead">Mead</option>
             <option value="Milliken">Milliken</option>
             <option value="Nederland">Nederland</option>
+            <option value="New Raymer">New Raymer</option>
+            <option value="Nunn">Nunn</option>
+            <option value="Pierce">Pierce</option>
+            <option value="Platteville">Platteville</option>
             <option value="Red Feather Lakes">Red Feather Lakes</option>
             <option value="Severance">Severance</option>
+            <option value="Superior">Superior</option>
             <option value="Timnath">Timnath</option>
+            <option value="Ward">Ward</option>
             <option value="Wellington">Wellington</option>
             <option value="Windsor">Windsor</option>
           </select>
@@ -239,7 +256,7 @@
   var fixedCity = null;
   var supportDeepLinks = true;
   var alwaysNoFloor = true;
-  var countyCityMap = {"larimer": ["Fort Collins", "Loveland", "Berthoud", "Masonville", "Windsor", "Timnath", "Wellington", "Red Feather Lakes"], "weld": ["Greeley", "Windsor", "Severance", "Eaton", "Ault", "Johnstown", "Milliken", "Firestone", "Frederick", "Dacono", "Fort Lupton", "Mead", "Erie"], "boulder": ["Boulder", "Lafayette", "Louisville", "Nederland"]};
+  var countyCityMap = {"larimer": ["Fort Collins", "Loveland", "Estes Park", "Berthoud", "Masonville", "Windsor", "Timnath", "Wellington", "Laporte", "Red Feather Lakes"], "weld": ["Greeley", "Windsor", "Evans", "Severance", "Eaton", "Ault", "Johnstown", "Milliken", "Firestone", "Frederick", "Dacono", "Fort Lupton", "Mead", "Erie", "Platteville", "Kersey", "LaSalle", "Gilcrest", "Hudson", "Keenesburg", "Lochbuie", "Nunn", "Pierce", "Garden City", "Grover", "New Raymer"], "boulder": ["Boulder", "Longmont", "Lafayette", "Louisville", "Superior", "Nederland", "Lyons", "Jamestown", "Ward"]};
   var form = document.getElementById(wid + '-form');
   var resultsEl = document.getElementById(wid + '-results');
   var statusEl = document.getElementById(wid + '-status');

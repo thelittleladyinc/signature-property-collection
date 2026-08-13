@@ -215,6 +215,16 @@ h2.section-title {
 }
 .instagram-embed-wrap > .instagram-media { margin: 0 auto !important; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+/* 2026-08-13: mobile-audit fix -- free-home-valuation.html's 4-card "Proven
+   Results" block used to hardcode style="grid-template-columns:1fr 1fr"
+   directly on a .grid-3 div. That inline style has higher specificity than
+   the .grid-3 media-query rule below, so it never collapsed to one column
+   on phones -- confirmed via a 390px-viewport Playwright check showing the
+   page forced to a 433px layout viewport (mobile Safari/Chrome zooming out
+   to fit the overflowing 2-column grid). .grid-2col replaces that inline
+   style with a real class that has its own mobile breakpoint. */
+.grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 52px; }
+@media (max-width: 600px) { .grid-2col { grid-template-columns: 1fr; } }
 @media (max-width: 900px) {
   .grid-3 { grid-template-columns: 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
