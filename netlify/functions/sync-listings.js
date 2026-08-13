@@ -155,14 +155,36 @@ function statusClause() {
   return "(" + REPLICATED_STATUSES.map((s) => `StandardStatus eq '${s}'`).join(" or ") + ")";
 }
 
+// 2026-08-13 (prune fix): a listing that goes off-market (sells, gets
+// withdrawn, expires, goes under a status outside REPLICATED_STATUSES) OR
+// gets its MlgCanView flag flipped to false was never actually removed from
+// storage, even though the per-record handling below (both here and in
+// refreshOneListing) already knows how to delete a disqualified record the
+// moment it sees one. The reason it never saw one: every INCREMENTAL query
+// filtered server-side on `MlgCanView eq true and (StandardStatus eq
+// 'Active' or ...)` -- so the instant a stored listing's status or
+// MlgCanView flag changed to something disqualifying, that exact change is
+// what made MLS Grid stop returning the record at all, even though its
+// ModificationTimestamp legitimately advanced. The sync would then never
+// see it again, and the stale (e.g. actually-sold) listing would sit in
+// Blobs and on the public site forever, looking active. This is the
+// dataset's actual pruning gap, not just unbounded growth.
+// Fix: only apply the MlgCanView/status filters on the BOOTSTRAP pass
+// (sinceTimestamp is falsy there), where it's correct and intentional --
+// never pull sold/closed/non-viewable data into storage in the first
+// place. Once bootstrapped, the incremental pass filters ONLY by
+// OriginatingSystemName + ModificationTimestamp, so ANY change to an
+// already-known listing (including one that disqualifies it) comes back
+// and hits the existing "delete if disqualified" logic below / in
+// refreshOneListing. MlgCanView/StandardStatus are both in MLS Grid's
+// allowed-filter-fields list, so this is just choosing to filter on fewer
+// of them for the incremental pass -- still fully within their contract.
 function baseFilter(sinceTimestamp) {
-  const clauses = [
-    "OriginatingSystemName eq 'ires'",
-    "MlgCanView eq true",
-    statusClause(),
-  ];
+  const clauses = ["OriginatingSystemName eq 'ires'"];
   if (sinceTimestamp) {
     clauses.push(`ModificationTimestamp gt ${sinceTimestamp}`);
+  } else {
+    clauses.push("MlgCanView eq true", statusClause());
   }
   return clauses.join(" and ");
 }
