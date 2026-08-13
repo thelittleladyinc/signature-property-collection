@@ -2239,14 +2239,14 @@ def build_about():
     <div>
       <span class="eyebrow" style="color:var(--dusty-rose)">Meet Christine</span>
       <h2 class="section-title">Best Northern Colorado Real Estate Agent</h2>
-      <p class="lede">A short introduction from {SITE['agent']}'s own YouTube channel,
-      The Little Lady Sells Homes.</p>
+      <p class="lede">A recent luxury tour from {SITE['agent']}'s own YouTube channel,
+      The Little Lady Sells Homes &mdash; 913 Green Mountain Dr in Erie's Colliers Hill.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
         <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="https://www.youtube.com/@thelittleladysellshomes" target="_blank" rel="noopener">More On YouTube &rarr;</a>
       </div>
     </div>
     <div>
-      {_yt_embed("umlsSBWfhfg", f"{SITE['agent']} Will Get Your Home Sold Fast In Northern Colorado", _fmt_views(11547))}
+      {_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", _fmt_views(521))}
     </div>
   </div>
 </section>
