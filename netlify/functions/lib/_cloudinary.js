@@ -3,13 +3,40 @@
 // api/lib/cloudinary.js) — confirmed live/working there, not a guess.
 //
 // WHY NOT CLOUDINARY'S "REMOTE FETCH" UPLOAD MODE (file=<url>)?
-// MLS Grid's MediaURL values are served from a CDN that requires
-// Authorization: Bearer <MLSGRID_API_TOKEN>. If we hand Cloudinary the raw
-// URL and let ITS servers fetch it, Cloudinary can't send that header and
-// the fetch 4xxs — confirmed in Listing-Engine's own commit history (their
-// first attempt did exactly this and every photo failed). So instead we
-// download the bytes ourselves (with the token) and hand Cloudinary a
-// Buffer — Cloudinary never talks to media.mlsgrid.com directly.
+// MLS Grid's Media URLs require a specific auth header to fetch. If we hand
+// Cloudinary the raw URL and let ITS servers fetch it, Cloudinary can't send
+// that header and the fetch 4xxs — confirmed in Listing-Engine's own commit
+// history (their first attempt did exactly this and every photo failed). So
+// instead we download the bytes ourselves (with the header) and hand
+// Cloudinary a Buffer — Cloudinary never talks to media.mlsgrid.com directly.
+//
+// 2026-08-13 (real bug found in MLS Grid's own docs, not a guess): every
+// media download this file has ever attempted was sending the WRONG header.
+// MLS Grid's docs (MLS Grid Documentation > Media Files) say: "ALL requests
+// to download the expanded media using the Media URL MUST include the HTTP
+// header User-Agent. The User-Agent value MUST be the Oauth 2 access token
+// you are provided by MLS Grid... Any User-Agent that is not your Oauth 2
+// access token will be blocked by our service." This file was sending a
+// fake browser-style User-Agent string instead — meaning every single photo
+// download this function ever made was rejected by MLS Grid's media server
+// before it even got to a rate-limit check. That's almost certainly the
+// real reason zero photos ever got Cloudinary-cached, independent of the
+// separate account-wide rate-limiting problem. Fixed below: User-Agent is
+// now the literal access token, per spec. Authorization: Bearer is kept too
+// since the main api.mlsgrid.com API documents that header and it's
+// harmless to include here, but User-Agent is the one the media server
+// actually requires.
+//
+// Also worth knowing for anyone touching this later: MLS Grid's docs state
+// Media URLs are SIGNED, SINGLE-USE, and TIME-LIMITED (1 hour) — "the URL
+// may be used to download its image only once. A second request using the
+// same URL will fail." And separately, in bold, twice: "DO NOT use these
+// URLs on your website or in your application" — they exist ONLY to be
+// downloaded once, server-side, and re-hosted (which is exactly what this
+// file does). That's a second, independent reason the site must never fall
+// back to serving a raw MLS Grid photo URL straight to a visitor's
+// browser — it's out of spec and it will only ever work for the first
+// visitor to load it.
 const cloudinary = require("cloudinary").v2;
 
 let _configured = false;
@@ -35,13 +62,15 @@ function isCloudinaryConfigured() {
 // to avoid caching an error page as if it were a real photo.
 const MIN_IMAGE_SIZE_BYTES = 2048;
 
-// Downloads one MLS Grid MediaURL with the Bearer token and verifies it's
-// actually image bytes, not an error page.
+// Downloads one MLS Grid MediaURL and verifies it's actually image bytes,
+// not an error page. Per MLS Grid's own docs, the User-Agent header MUST be
+// the literal access token — that's the real credential the media server
+// checks (see the 2026-08-13 file-header note above).
 async function fetchMlsPhotoBuffer(mediaUrl, token) {
   const res = await fetch(mediaUrl, {
     headers: {
       Authorization: `Bearer ${token}`,
-      "User-Agent": "Mozilla/5.0 (compatible; SignaturePropertyCollection/1.0)",
+      "User-Agent": token,
       Accept: "image/*,*/*;q=0.8",
     },
     signal: AbortSignal.timeout(10000),
