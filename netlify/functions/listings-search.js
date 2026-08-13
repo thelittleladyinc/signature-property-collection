@@ -124,9 +124,28 @@ exports.handler = async (event) => {
       };
     }
 
+    // 2026-08-13 (Christine's request): on her own mine=true showcase, a
+    // listing going under contract is a good thing to lead with (it shows
+    // momentum), not something to bury — she wants it to keep appearing in
+    // the same feed (not split into a separate section, which is already
+    // how this worked) but sorted to the front, ahead of her still-active
+    // listings. Only affects mine=true: the general public search
+    // (PUBLIC_STATUSES = ["Active"] in _mls-shared.js) never contains a
+    // non-Active status in the first place, so this is a no-op there.
+    const isUnderContractOrPending = (l) => {
+      const s = String(l.status || "").toLowerCase();
+      return s.indexOf("contract") !== -1 || s.indexOf("pending") !== -1;
+    };
     const matched = Object.values(listingsById)
       .filter((l) => matchesQuery(l, params))
-      .sort((a, b) => (b.price || 0) - (a.price || 0));
+      .sort((a, b) => {
+        if (mine) {
+          const aFirst = isUnderContractOrPending(a) ? 1 : 0;
+          const bFirst = isUnderContractOrPending(b) ? 1 : 0;
+          if (aFirst !== bFirst) return bFirst - aFirst;
+        }
+        return (b.price || 0) - (a.price || 0);
+      });
 
     const page = matched.slice(skip, skip + top).map((l) => {
       // Strip internal-only fields before they reach the browser. photos[]
