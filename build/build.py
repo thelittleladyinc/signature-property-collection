@@ -1179,6 +1179,54 @@ INSTAGRAM_FEED_POSTS = [
 ]
 
 
+def _leaflet_lazy_loader_extra():
+    # 2026-08-13 (performance fix): the "Find Your Community" county map
+    # (Leaflet + a ~150KB leaflet.js + county boundary GeoJSON it fetches
+    # itself) used to load eagerly on every homepage/communities-index page
+    # view via a blocking <link>/<script> pair in <head>, even though the
+    # map sits well below the fold on both pages. That meant every visitor
+    # paid for ~162KB of CSS+JS parse/exec before first paint whether or not
+    # they ever scrolled down to the map.
+    # Fix: only inject leaflet.css/leaflet.js/map.js once #county-map is
+    # about to enter the viewport (IntersectionObserver, 600px rootMargin so
+    # it's already loaded by the time a normal scroll reaches it — no
+    # visible pop-in). #county-map already has a fixed min-height + dark
+    # background in CSS, so there's no layout shift while it waits. Falls
+    # back to loading immediately if IntersectionObserver isn't supported
+    # (very old browsers) so the map is never permanently broken for them.
+    return (
+        "<script>\n"
+        "(function () {\n"
+        "  function loadLeafletMap() {\n"
+        "    var css = document.createElement('link');\n"
+        "    css.rel = 'stylesheet';\n"
+        "    css.href = '/assets/vendor/leaflet/leaflet.css';\n"
+        "    document.head.appendChild(css);\n"
+        "    var leafletJs = document.createElement('script');\n"
+        "    leafletJs.src = '/assets/vendor/leaflet/leaflet.js';\n"
+        "    leafletJs.onload = function () {\n"
+        "      var mapJs = document.createElement('script');\n"
+        "      mapJs.src = '/assets/js/map.js';\n"
+        "      document.body.appendChild(mapJs);\n"
+        "    };\n"
+        "    document.body.appendChild(leafletJs);\n"
+        "  }\n"
+        "  document.addEventListener('DOMContentLoaded', function () {\n"
+        "    var el = document.getElementById('county-map');\n"
+        "    if (!el) return;\n"
+        "    if (!('IntersectionObserver' in window)) { loadLeafletMap(); return; }\n"
+        "    var io = new IntersectionObserver(function (entries) {\n"
+        "      entries.forEach(function (entry) {\n"
+        "        if (entry.isIntersecting) { io.disconnect(); loadLeafletMap(); }\n"
+        "      });\n"
+        "    }, { rootMargin: '600px 0px' });\n"
+        "    io.observe(el);\n"
+        "  });\n"
+        "})();\n"
+        "</script>"
+    )
+
+
 def _instagram_feed_section():
     handle_url = SITE["social"].get("Instagram", "")
 
@@ -1660,9 +1708,7 @@ def build_home():
     body += _instagram_feed_section()
     faq_html, faq_schema = _faq_block(HOME_FAQ)
     body += faq_html
-    extra = ('<link rel="stylesheet" href="/assets/vendor/leaflet/leaflet.css">\n'
-             '<script src="/assets/vendor/leaflet/leaflet.js"></script>\n'
-             '<script defer src="/assets/js/map.js"></script>')
+    extra = _leaflet_lazy_loader_extra()
     page(
         "Luxury Real Estate Loveland & Northern Colorado | Signature Property Collection",
         "Christine Gwinnup and Signature Property Collection — luxury real estate across Loveland, "
@@ -1698,9 +1744,7 @@ def build_communities_index():
   </div>
 </section>
 """
-    extra = ('<link rel="stylesheet" href="/assets/vendor/leaflet/leaflet.css">\n'
-             '<script src="/assets/vendor/leaflet/leaflet.js"></script>\n'
-             '<script defer src="/assets/js/map.js"></script>')
+    extra = _leaflet_lazy_loader_extra()
     page(
         "Explore Northern Colorado Communities | Signature Property Collection",
         "Click-to-explore county map of Northern Colorado — Larimer, Weld, Boulder, "

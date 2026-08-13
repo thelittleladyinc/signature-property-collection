@@ -500,5 +500,18 @@
     '.county-label-tooltip::before{display:none;}';
   document.head.appendChild(style);
 
-  document.addEventListener('DOMContentLoaded', init);
+  // 2026-08-13 (performance fix): this script (plus leaflet.css/leaflet.js)
+  // is now lazy-injected only when the #county-map section nears the
+  // viewport (see the loadMapWhenNear() loader build.py writes into each
+  // page's <head>) instead of being loaded eagerly on every page view. By
+  // the time that happens the DOM has always already finished loading, so
+  // the DOMContentLoaded event this used to wait for has already fired and
+  // would never come again -- init() must run immediately in that case.
+  // Kept the DOMContentLoaded fallback too so this file still works
+  // correctly if it's ever loaded the old eager way.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
