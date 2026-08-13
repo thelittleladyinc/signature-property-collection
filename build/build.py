@@ -1346,17 +1346,52 @@ def head(title, description, path="/", canonical_extra="", schema_extra=""):
 
 
 def header_html(active=None):
+    # 2026-08-13 (critical mobile-nav fix): style.css hides nav.primary-nav
+    # entirely below 900px (`nav.primary-nav { display: none; }`) with no
+    # replacement -- confirmed via a full site review that there was no
+    # hamburger button in this markup, no toggle CSS, and no JS anywhere in
+    # the built site to show one. That meant every visitor on a phone or
+    # narrow tablet (the majority of real-estate site traffic) landed with
+    # NO way to reach Communities, Search Homes, Current Listings, Buy,
+    # Sell, Testimonials, or Contact except the browser back button. Fixed
+    # with a standard hamburger toggle: a button (hidden on desktop, shown
+    # under 900px via CSS in style.css) that reveals the nav as a dropdown
+    # panel. Vanilla JS, no dependencies, mirrors the same
+    # inline-script-per-page pattern already used elsewhere on this site
+    # (e.g. the homepage's lazy Instagram embed loader).
     return f"""<header class="site-header">
   <div class="wrap">
     <div class="brand">
       <a href="/index.html"><img class="brand-logo" src="/assets/img/logo-full.png" alt="{SITE['name']}"></a>
       <span class="brokerage">{SITE['brokerage']}</span>
     </div>
-    <nav class="primary-nav">
+    <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+      <span></span><span></span><span></span>
+    </button>
+    <nav class="primary-nav" id="primary-nav">
       {nav_html(active)}
     </nav>
   </div>
-</header>"""
+</header>
+<script>
+(function () {{
+  var btn = document.getElementById('nav-toggle');
+  var nav = document.getElementById('primary-nav');
+  if (!btn || !nav) return;
+  btn.addEventListener('click', function () {{
+    var isOpen = nav.classList.toggle('nav-open');
+    btn.classList.toggle('is-active', isOpen);
+    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }});
+  nav.querySelectorAll('a').forEach(function (a) {{
+    a.addEventListener('click', function () {{
+      nav.classList.remove('nav-open');
+      btn.classList.remove('is-active');
+      btn.setAttribute('aria-expanded', 'false');
+    }});
+  }});
+}})();
+</script>"""
 
 
 def _qr_slug(path):

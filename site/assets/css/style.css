@@ -59,6 +59,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--dusty-rose);
   color: var(--white);
   padding: 18px 0;
+  position: relative;
 }
 .site-header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand { display: flex; align-items: center; gap: 14px; }
@@ -75,6 +76,35 @@ nav.primary-nav a {
   font-weight: 600;
 }
 nav.primary-nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* 2026-08-13 (mobile-nav fix): hidden on desktop by default -- shown only
+   inside the max-width:900px block below, where nav.primary-nav itself
+   switches from "display:none" (the old, broken, no-alternative behavior)
+   to a toggleable dropdown panel this button controls. */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.nav-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--white);
+  transition: transform .2s ease, opacity .2s ease;
+}
+.nav-toggle.is-active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-toggle.is-active span:nth-child(2) { opacity: 0; }
+.nav-toggle.is-active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
 /* ---------- Hero ---------- */
 .hero {
@@ -157,7 +187,25 @@ h2.section-title {
 @media (max-width: 900px) {
   .grid-3 { grid-template-columns: 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
-  nav.primary-nav { display: none; }
+  .nav-toggle { display: flex; }
+  nav.primary-nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    background: var(--dusty-rose);
+    padding: 8px 24px 20px;
+    box-shadow: 0 16px 30px rgba(20,20,21,.18);
+    z-index: 50;
+  }
+  nav.primary-nav.nav-open { display: flex; }
+  nav.primary-nav a {
+    padding: 14px 0;
+    border-top: 1px solid rgba(255,255,255,.18);
+  }
 }
 
 .card {
