@@ -72,7 +72,24 @@ const {
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
 
-const TIME_BUDGET_MS = 20000; // leave headroom under the 30s function limit
+// 2026-08-13 (real timeout found in Netlify's own Observability logs):
+// this used to be 20000 on the assumption of a 30s function limit — that
+// assumption was wrong. Live logs showed sync-listings POST requests
+// returning HTTP 499 (client closed / timed out) on essentially every
+// scheduled invocation once photo caching started doing real network work
+// (downloading+uploading real photos takes real seconds, unlike the old
+// wrong-header fetches which failed near-instantly). A platform kill isn't
+// a catchable JS exception — it cuts the process before the try/catch's
+// cleanup or the final store.setJSON() calls at the bottom of this file
+// ever run, so a timed-out run silently threw away 100% of that run's
+// work (every listing pulled, every photo cached) with nothing written to
+// Blobs. That's the real reason cloudinaryPhoto never appeared even after
+// the User-Agent fix, and why the bootstrap crawl and photosRefreshedAt
+// both looked completely frozen run after run. Tightened here for extra
+// margin, but the durable fix is the incremental checkpoint saves added
+// below (after the priority pass and after each page) — those make a
+// timeout lose at most the current chunk of work instead of the whole run.
+const TIME_BUDGET_MS = 8000;
 const PAGE_SIZE = 50; // kept small since $expand=Media makes each record heavy
 // 2026-08-12 (rate-limit fix): MLS Grid suspended API access today (and
 // several times before, per notify@mlsgrid.com emails going back to
@@ -338,6 +355,17 @@ exports.handler = async () => {
     }
   }
 
+  // 2026-08-13 (checkpoint save): write Christine's own listings' progress
+  // to Blobs right now, before spending any time budget on the much larger
+  // regional crawl below. This is the fix for the real timeout confirmed in
+  // Netlify's Observability logs (see the TIME_BUDGET_MS comment above) —
+  // her newly-cached cover photos and refreshed data survive even if the
+  // main crawl loop or refresh sweep below gets killed by the platform
+  // before the function's own final save at the bottom of this file ever
+  // runs. Cheap and safe to call this often; Blobs writes are fast and
+  // idempotent.
+  await store.setJSON(LISTINGS_KEY, listingsById);
+
   let requestUrl;
   if (state.cursor) {
     // Mid-pass (bootstrap or incremental) — the saved nextLink already
@@ -418,6 +446,28 @@ exports.handler = async () => {
         }
 
         requestUrl = json["@odata.nextLink"] || null;
+
+        // 2026-08-13 (checkpoint save): persist after every page, not just
+        // once at the end. Same real-timeout problem as the priority-pass
+        // checkpoint above — without this, a run that times out partway
+        // through a multi-page bootstrap pull saves NOTHING, not even the
+        // cursor, so totalListingsStored/cursorPending can look frozen for
+        // hours even though real MLS Grid requests are succeeding every
+        // run. Saving the cursor here means a timeout mid-crawl resumes
+        // from the next page instead of replaying pages already fetched.
+        await store.setJSON(LISTINGS_KEY, listingsById);
+        await store.setJSON(SYNC_STATE_KEY, {
+          bootstrapped: state.bootstrapped,
+          cursor: requestUrl,
+          lastModified: state.lastModified,
+          lastRunAt: new Date().toISOString(),
+          lastRunPagesFetched: pagesFetched,
+          lastRunRecordsSeen: recordsSeen,
+          totalListingsStored: Object.keys(listingsById).length,
+          lastRunCoverPhotosCached: coverPhotosCached,
+          lastRunStaleListingsRefreshed: staleListingsRefreshed,
+          lastRunError: null,
+        });
       }
     }
 
