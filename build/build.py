@@ -1376,7 +1376,7 @@ def header_html(active=None):
   <div class="wrap">
     <div class="brand">
       <a href="/index.html"><img class="brand-logo" src="/assets/img/logo-full.png" alt="{SITE['name']}"></a>
-      <span class="brokerage">{SITE['brokerage']}</span>
+      <img class="brokerage-logo" src="/assets/img/lpt-logo.png" alt="{SITE['brokerage']}">
     </div>
     <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
       <span></span><span></span><span></span>
