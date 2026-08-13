@@ -2029,6 +2029,25 @@ def build_buyers():
   </div>
 </section>
 """
+    # 2026-08-13: this page previously only linked out to /contact.html --
+    # no actual lead-capture form of its own, unlike free-home-valuation.html
+    # and lifestyle-search. Adding one here so buyer interest gets captured
+    # (and pushed to Lofty) right where it happens, using the same
+    # _tool_lead_form() pattern as the rest of the site.
+    body += f"""
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <h2 class="section-title">Ready To Start Your Search?</h2>
+      <p class="lede">Tell us what you're looking for &mdash; price range, must-haves,
+      timeline &mdash; and {esc(SITE['agent'].split()[0])} will follow up personally,
+      usually within one business day.</p>
+    </div>
+    {_tool_lead_form("buyers-page-inquiry", "Get Matched With Listings",
+        '<textarea name="message" rows="3" placeholder="What are you looking for? (optional)"></textarea>')}
+  </div>
+</section>
+"""
     page(
         "Expert Home Buying Guidance in Northern Colorado | Signature Property Collection",
         "Buy a home in Loveland, Berthoud, Masonville, or across the Larimer, Weld & "
@@ -2065,6 +2084,24 @@ def build_sellers():
       <div class="card"><h3>Expert Negotiation</h3><p>Years of experience and negotiation
       certifications working to get you top dollar.</p></div>
     </div>
+  </div>
+</section>
+"""
+    # 2026-08-13: same gap as buyers.html -- the hero CTA promised a "Free
+    # Home Valuation" but only linked to /contact.html, a generic form with
+    # no address field and no seller-specific Lofty source label. Adding a
+    # real form right on this page instead.
+    body += f"""
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <h2 class="section-title">What's Your Home Worth?</h2>
+      <p class="lede">Get a free, no-obligation home valuation from
+      {esc(SITE['agent'])} &mdash; grounded in real comparable sales, not an
+      automated estimate.</p>
+    </div>
+    {_tool_lead_form("sellers-page-inquiry", "Get My Free Valuation",
+        '<input type="text" name="address" placeholder="Property Address (optional)">')}
   </div>
 </section>
 """
@@ -2203,7 +2240,17 @@ def build_guides():
 
     # Lead-capture landing pages (mirror the live site's PDF-download offers,
     # wired to the same Netlify Forms pattern as /contact.html for now).
-    def _lead_guide(path, title, description, kicker, headline, bullets):
+    def _lead_guide(path, title, description, kicker, headline, bullets, form_name=None):
+        # 2026-08-13 fix: this used to derive the form name from the path
+        # via `path.strip('/').replace('/', '-')`, which for
+        # "/guides/buyers-guide.html" produces "guides-buyers-guide.html"
+        # (note the stray ".html") -- that never matched the "buyers-guide"
+        # / "sellers-guide" keys already sitting in submission-created.js's
+        # SOURCE_LABELS, so these leads landed in Lofty with an ugly
+        # fallback source instead of "Buyer's/Seller's Guide Download".
+        # Callers now pass the exact SOURCE_LABELS key explicitly.
+        if form_name is None:
+            form_name = path.strip("/").replace("/", "-").replace(".html", "")
         bullet_html = "\n      ".join(f"<li>{esc(b)}</li>" for b in bullets)
         body = f"""
 <section class="hero" style="padding:90px 0 60px">
@@ -2222,8 +2269,8 @@ def build_guides():
       {bullet_html}
       </ul>
     </div>
-    <form class="lead-form" name="{path.strip('/').replace('/', '-')}" method="POST" data-netlify="true" netlify-honeypot="bot-field">
-      <input type="hidden" name="form-name" value="{path.strip('/').replace('/', '-')}">
+    <form class="lead-form" name="{form_name}" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name" value="{form_name}">
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email" required>
@@ -2250,6 +2297,7 @@ def build_guides():
          "Find the right lender — and get the best mortgage terms with ease",
          "Make the perfect offer — often the first is the one that wins",
          "Negotiate closing costs so the seller covers key expenses"],
+        form_name="buyers-guide",
     )
     _lead_guide(
         "/guides/sellers-guide.html",
@@ -2261,6 +2309,7 @@ def build_guides():
          "Avoid common mistakes sellers make",
          "Understand pricing strategies that work",
          "Attract the right buyers quickly"],
+        form_name="sellers-guide",
     )
 
 
@@ -3777,9 +3826,26 @@ def build_nav_pages():
       {steps_html}
     </div>
     <div class="btn-row" style="justify-content:flex-start;margin-top:40px">
-      <a class="btn btn-dark" href="/contact.html">Start Your Relocation</a>
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/communities/index.html">Explore Communities</a>
     </div>
+  </div>
+</section>
+"""
+    # 2026-08-13: this page's only lead capture was a button to /contact.html
+    # (generic form, no relocation context) despite submission-created.js
+    # already having a "relocation" Lofty source label sitting unused. Adding
+    # a real form here, using that exact form name so it lines up.
+    body += f"""
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <h2 class="section-title">Start Your Relocation</h2>
+      <p class="lede">Moving from out of state or just across town &mdash; tell us where
+      you're coming from and what matters most, and {esc(SITE['agent'].split()[0])} will
+      personally reach out to help you plan the move.</p>
+    </div>
+    {_tool_lead_form("relocation", "Start Your Relocation",
+        '<input type="text" name="moving_from" placeholder="Moving From (city, state)">')}
   </div>
 </section>
 """

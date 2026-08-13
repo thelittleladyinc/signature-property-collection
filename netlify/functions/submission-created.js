@@ -25,6 +25,11 @@ const SOURCE_LABELS = {
   "lifestyle-search": "Signature Property Collection - Lifestyle Search",
   "listing-inquiry": "Signature Property Collection - Listing Inquiry (Current Listings page)",
   "neighborhood-quiz": "Signature Property Collection - Neighborhood Quiz",
+  // 2026-08-13: added when buyers.html/sellers.html/relocation.html got
+  // their own real lead-capture forms (previously they only linked out to
+  // /contact.html) -- see build.py build_buyers()/build_sellers().
+  "buyers-page-inquiry": "Signature Property Collection - Buyers Page Inquiry",
+  "sellers-page-inquiry": "Signature Property Collection - Sellers Page Inquiry (Home Valuation)",
 };
 
 function splitName(fullName) {
@@ -62,8 +67,15 @@ exports.handler = async (event) => {
       const msg = data.message ? ` — "${data.message}"` : "";
       body.notes = `${kind} about listing: ${data.listing_address}${mls}${msg}`;
       body.tags.push(data.inquiry_type === "Tour" ? "Tour Request" : "Listing Question");
+    } else if (data.moving_from) {
+      // From the Relocation page's form (build_nav_pages() in build.py).
+      body.notes = `Relocating from: ${data.moving_from}` +
+        (data.message ? ` — "${data.message}"` : "");
     } else if (data.address) {
       body.notes = `Requested valuation for: ${data.address}`;
+    } else if (data.message) {
+      // From the Buyers page's form (build_buyers() in build.py).
+      body.notes = data.message;
     } else if (data.quiz_match) {
       // From the Neighborhood Quiz (build_neighborhood_quiz() in build.py) —
       // quiz_match is the top city match (+ runner-up), quiz_answers is a
