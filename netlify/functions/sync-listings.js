@@ -49,6 +49,22 @@
 // circuit breaker below is for (same pattern Listing-Engine's mls.js uses,
 // persisted to Blobs here since Netlify Functions don't keep in-memory
 // state between invocations the way Listing-Engine's always-on server does).
+//
+// 2026-08-13 (priority pass): the main loop below walks ALL IRES listings
+// in ModificationTimestamp order. During the initial bootstrap (which can
+// take many hours over a ~19,000-listing regional dataset), Christine's own
+// handful of listings could be anywhere in that walk — so cacheCoverPhotoIfHers
+// might not reach them for a long time, and the refresh sweep never even
+// runs during bootstrap since it only fires when the main loop finishes
+// early (time budget left over), which never happens while bootstrapping.
+// Her own listings are the actual point of this fix, so they can't be left
+// waiting on an unrelated regional crawl to get around to them. The
+// priority pass below refreshes her known listings directly, every run,
+// before the main loop spends any of the time budget — small and fixed
+// (bounded by however many of her listings are already known), and
+// effectively free once each one is cached (cacheCoverPhotoIfHers no-ops
+// immediately for anything already on Cloudinary, so this only costs real
+// MLS Grid requests for the ones not yet cached).
 const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES,
@@ -181,6 +197,46 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token) {
   }
 }
 
+// Fetches one listing by ListingId, verifies MLS Grid actually honored the
+// filter (it's documented — per Listing-Engine's own hard-won notes — to
+// sometimes silently ignore a ListingId filter and return an unrelated
+// record instead), applies the same cover-photo caching used everywhere
+// else, and stores/removes it in listingsById as appropriate. Shared by the
+// priority pass (Christine's own listings, below) and the refresh sweep
+// (everyone else's stale listings, below) so both go through identical
+// logic.
+async function refreshOneListing(listingId, listingsById, store, token) {
+  const qs = new URLSearchParams({
+    "$filter": `ListingId eq '${listingId}' and MlgCanView eq true`,
+    "$select": SELECT_FIELDS,
+    "$expand": "Media",
+    "$top": "1",
+  });
+  const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 429) {
+    await markSuspended(store, SUSPENSION_COOLDOWN_MS);
+    return { suspended: true };
+  }
+  if (!res.ok) return { skipped: true };
+  const json = await res.json();
+  const returned = (json.value || [])[0];
+  if (!returned) return { skipped: true };
+  const mapped = mapListing(returned);
+  if (mapped.listingId !== listingId) return { skipped: true }; // filter was ignored
+  if (mapped.mlgCanView === false || !REPLICATED_STATUSES.includes(mapped.status)) {
+    delete listingsById[mapped.listingId];
+    return { removed: true };
+  }
+  const previouslyStored = listingsById[mapped.listingId];
+  await cacheCoverPhotoIfHers(mapped, previouslyStored, token);
+  const justCached = !!mapped.cloudinaryPhoto && (!previouslyStored || !previouslyStored.cloudinaryPhoto);
+  mapped.photosRefreshedAt = new Date().toISOString();
+  listingsById[mapped.listingId] = mapped;
+  return { refreshed: true, cached: justCached };
+}
+
 exports.handler = async () => {
   const token = process.env.MLSGRID_API_TOKEN;
   if (!token) {
@@ -205,6 +261,46 @@ exports.handler = async () => {
   };
 
   let listingsById = (await store.get(LISTINGS_KEY, { type: "json" })) || {};
+
+  let lastRunError = null;
+  let httpErrorOccurred = false;
+  let coverPhotosCached = 0;
+  let staleListingsRefreshed = 0;
+  // Tracks whether ANY MLS Grid request has been made yet this run (across
+  // the priority pass, the main loop, and the refresh sweep) so exactly one
+  // fixed REQUEST_DELAY_MS gap is kept between every consecutive request
+  // regardless of which phase makes it, and the very first request of the
+  // whole run never waits for nothing.
+  let anyRequestMadeThisRun = false;
+  async function throttle() {
+    if (anyRequestMadeThisRun) await sleep(REQUEST_DELAY_MS);
+    anyRequestMadeThisRun = true;
+  }
+
+  // ---- Priority pass: Christine's own listings, independent of bootstrap
+  // progress (see the 2026-08-13 file-level comment above for why this
+  // exists) ----
+  const herPendingIds = Object.values(listingsById)
+    .filter((l) => l.listingId && isHerListing(l) && !l.cloudinaryPhoto)
+    .map((l) => l.listingId);
+
+  for (const listingId of herPendingIds) {
+    if (Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
+    await throttle();
+    try {
+      const result = await refreshOneListing(listingId, listingsById, store, token);
+      if (result.suspended) {
+        lastRunError = "MLS Grid 429: rate limited during priority pass — suspension circuit breaker opened for 5 minutes";
+        console.error(`sync-listings: ${lastRunError}`);
+        httpErrorOccurred = true;
+        break;
+      }
+      if (result.cached) coverPhotosCached += 1;
+    } catch (err) {
+      console.warn(`sync-listings: priority pass failed for ${listingId}: ${err && err.message}`);
+    }
+  }
+
   let requestUrl;
   if (state.cursor) {
     // Mid-pass (bootstrap or incremental) — the saved nextLink already
@@ -225,84 +321,69 @@ exports.handler = async () => {
   let pagesFetched = 0;
   let recordsSeen = 0;
   let maxModTimestampThisPass = state.lastModified;
-  // 2026-08-12: surfaced into sync-state.json (and from there into
-  // listings-search.js's ?debug=true response) so a failed MLS Grid call
-  // is visible from the browser instead of only in Netlify's own function
-  // logs, which we don't have a way to read directly.
-  let lastRunError = null;
-  // 2026-08-12: tracks whether this run ended because MLS Grid rejected a
-  // request (4xx/5xx), as opposed to running out of time budget or a
-  // network-level exception. Used below to decide whether it's safe to
-  // save `requestUrl` as next run's resume cursor.
-  let httpErrorOccurred = false;
-  let coverPhotosCached = 0;
-  let staleListingsRefreshed = 0;
 
   try {
-    while (requestUrl) {
-      if (Date.now() - startedAt > TIME_BUDGET_MS) {
-        // Out of time for this invocation — save the cursor and resume on
-        // the next scheduled run rather than risk a timeout mid-request.
-        break;
-      }
-
-      if (pagesFetched > 0) {
-        // Throttle: see REQUEST_DELAY_MS comment above. Skipped before the
-        // very first request of the run (no prior request to space out
-        // from) so it doesn't eat into the time budget for nothing.
-        await sleep(REQUEST_DELAY_MS);
-      }
-
-      const res = await fetch(requestUrl, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 429) {
-        // Same account-wide suspension Listing-Engine's mls.js guards
-        // against — open the circuit breaker so neither this run's
-        // remaining pages nor the next scheduled run try again until the
-        // cooldown passes.
-        await markSuspended(store, SUSPENSION_COOLDOWN_MS);
-        lastRunError = "MLS Grid 429: rate limited — suspension circuit breaker opened for 5 minutes";
-        console.error(`sync-listings: ${lastRunError}`);
-        httpErrorOccurred = true;
-        break;
-      }
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        lastRunError = `MLS Grid ${res.status}: ${text.slice(0, 500)}`;
-        console.error(`sync-listings: ${lastRunError}`);
-        httpErrorOccurred = true;
-        break;
-      }
-      const json = await res.json();
-      const items = json.value || [];
-      pagesFetched += 1;
-      recordsSeen += items.length;
-
-      for (const item of items) {
-        const mapped = mapListing(item);
-        if (mapped.mlgCanView === false || !REPLICATED_STATUSES.includes(mapped.status)) {
-          // Deleted / no-longer-qualifying / off the replicated status set
-          // — remove it if we had it, per MLS Grid's MlgCanView contract.
-          if (mapped.listingId) delete listingsById[mapped.listingId];
-          continue;
+    if (!httpErrorOccurred) {
+      while (requestUrl) {
+        if (Date.now() - startedAt > TIME_BUDGET_MS) {
+          // Out of time for this invocation — save the cursor and resume on
+          // the next scheduled run rather than risk a timeout mid-request.
+          break;
         }
-        if (mapped.listingId) {
-          const previouslyStored = listingsById[mapped.listingId];
-          if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
-            await cacheCoverPhotoIfHers(mapped, previouslyStored, token);
-            if (mapped.cloudinaryPhoto && (!previouslyStored || !previouslyStored.cloudinaryPhoto)) {
-              coverPhotosCached += 1;
-            }
+
+        await throttle();
+
+        const res = await fetch(requestUrl, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.status === 429) {
+          // Same account-wide suspension Listing-Engine's mls.js guards
+          // against — open the circuit breaker so neither this run's
+          // remaining pages nor the next scheduled run try again until the
+          // cooldown passes.
+          await markSuspended(store, SUSPENSION_COOLDOWN_MS);
+          lastRunError = "MLS Grid 429: rate limited — suspension circuit breaker opened for 5 minutes";
+          console.error(`sync-listings: ${lastRunError}`);
+          httpErrorOccurred = true;
+          break;
+        }
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          lastRunError = `MLS Grid ${res.status}: ${text.slice(0, 500)}`;
+          console.error(`sync-listings: ${lastRunError}`);
+          httpErrorOccurred = true;
+          break;
+        }
+        const json = await res.json();
+        const items = json.value || [];
+        pagesFetched += 1;
+        recordsSeen += items.length;
+
+        for (const item of items) {
+          const mapped = mapListing(item);
+          if (mapped.mlgCanView === false || !REPLICATED_STATUSES.includes(mapped.status)) {
+            // Deleted / no-longer-qualifying / off the replicated status set
+            // — remove it if we had it, per MLS Grid's MlgCanView contract.
+            if (mapped.listingId) delete listingsById[mapped.listingId];
+            continue;
           }
-          mapped.photosRefreshedAt = new Date().toISOString();
-          listingsById[mapped.listingId] = mapped;
+          if (mapped.listingId) {
+            const previouslyStored = listingsById[mapped.listingId];
+            if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
+              await cacheCoverPhotoIfHers(mapped, previouslyStored, token);
+              if (mapped.cloudinaryPhoto && (!previouslyStored || !previouslyStored.cloudinaryPhoto)) {
+                coverPhotosCached += 1;
+              }
+            }
+            mapped.photosRefreshedAt = new Date().toISOString();
+            listingsById[mapped.listingId] = mapped;
+          }
+          if (mapped.modificationTimestamp &&
+            (!maxModTimestampThisPass || mapped.modificationTimestamp > maxModTimestampThisPass)) {
+            maxModTimestampThisPass = mapped.modificationTimestamp;
+          }
         }
-        if (mapped.modificationTimestamp &&
-          (!maxModTimestampThisPass || mapped.modificationTimestamp > maxModTimestampThisPass)) {
-          maxModTimestampThisPass = mapped.modificationTimestamp;
-        }
-      }
 
-      requestUrl = json["@odata.nextLink"] || null;
+        requestUrl = json["@odata.nextLink"] || null;
+      }
     }
 
     // ---- Refresh sweep: keep the wider (non-Christine) search's photos
@@ -317,9 +398,10 @@ exports.handler = async () => {
       const touchedThisRun = new Set();
       const stale = Object.values(listingsById)
         .filter((l) => l.listingId)
-        // Exclude anything the main incremental loop above already touched
-        // THIS run — it was just refreshed moments ago, re-fetching it
-        // again in the sweep would just waste a request for nothing.
+        // Exclude anything already touched THIS run (priority pass or the
+        // main incremental loop above) — it was just refreshed moments
+        // ago, re-fetching it again in the sweep would just waste a
+        // request for nothing.
         .filter((l) => !l.photosRefreshedAt || Date.parse(l.photosRefreshedAt) < startedAt)
         .sort((a, b) => {
           const at = a.photosRefreshedAt ? Date.parse(a.photosRefreshedAt) : 0;
@@ -331,42 +413,17 @@ exports.handler = async () => {
       for (const staleListing of stale) {
         if (Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
         if (touchedThisRun.has(staleListing.listingId)) continue;
-        await sleep(REQUEST_DELAY_MS);
+        await throttle();
         try {
-          const qs = new URLSearchParams({
-            "$filter": `ListingId eq '${staleListing.listingId}' and MlgCanView eq true`,
-            "$select": SELECT_FIELDS,
-            "$expand": "Media",
-            "$top": "1",
-          });
-          const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.status === 429) {
-            await markSuspended(store, SUSPENSION_COOLDOWN_MS);
+          const result = await refreshOneListing(staleListing.listingId, listingsById, store, token);
+          if (result.suspended) {
             console.error("sync-listings: refresh sweep hit 429 — suspension circuit breaker opened, stopping sweep.");
             break;
           }
-          if (!res.ok) continue; // leave this one stale, try again next run
-          const json = await res.json();
-          const returned = (json.value || [])[0];
-          if (!returned) continue;
-          const mapped = mapListing(returned);
-          // MLS Grid is documented (per Listing-Engine's own hard-won notes)
-          // to sometimes silently ignore a ListingId filter and return an
-          // unrelated record — verify before trusting it, same as
-          // Listing-Engine's mls.js does.
-          if (mapped.listingId !== staleListing.listingId) continue;
-          if (mapped.mlgCanView === false || !REPLICATED_STATUSES.includes(mapped.status)) {
-            delete listingsById[mapped.listingId];
-            continue;
+          if (result.refreshed || result.removed) {
+            touchedThisRun.add(staleListing.listingId);
+            staleListingsRefreshed += 1;
           }
-          const previouslyStored = listingsById[mapped.listingId];
-          await cacheCoverPhotoIfHers(mapped, previouslyStored, token);
-          mapped.photosRefreshedAt = new Date().toISOString();
-          listingsById[mapped.listingId] = mapped;
-          touchedThisRun.add(mapped.listingId);
-          staleListingsRefreshed += 1;
         } catch (err) {
           console.warn(`sync-listings: refresh sweep failed for ${staleListing.listingId}: ${err && err.message}`);
         }
