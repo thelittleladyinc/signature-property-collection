@@ -44,7 +44,7 @@
 // now, not this function).
 const { getStore } = require("@netlify/blobs");
 const {
-  LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery, getBlobStore,
+  LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, matchesQuery, getBlobStore,
 } = require("./lib/_mls-shared");
 
 exports.handler = async (event) => {
@@ -52,12 +52,33 @@ exports.handler = async (event) => {
   const params = event.queryStringParameters || {};
   const top = Math.min(parseInt(params.top, 10) || 12, 24);
   const skip = Math.max(parseInt(params.skip, 10) || 0, 0);
+  const mine = params.mine === "true";
 
   try {
-    const [allListings, state] = await Promise.all([
-      store.get(LISTINGS_KEY, { type: "json" }),
+    // 2026-08-13 (performance fix): mine=true is the overwhelming majority
+    // of traffic to this function — it's what 97+ pages across the site
+    // (blog posts, city pages, the homepage spotlight, current-listings.html)
+    // use for their "one of Christine's listings" widgets. Reading the small
+    // MINE_LISTINGS_KEY copy instead of the full regional dataset (tens of
+    // thousands of records) turns those into a near-instant lookup instead
+    // of a full-dataset parse+scan on every single page load. Falls back to
+    // the full dataset if the small copy hasn't been computed yet (e.g.
+    // right after this deploy, before sync-listings.js's first run since
+    // the update) so nothing breaks during rollout.
+    let allListings;
+    if (mine) {
+      const mineOnly = await store.get(MINE_LISTINGS_KEY, { type: "json" });
+      if (mineOnly) {
+        allListings = Object.fromEntries(
+          mineOnly.filter((l) => l && l.listingId).map((l) => [l.listingId, l]),
+        );
+      }
+    }
+    const [fullListings, state] = await Promise.all([
+      allListings ? Promise.resolve(null) : store.get(LISTINGS_KEY, { type: "json" }),
       store.get(SYNC_STATE_KEY, { type: "json" }),
     ]);
+    if (!allListings) allListings = fullListings;
 
     if (!state) {
       // sync-listings.js hasn't completed a single run yet (e.g. right
@@ -106,7 +127,20 @@ exports.handler = async (event) => {
     }
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // 2026-08-13 (performance fix): the underlying data only changes
+        // every 15 minutes (sync-listings.js's schedule), so there's no
+        // reason every page load re-runs this function from scratch.
+        // Skipped for ?debug=true so live diagnostic checks are never
+        // served a stale cached copy. stale-while-revalidate lets Netlify's
+        // CDN serve an older-but-still-fresh-enough response instantly
+        // while it refreshes in the background, instead of visitors ever
+        // waiting on a cold function invocation.
+        ...(params.debug === "true" ? {} : {
+          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        }),
+      },
       body: JSON.stringify(response),
     };
   } catch (err) {

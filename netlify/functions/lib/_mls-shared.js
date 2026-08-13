@@ -93,6 +93,19 @@ const LUXURY_PRICE_FLOOR = 950000;
 const BLOB_STORE_NAME = "mls-listings";
 const LISTINGS_KEY = "listings.json";
 const SYNC_STATE_KEY = "sync-state.json";
+// 2026-08-13 (performance fix): a small, pre-filtered copy of ONLY
+// Christine's own listings (typically 5-10 records), maintained by
+// sync-listings.js alongside the full LISTINGS_KEY blob. Every mine=true
+// request — used by 97+ pages across the site (blog posts, city pages,
+// the homepage spotlight, current-listings.html) via top:1/top:6-style
+// widgets — used to force listings-search.js to pull and JSON-parse the
+// ENTIRE regional dataset (tens of thousands of listings, tens of MB) just
+// to find her handful. Reading this tiny key instead turns that into a
+// near-instant lookup. The full-dataset LISTINGS_KEY is still read for the
+// general public luxury search (mine not set) and as a one-time fallback
+// if this key hasn't been computed yet (e.g. right after this deploy,
+// before sync-listings.js's first run since the update).
+const MINE_LISTINGS_KEY = "mine-listings.json";
 
 // Netlify's docs promise getStore(name) auto-configures itself with no
 // setup inside any Netlify Function — but in production here it actually
@@ -253,6 +266,7 @@ module.exports = {
   BLOB_STORE_NAME,
   LISTINGS_KEY,
   SYNC_STATE_KEY,
+  MINE_LISTINGS_KEY,
   mapListing,
   matchesQuery,
 };

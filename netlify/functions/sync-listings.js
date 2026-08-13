@@ -68,7 +68,7 @@
 const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES,
-  LISTINGS_KEY, SYNC_STATE_KEY, AGENT_SURNAME, mapListing, getBlobStore,
+  LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
 
@@ -176,6 +176,21 @@ function isHerListing(mapped) {
   const agent = (mapped.agentName || "").toLowerCase();
   const coAgent = (mapped.coAgentName || "").toLowerCase();
   return agent.includes(surname) || coAgent.includes(surname);
+}
+
+// 2026-08-13 (performance fix): every save of the full listings blob also
+// writes a small MINE_LISTINGS_KEY copy containing just Christine's own
+// listings, so listings-search.js can answer mine=true requests (the vast
+// majority of traffic — see the file comment on MINE_LISTINGS_KEY in
+// _mls-shared.js) without reading the full regional dataset. Cheap: this
+// is always a handful of records, and Object.values+filter over the
+// already-in-memory listingsById is negligible next to the Blobs write
+// itself. Called from all three checkpoint-save sites below so the small
+// copy never lags behind the full one.
+async function saveListingsCheckpoint(store, listingsById) {
+  await store.setJSON(LISTINGS_KEY, listingsById);
+  const mineListings = Object.values(listingsById).filter(isHerListing);
+  await store.setJSON(MINE_LISTINGS_KEY, mineListings);
 }
 
 // 2026-08-13 (full-gallery cache): originally this only cached photos[0]
@@ -364,7 +379,7 @@ exports.handler = async () => {
   // before the function's own final save at the bottom of this file ever
   // runs. Cheap and safe to call this often; Blobs writes are fast and
   // idempotent.
-  await store.setJSON(LISTINGS_KEY, listingsById);
+  await saveListingsCheckpoint(store, listingsById);
 
   let requestUrl;
   if (state.cursor) {
@@ -455,7 +470,7 @@ exports.handler = async () => {
         // hours even though real MLS Grid requests are succeeding every
         // run. Saving the cursor here means a timeout mid-crawl resumes
         // from the next page instead of replaying pages already fetched.
-        await store.setJSON(LISTINGS_KEY, listingsById);
+        await saveListingsCheckpoint(store, listingsById);
         await store.setJSON(SYNC_STATE_KEY, {
           bootstrapped: state.bootstrapped,
           cursor: requestUrl,
@@ -534,7 +549,7 @@ exports.handler = async () => {
   // (A time-budget break or network exception still resumes from
   // `requestUrl` as before — those aren't proof the query itself is bad.)
   const cursorToSave = httpErrorOccurred ? null : requestUrl;
-  await store.setJSON(LISTINGS_KEY, listingsById);
+  await saveListingsCheckpoint(store, listingsById);
   await store.setJSON(SYNC_STATE_KEY, {
     bootstrapped: state.bootstrapped || passComplete,
     cursor: cursorToSave,
