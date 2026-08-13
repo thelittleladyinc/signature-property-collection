@@ -4558,9 +4558,36 @@ def build_nav_pages():
     # home shown as "sold"). This is real content, not invented sales
     # figures — the honest caption is each video's own original YouTube
     # title, which already names the address and story.
-    sold_home_cards = "\n      ".join(
-        f'<div>{_yt_embed(vid, title)}</div>' for vid, title in SOLD_HOME_VIDEOS
+    #
+    # 2026-08-13 (seller-walkthrough fix): this used to render every single
+    # SOLD_HOME_VIDEOS entry (12 as of this writing) as a live YouTube iframe
+    # all at once on page load -- confirmed via a real browser test that only
+    # ~1 of 12 actually finished loading even after a 10-second wait, with
+    # the rest stuck permanently black. Loading a dozen simultaneous
+    # cross-origin YouTube embeds is more than browsers reliably render at
+    # once, `loading="lazy"` doesn't help when most of the grid is already
+    # near the viewport, and this is exactly the track-record proof a seller
+    # lands on this page to see. listing-video-portfolio.html already solved
+    # this same problem correctly (first 3 videos render immediately, the
+    # rest sit behind a "View More Videos" button that only reveals -- and
+    # only then starts loading -- them on click) -- reusing that identical,
+    # already-proven pattern here instead of inventing a second one.
+    visible_sold_cards = "\n      ".join(
+        f'<div>{_yt_embed(vid, title)}</div>' for vid, title in SOLD_HOME_VIDEOS[:3]
     )
+    hidden_sold_cards = "\n      ".join(
+        f'<div>{_yt_embed(vid, title)}</div>' for vid, title in SOLD_HOME_VIDEOS[3:]
+    )
+    more_sold_tours_block = f"""
+    <div id="more-sold-tours" style="display:none">
+      <div class="video-grid" style="margin-top:28px">
+        {hidden_sold_cards}
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:32px">
+      <button type="button" class="btn btn-outline" style="border-color:#141415;color:#141415;cursor:pointer"
+      onclick="document.getElementById('more-sold-tours').style.display='block';this.style.display='none'">View More Videos</button>
+    </div>""" if hidden_sold_cards else ""
     sold_homes_section = f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">How I Sold These Homes</span>
@@ -4568,8 +4595,9 @@ def build_nav_pages():
     <p class="lede">A look at the actual marketing video for each property, filmed and
     posted by {esc(SITE['agent'])} herself — real homes, real results, no stock photos.</p>
     <div class="video-grid">
-      {sold_home_cards}
+      {visible_sold_cards}
     </div>
+    {more_sold_tours_block}
   </div>
 </section>""" if SOLD_HOME_VIDEOS else ""
 
