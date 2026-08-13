@@ -339,6 +339,18 @@ form.lead-form label.consent { font-size: 12px; color: #6a6a6c; display: flex; g
 .footer-bottom { margin-top: 64px; padding-top: 28px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; opacity: .6; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .qr-share-btn { background: none; border: none; padding: 0; margin: 0; font-family: inherit; font-size: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
 
+/* ---------- Blog post pull-quote (typographic break, no photo available) ---------- */
+.blog-pull-quote {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  line-height: 1.4;
+  font-style: italic;
+  color: var(--charcoal);
+  border-left: 3px solid var(--dusty-rose);
+  padding: 4px 0 4px 28px;
+  margin: 40px 0;
+}
+
 /* ---------- Breadcrumb / county page hero variants ---------- */
 .county-hero { padding: 120px 0 80px; background: var(--charcoal); color: var(--white); }
 .county-hero .eyebrow { color: var(--dusty-rose); }

@@ -88,6 +88,16 @@ SITE = {
     "name": "Signature Property Collection",
     "agent": "Christine Gwinnup",
     "brokerage": "LPT Realty",
+    # 2026-08-13: no CO real estate license number appeared anywhere on the
+    # site despite prominent LPT Realty branding -- flagged in the site
+    # review since many states require it to be displayed. Found it
+    # verbatim in her own content: the "June 2026" blog post's scraped
+    # email-signature block (build/data/blog.json) reads "LPT Realty · CO
+    # License #100090441 ·" right after her name/brokerage/phone/address,
+    # all of which match SITE above exactly -- so this is her real number,
+    # not a guess. Double-check this against her actual license/DORA record
+    # if there's ever any doubt.
+    "license": "CO License #100090441",
     "phone": "303-709-4262",
     "email": "hello@signaturepropertycollection.com",
     "domain": "https://signaturepropertycollection.com",
@@ -1234,7 +1244,7 @@ def _instagram_feed_section():
 # lift and cite whole rather than paraphrase.
 HOME_FAQ = [
     ("Who is the best luxury real estate agent in Loveland, Berthoud, and Masonville?",
-     f"As of {BUILD_DATE}, {SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a "
+     f"{SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a "
      f"luxury real estate agent based in Loveland, serving Berthoud, Masonville, and the "
      f"rest of Larimer County with 200+ homes sold and expertise in luxury "
      f"marketing and negotiation."),
@@ -1529,11 +1539,10 @@ def footer_html():
       </div>
     </div>
     <div class="footer-bottom">
-      <span>&copy; 2026 {SITE['name']} &middot; {SITE['agent']}, {SITE['brokerage']}. All information deemed reliable but not guaranteed.
+      <span>&copy; 2026 {SITE['name']} &middot; {SITE['agent']}, {SITE['brokerage']} &middot; {SITE['license']}. All information deemed reliable but not guaranteed.
       &middot; <a href="/privacy-policy.html" style="text-decoration:underline">Privacy Policy</a>
       &middot; <a href="/accessibility.html" style="text-decoration:underline">Accessibility</a>
       &middot; {_qr_share_button()}</span>
-      <span>Built by Claude for {SITE['agent']}</span>
     </div>
   </div>
 </footer>"""
@@ -2035,6 +2044,34 @@ def build_city_pages():
                     ";background:linear-gradient(180deg, rgba(20,20,21,.5), rgba(20,20,21,.82)), "
                     f"url('/assets/img/communities/{data_slug}.jpg') center/cover no-repeat"
                 )
+            # 2026-08-13 (duplicate-content fix, body copy): the meta
+            # description disambiguation above only fixed the <meta> tag --
+            # a city that straddles two counties (currently just Windsor)
+            # still had two page BODIES built from the exact same welcome/
+            # things-to-do/dining/etc. facts in CITY_CONTENT, which is
+            # correct (it's the same town, the facts don't change per
+            # county) but reads as a straight copy-paste to a reader
+            # comparing the two pages. Adding a short paragraph of real,
+            # per-county-different content instead of reworded filler --
+            # which OTHER cities in *this* county are its neighbors -- plus
+            # a direct cross-link to the sibling county's page for the same
+            # city, so two pages existing for one town reads as intentional
+            # (it really does span two counties) rather than an accident.
+            dual_county_note = ""
+            if city_county_counts[city] > 1:
+                sibling_counties = [oc for oc in COUNTIES if city in oc["cities"] and oc["slug"] != c["slug"]]
+                other_cities_this_county = [x for x in c["cities"] if x != city][:4]
+                sibling_links = ", ".join(
+                    f'<a href="{esc(_city_url(oc["slug"], city))}" style="text-decoration:underline">{esc(oc["name"])}</a>'
+                    for oc in sibling_counties if _city_url(oc["slug"], city)
+                )
+                if sibling_links and other_cities_this_county:
+                    dual_county_note = (
+                        f'<p class="lede">{esc(city)} is one of the few Northern Colorado towns '
+                        f'that spans two counties. This page covers the {esc(c["name"])} side, '
+                        f'right alongside {esc(", ".join(other_cities_this_county))}. Looking for '
+                        f'the other side instead? See it here: {sibling_links}.</p>'
+                    )
             body = f"""
 <section class="county-hero" style="{hero_style}">
   <div class="wrap">
@@ -2047,6 +2084,7 @@ def build_city_pages():
     <div>
       <h2 class="section-title">Welcome To {esc(city)}</h2>
       <p class="lede">{esc(welcome)}</p>
+      {dual_county_note}
       <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
         <a class="btn btn-dark" href="/contact.html">Talk To {esc(SITE['agent'].split()[0])} About {esc(city)}</a>
         <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/communities/{c['slug']}.html">&larr; {esc(c['name'])}</a>
@@ -2250,7 +2288,7 @@ def build_sellers():
     <h2 class="section-title">Sell With The Best Agent In Colorado</h2>
     <p class="lede">Personalized pricing strategies and innovative marketing that
     maximizes exposure, so your home stands out and sells for the highest value.</p>
-    <div class="grid-3">
+    <div class="grid-2" style="gap:40px;align-items:stretch">
       <div class="card"><h3>Comprehensive Marketing</h3><p>Digital, print, and social
       media strategies with premium placement on Zillow and Realtor.com.</p></div>
       <div class="card"><h3>Photography &amp; Video</h3><p>High-resolution photography,
@@ -2307,6 +2345,24 @@ def build_testimonials():
 <section>
   <div class="wrap grid-3">
     {cards}
+  </div>
+</section>
+"""
+    # 2026-08-13: page previously ended abruptly right after the last quote
+    # with no path forward for a reader who's just been convinced -- adding
+    # the same closing lead-capture pattern used on buyers.html/sellers.html
+    # so that momentum actually converts into a contact.
+    body += f"""
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <h2 class="section-title">Ready For An Experience Like This?</h2>
+      <p class="lede">Whether you're buying, selling, or just exploring your options,
+      {esc(SITE['agent'].split()[0])} would love to help you get there &mdash; reach out
+      and let's start the conversation.</p>
+    </div>
+    {_tool_lead_form("testimonials-page-inquiry", "Get In Touch",
+        '<textarea name="message" rows="3" placeholder="What can we help with? (optional)"></textarea>')}
   </div>
 </section>
 """
@@ -3407,11 +3463,29 @@ def build_subdivision_pages():
 
 # ---------------------------------------------------------------- BLOG ----
 def _blog_body_html(paragraphs):
+    # 2026-08-13 (site review): blog posts have no real photography to
+    # break up the text -- there isn't any to add without Christine
+    # supplying real images per post, which is a separate ask, not
+    # something to fabricate. As a typographic mitigation in the meantime,
+    # style one substantive paragraph partway through each post as a
+    # pull-quote (real article text, just visually promoted) so long posts
+    # get at least one visual break instead of reading as an unbroken wall
+    # of text end to end.
+    is_heading = lambda p: len(p) < 70 and not p.endswith((".", "!", "?", ":", ","))
+    body_paragraphs = [p for p in paragraphs if not is_heading(p)]
+    pull_quote_text = None
+    if len(body_paragraphs) >= 4:
+        candidates = [p for p in body_paragraphs[2:-1] if 80 <= len(p) <= 220]
+        if candidates:
+            pull_quote_text = candidates[len(candidates) // 2]
     parts = []
+    quoted_once = False
     for p in paragraphs:
-        is_heading = len(p) < 70 and not p.endswith((".", "!", "?", ":", ","))
-        if is_heading:
+        if is_heading(p):
             parts.append(f'<h3 style="margin-top:28px">{esc(p)}</h3>')
+        elif p == pull_quote_text and not quoted_once:
+            quoted_once = True
+            parts.append(f'<p class="blog-pull-quote">{esc(p)}</p>')
         else:
             parts.append(f"<p>{esc(p)}</p>")
     return "\n      ".join(parts)
