@@ -1574,12 +1574,39 @@ def build_home():
         f'<div class="testimonial"><p>&ldquo;{esc(t)}&rdquo;</p><div class="who">{esc(who)}</div></div>'
         for t, who in TESTIMONIALS[:3]
     )
+    # 2026-08-13 (luxury repositioning): rewritten to lead unambiguously with
+    # luxury-only positioning rather than broad "we help everyone" copy — per
+    # Christine's direction to narrow Signature's brand identity toward
+    # luxury/estate-caliber real estate specifically, distinct from the
+    # general-market business her other brands (The Little Lady Sells Homes)
+    # already cover. Added a real Services block (mirrors the standard
+    # "services grid" pattern from the noco-digital-takeover template system)
+    # since the homepage previously jumped straight from hero to community
+    # map with no explicit statement of what Signature actually does.
+    services = [
+        ("Buyer Representation", "Private showings, off-market access, and construction-grade "
+         "diligence on estate homes, acreage, and architecturally significant properties — not a "
+         "generic buyer's-agent checklist."),
+        ("Luxury Marketing &amp; Staging", "Cinematic video, drone, and print campaigns built for "
+         "$1M+ listings, paired with professional staging that photographs the way the home "
+         "actually lives."),
+        ("Concierge Relocation", "White-glove relocation for executives, out-of-state buyers, and "
+         "families moving on a timeline — private tours, trusted local vendors, and one point of "
+         "contact from first call to closing."),
+        ("Investment &amp; Acreage Advisory", "Farm, ranch, and acreage transactions, creative "
+         "financing structures, and portfolio strategy for investors building in Northern "
+         "Colorado's luxury tier."),
+    ]
+    services_html = "\n      ".join(
+        f'<div class="card"><h3>{t}</h3><p>{d}</p></div>' for t, d in services
+    )
     body = f"""
 <section class="hero">
   <div class="wrap">
     <h1>Turning Dreams<br>Into Addresses</h1>
-    <p class="lede">Northern Colorado's trusted luxury real estate team — serving Loveland,
-    Berthoud, Masonville, and the Larimer, Weld &amp; Boulder County Front Range.</p>
+    <p class="lede">Northern Colorado's luxury real estate collection — representing estate homes,
+    acreage, and architecturally significant properties across Loveland, Berthoud, Masonville, and
+    the Larimer, Weld &amp; Boulder County Front Range.</p>
     <div class="btn-row">
       <a class="btn btn-primary" href="/buyers.html">Find Your Home</a>
       <a class="btn btn-outline" href="/sellers.html">List With Us</a>
@@ -1591,29 +1618,12 @@ def build_home():
   <div class="wrap">
     <span class="eyebrow">{SITE['agent']}</span>
     <h2 class="section-title">With 200+ homes sold and $200M+ in sales volume</h2>
-    <p class="lede">Award-winning service and expertise in luxury marketing and negotiation —
-    {SITE['agent']} and Signature Property Collection are redefining real estate excellence across
-    Northern Colorado. Whether you're buying, selling, or relocating, we deliver unmatched
-    results.</p>
+    <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, {SITE['agent']} and
+    Signature Property Collection represent Northern Colorado's luxury tier exclusively — the
+    estate homes, acreage, and architecturally distinct properties that a generalist local search
+    doesn't do justice to.</p>
     <div class="grid-3">
-      <div class="card">
-        <h3>Buyers</h3>
-        <p>From first showing to final signature, we simplify the process and turn complex
-        steps into a smooth experience tailored to you.</p>
-        <a class="cta" href="/buyers.html">Find Your Home &rarr;</a>
-      </div>
-      <div class="card">
-        <h3>Sellers</h3>
-        <p>Expert pricing, sharp marketing, and thoughtful guidance to help you get top
-        dollar while staying stress-free from start to finish.</p>
-        <a class="cta" href="/sellers.html">List With Confidence &rarr;</a>
-      </div>
-      <div class="card">
-        <h3>Relocation</h3>
-        <p>Moving for work, lifestyle, or family — our relocation specialists make your
-        transition to Northern Colorado seamless.</p>
-        <a class="cta" href="/about.html">Plan Your Move &rarr;</a>
-      </div>
+      {services_html}
     </div>
   </div>
 </section>
@@ -1996,6 +2006,39 @@ def build_city_pages():
   </div>
 </section>"""
 
+            # 2026-08-13 (luxury site-structure completeness): city pages
+            # were missing two blocks standard to a proper local-authority
+            # page — a named "who you're working with" agent block and a
+            # real social-proof/review snippet — both present site-wide
+            # (About page, Testimonials page) but never surfaced on the page
+            # a luxury buyer/seller actually lands on for a given town.
+            # Testimonial is rotated deterministically by city index (not
+            # claimed as city-specific — none of the real reviews name a
+            # city, so this is presented honestly as "what clients say," not
+            # misattributed to this town).
+            city_index = list(CITY_CONTENT.keys()).index(data_slug) if data_slug in CITY_CONTENT else 0
+            proof_quote, proof_who = TESTIMONIALS[city_index % len(TESTIMONIALS)]
+            agent_proof_block = f"""<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">Meet {esc(SITE['agent'])}</span>
+      <h2 class="section-title">Your {esc(city)} Luxury Real Estate Agent</h2>
+      <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 200+
+      homes sold and $200M+ in sales volume across Northern Colorado's luxury tier. A
+      Certified Negotiation Specialist and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
+      represents estate homes, acreage, and architecturally significant properties in and
+      around {esc(city)}.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:20px">
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/about.html">More About {esc(SITE['agent'].split()[0])} &rarr;</a>
+      </div>
+    </div>
+    <div class="testimonial">
+      <p>&ldquo;{esc(proof_quote)}&rdquo;</p>
+      <div class="who">{esc(proof_who)}</div>
+    </div>
+  </div>
+</section>"""
+
             # Priority (IRES-covered) cities get the full interactive live
             # search embedded right on the page — price slider + beds/baths
             # pills — instead of just a link out to search-homes.html, per
@@ -2101,6 +2144,7 @@ def build_city_pages():
 {search_widget_block}
 {local_block}
 {video_block}
+{agent_proof_block}
 {own_home_block}
 {subdivisions_block}
 """
@@ -2217,13 +2261,19 @@ def build_about():
 
 # --------------------------------------------------------------- BUYERS ---
 def build_buyers():
+    # 2026-08-13 (luxury repositioning): rewritten from generic "any buyer,
+    # any budget" copy to explicit luxury-buyer intent — estate homes,
+    # acreage, architecturally significant properties — per Christine's
+    # direction to narrow Signature to the luxury tier specifically rather
+    # than compete with her general-market brand for the same broad
+    # buyer-intent search terms.
     body = """
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
-    <h1>Your Perfect Home Awaits</h1>
-    <p class="lede">Whatever stage you're at in searching for your dream property, we
-    provide expert guidance, tailored strategies, and personalized support to make your
-    home-buying journey seamless.</p>
+    <h1>Your Estate Awaits</h1>
+    <p class="lede">For buyers who expect more than a standard search — private showings,
+    off-market access, and a process built for estate homes, acreage, and architecturally
+    significant properties.</p>
     <div class="btn-row"><a class="btn btn-primary" href="/contact.html">Get Started</a></div>
   </div>
 </section>
@@ -2231,13 +2281,16 @@ def build_buyers():
   <div class="wrap">
     <span class="eyebrow">The Advantage You Deserve</span>
     <h2 class="section-title">Buy With Confidence</h2>
-    <p class="lede">From helping veterans secure VA loans to guiding acreage and luxury
-    buyers through a well-crafted offer, we make homeownership seamless and rewarding.</p>
+    <p class="lede">From helping veterans secure VA loans on estate-sized acreage to guiding
+    luxury buyers through a well-crafted offer on a marquee property, we make high-end
+    homeownership seamless and rewarding.</p>
     <div class="grid-3">
       <div class="card"><h3>01&ndash;02 &middot; Get Ready</h3><p>Pre-approval and a
-      focused home search across Loveland, Berthoud, Masonville and beyond.</p></div>
+      focused search across Loveland, Berthoud, Masonville and beyond, including
+      off-market and pre-public inventory.</p></div>
       <div class="card"><h3>03&ndash;05 &middot; Make It Yours</h3><p>A well-crafted
-      offer, earnest money, and a qualified inspection team.</p></div>
+      offer, earnest money, and a qualified inspection team experienced with estate
+      homes and acreage.</p></div>
       <div class="card"><h3>06&ndash;07 &middot; Close</h3><p>Radon testing, final
       walkthrough, and a smooth path to closing day.</p></div>
     </div>
@@ -2264,30 +2317,37 @@ def build_buyers():
 </section>
 """
     page(
-        "Expert Home Buying Guidance in Northern Colorado | Signature Property Collection",
-        "Buy a home in Loveland, Berthoud, Masonville, or across the Larimer, Weld & "
-        "Boulder County Front Range with expert local guidance.",
+        "Luxury Home Buying in Northern Colorado | Signature Property Collection",
+        "Buy an estate home, acreage, or architecturally significant property in "
+        "Loveland, Berthoud, Masonville, or across the Larimer, Weld & Boulder County "
+        "Front Range luxury market.",
         "/buyers.html", "Buy", body,
     )
 
 
 # -------------------------------------------------------------- SELLERS ---
 def build_sellers():
+    # 2026-08-13 (luxury repositioning): rewritten toward explicit
+    # luxury-marketing/high-end-seller intent — per Christine's direction to
+    # narrow Signature's seller content to the luxury tier rather than
+    # compete with her general-market brand for the same broad
+    # seller-intent search terms.
     body = """
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
     <h1>Marketing Matters</h1>
-    <p class="lede">Stand out in Northern Colorado's competitive market with expert
-    strategies, cutting-edge marketing, and proven results.</p>
+    <p class="lede">Luxury homes don't sell themselves — they sell on cinematic marketing,
+    precise pricing, and a strategy built for Northern Colorado's high-end market.</p>
     <div class="btn-row"><a class="btn btn-primary" href="/contact.html">Free Home Valuation</a></div>
   </div>
 </section>
 <section>
   <div class="wrap">
     <span class="eyebrow">The Advantage You Deserve</span>
-    <h2 class="section-title">Sell With The Best Agent In Colorado</h2>
-    <p class="lede">Personalized pricing strategies and innovative marketing that
-    maximizes exposure, so your home stands out and sells for the highest value.</p>
+    <h2 class="section-title">Sell With The Best Luxury Agent In Colorado</h2>
+    <p class="lede">Personalized pricing strategy and marketing built specifically for
+    estate homes, acreage, and architecturally significant properties — the kind of
+    listing a generalist approach undersells.</p>
     <div class="grid-2" style="gap:40px;align-items:stretch">
       <div class="card"><h3>Comprehensive Marketing</h3><p>Digital, print, and social
       media strategies with premium placement on Zillow and Realtor.com.</p></div>
@@ -2321,9 +2381,10 @@ def build_sellers():
 </section>
 """
     page(
-        "Expert Home Selling in Northern Colorado | Signature Property Collection",
-        "Sell your home in Loveland, Berthoud, Masonville, or across the Larimer, Weld "
-        "& Boulder County Front Range with expert local marketing.",
+        "Luxury Home Marketing & Selling in Northern Colorado | Signature Property Collection",
+        "Sell an estate home or luxury property in Loveland, Berthoud, Masonville, or "
+        "across the Larimer, Weld & Boulder County Front Range with cinematic marketing "
+        "built for the high-end market.",
         "/sellers.html", "Sell", body,
     )
 
@@ -4061,13 +4122,19 @@ def build_nav_pages():
     steps_html = "\n      ".join(
         f"""<div class="card"><h3>{n}. {esc(t)}</h3><p>{esc(d)}</p></div>""" for n, t, d in steps
     )
+    # 2026-08-13 (luxury repositioning): rewritten to executive/luxury
+    # relocation specifically — per Christine's direction, this page should
+    # not compete with her general-market relocation content elsewhere;
+    # Signature's version serves executives, out-of-state luxury buyers, and
+    # families relocating into the high-end market specifically.
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Your Move, Simplified</span>
-    <h1>Relocating To Northern Colorado</h1>
-    <p class="lede">Expert guidance, personalized support, and unmatched local knowledge —
-    from finding your perfect home to settling into your new community.</p>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Executive &amp; Luxury Relocation</span>
+    <h1>Relocating To Northern Colorado's Luxury Market</h1>
+    <p class="lede">Private tours, trusted local vendors, and one point of contact from first
+    call to closing — concierge relocation for executives, out-of-state buyers, and families
+    moving into Northern Colorado's estate and acreage market.</p>
   </div>
 </section>
 <section>
@@ -4102,9 +4169,10 @@ def build_nav_pages():
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Relocation", None)])
     page(
-        "Relocation Services In Northern Colorado | Signature Property Collection",
-        "Relocating to Northern Colorado? Get personalized relocation support, local "
-        "insight, and stress-free guidance from initial consultation to settling in.",
+        "Executive & Luxury Relocation to Northern Colorado | Signature Property Collection",
+        "Concierge relocation into Northern Colorado's luxury real estate market — for "
+        "executives, out-of-state buyers, and families moving into the estate and "
+        "acreage tier.",
         "/relocation.html", None, body, schema_extra=[breadcrumbs],
     )
 
