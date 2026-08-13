@@ -89,6 +89,19 @@ exports.handler = async (event) => {
       ok: !state || !state.lastCloudinaryError,
       detail: (state && state.lastCloudinaryError) || "none",
     },
+    {
+      // 2026-08-14: informational only (always ok) -- this is a nice-to-have
+      // speed optimization, not something required for the site to work
+      // correctly, so it never flips the overall "Everything looks clean"
+      // banner. If IRES rejects ListOfficeMlsId the same way it rejected a
+      // few other MLS Grid field names before, this just stays "not yet" --
+      // the existing agent-name-match walk is unaffected either way.
+      name: "Fast office-wide listing lookup",
+      ok: true,
+      detail: state && state.herOfficeMlsId
+        ? `Active (office ID ${state.herOfficeMlsId}) — ${state.lastRunNewlyDiscoveredByOffice ?? 0} newly discovered on the last run`
+        : "Not yet discovered — falls back to the slower regional-walk method (not a problem, just not optimized yet)",
+    },
   ];
 
   const allOk = checks.every((c) => c.ok);

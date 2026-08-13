@@ -67,7 +67,7 @@
 // MLS Grid requests for the ones not yet cached).
 const { getStore } = require("@netlify/blobs");
 const {
-  BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES,
+  BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES, OPERATING_COUNTIES,
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
@@ -254,7 +254,21 @@ const CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN = 4;
 // if Cloudinary env vars aren't set yet, so nothing breaks before Christine
 // adds them in Netlify. Returns the number of photos newly cached this call
 // (for the caller's run-summary counters).
-async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt) {
+//
+// 2026-08-13 (stuck-crawl fix): real Netlify function logs showed listing
+// IRE1059947 retrying ALL 11 of its photos on every single 15-minute run —
+// every attempt was failing (Cloudinary "Invalid Signature" + MLS Grid
+// HTTP 429s), and the old CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN cap only
+// counted uploadedThisCall (successes), so a listing where every attempt
+// fails was never actually capped — it burned the entire remaining time
+// budget every run, starving the main bootstrap crawl loop (confirmed via
+// logs: one invocation's Duration was 11754ms against an 8000ms budget),
+// which is why totalListingsStored got stuck at the same number run after
+// run. Now capped by ATTEMPTS, not successes, and each attempt goes through
+// the same account-wide throttle() gate as every other MLS Grid request
+// this run, since the unthrottled photo fetches were also the direct cause
+// of the logged 429s (a real risk of another full account suspension).
+async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle) {
   if (!mapped.photos || !mapped.photos.length || !isHerListing(mapped)) return 0;
   if (!isCloudinaryConfigured()) {
     _lastCloudinaryError = "not_configured: one or more of CLOUDINARY_CLOUD_NAME/" +
@@ -268,11 +282,17 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt)
     : (previouslyStored && previouslyStored.cloudinaryPhoto ? [previouslyStored.cloudinaryPhoto] : []);
   const cloudinaryPhotos = mapped.photos.map((_, i) => already[i] || null);
   let uploadedThisCall = 0;
+  let attemptsThisCall = 0;
 
   for (let i = 0; i < mapped.photos.length; i += 1) {
     if (cloudinaryPhotos[i]) continue; // already cached from an earlier run
-    if (uploadedThisCall >= CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN) break;
+    // Cap by ATTEMPTS, not successes -- see the 2026-08-13 note above. A
+    // listing where every attempt fails must still stop after this many
+    // tries per run, or it consumes the whole time budget forever.
+    if (attemptsThisCall >= CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN) break;
     if (startedAt && Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
+    attemptsThisCall += 1;
+    if (throttle) await throttle();
     try {
       const publicId = `spc-listings/${mapped.listingId}/photo-${i}`;
       const secureUrl = await cachePhotoToCloudinary(mapped.photos[i], token, publicId);
@@ -310,7 +330,7 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt)
 // priority pass (Christine's own listings, below) and the refresh sweep
 // (everyone else's stale listings, below) so both go through identical
 // logic.
-async function refreshOneListing(listingId, listingsById, store, token, startedAt) {
+async function refreshOneListing(listingId, listingsById, store, token, startedAt, throttle) {
   const qs = new URLSearchParams({
     "$filter": `ListingId eq '${listingId}' and MlgCanView eq true`,
     "$select": SELECT_FIELDS,
@@ -335,10 +355,122 @@ async function refreshOneListing(listingId, listingsById, store, token, startedA
     return { removed: true };
   }
   const previouslyStored = listingsById[mapped.listingId];
-  const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt);
+  const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle);
   mapped.photosRefreshedAt = new Date().toISOString();
   listingsById[mapped.listingId] = mapped;
   return { refreshed: true, cached: photosCached > 0, photosCached };
+}
+
+// 2026-08-14 (office-wide discovery, part 1 -- find the ID): Christine's own
+// listings are currently only found by walking the ENTIRE regional feed and
+// text-matching her surname on the agent field -- see the 2026-08-13
+// comment above for why that's slow. ListOfficeMlsId is one of the seven
+// fields MLS Grid's Property resource actually allows filtering on
+// (confirmed directly against their docs), so a dedicated `ListOfficeMlsId
+// eq '<id>'` query could find her listings in one or two fast requests
+// instead of waiting for the slow walk to reach them. But this exact feed
+// (IRES, via this exact MLS Grid account) has a real, repeated history of
+// rejecting "obvious" RESO field names under their standard names --
+// WaterfrontFeatures, ListOfficeName, ListAgentDirectPhone, and
+// ListAgentEmail all came back with a 400 "does not exist or is unable to
+// be retrieved" the first time they were tried (see _mls-shared.js's file
+// comment) -- so there's real reason to be cautious about ListOfficeMlsId
+// too, rather than trust MLS Grid's docs blindly.
+//
+// This function is the one and only place that ever puts ListOfficeMlsId in
+// a $select -- a single, tiny, try/caught request against a listing we
+// already know is hers (found the normal way), completely isolated from
+// the main crawl's SELECT_FIELDS (proven-stable, never touched here) and
+// from refreshOneListing (used every run for real work -- also never
+// touched here). If MLS Grid rejects this the same way it rejected
+// ListOfficeName, this just returns null and nothing else in the file is
+// affected -- the existing agent-name-match approach keeps working exactly
+// as it does today. Only runs once per deploy, effectively -- see the
+// `if (!state.herOfficeMlsId)` guard around the call site below -- so a
+// rejection costs one extra request per run, forever, which is negligible
+// next to REQUEST_DELAY_MS pacing.
+async function discoverHerOfficeMlsId(listingsById, token) {
+  const known = Object.values(listingsById).find((l) => l.listingId && isHerListing(l));
+  if (!known) return null; // nothing to look up from yet -- try again once bootstrap finds at least one
+  try {
+    const qs = new URLSearchParams({
+      "$filter": `ListingId eq '${known.listingId}' and MlgCanView eq true`,
+      "$select": "ListingId,ListOfficeMlsId",
+      "$top": "1",
+    });
+    const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null; // includes a 400 if this feed rejects the field -- fails silently, retried next run
+    const json = await res.json();
+    const officeMlsId = (json.value || [])[0] && (json.value || [])[0].ListOfficeMlsId;
+    return officeMlsId || null;
+  } catch (err) {
+    console.warn(`sync-listings: office ID discovery failed: ${err && err.message}`);
+    return null;
+  }
+}
+
+// 2026-08-14 (office-wide discovery, part 2 -- use the ID): once
+// state.herOfficeMlsId is known, this runs every invocation as a fast
+// supplement to the priority pass above -- it can find a brand-new listing
+// of Christine's the very run it's entered into MLS, instead of waiting for
+// the slow regional walk to eventually reach it (which, during a bootstrap
+// pass over ~19,000 records, could otherwise take a long time). Bounded to
+// OFFICE_DISCOVERY_MAX_PAGES per run, same throttle() gate as everything
+// else, and its $select is the proven-stable SELECT_FIELDS -- ListOfficeMlsId
+// only ever appears in the $filter here, never in $select, so this call
+// carries none of the "is this field even selectable" risk discoverHer
+// OfficeMlsId above already absorbed on its own.
+const OFFICE_DISCOVERY_MAX_PAGES = 3;
+async function discoverListingsByOffice(officeMlsId, listingsById, store, token, startedAt, throttle) {
+  const qs = new URLSearchParams({
+    "$filter": `ListOfficeMlsId eq '${officeMlsId}' and MlgCanView eq true and ${statusClause()}`,
+    "$select": SELECT_FIELDS,
+    "$expand": "Media",
+    "$top": String(PAGE_SIZE),
+  });
+  let url = `${BASE_URL}?${qs.toString()}`;
+  let found = 0;
+  let pages = 0;
+  try {
+    while (url && pages < OFFICE_DISCOVERY_MAX_PAGES) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
+      await throttle();
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 429) {
+        await markSuspended(store, SUSPENSION_COOLDOWN_MS);
+        return { suspended: true, found };
+      }
+      if (!res.ok) {
+        // ListOfficeMlsId got rejected as a $filter field (or some other
+        // 4xx) -- give up for this run, same graceful-degrade spirit as
+        // everything else in this file. The existing agent-name-match walk
+        // is completely unaffected either way.
+        console.warn(`sync-listings: office-wide discovery got HTTP ${res.status} — skipping this run.`);
+        return { found };
+      }
+      pages += 1;
+      const json = await res.json();
+      for (const item of json.value || []) {
+        const mapped = mapListing(item);
+        if (!mapped.listingId) continue;
+        if (mapped.mlgCanView === false || !REPLICATED_STATUSES.includes(mapped.status)) continue;
+        const isNew = !listingsById[mapped.listingId];
+        const previouslyStored = listingsById[mapped.listingId];
+        if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
+          await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle);
+        }
+        mapped.photosRefreshedAt = new Date().toISOString();
+        listingsById[mapped.listingId] = mapped;
+        if (isNew) found += 1;
+      }
+      url = json["@odata.nextLink"] || null;
+    }
+  } catch (err) {
+    console.warn(`sync-listings: office-wide discovery exception: ${err && err.message}`);
+  }
+  return { found };
 }
 
 exports.handler = async () => {
@@ -382,6 +514,29 @@ exports.handler = async () => {
     anyRequestMadeThisRun = true;
   }
 
+  // ---- Office-wide discovery: learn Christine's ListOfficeMlsId once (if
+  // this feed allows it -- see discoverHerOfficeMlsId's comment above for
+  // why that's not assumed), then use it every run as a fast supplement to
+  // the priority pass below. Entirely best-effort: if either step fails or
+  // is never able to run, nothing else in this file changes behavior. ----
+  if (!state.herOfficeMlsId) {
+    const discovered = await discoverHerOfficeMlsId(listingsById, token);
+    if (discovered) {
+      state = { ...state, herOfficeMlsId: discovered };
+      console.log(`sync-listings: discovered ListOfficeMlsId=${discovered} for Christine's office -- office-wide fast discovery is now active.`);
+    }
+  }
+  let newlyDiscoveredByOffice = 0;
+  if (state.herOfficeMlsId) {
+    const officeResult = await discoverListingsByOffice(state.herOfficeMlsId, listingsById, store, token, startedAt, throttle);
+    newlyDiscoveredByOffice = officeResult.found || 0;
+    if (officeResult.suspended) {
+      lastRunError = "MLS Grid 429: rate limited during office-wide discovery — suspension circuit breaker opened for 5 minutes";
+      console.error(`sync-listings: ${lastRunError}`);
+      httpErrorOccurred = true;
+    }
+  }
+
   // ---- Priority pass: Christine's own listings, independent of bootstrap
   // progress (see the 2026-08-13 file-level comment above for why this
   // exists) ----
@@ -401,7 +556,7 @@ exports.handler = async () => {
     if (Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
     await throttle();
     try {
-      const result = await refreshOneListing(listingId, listingsById, store, token, startedAt);
+      const result = await refreshOneListing(listingId, listingsById, store, token, startedAt, throttle);
       if (result.suspended) {
         lastRunError = "MLS Grid 429: rate limited during priority pass — suspension circuit breaker opened for 5 minutes";
         console.error(`sync-listings: ${lastRunError}`);
@@ -489,10 +644,19 @@ exports.handler = async () => {
             if (mapped.listingId) delete listingsById[mapped.listingId];
             continue;
           }
+          // 2026-08-14 (market scoping): only actually filters anything once
+          // Christine sets OPERATING_COUNTIES -- see that constant's comment
+          // in _mls-shared.js. Never drops one of her OWN listings, and
+          // never drops a listing whose county couldn't be inferred (a gap
+          // in the city lookup table shouldn't silently hide a real home).
+          if (OPERATING_COUNTIES.size > 0 && mapped.county && !OPERATING_COUNTIES.has(mapped.county) && !isHerListing(mapped)) {
+            if (mapped.listingId) delete listingsById[mapped.listingId];
+            continue;
+          }
           if (mapped.listingId) {
             const previouslyStored = listingsById[mapped.listingId];
             if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
-              const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt);
+              const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle);
               coverPhotosCached += photosCached;
             }
             mapped.photosRefreshedAt = new Date().toISOString();
@@ -527,6 +691,8 @@ exports.handler = async () => {
           lastRunStaleListingsRefreshed: staleListingsRefreshed,
           lastRunError: null,
           lastCloudinaryError: _lastCloudinaryError,
+          herOfficeMlsId: state.herOfficeMlsId || null,
+          lastRunNewlyDiscoveredByOffice: newlyDiscoveredByOffice,
         });
       }
     }
@@ -560,7 +726,7 @@ exports.handler = async () => {
         if (touchedThisRun.has(staleListing.listingId)) continue;
         await throttle();
         try {
-          const result = await refreshOneListing(staleListing.listingId, listingsById, store, token, startedAt);
+          const result = await refreshOneListing(staleListing.listingId, listingsById, store, token, startedAt, throttle);
           if (result.suspended) {
             console.error("sync-listings: refresh sweep hit 429 — suspension circuit breaker opened, stopping sweep.");
             break;
@@ -607,6 +773,8 @@ exports.handler = async () => {
     lastRunStaleListingsRefreshed: staleListingsRefreshed,
     lastRunError,
     lastCloudinaryError: _lastCloudinaryError,
+    herOfficeMlsId: state.herOfficeMlsId || null,
+    lastRunNewlyDiscoveredByOffice: newlyDiscoveredByOffice,
   });
 
   console.log(
@@ -614,7 +782,8 @@ exports.handler = async () => {
     `pass ${passComplete ? "complete" : "paused (resumes next run)"}, ` +
     `${Object.keys(listingsById).length} listing(s) now stored, ` +
     `${coverPhotosCached} cover photo(s) cached to Cloudinary, ` +
-    `${staleListingsRefreshed} stale listing(s) refreshed.`
+    `${staleListingsRefreshed} stale listing(s) refreshed, ` +
+    `${newlyDiscoveredByOffice} newly discovered via office-wide lookup.`
   );
 
   return { statusCode: 200, body: "ok" };

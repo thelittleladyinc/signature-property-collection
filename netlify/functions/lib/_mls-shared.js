@@ -90,6 +90,76 @@ const PUBLIC_STATUSES = ["Active"];
 const AGENT_SURNAME = (process.env.LISTING_AGENT_SURNAME || "gwinnup").toLowerCase();
 const LUXURY_PRICE_FLOOR = 950000;
 
+// 2026-08-14 (market-scoping research): borrowed directly from Christine's
+// own Expired-Luxury app (lib/mlsSyncRunner.ts), which hit this exact
+// problem on this exact IRES feed first. Its own comment: "This MLS feed
+// frequently leaves CountyOrParish blank or in a format the filter can't
+// match... City is far more reliably populated, so when the county can't
+// be matched we infer it from the city." Rather than trust MLS Grid's raw
+// county field (or worse, try to filter on it server-side -- Expired-
+// Luxury's mlsClient.ts confirms MLS Grid flatly rejects every geographic
+// $filter field, including CountyOrParish, City, and PostalCode, with
+// "Invalid filter field" 400s), this infers county from City, which this
+// site already selects safely. Table copied verbatim from Expired-Luxury
+// so both apps agree on the same city->county mapping.
+const CO_CITY_COUNTY = {
+  // Larimer
+  "fort collins": "larimer", "loveland": "larimer", "estes park": "larimer",
+  "wellington": "larimer", "timnath": "larimer", "berthoud": "larimer",
+  "bellvue": "larimer", "laporte": "larimer", "la porte": "larimer",
+  "livermore": "larimer", "red feather lakes": "larimer", "drake": "larimer",
+  "masonville": "larimer", "glen haven": "larimer", "waverly": "larimer",
+  // Weld
+  "greeley": "weld", "evans": "weld", "la salle": "weld", "lasalle": "weld",
+  "windsor": "weld", "johnstown": "weld", "milliken": "weld", "mead": "weld",
+  "platteville": "weld", "gilcrest": "weld", "kersey": "weld", "eaton": "weld",
+  "ault": "weld", "pierce": "weld", "nunn": "weld", "severance": "weld",
+  "hudson": "weld", "keenesburg": "weld", "fort lupton": "weld", "dacono": "weld",
+  "firestone": "weld", "frederick": "weld", "erie": "weld", "lochbuie": "weld",
+  "gill": "weld", "galeton": "weld", "briggsdale": "weld", "grover": "weld",
+  "roggen": "weld", "wiggins": "morgan",
+  // Broader Front Range -- kept available for a future widen (same as
+  // Expired-Luxury's table) but not applied unless OPERATING_COUNTIES below
+  // is actually set to include them.
+  "denver": "denver", "boulder": "boulder", "longmont": "boulder",
+  "lafayette": "boulder", "louisville": "boulder", "superior": "boulder",
+  "castle rock": "douglas", "parker": "douglas", "highlands ranch": "douglas",
+  "lone tree": "douglas", "aurora": "arapahoe", "centennial": "arapahoe",
+  "littleton": "arapahoe", "englewood": "arapahoe", "thornton": "adams",
+  "westminster": "adams", "brighton": "adams", "commerce city": "adams",
+  "golden": "jefferson", "arvada": "jefferson", "lakewood": "jefferson",
+  "wheat ridge": "jefferson", "broomfield": "broomfield",
+  "colorado springs": "el paso", "monument": "el paso",
+  "breckenridge": "summit", "frisco": "summit", "silverthorne": "summit",
+  "vail": "eagle", "avon": "eagle", "edwards": "eagle", "eagle": "eagle",
+  "aspen": "pitkin", "snowmass village": "pitkin", "steamboat springs": "routt",
+};
+
+function inferCountyFromCity(cityLower) {
+  if (!cityLower) return null;
+  return CO_CITY_COUNTY[cityLower] || null;
+}
+
+// 2026-08-14: OFF by default (empty = no filtering at all, current behavior
+// unchanged) -- set OPERATING_COUNTIES in Netlify's env vars (comma-
+// separated, e.g. "larimer,weld") once Christine has confirmed which
+// counties the public search/current-listings pages should actually cover.
+// Deliberately never applied to Christine's OWN listings (see the
+// isHerListing() exclusion everywhere this is used) -- she should never
+// lose one of her own listings to a geography filter even if it happens to
+// be outside the configured set. Important: this can only ever shrink what
+// gets STORED, never speed up the crawl itself -- MLS Grid's API rejects
+// every geographic $filter field outright (confirmed in both MLS Grid's
+// own docs and Expired-Luxury's production history), so every record still
+// has to be paged through and inspected regardless; this just decides
+// what's worth keeping in Blobs afterward.
+const OPERATING_COUNTIES = new Set(
+  (process.env.OPERATING_COUNTIES || "")
+    .split(",")
+    .map((c) => c.toLowerCase().replace(/\s+county$/, "").trim())
+    .filter(Boolean)
+);
+
 const BLOB_STORE_NAME = "mls-listings";
 const LISTINGS_KEY = "listings.json";
 const SYNC_STATE_KEY = "sync-state.json";
@@ -186,6 +256,17 @@ function mapListing(item) {
     subdivision: item.SubdivisionName || null,
     waterfront: item.WaterfrontYN === true || null,
     officeName: item.ListOfficeName || null,
+    // 2026-08-14: NOT in SELECT_FIELDS above by default -- ListOfficeMlsId is
+    // only ever requested by sync-listings.js's isolated, try/caught
+    // discoverHerOfficeMlsId() call (see that file), never by the main
+    // crawl, specifically because this feed has a real, repeated history of
+    // rejecting "obvious" RESO field names under their standard names
+    // (WaterfrontFeatures, ListOfficeName, ListAgentDirectPhone,
+    // ListAgentEmail all 400'd here before -- see the file comment above).
+    // Reading it here unconditionally is harmless either way: item.
+    // ListOfficeMlsId is simply undefined on every call that didn't select
+    // it, so this is just null for those.
+    officeMlsId: item.ListOfficeMlsId || null,
     agentName: item.ListAgentFullName || null,
     coAgentName: item.CoListAgentFullName || null,
     agentPhone: item.ListAgentDirectPhone || null,
@@ -194,6 +275,11 @@ function mapListing(item) {
     photos,
     modificationTimestamp: item.ModificationTimestamp || null,
     mlgCanView: item.MlgCanView !== false,
+    // 2026-08-14 (market-scoping): inferred from City only -- see the
+    // OPERATING_COUNTIES comment above for why CountyOrParish itself isn't
+    // trusted/selected. Null when City isn't in the lookup table yet, which
+    // deliberately means "don't filter this one out" wherever this is used.
+    county: inferCountyFromCity((item.City || "").toLowerCase().trim()),
   };
 }
 
@@ -267,6 +353,9 @@ module.exports = {
   LISTINGS_KEY,
   SYNC_STATE_KEY,
   MINE_LISTINGS_KEY,
+  CO_CITY_COUNTY,
+  OPERATING_COUNTIES,
+  inferCountyFromCity,
   mapListing,
   matchesQuery,
 };
