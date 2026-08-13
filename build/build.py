@@ -99,7 +99,7 @@ SITE = {
     # if there's ever any doubt.
     "license": "CO License #100090441",
     "phone": "303-709-4262",
-    "email": "hello@signaturepropertycollection.com",
+    "email": "thelittleladyinc@gmail.com",
     "domain": "https://signaturepropertycollection.com",
     # Business address, confirmed by Christine 2026-08-11 (cross-checked
     # against her public Yelp business listing, which lists this same
