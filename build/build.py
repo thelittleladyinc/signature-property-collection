@@ -1724,7 +1724,7 @@ def build_county_pages():
             (c["name"], None),
         ])
         page(
-            f"{c['name']} Real Estate | Luxury Homes in {c['cities'][0]} & Beyond",
+            f"{c['name']} Real Estate | Luxury Homes in {c['cities'][0]} & Beyond | {SITE['name']}",
             f"Explore {c['name']} real estate with Signature Property Collection — luxury homes, "
             f"acreage, and local expertise across {', '.join(c['cities'][:4])}.",
             f"/communities/{c['slug']}.html", "Communities", body,
@@ -1759,11 +1759,67 @@ def _faq_block(qa_pairs):
     return html, json.dumps(schema)
 
 
+def _city_meta_description(city, county_name, welcome_text, budget=158, disambiguate=False):
+    """2026-08-13 (SEO fix): city_content.json's own "meta" field is
+    scraped AgentFire boilerplate -- literally
+    'Welcome to {City}. In this guide we will explore the local market
+    including listings, schools, businesses, and more.' for ~20 of 24
+    cities, verbatim except the city name. That's a template with the
+    name swapped in, not a real description -- no differentiator, no
+    keyword value beyond the bare city name, and it reads as thin/
+    duplicate-ish content to Google across the whole city-page set.
+    build_city_pages() used to fall back to a better hand-written template
+    only when "meta" was empty, but "meta" is never actually empty (it's
+    always that boilerplate string), so the better copy never fired -- the
+    condition had it backwards. Fixed by not trusting city_content.json's
+    "meta" field at all: every city page now gets a real, unique
+    description built from the genuinely well-written, city-specific
+    "welcome" copy already sitting in the same JSON file (a proper local
+    description, not scraped filler), trimmed to fit a real SERP snippet
+    width, with a "homes for sale" + city keyword suffix for search intent.
+    """
+    # 2026-08-13 (SEO fix, duplicate-content): Windsor straddles Larimer and
+    # Weld counties and gets a full page under each -- same welcome text,
+    # so without this the two pages' meta descriptions would be byte-
+    # identical (confirmed duplicate, flagged in the SEO audit). Folding the
+    # county into the suffix for cities that appear under more than one
+    # county disambiguates them with zero new content needed.
+    suffix = (
+        f" See homes for sale in {city}, {county_name} with Signature Property Collection."
+        if disambiguate else
+        f" See homes for sale in {city} with Signature Property Collection."
+    )
+    hook = ""
+    if welcome_text:
+        hook = welcome_text.split(". ")[0].strip().rstrip(".")
+        hook = f"{hook}." if hook else ""
+    if hook and len(hook) + len(suffix) <= budget:
+        return hook + suffix
+    if hook:
+        available = budget - len(suffix) - 1  # -1 for the trailing ellipsis char
+        if available > 40:
+            trimmed = hook[:available].rsplit(" ", 1)[0].rstrip(",.")
+            return f"{trimmed}…{suffix}"
+    return (
+        f"{city} real estate with Signature Property Collection — homes, local market "
+        f"insight, and neighborhood guidance in {city}, {county_name}."
+    )
+
+
 def build_city_pages():
     """One page per city we have real captured content for (welcome blurb +
     things-to-do highlights, pulled from the live site's own city pages —
     see CITY_CONTENT). This is the content that most directly serves the
     'discoverable in Loveland, Berthoud, Masonville...' local-SEO goal."""
+    # Cities that appear under more than one county (e.g. Windsor straddles
+    # Larimer and Weld) get a full page per county from the same source
+    # content -- flagged here so their meta descriptions can disambiguate
+    # with the county name instead of coming out byte-identical.
+    city_county_counts = {}
+    for c in COUNTIES:
+        for city in c["cities"]:
+            city_county_counts[city] = city_county_counts.get(city, 0) + 1
+
     for c in COUNTIES:
         for city in c["cities"]:
             data_slug = CITY_DATA_SLUG.get(city)
@@ -1779,9 +1835,9 @@ def build_city_pages():
             school_district = info.get("school_district", "")
             commute = info.get("commute", "")
             relocate_extra = info.get("relocate_extra", "")
-            meta = info.get("meta") or (
-                f"{city} real estate with Signature Property Collection — homes, local market "
-                f"insight, and neighborhood guidance in {city}, {c['name']}."
+            meta = _city_meta_description(
+                city, c["name"], welcome,
+                disambiguate=city_county_counts[city] > 1,
             )
 
             def _local_card(title, text):
