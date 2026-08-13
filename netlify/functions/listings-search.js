@@ -94,14 +94,48 @@ exports.handler = async (event) => {
     }
 
     const listingsById = allListings || {};
+
+    // 2026-08-13 (performance fix): a card only ever shows the cover photo,
+    // but every listing was shipping its ENTIRE photos[] array (up to ~50
+    // signed MLS Grid URLs) on every list request — dead weight on every
+    // single page load. listingId is the on-demand counterpart: when the
+    // "View All N Photos" lightbox is actually opened, the browser fetches
+    // just that one listing's full gallery via this param instead of it
+    // having been in the payload all along. Only ever hit for one of
+    // Christine's own listings today (the gallery button only appears on
+    // current-listings.html's mine=true cards), so this stays a tiny,
+    // cheap lookup even though it's written generically.
+    if (params.listingId) {
+      const listing = listingsById[params.listingId];
+      if (!listing) {
+        return {
+          statusCode: 200,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ error: "not_found", photos: [] }),
+        };
+      }
+      return {
+        statusCode: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        },
+        body: JSON.stringify({ photos: listing.photos || [] }),
+      };
+    }
+
     const matched = Object.values(listingsById)
       .filter((l) => matchesQuery(l, params))
       .sort((a, b) => (b.price || 0) - (a.price || 0));
 
     const page = matched.slice(skip, skip + top).map((l) => {
-      // Strip internal-only fields before they reach the browser.
-      const { listingKey, modificationTimestamp, mlgCanView, ...publicFields } = l;
-      return publicFields;
+      // Strip internal-only fields before they reach the browser. photos[]
+      // is trimmed to just the cover photo here — see the listingId block
+      // above for how the full gallery is fetched, only when needed.
+      const {
+        listingKey, modificationTimestamp, mlgCanView, photos, ...publicFields
+      } = l;
+      return { ...publicFields, photoCount: Array.isArray(photos) ? photos.length : (l.photo ? 1 : 0) };
     });
 
     const response = {

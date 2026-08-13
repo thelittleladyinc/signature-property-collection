@@ -574,15 +574,22 @@ def _listing_showcase_js_helpers():
 
   function mediaHtml(l, full) {{
     var video = matchVideo(l);
-    var photos = (Array.isArray(l.photos) && l.photos.length) ? l.photos : (l.photo ? [l.photo] : []);
+    // 2026-08-13 (performance fix): the API now sends only the cover photo
+    // (l.photo) plus a photoCount, not the full photos[] array — see the
+    // listingId block in listings-search.js. The full gallery is fetched
+    // on demand, only if/when "View All N Photos" is actually clicked
+    // (openGallery below), instead of every card shipping every photo's
+    // URL whether anyone ever opens the gallery or not.
+    var cover = l.photo || null;
+    var photoCount = typeof l.photoCount === 'number' ? l.photoCount : (cover ? 1 : 0);
     var top;
     if (video) {{
       top = '<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/' +
         esc(video.id) + '" title="' + esc(video.title) + '" loading="lazy" allow="accelerometer; autoplay; ' +
         'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
         'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
-    }} else if (photos.length) {{
-      top = '<img src="' + esc(photos[0]) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+    }} else if (cover) {{
+      top = '<img src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
         'onerror="this.onerror=null;this.style.background=\\'#eee\\';this.style.aspectRatio=\\'4/3\\';this.removeAttribute(\\'src\\')">';
     }} else {{
       top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
@@ -593,9 +600,9 @@ def _listing_showcase_js_helpers():
       links += '<a class="media-link" href="https://www.youtube.com/watch?v=' + esc(video.id) +
         '" target="_blank" rel="noopener">Watch Full Video Tour \\u2197</a>';
     }}
-    if (photos.length > 1) {{
-      links += '<button type="button" class="media-link" onclick="openGallery(this)" data-photos="' +
-        esc(JSON.stringify(photos)) + '">View All ' + photos.length + ' Photos</button>';
+    if (photoCount > 1) {{
+      links += '<button type="button" class="media-link" onclick="openGallery(this)" data-listing-id="' +
+        esc(l.listingId || '') + '">View All ' + photoCount + ' Photos</button>';
     }}
     return '<div class="listing-media">' + top + (links ? '<div class="media-links">' + links + '</div>' : '') + '</div>';
   }}
@@ -4693,17 +4700,42 @@ def build_current_listings():
       (galleryState.index + 1) + ' / ' + galleryState.photos.length;
   }
 
+  // 2026-08-13 (performance fix): the full photo gallery is no longer
+  // embedded in every card's HTML — it's fetched here, on demand, only
+  // when someone actually clicks "View All N Photos". Shows the overlay
+  // immediately with a loading state so the click still feels instant,
+  // then swaps in the real photos once the (tiny, single-listing) fetch
+  // resolves.
   window.openGallery = function (btn) {
-    var photos = [];
-    try { photos = JSON.parse(btn.dataset.photos || '[]'); } catch (e) {}
-    if (!photos.length) return;
-    galleryState.photos = photos;
-    galleryState.index = 0;
-    renderGallery();
+    var listingId = btn.dataset.listingId || '';
+    if (!listingId) return;
     lastFocused = btn;
     var overlay = document.getElementById('gallery-overlay');
+    var counterEl = document.getElementById('gallery-counter');
+    var img = document.getElementById('gallery-img');
+    galleryState.photos = [];
+    galleryState.index = 0;
+    img.removeAttribute('src');
+    img.style.background = '#eee';
+    img.style.aspectRatio = '4/3';
+    counterEl.textContent = 'Loading\\u2026';
     overlay.classList.add('open');
     overlay.querySelector('.lb-close').focus();
+    fetch('/.netlify/functions/listings-search?listingId=' + encodeURIComponent(listingId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var photos = (data && data.photos) || [];
+        if (!photos.length) {
+          counterEl.textContent = 'No photos available';
+          return;
+        }
+        galleryState.photos = photos;
+        galleryState.index = 0;
+        renderGallery();
+      })
+      .catch(function () {
+        counterEl.textContent = 'Couldn\\u2019t load photos \\u2014 please try again';
+      });
   };
   window.galleryNav = function (dir) {
     var n = galleryState.photos.length;
