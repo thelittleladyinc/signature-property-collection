@@ -1,10 +1,8 @@
 // Powers the "Sold Homes Map" (see build_sold_homes_map() in build.py) --
 // Christine's request 2026-08-13: map her sold listings with their video
-// tours plotted by real address, "using google api". This geocodes the
-// fixed list of sold-home addresses (SOLD_HOME_LOCATIONS in build.py,
-// mirrored below) server-side via Google's Geocoding API, so the actual
-// map key (used client-side by Leaflet, not Google Maps JS) never touches
-// the browser -- same "secret key stays server-side" pattern as
+// tours plotted by real address, "using google api". This geocodes her sold
+// addresses server-side via Google's Geocoding API, so the map key never
+// touches the browser -- same "secret key stays server-side" pattern as
 // nearby-places.js.
 //
 // Setup required (one-time, Netlify dashboard -> Site settings ->
@@ -21,36 +19,54 @@
 // forever -- once geocoded, a sold address never re-spends Google API
 // quota again, even years later.
 //
-// The address list itself is small (12 as of this writing) and changes
-// rarely (only when Christine films a new listing tour for a property that
-// later sells -- see _LISTING_VIDEO_ENTRIES / SOLD_HOME_VIDEOS in
-// build.py). Keeping it here too (rather than fetching it from build.py,
-// which isn't reachable at runtime) means this file needs a manual update
-// any time that list grows -- flagged clearly so it isn't missed.
+// 2026-08-14 -- TWO CHANGES, both prompted by Christine asking why only 12
+// of her 150+ sales were on the map:
+//
+// 1. The address list is no longer hand-copied into this file. It used to
+//    be, with a comment conceding that "this file needs a manual update any
+//    time that list grows -- flagged clearly so it isn't missed". Being
+//    flagged did not stop it being missed. It's now generated into
+//    lib/_sold-homes-data.json by build.py from build/data/sold_homes.json,
+//    the same source the page itself is built from, so the two cannot
+//    disagree. A pin no longer requires a YouTube tour to exist either --
+//    videoId is optional in that file.
+//
+// 2. That list is now expected to run to 150+ entries rather than 12, which
+//    breaks the old "Promise.all over every address at once" approach on a
+//    cold cache: 150 simultaneous outbound calls invites Google's rate
+//    limiter, and a function that tries to finish all of them in one
+//    invocation hits Netlify's execution ceiling and returns nothing (the
+//    same failure mode already fixed once in sync-listings.js, see its
+//    2026-08-14 timeout commit). So geocoding is now bounded on three axes:
+//    a small concurrency window, a per-request timeout, and an overall time
+//    budget after which no NEW lookups start. Whatever is already cached
+//    always returns immediately and in full, so the map is never empty
+//    while the cache warms -- it fills in over the first couple of loads
+//    and is permanent from then on. The response reports pending work so
+//    the client can pick up the rest without a page refresh.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
+const SOLD_HOMES_DATA = require("./lib/_sold-homes-data.json");
 
 const GEOCODE_STORE_NAME = "sold-homes-geocode-cache";
 
-// Keep this in sync with SOLD_HOME_LOCATIONS in build.py -- same 12
-// sold-status entries from _LISTING_VIDEO_ENTRIES, with a city added (taken
-// directly from each video's own title, e.g. "45615 County Rd 27, Pierce
-// CO") so the Geocoding API has enough to resolve an exact match instead of
-// guessing among same-named streets in other towns.
-const SOLD_HOME_LOCATIONS = [
-  { address: "32 Victoria Dr, Johnstown, CO", videoId: "9aIGz-SvCtI", title: "Affordable Luxury at 32 Victoria Dr — Johnstown Home Tour" },
-  { address: "929 W Independent Ave, LaSalle, CO", videoId: "TpjE36J71zc", title: "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado" },
-  { address: "294 Gila Trail, Ault, CO", videoId: "JvtRGf01JXU", title: "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail" },
-  { address: "39243 Boulevard E, Eaton, CO", videoId: "L-uEVzq1bv4", title: "Eaton, CO Home Under $400K — 39243 Boulevard E" },
-  { address: "1110 S Quitman St, Denver, CO", videoId: "e7kMY1yV7GI", title: "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St" },
-  { address: "45615 County Rd 27, Pierce, CO", videoId: "dVonJhu_zCo", title: "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO" },
-  { address: "504 Graefe Ave, Ault, CO", videoId: "eiFurERq_As", title: "Charming Home for Sale at 504 Graefe Ave, Ault CO" },
-  { address: "1316 Cimarron Cir, Eaton, CO", videoId: "xWcrj6foJ-Q", title: "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir" },
-  { address: "4986 Stuart St, Denver, CO", videoId: "oNZBc-MxzUg", title: "Stunning Home for Sale — 4986 Stuart St, Denver (Tennyson Art District)" },
-  { address: "5705 Snow Mesa Dr, Loveland, CO", videoId: "MDfyzESb1Yk", title: "Why Is Loveland, CO Called the \"Sweetheart City\"? — 5705 Snow Mesa Dr" },
-  { address: "475 Homestead Ln, Johnstown, CO", videoId: "6Hrdv6LZIDM", title: "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)" },
-  { address: "913 Green Mountain Dr, Erie, CO", videoId: "e-_3Qs3liQ0", title: "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie" },
-];
+// Tuned for Netlify's 10s default function timeout. GEOCODE_TIME_BUDGET_MS
+// is when we stop STARTING lookups, not a hard abort -- in-flight requests
+// still get their own GEOCODE_TIMEOUT_MS to land, so the worst case is
+// roughly budget + timeout, comfortably inside the ceiling.
+const GEOCODE_CONCURRENCY = 5;
+const GEOCODE_TIMEOUT_MS = 4000;
+const GEOCODE_TIME_BUDGET_MS = 5000;
+const CACHE_READ_CONCURRENCY = 25;
+
+const SOLD_HOME_LOCATIONS = Array.isArray(SOLD_HOMES_DATA.homes) ? SOLD_HOMES_DATA.homes : [];
+
+// The string handed to the Geocoding API, and shown in the pin popup. The
+// city matters: without it the API guesses between same-named streets in
+// different towns, which is how a Loveland sale ends up pinned in Denver.
+function fullAddress(loc) {
+  return [loc.address, loc.city, loc.state || "CO"].filter(Boolean).join(", ");
+}
 
 function normalizeAddressKey(address) {
   return address.trim().toLowerCase().replace(/\s+/g, " ");
@@ -58,7 +74,7 @@ function normalizeAddressKey(address) {
 
 async function geocodeAddress(address, apiKey) {
   const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(GEOCODE_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`Geocoding API HTTP ${res.status}`);
   const json = await res.json();
   if (json.status !== "OK" || !json.results || !json.results.length) {
@@ -69,7 +85,38 @@ async function geocodeAddress(address, apiKey) {
   return { lat: loc.lat, lng: loc.lng, formatted };
 }
 
-exports.handler = async (event) => {
+// Runs `worker` over `items` with at most `limit` in flight at once,
+// preserving input order in the returned array.
+async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  const runners = new Array(Math.min(limit, items.length)).fill(null).map(async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await worker(items[i], i);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
+
+function toPin(loc, geo) {
+  const pin = {
+    address: fullAddress(loc),
+    lat: geo.lat,
+    lng: geo.lng,
+  };
+  if (loc.year) pin.year = String(loc.year);
+  // Optional since 2026-08-14 -- a home with no tour filmed still gets a
+  // pin, it just gets an address-only popup.
+  if (loc.videoId) {
+    pin.videoId = loc.videoId;
+    pin.title = loc.title || null;
+  }
+  return pin;
+}
+
+exports.handler = async () => {
   try {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
@@ -81,40 +128,76 @@ exports.handler = async (event) => {
     }
 
     const store = getBlobStore(getStore, GEOCODE_STORE_NAME);
+    const startedAt = Date.now();
 
-    const pins = await Promise.all(
-      SOLD_HOME_LOCATIONS.map(async (loc) => {
-        const cacheKey = normalizeAddressKey(loc.address);
-        let geo = await store.get(cacheKey, { type: "json" }).catch(() => null);
-        if (!geo) {
-          try {
-            geo = await geocodeAddress(loc.address, apiKey);
-            await store.setJSON(cacheKey, geo);
-          } catch (err) {
-            console.error(`sold-homes-geocode: failed for "${loc.address}":`, err.message);
-            return null;
-          }
-        }
-        return {
-          address: loc.address,
-          lat: geo.lat,
-          lng: geo.lng,
-          videoId: loc.videoId,
-          title: loc.title,
-        };
-      })
+    // Pass 1: everything already cached. Reads hit our own storage only --
+    // no Google calls, nothing to rate limit -- so this stays fast even at
+    // 150+ addresses, and it means a warm cache always returns the complete
+    // map regardless of the time budget below. Still windowed rather than a
+    // flat Promise.all so 150 addresses don't open 150 simultaneous Blobs
+    // connections.
+    const cached = await mapWithConcurrency(
+      SOLD_HOME_LOCATIONS,
+      CACHE_READ_CONCURRENCY,
+      (loc) =>
+        store
+          .get(normalizeAddressKey(fullAddress(loc)), { type: "json" })
+          .catch(() => null)
     );
+
+    const pins = [];
+    const missing = [];
+    SOLD_HOME_LOCATIONS.forEach((loc, i) => {
+      const geo = cached[i];
+      if (geo && typeof geo.lat === "number" && typeof geo.lng === "number") {
+        pins.push(toPin(loc, geo));
+      } else {
+        missing.push(loc);
+      }
+    });
+
+    // Pass 2: geocode what's left, bounded, and only until the time budget
+    // runs out. Anything not reached this time is reported as pending and
+    // picked up on the next request -- permanently, once cached.
+    let deferred = 0;
+    if (missing.length) {
+      const fresh = await mapWithConcurrency(missing, GEOCODE_CONCURRENCY, async (loc) => {
+        if (Date.now() - startedAt > GEOCODE_TIME_BUDGET_MS) {
+          deferred += 1;
+          return null;
+        }
+        const address = fullAddress(loc);
+        try {
+          const geo = await geocodeAddress(address, apiKey);
+          await store.setJSON(normalizeAddressKey(address), geo);
+          return toPin(loc, geo);
+        } catch (err) {
+          console.error(`sold-homes-geocode: failed for "${address}":`, err.message);
+          return null;
+        }
+      });
+      fresh.filter(Boolean).forEach((pin) => pins.push(pin));
+    }
+
+    const pending = deferred > 0;
 
     return {
       statusCode: 200,
       headers: {
         "Content-Type": "application/json",
-        // Pins essentially never change (a sold address's location is
-        // permanent, and this list only grows a couple times a year) --
-        // safe to cache aggressively at the CDN edge.
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        // A sold address's location is permanent, so a fully-resolved
+        // response is safe to cache hard at the edge. A partial one is not:
+        // caching it would freeze the half-built map in place for a day and
+        // stop the cache from warming, so those go uncached.
+        "Cache-Control": pending
+          ? "no-store"
+          : "public, max-age=86400, stale-while-revalidate=604800",
       },
-      body: JSON.stringify({ pins: pins.filter(Boolean), totalCount: SOLD_HOME_LOCATIONS.length }),
+      body: JSON.stringify({
+        pins,
+        totalCount: SOLD_HOME_LOCATIONS.length,
+        pending,
+      }),
     };
   } catch (err) {
     console.error("sold-homes-geocode function error:", err);

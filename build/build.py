@@ -45,6 +45,11 @@ GUIDES = _load_json("guides.json")
 LEGAL = _load_json("legal.json")
 BLOG = _load_json("blog.json")  # 60 posts migrated from the live site's blog
 
+# Christine's past sales, plotted on /sold-homes-map.html. A video is
+# optional here — see the _README inside the file, and the SOLD MAP section
+# further down, for why that's the whole point of this file existing.
+SOLD_HOMES_DATA = _load_json("sold_homes.json")
+
 # Old AgentFire/WordPress URL -> new site path, for anything printed,
 # bookmarked, or otherwise pointing at a URL that must keep working exactly
 # as-is after DNS cuts over — a 301 redirect, not a rename of our own page,
@@ -473,6 +478,88 @@ LISTING_VIDEOS = {addr: (vid, title) for addrs, vid, title, _status in _LISTING_
 SOLD_HOME_VIDEOS = [
     (vid, title) for addrs, vid, title, status in _LISTING_VIDEO_ENTRIES if status == "sold"
 ]
+
+
+# ----------------------------------------------------- SOLD HOME PINS ----
+# 2026-08-14 (Christine, on seeing only 12 pins): "I have sold 150 plus
+# homes! why arent they on there?" — a fair question, and the answer was a
+# real design flaw, not missing data entry.
+#
+# The map used to be built straight from the "sold"-status rows of
+# _LISTING_VIDEO_ENTRIES above. That list exists to match YouTube listing
+# TOURS to addresses, so a home could only ever get a pin if Christine had
+# also filmed and uploaded a video for it. It was a map of "sold homes I
+# happened to film", displayed under copy that claimed it was her track
+# record. Twelve of 150+.
+#
+# The pin list now comes from build/data/sold_homes.json instead, where the
+# video is optional and the minimum viable entry is an address plus a city.
+# The sold video entries above are still merged in automatically, so no pin
+# that used to appear can be lost by an editing slip in the JSON — and any
+# video entry missing from the JSON prints a build warning rather than
+# silently geocoding without a city (which is how a pin lands on the wrong
+# "Main St" in the wrong town).
+def _street_key(street):
+    """Normalized street-only key, used to dedupe the JSON against the
+    video list. Deliberately street-only: the video list has no city, so
+    the street is the only field the two sources share."""
+    return " ".join(street.strip().lower().split())
+
+
+def _build_sold_home_pins():
+    pins = []
+    seen = set()
+
+    for home in SOLD_HOMES_DATA.get("homes", []):
+        street = (home.get("address") or "").strip()
+        city = (home.get("city") or "").strip()
+        if not street:
+            print("  ! sold_homes.json: skipping an entry with no address")
+            continue
+        if not city:
+            print(f"  ! sold_homes.json: '{street}' has no city — the geocoder "
+                  f"will have to guess which town it's in")
+        key = _street_key(street)
+        if key in seen:
+            print(f"  ! sold_homes.json: '{street}' is listed twice — keeping the first")
+            continue
+        seen.add(key)
+        pin = {
+            "address": street,
+            "city": city,
+            "state": (home.get("state") or "CO").strip(),
+        }
+        if home.get("year"):
+            pin["year"] = str(home["year"])
+        if home.get("videoId"):
+            pin["videoId"] = home["videoId"]
+            pin["title"] = home.get("title") or f"{street} home tour"
+        pins.append(pin)
+
+    # Safety net: any sold video entry that isn't in the JSON still gets a
+    # pin, so the map can only ever gain homes from this refactor.
+    for addrs, vid, title, status in _LISTING_VIDEO_ENTRIES:
+        if status != "sold":
+            continue
+        # Test every spelling variant, not just the first: the video list
+        # carries several forms per property ("929 independent ave", "929 w
+        # independent ave", ...) precisely because MLS address formatting
+        # varies, and sold_homes.json will naturally use whichever form
+        # reads best. Matching on addrs[0] alone double-pinned two homes.
+        if any(_street_key(a) in seen for a in addrs):
+            continue
+        print(f"  ! '{addrs[0]}' has a sold listing video but no entry in "
+              f"sold_homes.json — pinning it without a city, add one for accuracy")
+        seen.add(_street_key(addrs[0]))
+        pins.append({
+            "address": addrs[0].title(), "city": "", "state": "CO",
+            "videoId": vid, "title": title,
+        })
+
+    return pins
+
+
+SOLD_HOME_PINS = _build_sold_home_pins()
 
 
 def _fmt_views(n):
@@ -4821,9 +4908,9 @@ _QUIZ_BUDGET_PARAMS = {
 
 # --------------------------------------------------------- SOLD MAP ----
 # 2026-08-13 (Christine's request): "map my sold listings and their videos
-# using google api to be able to document homes sold." The 12 sold-status
-# addresses already tracked in _LISTING_VIDEO_ENTRIES (see that list's own
-# comment above) get geocoded server-side by
+# using google api to be able to document homes sold." The addresses in
+# SOLD_HOME_PINS (see that section's comment for where they come from and
+# why it changed on 2026-08-14) get geocoded server-side by
 # netlify/functions/sold-homes-geocode.js and plotted here with Leaflet —
 # same "Google API for geocoding, Leaflet for the actual map" split as the
 # Communities county map, so no Google Maps JS key (billed per map load)
@@ -4835,6 +4922,30 @@ _QUIZ_BUDGET_PARAMS = {
 # she confirmed 2026-08-13 she already has a key. Until then the page
 # still renders cleanly with a friendly "almost ready" message instead of
 # a blank or broken map.
+
+
+def write_sold_homes_function_data():
+    """Emit the pin list the Netlify geocoder function reads at runtime.
+
+    The function used to carry its own hand-copied duplicate of the address
+    list, with a comment admitting it "needs a manual update any time that
+    list grows -- flagged clearly so it isn't missed." It got missed, which
+    is part of why the map stalled at 12 pins. Generating it from the same
+    source as the page removes the chance to forget. Netlify runs no build
+    step for this site (see netlify.toml), so the generated file is
+    committed alongside /site."""
+    out_dir = os.path.abspath(os.path.join(HERE, "..", "netlify", "functions", "lib"))
+    os.makedirs(out_dir, exist_ok=True)
+    payload = {
+        "_generated": "Written by build/build.py from build/data/sold_homes.json. "
+                      "Do not edit by hand — edit that file and re-run the build.",
+        "homes": SOLD_HOME_PINS,
+    }
+    with open(os.path.join(out_dir, "_sold-homes-data.json"), "w") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print(f"  sold homes map: {len(SOLD_HOME_PINS)} pins "
+          f"({sum(1 for p in SOLD_HOME_PINS if p.get('videoId'))} with video tours)")
 def _sold_homes_map_lazy_loader():
     return (
         "<script>\n"
@@ -4879,27 +4990,35 @@ def build_sold_homes_map():
     # elements exist in the DOM either way, just visually hidden while
     # collapsed, exactly like the rest of this page's lazy-loaded map).
     quiz_block = _neighborhood_quiz_block()
+    # 2026-08-14: rewritten after Christine's read on the old version ("this
+    # is sooo not human sounding"). The old lede was three sentences of
+    # reassurance that the homes were real ("Every pin below is a real home",
+    # "the actual video tour", "Real homes, real results") and referred to
+    # her in the third person on a page about her own work. Plain first
+    # person, no insisting, no closing triad.
+    n_with_video = sum(1 for p in SOLD_HOME_PINS if p.get("videoId"))
     body = f"""
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">The Track Record, On A Map</span>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Homes I've Sold</span>
     <h1>Sold Homes Map</h1>
-    <p class="lede">Every pin below is a real home {esc(SITE['agent'])} has represented —
-    click one to watch the actual video tour she filmed for that property. Real homes,
-    real results, mapped across Northern Colorado.</p>
+    <p class="lede">These are homes I've sold around Northern Colorado. Click a pin to see
+    the address, and where I filmed a tour, to watch it. I've closed more than 150 of
+    these since I started, in Loveland and Greeley and Fort Collins and most of the
+    small towns in between.</p>
   </div>
 </section>
 <section>
   <div class="wrap">
     <div id="sold-homes-map"></div>
     <p id="sold-homes-map-status" class="sold-homes-map-status"></p>
-    <p class="lede" style="margin-top:24px">Want to see the full library, not just what's
-    mapped? Visit the <a href="/past-sales.html" style="text-decoration:underline">Past Sales</a>
-    page, or browse every tour on the
+    <p class="lede" style="margin-top:24px">I'm still adding older sales to the map, so it
+    isn't every home yet. {n_with_video} of the ones here have a full video tour, and
+    those are all collected on
+    <a href="/past-sales.html" style="text-decoration:underline">Past Sales</a> and the
     <a href="/listing-video-portfolio.html" style="text-decoration:underline">Listing Video Portfolio</a>.
-    Curious what it's actually like working with {esc(SITE['agent'].split()[0])}? Read
-    <a href="/testimonials.html" style="text-decoration:underline">what these same sellers said</a>
-    afterward.</p>
+    The sellers behind them wrote
+    <a href="/testimonials.html" style="text-decoration:underline">these reviews</a>.</p>
   </div>
 </section>
 <section class="tight">
@@ -6476,6 +6595,7 @@ if __name__ == "__main__":
     build_blog()
     build_rss_feed()
     build_sold_homes_map()
+    write_sold_homes_function_data()
     build_nav_pages()
     build_search_homes()
     build_current_listings()
