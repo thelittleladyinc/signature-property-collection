@@ -64,6 +64,13 @@ LEGACY_URL_REDIRECTS = {
     # published URLs 404, in case either is indexed or bookmarked anywhere.
     "/blog/rent-buy-home.html": "/blog/index.html",
     "/blog/things-shouldnt-buying-home.html": "/blog/index.html",
+    # 2026-08-14: re-anchored this post's price examples from sub-$500k to
+    # luxury tier ($2M+) -- the original read like generic mass-market
+    # content (title itself was "...Why That $499,000 Tag Works"), which
+    # undercut the luxury brand. Same slug is reused for the new URL's old
+    # counterpart in case it was indexed/bookmarked.
+    "/blog/the-psychology-of-pricing-why-that-499000-tag-works.html":
+        "/blog/psychology-of-pricing-luxury-homes-northern-colorado.html",
 }
 
 # Display name (as used in COUNTIES[]["cities"]) -> CITY_CONTENT data key.
