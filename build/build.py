@@ -1648,10 +1648,23 @@ def nav_html(active=None):
 # 250+ homes, $200M+ volume) -- Christine confirmed $200M+ is their real
 # joint total, not a solo figure (an earlier pass here had briefly used
 # the brochure's more conservative $100M+ before she corrected it).
+#
+# 2026-08-14 (final polish pass): dropped the "/review" suffix from the
+# g.page link. Verified directly (fetched both variants) that
+# g.page/r/<code>/review forces Google's sign-in-then-write-a-review
+# compose flow -- exactly wrong for a "see the reviews" stat, since a
+# visitor clicking to browse reviews would instead hit a login wall and a
+# blank review box. The bare g.page/r/<code> (no suffix) redirects to the
+# normal browsable google.com/maps/place/... listing -- reviews, rating,
+# and photos, no sign-in required. Same code, just without the suffix that
+# was silently changing its meaning.
+GOOGLE_REVIEWS_URL = "https://g.page/r/CZbs8kiTCII_EBM"
+
+
 def _trust_ribbon_html():
     return f"""<div class="trust-ribbon">
   <div class="wrap">
-    <a class="item" href="https://g.page/r/CZbs8kiTCII_EBM/review" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>158 Five-Star Google Reviews</a>
+    <a class="item" href="{GOOGLE_REVIEWS_URL}" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>158 Five-Star Google Reviews</a>
     <span class="divider">&middot;</span>
     <span class="item">250+ Homes Sold</span>
     <span class="divider">&middot;</span>
@@ -1724,6 +1737,44 @@ def _real_estate_agent_schema():
             "bestRating": "5",
             "reviewCount": "99",
         },
+    }
+    if SITE.get("address"):
+        a = SITE["address"]
+        data["address"] = {
+            "@type": "PostalAddress",
+            "streetAddress": a["street"],
+            "addressLocality": a["city"],
+            "addressRegion": a["state"],
+            "postalCode": a["zip"],
+            "addressCountry": "US",
+        }
+    return json.dumps(data, indent=None)
+
+
+def _kendra_agent_schema():
+    """RealEstateAgent JSON-LD for Kendra Bajcar -- placed only on
+    /about.html (the one page she actually appears on, in the "Meet The
+    Team" section), not sitewide like Christine's above. 2026-08-14, per
+    Christine: keep the site's primary identity (nav, every other page's
+    schema, contact info) as Christine solo, but give Kendra her own real
+    structured-data entity so she's individually indexable too, not just
+    visually present in a photo. Deliberately omits telephone/email (not
+    published anywhere else on the site, so not fabricating a contact
+    channel here) and aggregateRating (no individually-verified review
+    count for her specifically -- the 158 figure shown elsewhere is
+    explicitly the combined total across both her and Christine's Google
+    profiles, not hers alone; see _trust_ribbon_html()'s comment)."""
+    area_served = sorted({c["name"] for c in COUNTIES})
+    data = {
+        "@context": "https://schema.org",
+        "@type": "RealEstateAgent",
+        "name": "Kendra Bajcar",
+        "url": SITE["domain"] + "/about.html",
+        "image": SITE["domain"] + "/assets/img/team/kendra-headshot.jpg",
+        "worksFor": {"@type": "Organization", "name": SITE["brokerage"]},
+        "colleague": {"@type": "Person", "name": SITE["agent"], "url": SITE["domain"] + "/index.html"},
+        "areaServed": [{"@type": "AdministrativeArea", "name": n} for n in area_served],
+        "dateModified": BUILD_DATE,
     }
     if SITE.get("address"):
         a = SITE["address"]
@@ -2734,7 +2785,7 @@ def build_about():
     &mdash; two agents already focused on elevated representation, each looking for a partner
     who understood what luxury truly demands. What began as a professional connection became
     the operating model behind every Signature Property Collection listing: a combined record
-    exceeding $100 million in sales, more than 250 homes represented, and a partnership built
+    exceeding $200 million in sales, more than 250 homes represented, and a partnership built
     so that no detail of a sale is left to chance.</p>
     <img src="/assets/img/team/christine-kendra.jpg" alt="Christine Gwinnup and Kendra Bajcar, Signature Property Collection"
     style="width:100%;border-radius:4px;margin:32px 0;box-shadow:0 10px 30px rgba(20,20,21,.10)" loading="lazy">
@@ -2825,6 +2876,7 @@ def build_about():
         f"Meet {SITE['agent']}, luxury real estate agent serving Loveland, Berthoud, "
         f"Masonville and the Larimer, Weld & Boulder County Front Range.",
         "/about.html", "About", body,
+        schema_extra=[_kendra_agent_schema()],
     )
 
 
@@ -3210,7 +3262,15 @@ def build_testimonials():
     # generic Google search fallback to her real Google Business Profile
     # review link (g.page/r/... -- the permanent share link, same one now
     # used site-wide in the trust ribbon) now that we have it.
-    google_reviews_url = "https://g.page/r/CZbs8kiTCII_EBM/review"
+    #
+    # 2026-08-14 (final polish pass): was using the "/review"-suffixed
+    # variant, which we verified redirects into a sign-in-walled
+    # write-a-review compose flow instead of a browsable reviews page --
+    # exactly wrong for a "Read All 158 On Google" link. Switched to the
+    # shared GOOGLE_REVIEWS_URL constant (no suffix), same fix already
+    # applied to the trust ribbon; see that constant's comment for the
+    # verified redirect behavior of each variant.
+    google_reviews_url = GOOGLE_REVIEWS_URL
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
