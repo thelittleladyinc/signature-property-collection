@@ -42,11 +42,29 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+/* 2026-08-14 (Christine: "i want some of the patterns textures to be add
+   to make it a little more gradient visually"): every light section on the
+   site (the default, unstyled <section> -- most of every page) previously
+   sat on a completely flat --cream fill with zero depth. Added a soft,
+   very-low-opacity rose-tinted radial wash top-left/bottom-right (echoes
+   the dusty-rose brand color at a whisper, not a tint anyone would
+   consciously notice) plus an extremely fine dot-grid texture (a repeating
+   radial-gradient, not an image file -- no asset to go missing, no extra
+   request, renders identically at any zoom/DPI). Both are subtle by
+   design: this should read as "a little more depth," never as visible
+   pattern or noise sitting on top of text. */
 body {
   margin: 0;
   font-family: var(--font-sans);
   color: var(--charcoal);
-  background: var(--cream);
+  background-color: var(--cream);
+  background-image:
+    radial-gradient(circle at 12% -5%, rgba(184,111,122,.06), transparent 38%),
+    radial-gradient(circle at 92% 105%, rgba(184,111,122,.05), transparent 42%),
+    radial-gradient(rgba(20,20,21,.035) 1px, transparent 1px);
+  background-size: auto, auto, 26px 26px;
+  background-position: 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, repeat;
   -webkit-font-smoothing: antialiased;
   line-height: 1.6;
 }
@@ -77,6 +95,20 @@ a { color: inherit; text-decoration: none; }
    degrading like a scaled-down raster image. logo-full.png is untouched
    everywhere else (OG/social share images), since a single self-contained
    image is the right call there. */
+/* 2026-08-14: the diamond "PC" monogram (real vector, Logo/Rose Color/SVG
+   in Christine's Drive) added as a small badge to the left of the script
+   wordmark. Kept in its natural black+rose two-tone -- unlike brand-logo
+   and brokerage-logo it is NOT run through brightness(0) invert(1), since
+   that would flatten it to solid white and lose the rose accent that makes
+   it read as a monogram rather than a blob -- so it gets a small white
+   circular backing instead, giving both colors contrast against the
+   header's rose background. Sized to roughly match the wordmark's height. */
+.brand-monogram-badge {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: 50%; background: var(--white);
+  box-shadow: 0 1px 4px rgba(20,20,21,.18);
+}
+.brand-monogram { height: 26px; width: 26px; display: block; }
 .brand-wordmark { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
 .brand-logo { height: 26px; width: auto; display: block; filter: brightness(0) invert(1); }
 .brand-mark { font-family: var(--font-script); font-size: 30px; line-height: 1; color: var(--white); }
@@ -160,10 +192,21 @@ nav.primary-nav a:hover { text-decoration: underline; text-decoration-color: cur
 .nav-toggle.is-active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
 /* ---------- Hero ---------- */
+/* 2026-08-14: same "a little more gradient visually" pass as body above --
+   a soft rose-tinted glow (top-right) plus the same fine dot texture, this
+   time in white at a whisper of opacity so it reads against charcoal
+   instead of cream. Layered underneath the existing dark overlay, so text
+   contrast/readability is completely unaffected -- purely a texture behind
+   the same dark backdrop that was already there. */
 .hero {
-  background: linear-gradient(180deg, rgba(20,20,21,.55), rgba(20,20,21,.75)), var(--charcoal);
-  background-size: cover;
-  background-position: center;
+  background-color: var(--charcoal);
+  background-image:
+    radial-gradient(circle at 88% -10%, rgba(184,111,122,.16), transparent 45%),
+    radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(20,20,21,.55), rgba(20,20,21,.75));
+  background-size: cover, 26px 26px, cover;
+  background-position: center, 0 0, center;
+  background-repeat: no-repeat, repeat, no-repeat;
   color: var(--white);
   padding: 170px 0 130px;
   text-align: center;
@@ -231,7 +274,19 @@ h2.section-title {
 }
 .lede { font-size: 17px; line-height: 1.8; max-width: 680px; color: #3a3a3c; }
 
-.section-dark { background: var(--charcoal); color: var(--white); }
+/* 2026-08-14: same subtle rose-glow + dot-texture treatment as .hero above,
+   so the site's other full-width dark sections (Success Stories, etc.)
+   don't read as a flatter, less-finished version of the hero right above
+   them on the same page. */
+.section-dark {
+  background-color: var(--charcoal);
+  background-image:
+    radial-gradient(circle at 10% 110%, rgba(184,111,122,.13), transparent 42%),
+    radial-gradient(rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: cover, 26px 26px;
+  background-repeat: no-repeat, repeat;
+  color: var(--white);
+}
 .section-dark .lede { color: rgba(255,255,255,.78); }
 .section-dark .eyebrow { color: var(--dusty-rose); }
 
@@ -430,7 +485,15 @@ form.lead-form input, form.lead-form textarea {
 form.lead-form label.consent { font-size: 12px; color: #6a6a6c; display: flex; gap: 8px; align-items: flex-start; }
 
 /* ---------- Footer ---------- */
-.site-footer { background: var(--charcoal); color: rgba(255,255,255,.8); padding: 90px 0 40px; font-size: 14px; }
+.site-footer {
+  background-color: var(--charcoal);
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(184,111,122,.1), transparent 40%),
+    radial-gradient(rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: cover, 26px 26px;
+  background-repeat: no-repeat, repeat;
+  color: rgba(255,255,255,.8); padding: 90px 0 40px; font-size: 14px;
+}
 .footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1.3fr 1fr; gap: 52px; }
 @media (max-width: 1100px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 600px) { .footer-grid { grid-template-columns: 1fr; } }
@@ -454,7 +517,16 @@ form.lead-form label.consent { font-size: 12px; color: #6a6a6c; display: flex; g
 }
 
 /* ---------- Breadcrumb / county page hero variants ---------- */
-.county-hero { padding: 120px 0 80px; background: var(--charcoal); color: var(--white); }
+.county-hero {
+  padding: 120px 0 80px;
+  background-color: var(--charcoal);
+  background-image:
+    radial-gradient(circle at 88% -10%, rgba(184,111,122,.16), transparent 45%),
+    radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: cover, 26px 26px;
+  background-repeat: no-repeat, repeat;
+  color: var(--white);
+}
 .county-hero .eyebrow { color: var(--dusty-rose); }
 .county-hero .lede { color: rgba(255,255,255,.85); }
 .city-pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }

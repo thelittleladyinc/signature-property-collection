@@ -1619,15 +1619,21 @@ def nav_html(active=None):
 # Christine's request): a persistent credibility thread carried on every
 # single page via page() below -- real numbers (99 five-star Google
 # reviews, 200+ homes sold, $200M+ volume, RealTrends Top 0.5%), not stock
-# trust badges. The reviews stat links to /testimonials.html so the ribbon
-# doubles as a standing invitation deeper into the site from literally
-# anywhere, which is the actual "flow between pages" ask, not just a visual
-# add-on. See _real_estate_agent_schema() above for the same 99/5.0 numbers
-# surfaced to search engines via aggregateRating.
+# trust badges. See _real_estate_agent_schema() above for the same 99/5.0
+# numbers surfaced to search engines via aggregateRating.
+#
+# 2026-08-14 (later same day, per Christine): the reviews stat now links
+# straight out to her real Google Business Profile review page
+# (g.page/r/... -- the permanent public share link she pulled from Google
+# Business Profile's own "Share profile" flow, not a session-tied search
+# URL) instead of the internal /testimonials.html page, so "99 Five-Star
+# Google Reviews" takes visitors to the actual Google reviews, not just a
+# page about them. Opens in a new tab (external site) so visitors don't
+# lose their place on the site.
 def _trust_ribbon_html():
     return f"""<div class="trust-ribbon">
   <div class="wrap">
-    <a class="item" href="/testimonials.html"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>99 Five-Star Google Reviews</a>
+    <a class="item" href="https://g.page/r/CZbs8kiTCII_EBM/review" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>99 Five-Star Google Reviews</a>
     <span class="divider">&middot;</span>
     <span class="item">200+ Homes Sold</span>
     <span class="divider">&middot;</span>
@@ -1799,9 +1805,29 @@ def header_html(active=None):
     # any background color, and safe to pair with the real <span> below.
     # logo.png and logo-full.png are both left alone (logo-full.png is
     # still used for OG/social meta images, see head()).
+    #
+    # 2026-08-14 (Christine: "I want screenshot top left logo to actually be
+    # my real logo found in drive"): traced this to ground first rather than
+    # assuming the header was using a fake/placeholder mark -- it wasn't.
+    # logo-mark.png (above) is already a pixel-identical crop of her real
+    # Drive file (rose_primary_01.png in Logo/Rose Color/PNG). What the
+    # header was actually missing was her diamond "PC" monogram/logomark --
+    # the more distinctly logo-like brand asset -- so this adds it as a
+    # small badge to the left of the existing script wordmark. Pulled the
+    # real vector (Logo/Rose Color/SVG/Logomark_01.svg) rather than a raster
+    # export so it stays crisp at this small header size. Left in its
+    # natural two-tone black+rose coloring (unlike brand-logo/brokerage-logo
+    # above, this one does NOT get brightness(0) invert(1) -- that filter
+    # would flatten it to solid white and erase the rose accent that makes
+    # it read as a monogram rather than a blob) on a small white badge
+    # backing so both colors keep contrast against the header's rose
+    # background, echoing the badge treatment already used for the LPT mark.
     return f"""<header class="site-header">
   <div class="wrap">
     <div class="brand">
+      <span class="brand-monogram-badge" aria-hidden="true">
+        <img class="brand-monogram" src="/assets/img/logo-monogram.svg" alt="">
+      </span>
       <a href="/index.html" class="brand-wordmark">
         <img class="brand-logo" src="/assets/img/logo-mark.png" alt="{SITE['name']}">
         <span class="brand-sub">Property Collection</span>
@@ -4971,6 +4997,28 @@ def build_nav_pages():
     # (generic form, no relocation context) despite submission-created.js
     # already having a "relocation" Lofty source label sitting unused. Adding
     # a real form here, using that exact form name so it lines up.
+    # 2026-08-14 (Christine: "I also have a relocation video for Loveland -
+    # called why I moved back - we should add"): a personal, authentic beat
+    # in the middle of an otherwise process-and-logistics page -- Christine
+    # didn't just start selling real estate here, she moved away and chose
+    # to come back, which is exactly the kind of local credibility a
+    # relocating buyer (the entire audience of this page) responds to.
+    # Video confirmed via YouTube oEmbed: "I Moved Away from Loveland, CO...
+    # And Here's Why I'm Back" on Christine's own channel.
+    body += f"""
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">From {esc(SITE['agent'].split()[0])}, Personally</span>
+      <h2 class="section-title" style="margin-top:6px">Why I Moved Back To Loveland</h2>
+      <p class="lede">Before I was selling homes here, I left Loveland — and then I came back.
+      If you're weighing a move to Northern Colorado, I'd rather you hear the honest version
+      from someone who's actually made that decision than another list of amenities.</p>
+    </div>
+    {_yt_embed("2jNGXw5lzAM", "I Moved Away from Loveland, CO... And Here's Why I'm Back")}
+  </div>
+</section>
+"""
     body += f"""
 <section class="tight">
   <div class="wrap grid-2">
