@@ -9,6 +9,55 @@
 [functions]
   directory = "netlify/functions"
 
+# 2026-08-14: there was no [[headers]] block at all. Two costs, in order of
+# impact:
+#
+#  1. No Cache-Control on static assets. The site ships ~5.5MB of imagery,
+#     and every byte of it was being revalidated far more often than
+#     necessary -- a direct, free Core Web Vitals win on exactly the
+#     community pages that need to rank on mobile.
+#  2. No baseline security headers, on a site collecting lead data through
+#     68 forms. Not ranking factors, but standard hygiene.
+#
+# Fingerprinted-by-path assets (images, fonts, vendored JS) get a long
+# immutable TTL; CSS/JS are not content-hashed in this build, so they get a
+# short TTL with revalidation rather than immutable -- otherwise a style
+# change wouldn't reach returning visitors for a year.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
+    Permissions-Policy = "geolocation=(self), microphone=(), camera=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+[[headers]]
+  for = "/assets/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/qr/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, must-revalidate"
+
+[[headers]]
+  for = "/assets/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, must-revalidate"
+
 # Replicates Christine's licensed IRES listings from MLS Grid into Netlify
 # Blobs every 15 minutes (MLS Grid's own recommended cadence — see
 # sync-listings.js's file comment for why a live per-search query to MLS

@@ -761,3 +761,24 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 }
 .poi-icon-marker svg { width: 60%; height: 60%; }
 .leaflet-marker-icon:hover .poi-icon-marker { transform: scale(1.12); }
+
+/* 2026-08-14 (a11y): skip link paired with the new <main id="main">
+   landmark in build.py's page(). Visually hidden until keyboard-focused,
+   so it costs sighted users nothing and gives keyboard/screen-reader
+   users a way past the nav + trust ribbon that repeat on all 136 pages. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  padding: 12px 20px;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+  text-decoration: none;
+  border: 2px solid #B86F7A;
+  border-radius: 0 0 4px 0;
+}
+.skip-link:focus {
+  left: 0;
+}
