@@ -1376,9 +1376,19 @@ def _social_follow_section(heading="Follow For More Beautiful Homes"):
 # scraped image grid would). Swap these URLs out any time for newer posts.
 # label = short fallback text shown before Instagram's JS replaces the
 # blockquote (and forever, if a visitor has JS/embeds blocked).
+#
+# 2026-08-14 (Christine's request, pulled the Kendra post): the
+# reel/DaNwBQSuTaN slot rendered live content promoting "The Bold
+# Collective" -- an old team name of Christine's, but with nothing on the
+# card itself explaining that history, so a visitor just sees Kendra
+# pitching a differently-named, unexplained brand on Christine's own site.
+# Because this is Instagram's *live* embed (not a static snapshot -- see
+# the file comment above), whatever's actually posted at a permalink today
+# is what renders, regardless of the label picked when the URL was chosen.
+# Pulled rather than relabeled; swap in a replacement permalink here
+# whenever Christine has one.
 INSTAGRAM_FEED_POSTS = [
     {"url": "https://www.instagram.com/reel/DagBahKAUhu/", "label": "New listing at 616 41st, Greeley"},
-    {"url": "https://www.instagram.com/reel/DaNwBQSuTaN/", "label": "Christine & Kendra — “we can help you”"},
     {"url": "https://www.instagram.com/reel/DaI30cygZnI/", "label": "A playful tour through our current listings"},
 ]
 
@@ -1475,13 +1485,21 @@ def _instagram_feed_section():
       </div>"""
 
     cards = "\n      ".join(_card(p, i) for i, p in enumerate(INSTAGRAM_FEED_POSTS))
+    # 2026-08-14: grid-3 is a fixed 3-column track -- with the Bold
+    # Collective post pulled (see INSTAGRAM_FEED_POSTS' comment above) this
+    # is down to 2 cards, and grid-3 would leave a visibly empty third
+    # column rather than reflow. grid-2col (already defined in style.css,
+    # with its own mobile breakpoint) is the right class whenever there are
+    # exactly 2 cards; falls back to grid-3 for 3+ so this isn't hardcoded
+    # to today's count.
+    grid_class = "grid-2col" if len(INSTAGRAM_FEED_POSTS) == 2 else "grid-3"
     return f"""<section class="tight" id="instagram-feed-section">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Follow Along</span>
     <h2 class="section-title">Real Listings, Real Life &mdash; @thelittleladysellshomes</h2>
     <p class="lede">Straight from {esc(SITE['agent'])}'s own Instagram &mdash; new listings, video
     tours, and the real day-to-day of selling Northern Colorado real estate.</p>
-    <div class="grid-3" style="justify-items:center">
+    <div class="{grid_class}" style="justify-items:center">
       {cards}
     </div>
     <div class="btn-row" style="margin-top:32px">
@@ -1514,19 +1532,27 @@ def _instagram_feed_section():
   // tall/narrow) -- the old fixed-height-with-overflow-hidden wrapper kept
   // the outer box the same size, but the visible content inside still
   // filled wildly different amounts of that box, so the grid still read as
-  // uneven. This crops+scales every rendered iframe to fill an identical
-  // square tile -- like Instagram's own profile grid -- by reading the
-  // iframe's real rendered size, scaling it up so its SHORTER side exactly
-  // fills the square, and centering it (overflow:hidden on the wrapper
-  // clips the overflow on the longer side). Same technique used for
-  // cropped video thumbnails in any masonry-to-grid layout.
+  // uneven. This scales every rendered iframe to fit inside an identical
+  // square tile and centers it.
+  //
+  // 2026-08-14 (Christine's follow-up: "I need to be able to see the video
+  // not have it cut off"): this used to scale by the SHORTER side (fill +
+  // crop, like Instagram's own profile grid) -- for a portrait Reel that
+  // meant scaling up until its width matched the tile, which pushed a real
+  // chunk of the top and bottom out of frame. Confirmed live: a Reel with a
+  // caption overlay near the top ("fall in love with one of our
+  // listings...") had that text cropped off entirely. Fixed by scaling by
+  // the LONGER side instead (fit, not fill) -- the whole video is always
+  // visible, at the cost of some empty space beside a portrait video or
+  // above/below a landscape one rather than a perfectly filled square.
+  // Full content over a perfectly uniform tile is the right trade here.
   function normalizeSize(w) {{
     var frame = w.querySelector('iframe');
     if (!frame) return;
     var nativeW = frame.offsetWidth, nativeH = frame.offsetHeight;
     if (!nativeW || !nativeH) return;
     var target = w.offsetWidth || 360;
-    var scale = target / Math.min(nativeW, nativeH);
+    var scale = target / Math.max(nativeW, nativeH);
     frame.style.position = 'absolute';
     frame.style.top = '50%';
     frame.style.left = '50%';

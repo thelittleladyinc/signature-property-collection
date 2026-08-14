@@ -309,11 +309,13 @@ h2.section-title {
 .section-dark .eyebrow { color: var(--dusty-rose); }
 
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 52px; }
-/* 2026-08-14 (Christine's request: equal size regardless of photo/video) --
-   a fixed square tile, like Instagram's own profile grid, instead of a
+/* 2026-08-14 (Christine's request: equal size regardless of photo/video,
+   then a follow-up fix so a video's content is never cropped) -- a fixed
+   square tile, like Instagram's own profile grid, instead of a
    fixed-height box that still let content fill unevenly. The JS watchdog
-   in _instagram_feed_section() scales+centers each rendered iframe to fill
-   this square exactly; overflow:hidden clips whatever spills past it. */
+   in _instagram_feed_section() scales+centers each rendered iframe to FIT
+   inside this square (not fill it) so nothing is ever cut off; overflow:
+   hidden here is just a safety net, not an active crop. */
 .instagram-embed-wrap {
   width: 100%; max-width: 360px; aspect-ratio: 1 / 1; overflow: hidden;
   border-radius: 8px; position: relative; background: #fafafa;

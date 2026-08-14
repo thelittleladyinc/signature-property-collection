@@ -185,7 +185,7 @@
     <h2 class="section-title">Real Listings, Real Life &mdash; @thelittleladysellshomes</h2>
     <p class="lede">Straight from Christine Gwinnup's own Instagram &mdash; new listings, video
     tours, and the real day-to-day of selling Northern Colorado real estate.</p>
-    <div class="grid-3" style="justify-items:center">
+    <div class="grid-2col" style="justify-items:center">
       <div class="instagram-embed-wrap" data-ig-fallback-idx="0">
       <blockquote class="instagram-media" data-instgrm-captioned
         data-instgrm-permalink="https://www.instagram.com/reel/DagBahKAUhu/" data-instgrm-version="14"
@@ -199,18 +199,6 @@
       </blockquote>
       </div>
       <div class="instagram-embed-wrap" data-ig-fallback-idx="1">
-      <blockquote class="instagram-media" data-instgrm-captioned
-        data-instgrm-permalink="https://www.instagram.com/reel/DaNwBQSuTaN/" data-instgrm-version="14"
-        style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
-        max-width:400px;min-height:420px;width:100%;">
-        <div style="padding:16px">
-          <a href="https://www.instagram.com/reel/DaNwBQSuTaN/" target="_blank" rel="noopener"
-          style="text-decoration:none;color:var(--charcoal);font-size:14px">
-          Christine &amp; Kendra — “we can help you” &mdash; view on Instagram &rarr;</a>
-        </div>
-      </blockquote>
-      </div>
-      <div class="instagram-embed-wrap" data-ig-fallback-idx="2">
       <blockquote class="instagram-media" data-instgrm-captioned
         data-instgrm-permalink="https://www.instagram.com/reel/DaI30cygZnI/" data-instgrm-version="14"
         style="background:#FFF;border:1px solid #dbdbdb;border-radius:8px;margin:0;
@@ -253,19 +241,27 @@
   // tall/narrow) -- the old fixed-height-with-overflow-hidden wrapper kept
   // the outer box the same size, but the visible content inside still
   // filled wildly different amounts of that box, so the grid still read as
-  // uneven. This crops+scales every rendered iframe to fill an identical
-  // square tile -- like Instagram's own profile grid -- by reading the
-  // iframe's real rendered size, scaling it up so its SHORTER side exactly
-  // fills the square, and centering it (overflow:hidden on the wrapper
-  // clips the overflow on the longer side). Same technique used for
-  // cropped video thumbnails in any masonry-to-grid layout.
+  // uneven. This scales every rendered iframe to fit inside an identical
+  // square tile and centers it.
+  //
+  // 2026-08-14 (Christine's follow-up: "I need to be able to see the video
+  // not have it cut off"): this used to scale by the SHORTER side (fill +
+  // crop, like Instagram's own profile grid) -- for a portrait Reel that
+  // meant scaling up until its width matched the tile, which pushed a real
+  // chunk of the top and bottom out of frame. Confirmed live: a Reel with a
+  // caption overlay near the top ("fall in love with one of our
+  // listings...") had that text cropped off entirely. Fixed by scaling by
+  // the LONGER side instead (fit, not fill) -- the whole video is always
+  // visible, at the cost of some empty space beside a portrait video or
+  // above/below a landscape one rather than a perfectly filled square.
+  // Full content over a perfectly uniform tile is the right trade here.
   function normalizeSize(w) {
     var frame = w.querySelector('iframe');
     if (!frame) return;
     var nativeW = frame.offsetWidth, nativeH = frame.offsetHeight;
     if (!nativeW || !nativeH) return;
     var target = w.offsetWidth || 360;
-    var scale = target / Math.min(nativeW, nativeH);
+    var scale = target / Math.max(nativeW, nativeH);
     frame.style.position = 'absolute';
     frame.style.top = '50%';
     frame.style.left = '50%';
