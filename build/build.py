@@ -1794,6 +1794,7 @@ def footer_html():
           <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
           <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
           <li><a href="/neighborhood-quiz.html">Neighborhood Quiz</a></li>
+          <li><a href="/sold-homes-map.html">Sold Homes Map</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
         </ul>
       </div>
@@ -4158,6 +4159,88 @@ _QUIZ_BUDGET_PARAMS = {
 }
 
 
+# --------------------------------------------------------- SOLD MAP ----
+# 2026-08-13 (Christine's request): "map my sold listings and their videos
+# using google api to be able to document homes sold." The 12 sold-status
+# addresses already tracked in _LISTING_VIDEO_ENTRIES (see that list's own
+# comment above) get geocoded server-side by
+# netlify/functions/sold-homes-geocode.js and plotted here with Leaflet —
+# same "Google API for geocoding, Leaflet for the actual map" split as the
+# Communities county map, so no Google Maps JS key (billed per map load)
+# ever ships to the browser, only the free Geocoding API call happens
+# server-side, cached forever once each address is resolved.
+#
+# Needs Christine to add GOOGLE_MAPS_API_KEY to Netlify's environment
+# variables before pins actually appear (see the function's own comment) —
+# she confirmed 2026-08-13 she already has a key. Until then the page
+# still renders cleanly with a friendly "almost ready" message instead of
+# a blank or broken map.
+def _sold_homes_map_lazy_loader():
+    return (
+        "<script>\n"
+        "(function () {\n"
+        "  function loadMap() {\n"
+        "    var css = document.createElement('link');\n"
+        "    css.rel = 'stylesheet';\n"
+        "    css.href = '/assets/vendor/leaflet/leaflet.css';\n"
+        "    document.head.appendChild(css);\n"
+        "    var leafletJs = document.createElement('script');\n"
+        "    leafletJs.src = '/assets/vendor/leaflet/leaflet.js';\n"
+        "    leafletJs.onload = function () {\n"
+        "      var mapJs = document.createElement('script');\n"
+        "      mapJs.src = '/assets/js/sold-homes-map.js';\n"
+        "      document.body.appendChild(mapJs);\n"
+        "    };\n"
+        "    document.body.appendChild(leafletJs);\n"
+        "  }\n"
+        "  document.addEventListener('DOMContentLoaded', function () {\n"
+        "    var el = document.getElementById('sold-homes-map');\n"
+        "    if (!el) return;\n"
+        "    if (!('IntersectionObserver' in window)) { loadMap(); return; }\n"
+        "    var io = new IntersectionObserver(function (entries) {\n"
+        "      entries.forEach(function (entry) {\n"
+        "        if (entry.isIntersecting) { io.disconnect(); loadMap(); }\n"
+        "      });\n"
+        "    }, { rootMargin: '600px 0px' });\n"
+        "    io.observe(el);\n"
+        "  });\n"
+        "})();\n"
+        "</script>"
+    )
+
+
+def build_sold_homes_map():
+    body = f"""
+<section class="hero" style="padding:100px 0 60px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Track Record, On A Map</span>
+    <h1>Sold Homes Map</h1>
+    <p class="lede">Every pin below is a real home {esc(SITE['agent'])} has represented —
+    click one to watch the actual video tour she filmed for that property. Real homes,
+    real results, mapped across Northern Colorado.</p>
+  </div>
+</section>
+<section>
+  <div class="wrap">
+    <div id="sold-homes-map"></div>
+    <p id="sold-homes-map-status" class="sold-homes-map-status"></p>
+    <p class="lede" style="margin-top:24px">Want to see the full library, not just what's
+    mapped? Visit the <a href="/past-sales.html" style="text-decoration:underline">Past Sales</a>
+    page, or browse every tour on the
+    <a href="/listing-video-portfolio.html" style="text-decoration:underline">Listing Video Portfolio</a>.</p>
+  </div>
+</section>
+"""
+    breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Sold Homes Map", None)])
+    extra = _sold_homes_map_lazy_loader()
+    page(
+        "Sold Homes Map | Signature Property Collection",
+        f"An interactive map of homes {SITE['agent']} has sold across Northern Colorado, "
+        "each pin linking to its real video tour.",
+        "/sold-homes-map.html", None, body, extra, schema_extra=[breadcrumbs],
+    )
+
+
 def build_neighborhood_quiz():
     cities_json = json.dumps(QUIZ_CITIES)
     questions_json = json.dumps(QUIZ_QUESTIONS)
@@ -4677,6 +4760,9 @@ def build_nav_pages():
       {visible_sold_cards}
     </div>
     {more_sold_tours_block}
+    <div class="btn-row" style="margin-top:32px">
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/sold-homes-map.html">See Them On A Map &rarr;</a>
+    </div>
   </div>
 </section>""" if SOLD_HOME_VIDEOS else ""
 
@@ -5330,7 +5416,7 @@ def build_redirects_and_meta():
               "/lifestyle-search.html", "/listing-video-portfolio.html",
               "/past-sales.html", "/mortgage-calculator.html",
               "/search-homes.html", "/current-listings.html",
-              "/neighborhood-quiz.html"]
+              "/neighborhood-quiz.html", "/sold-homes-map.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
     # discover and index them; everything else is unaffected.
@@ -5433,6 +5519,7 @@ def build_llms_txt(paths):
         "- [Past Sales](/past-sales.html)",
         "- [Lifestyle Home Search](/lifestyle-search.html)",
         "- [Neighborhood Quiz — Find Your Northern Colorado Match](/neighborhood-quiz.html)",
+        f"- [Sold Homes Map — {SITE['agent']}'s Track Record, Mapped](/sold-homes-map.html)",
         "- [Listing Video Portfolio](/listing-video-portfolio.html)",
         "- [Expired Listings](/expired-listings.html)",
         "- [Blog RSS Feed](/feed.xml)",
@@ -5534,6 +5621,7 @@ if __name__ == "__main__":
     build_blog()
     build_rss_feed()
     build_neighborhood_quiz()
+    build_sold_homes_map()
     build_nav_pages()
     build_search_homes()
     build_current_listings()

@@ -26,12 +26,20 @@
   // Only the three IRES-covered counties (priority=True in build.py) get
   // live MLS results; the rest fall back to the county guide page link only
   // since a live search there would just return zero matches.
+  // 2026-08-13 (audit fix): kept out of sync with build.py's COUNTIES for a
+  // while -- that list grew from a handful of well-known towns to every
+  // incorporated city/town per county (Christine's request), but this
+  // hand-duplicated copy wasn't updated to match, so the map's "quick
+  // search" popup was still only offering the old short list. Re-synced.
   var COUNTY_CITIES = {
-    'Larimer': ['Fort Collins', 'Loveland', 'Berthoud', 'Masonville', 'Windsor',
-      'Timnath', 'Wellington', 'Red Feather Lakes'],
-    'Weld': ['Greeley', 'Windsor', 'Severance', 'Eaton', 'Ault', 'Johnstown',
-      'Milliken', 'Firestone', 'Frederick', 'Dacono', 'Fort Lupton', 'Mead', 'Erie'],
-    'Boulder': ['Boulder', 'Lafayette', 'Louisville', 'Nederland']
+    'Larimer': ['Fort Collins', 'Loveland', 'Estes Park', 'Berthoud', 'Masonville',
+      'Windsor', 'Timnath', 'Wellington', 'Laporte', 'Red Feather Lakes'],
+    'Weld': ['Greeley', 'Windsor', 'Evans', 'Severance', 'Eaton', 'Ault',
+      'Johnstown', 'Milliken', 'Firestone', 'Frederick', 'Dacono', 'Fort Lupton',
+      'Mead', 'Erie', 'Platteville', 'Kersey', 'LaSalle', 'Gilcrest', 'Hudson',
+      'Keenesburg', 'Lochbuie', 'Nunn', 'Pierce', 'Garden City', 'Grover', 'New Raymer'],
+    'Boulder': ['Boulder', 'Longmont', 'Lafayette', 'Louisville', 'Superior',
+      'Nederland', 'Lyons', 'Jamestown', 'Ward']
   };
   var IRES_COUNTIES = { 'Larimer': true, 'Weld': true, 'Boulder': true };
 

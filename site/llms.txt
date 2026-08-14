@@ -147,6 +147,7 @@
 - [Past Sales](/past-sales.html)
 - [Lifestyle Home Search](/lifestyle-search.html)
 - [Neighborhood Quiz — Find Your Northern Colorado Match](/neighborhood-quiz.html)
+- [Sold Homes Map — Christine Gwinnup's Track Record, Mapped](/sold-homes-map.html)
 - [Listing Video Portfolio](/listing-video-portfolio.html)
 - [Expired Listings](/expired-listings.html)
 - [Blog RSS Feed](/feed.xml)

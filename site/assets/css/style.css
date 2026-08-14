@@ -293,6 +293,15 @@ h2.section-title {
 @media (max-width: 980px) { #county-map { min-height: 520px; } }
 .leaflet-container { background: var(--charcoal) !important; font-family: var(--font-sans); }
 
+/* Sold Homes Map (2026-08-13, Christine's request) — separate from
+   #county-map above but same visual language (dark base, brand rose pins). */
+#sold-homes-map { width: 100%; min-height: 560px; border-radius: 4px; background: var(--charcoal); }
+@media (max-width: 700px) { #sold-homes-map { min-height: 420px; } }
+.sold-homes-map-status {
+  display: none; text-align: center; padding: 20px; color: #6a6a6c;
+  font-size: 14px; background: var(--off-white, #F9F9EC); border-radius: 4px; margin-top: 12px;
+}
+
 /* County name labels shown directly on the map (not just on hover) */
 .county-label {
   color: var(--white);
