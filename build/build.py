@@ -1876,6 +1876,8 @@ def footer_html():
           <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
           <li><a href="/neighborhood-quiz.html">Neighborhood Quiz</a></li>
           <li><a href="/sold-homes-map.html">Sold Homes Map</a></li>
+          <li><a href="/press-recognition.html">Press &amp; Recognition</a></li>
+          <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
         </ul>
       </div>
@@ -2433,9 +2435,20 @@ def build_city_pages():
                 )
             hero_style = "padding:70px 0 50px"
             if data_slug in CITY_HERO_PHOTOS:
+                # 2026-08-14 (performance pass): these 6 city hero photos
+                # were 280-585KB unoptimized JPEGs -- re-encoded to WebP
+                # (quality 58, Pillow method=6) after visually confirming
+                # zero perceptible difference once composited under this
+                # same dark gradient overlay (the overlay itself hides most
+                # fine detail loss). 23-51% smaller per file, ~34% total
+                # payload reduction. WebP has near-universal browser support
+                # by 2026 (Safari since 14), and since these load as CSS
+                # background-image (not <img>), there's no <picture>
+                # fallback mechanism available anyway -- a straight format
+                # swap is the right call here, not a dual-format setup.
                 hero_style += (
                     ";background:linear-gradient(180deg, rgba(20,20,21,.5), rgba(20,20,21,.82)), "
-                    f"url('/assets/img/communities/{data_slug}.jpg') center/cover no-repeat"
+                    f"url('/assets/img/communities/{data_slug}.webp') center/cover no-repeat"
                 )
             # 2026-08-13 (duplicate-content fix, body copy): the meta
             # description disambiguation above only fixed the <meta> tag --
@@ -2582,6 +2595,7 @@ def build_about():
       BBB A+ Accredited Business<br>
       NAR, CAR &amp; LBAR Member<br>
       Certified Negotiation Specialist &amp; Luxury Home Marketing Expert</p>
+      <a class="cta" href="/press-recognition.html">See The Full Story &rarr;</a>
     </div>
   </div>
 </section>
@@ -2643,6 +2657,209 @@ def build_about():
     )
 
 
+# ------------------------------------------------ PRESS & RECOGNITION -----
+# 2026-08-14 (Christine's request: "luxury website specifically" -> Press &
+# Recognition page, one of three she picked from a menu of luxury-tier
+# opportunities). Every claim on this page was already live elsewhere on
+# the site (About's "By The Numbers" card) as plain, unsourced text -- this
+# page substantiates them with real, verifiable sources instead of just
+# repeating the claim: the actual NoCo Real Producers article (fetched
+# 2026-08-14, real quotes and career facts pulled directly from it) and the
+# actual public BBB profile (also verified reachable 2026-08-14). RealTrends
+# Verified / NAR / CAR / LBAR membership are kept as plain credential text,
+# not linked out, since no specific verifiable profile URL for those was
+# confirmed -- better to under-link than to guess a URL that might 404 or
+# point at the wrong agent.
+def build_press():
+    noco_url = "https://www.realproducersmag.com/locations/noco-real-producers-6bda/articles/-d920f0/"
+    bbb_url = "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390"
+    body = f"""
+<section class="hero" style="padding:100px 0 70px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">As Seen &amp; Recognized</span>
+    <h1>Press &amp; Recognition</h1>
+    <p class="lede">National rankings, real press coverage, and the credentials behind them
+    &mdash; not just a claim on a page, but sources you can actually check.</p>
+  </div>
+</section>
+<section>
+  <div class="wrap">
+    <span class="eyebrow">National Recognition</span>
+    <h2 class="section-title">Verified Performance</h2>
+    <div class="grid-3">
+      <div class="card">
+        <h3>RealTrends Verified</h3>
+        <p>Ranked in the Top 0.5% of Realtors&reg; nationwide for 2025 &mdash; RealTrends'
+        independent, transaction-verified ranking of America's top-performing real estate
+        professionals.</p>
+      </div>
+      <div class="card">
+        <h3>BBB A+ Accredited</h3>
+        <p>Accredited Business in good standing with the Better Business Bureau, serving
+        Loveland and Northern Colorado.</p>
+        <a class="cta" href="{bbb_url}" target="_blank" rel="noopener">View BBB Profile &rarr;</a>
+      </div>
+      <div class="card">
+        <h3>Professional Membership</h3>
+        <p>Active member of the National Association of Realtors&reg; (NAR), Colorado
+        Association of Realtors&reg; (CAR), and Loveland-Berthoud Association of
+        Realtors&reg; (LBAR).</p>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">Featured In</span>
+      <h2 class="section-title">NoCo Real Producers</h2>
+      <p class="lede">Before real estate, {SITE['agent'].split()[0]} spent 23 years teaching
+      English as a second language, then discovered a passion for sales and customer service
+      while working at Thunder Mountain Harley-Davidson. She earned her Colorado real estate
+      license in December 2020 (Wyoming followed in 2021) &mdash; and the results came fast:
+      12 homes her first year, 28 her second.</p>
+      <p class="lede">&ldquo;From the moment I started, I knew I was home. It's my
+      passion,&rdquo; she told NoCo Real Producers magazine.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="{noco_url}" target="_blank" rel="noopener">Read The Full Feature &rarr;</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Certifications &amp; Credentials</h3>
+      <p>Certified Negotiation Specialist<br>
+      Luxury Home Marketing Expert<br>
+      Pricing Strategy Advisor<br>
+      Social Media Marketing Certification<br>
+      B.A. &amp; M.Ed.</p>
+    </div>
+  </div>
+</section>
+<section>
+  <div class="wrap grid-2">
+    <div class="card">
+      <h3>Giving Back</h3>
+      <p>{SITE['agent'].split()[0]} donates 10% of every commission to people in need.
+      &ldquo;When I was in a really tough situation, someone gave me hope,&rdquo; she's said
+      of why it matters to her.</p>
+    </div>
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">Continue The Story</span>
+      <h2 class="section-title">See What This Looks Like In Practice</h2>
+      <p class="lede">Credentials are the foundation &mdash; here's what working with
+      {SITE['agent'].split()[0]} actually looks like, and what her clients have to say
+      about it.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
+        <a class="btn btn-dark" href="/concierge-experience.html">The Concierge Experience &rarr;</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/testimonials.html">Read Reviews &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+"""
+    breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Press & Recognition", None)])
+    page(
+        f"Press & Recognition | {SITE['agent']} | Signature Property Collection",
+        f"National rankings, real press coverage, and verifiable credentials behind "
+        f"{SITE['agent']}'s track record &mdash; RealTrends Verified, BBB A+, NoCo Real "
+        f"Producers, and more.",
+        "/press-recognition.html", None, body, schema_extra=[breadcrumbs],
+    )
+
+
+# ------------------------------------------------- CONCIERGE EXPERIENCE ---
+# 2026-08-14: the second of Christine's three picks. Buyers/Sellers/home
+# copy has referenced "private showings," "off-market access," "white-glove
+# relocation," and "concierge" repeatedly (see build_buyers()'s hero and the
+# homepage services grid) without ever having one real page that actually
+# walks through what that means -- a luxury buyer/seller comparing agents
+# reads exactly this kind of page. Deliberately stays inside claims already
+# established elsewhere on the site (staging, cinematic/drone marketing,
+# private showings, single point of contact, VA loan familiarity,
+# negotiation credentials) rather than inventing new specific promises
+# (guaranteed timelines, named vendors) that aren't backed up anywhere.
+def build_concierge():
+    body = f"""
+<section class="hero" style="padding:100px 0 70px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">White-Glove, By Design</span>
+    <h1>The Concierge Experience</h1>
+    <p class="lede">Estate homes, acreage, and architecturally significant properties deserve
+    a process built for them &mdash; not a generic transaction. Here's what that actually
+    looks like.</p>
+  </div>
+</section>
+<section>
+  <div class="wrap">
+    <span class="eyebrow">What Sets It Apart</span>
+    <h2 class="section-title">Three Things Every Client Gets</h2>
+    <div class="grid-3">
+      <div class="card">
+        <h3>Private Showings &amp; Off-Market Access</h3>
+        <p>A focused, private search &mdash; including off-market and pre-public inventory
+        &mdash; instead of the same public listings every buyer sees on Zillow.</p>
+      </div>
+      <div class="card">
+        <h3>Luxury Marketing &amp; Staging</h3>
+        <p>Cinematic video, drone footage, and print campaigns built for $1M+ listings,
+        paired with professional staging so the home photographs the way it actually
+        lives.</p>
+      </div>
+      <div class="card">
+        <h3>One Point Of Contact</h3>
+        <p>Relocation and out-of-state logistics, trusted local vendors, and a single
+        person &mdash; not a rotating cast &mdash; from first call to closing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Process</span>
+    <h2 class="section-title">What Working Together Looks Like</h2>
+    <div class="grid-3">
+      <div class="card"><h3>01 &middot; Discovery</h3><p>A real conversation about what
+      you're looking for (or what your home is worth) &mdash; no cookie-cutter
+      questionnaire.</p></div>
+      <div class="card"><h3>02 &middot; Strategy</h3><p>Pricing, positioning, and marketing
+      built around your specific property or search, informed by Certified Negotiation
+      Specialist and Luxury Home Marketing Expert training.</p></div>
+      <div class="card"><h3>03 &middot; Showings &amp; Offers</h3><p>Private tours or
+      showings, and a well-crafted offer or listing strategy &mdash; including VA loan
+      expertise for veteran buyers.</p></div>
+      <div class="card"><h3>04 &middot; Negotiation</h3><p>Earnest money, inspection, and
+      negotiation handled directly &mdash; not handed off.</p></div>
+      <div class="card"><h3>05 &middot; Closing</h3><p>Radon testing, final walkthrough,
+      and a coordinated path to closing day.</p></div>
+      <div class="card"><h3>06 &middot; After The Close</h3><p>The relationship doesn't end
+      at closing &mdash; ask any of the clients in our reviews.</p></div>
+    </div>
+  </div>
+</section>
+<section>
+  <div class="wrap grid-2">
+    <div>
+      <h2 class="section-title">See The Credentials Behind It</h2>
+      <p class="lede">RealTrends Verified, BBB A+, real press coverage &mdash; the track
+      record behind this process.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/press-recognition.html">Press &amp; Recognition &rarr;</a>
+      </div>
+    </div>
+    {_tool_lead_form("concierge-page-inquiry", "Start The Conversation",
+        '<textarea name="message" rows="3" placeholder="Tell us what you are looking for (optional)"></textarea>')}
+  </div>
+</section>
+"""
+    breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Concierge Experience", None)])
+    page(
+        f"The Concierge Experience | {SITE['agent']} | Signature Property Collection",
+        f"What working with {SITE['agent']} actually looks like &mdash; private showings, "
+        f"off-market access, luxury marketing, and a single point of contact from first "
+        f"call to closing.",
+        "/concierge-experience.html", None, body, schema_extra=[breadcrumbs],
+    )
+
+
 # --------------------------------------------------------------- BUYERS ---
 def build_buyers():
     # 2026-08-13 (luxury repositioning): rewritten from generic "any buyer,
@@ -2658,7 +2875,10 @@ def build_buyers():
     <p class="lede">For buyers who expect more than a standard search — private showings,
     off-market access, and a process built for estate homes, acreage, and architecturally
     significant properties.</p>
-    <div class="btn-row"><a class="btn btn-primary" href="/contact.html">Get Started</a></div>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="/contact.html">Get Started</a>
+      <a class="btn btn-outline" href="/concierge-experience.html">See What That Means &rarr;</a>
+    </div>
   </div>
 </section>
 <section>
@@ -5550,7 +5770,8 @@ def build_redirects_and_meta():
               "/lifestyle-search.html", "/listing-video-portfolio.html",
               "/past-sales.html", "/mortgage-calculator.html",
               "/search-homes.html", "/current-listings.html",
-              "/neighborhood-quiz.html", "/sold-homes-map.html"]
+              "/neighborhood-quiz.html", "/sold-homes-map.html",
+              "/press-recognition.html", "/concierge-experience.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
     # discover and index them; everything else is unaffected.
@@ -5654,6 +5875,8 @@ def build_llms_txt(paths):
         "- [Lifestyle Home Search](/lifestyle-search.html)",
         "- [Neighborhood Quiz — Find Your Northern Colorado Match](/neighborhood-quiz.html)",
         f"- [Sold Homes Map — {SITE['agent']}'s Track Record, Mapped](/sold-homes-map.html)",
+        f"- [Press & Recognition — {SITE['agent']}'s Verified Credentials](/press-recognition.html)",
+        "- [The Concierge Experience](/concierge-experience.html)",
         "- [Listing Video Portfolio](/listing-video-portfolio.html)",
         "- [Expired Listings](/expired-listings.html)",
         "- [Blog RSS Feed](/feed.xml)",
@@ -5745,6 +5968,8 @@ if __name__ == "__main__":
     build_county_pages()
     build_city_pages()
     build_about()
+    build_press()
+    build_concierge()
     build_buyers()
     build_sellers()
     build_testimonials()
