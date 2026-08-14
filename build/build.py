@@ -1627,19 +1627,27 @@ def nav_html(active=None):
 
 # 2026-08-14 (site-wide "classier + flow better from page to page" pass,
 # Christine's request): a persistent credibility thread carried on every
-# single page via page() below -- real numbers (99 five-star Google
-# reviews, 200+ homes sold, $200M+ volume, RealTrends Top 0.5%), not stock
-# trust badges. See _real_estate_agent_schema() above for the same 99/5.0
-# numbers surfaced to search engines via aggregateRating.
+# single page via page() below -- real numbers, not stock trust badges.
+# See _real_estate_agent_schema() above for Christine's own individually-
+# verified 99/5.0 review numbers surfaced to search engines via
+# aggregateRating (deliberately NOT the same as the 158 figure below --
+# see that schema function's comment for why).
 #
 # 2026-08-14 (later same day, per Christine): the reviews stat now links
 # straight out to her real Google Business Profile review page
 # (g.page/r/... -- the permanent public share link she pulled from Google
 # Business Profile's own "Share profile" flow, not a session-tied search
-# URL) instead of the internal /testimonials.html page, so "99 Five-Star
-# Google Reviews" takes visitors to the actual Google reviews, not just a
-# page about them. Opens in a new tab (external site) so visitors don't
-# lose their place on the site.
+# URL) instead of the internal /testimonials.html page, so the reviews
+# stat takes visitors to the actual Google reviews, not just a page about
+# them. Opens in a new tab (external site) so visitors don't lose their
+# place on the site.
+#
+# 2026-08-14 (later still, per Christine's official "Signature Listing
+# Strategy" brochure): reviews/homes/volume updated from Christine's solo
+# figures to her and Kendra Bajcar's combined-team numbers (158 reviews,
+# 250+ homes, $200M+ volume) -- Christine confirmed $200M+ is their real
+# joint total, not a solo figure (an earlier pass here had briefly used
+# the brochure's more conservative $100M+ before she corrected it).
 def _trust_ribbon_html():
     return f"""<div class="trust-ribbon">
   <div class="wrap">
@@ -1647,7 +1655,7 @@ def _trust_ribbon_html():
     <span class="divider">&middot;</span>
     <span class="item">250+ Homes Sold</span>
     <span class="divider">&middot;</span>
-    <span class="item">$100M+ In Sales Volume</span>
+    <span class="item">$200M+ In Sales Volume</span>
     <span class="divider">&middot;</span>
     <span class="item">RealTrends Top 0.5% Nationwide</span>
   </div>
@@ -2086,7 +2094,7 @@ def build_home():
 <section class="tight">
   <div class="wrap">
     <span class="eyebrow">{SITE['agent']}</span>
-    <h2 class="section-title">With 250+ homes sold and $100M+ in combined sales volume</h2>
+    <h2 class="section-title">With 250+ homes sold and $200M+ in combined sales volume</h2>
     <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, {SITE['agent']} and
     Signature Property Collection represent Northern Colorado's luxury tier exclusively — the
     estate homes, acreage, and architecturally distinct properties that a generalist local search
@@ -2494,7 +2502,7 @@ def build_city_pages():
       <span class="eyebrow" style="color:var(--dusty-rose)">Meet {esc(SITE['agent'])}</span>
       <h2 class="section-title">Your {esc(city)} Luxury Real Estate Agent</h2>
       <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 250+
-      homes sold and $100M+ in combined sales volume across Northern Colorado's luxury tier. A
+      homes sold and $200M+ in combined sales volume across Northern Colorado's luxury tier. A
       Certified Negotiation Specialist and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
       represents estate homes, acreage, and architecturally significant properties in and
       around {esc(city)}.</p>
@@ -2708,7 +2716,7 @@ def build_about():
     <div class="card">
       <h3>By The Numbers</h3>
       <p>&#9733;&#9733;&#9733;&#9733;&#9733; 158 Five-Star Reviews on Google<br>
-      250+ Homes Sold &amp; $100M+ in Combined Sales Volume<br>
+      250+ Homes Sold &amp; $200M+ in Combined Sales Volume<br>
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
@@ -6140,7 +6148,7 @@ def build_llms_txt(paths):
 
 > {SITE['agent']} is a luxury real estate agent with {SITE['brokerage']}, serving
 > Northern Colorado's Larimer, Weld, and Boulder County Front Range — with priority
-> focus on Loveland, Berthoud, Masonville, and Fort Collins. 250+ homes sold, $100M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
+> focus on Loveland, Berthoud, Masonville, and Fort Collins. 250+ homes sold, $200M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
 > Phone: {SITE['phone']}. Email: {SITE['email']}.
 > Last updated: {BUILD_DATE}.
 
@@ -6174,7 +6182,7 @@ def build_llms_txt(paths):
 {tool_lines}
 
 ## Why choose Signature Property Collection
-- 250+ homes sold and $100M+ in combined sales volume across Northern Colorado
+- 250+ homes sold and $200M+ in combined sales volume across Northern Colorado
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
 - Certified Negotiation Specialist and Luxury Home Marketing Expert
 - Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
