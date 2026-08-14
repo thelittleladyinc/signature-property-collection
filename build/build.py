@@ -1512,12 +1512,80 @@ def esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+# 2026-08-14 (site-wide "classier" pass): single source of truth for
+# rendering a testimonial, used by build_home(), build_testimonials(), and
+# the per-city "agent proof" block in build_city_pages() -- previously each
+# of those three spots hand-built its own `<div class="testimonial">...`
+# markup independently, the same drift risk that bit the COUNTY_CITIES/
+# COUNTIES mismatch earlier. Adds a real 5-star row (these are honestly
+# 5-star reviews -- 99 of them on Google, per Christine) above the quote.
+def _testimonial_card(t, who):
+    return (
+        '<div class="testimonial"><div class="stars" aria-label="5 out of 5 stars">'
+        '&#9733;&#9733;&#9733;&#9733;&#9733;</div>'
+        f'<p>&ldquo;{esc(t)}&rdquo;</p><div class="who">{esc(who)}</div></div>'
+    )
+
+
 def nav_html(active=None):
     items = []
     for label, href in NAV:
         cls = ' class="active"' if label == active else ""
         items.append(f'<a href="{href}"{cls}>{label}</a>')
     return "\n      ".join(items)
+
+
+# 2026-08-14 (site-wide "classier + flow better from page to page" pass,
+# Christine's request): a persistent credibility thread carried on every
+# single page via page() below -- real numbers (99 five-star Google
+# reviews, 200+ homes sold, $200M+ volume, RealTrends Top 0.5%), not stock
+# trust badges. The reviews stat links to /testimonials.html so the ribbon
+# doubles as a standing invitation deeper into the site from literally
+# anywhere, which is the actual "flow between pages" ask, not just a visual
+# add-on. See _real_estate_agent_schema() above for the same 99/5.0 numbers
+# surfaced to search engines via aggregateRating.
+def _trust_ribbon_html():
+    return f"""<div class="trust-ribbon">
+  <div class="wrap">
+    <a class="item" href="/testimonials.html"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>99 Five-Star Google Reviews</a>
+    <span class="divider">&middot;</span>
+    <span class="item">200+ Homes Sold</span>
+    <span class="divider">&middot;</span>
+    <span class="item">$200M+ In Sales Volume</span>
+    <span class="divider">&middot;</span>
+    <span class="item">RealTrends Top 0.5% Nationwide</span>
+  </div>
+</div>"""
+
+
+# 2026-08-14: companion to _trust_ribbon_html() -- the actual entrance
+# animation. See the .reveal/.is-visible rules in style.css for why this is
+# JS-applied-only (the .reveal class is never in the server-rendered HTML,
+# so a visitor with JS off or a failed script load just sees every section
+# normally, no FOUC/hidden-content risk). Excludes the page's own hero
+# (.hero / .county-hero, always the first section) since that's above the
+# fold and should render immediately, never wait on a scroll trigger.
+def _scroll_reveal_script():
+    return """<script>
+(function () {
+  if (!('IntersectionObserver' in window)) return;
+  var targets = [];
+  document.querySelectorAll('section').forEach(function (el) {
+    if (el.classList.contains('hero') || el.classList.contains('county-hero')) return;
+    el.classList.add('reveal');
+    targets.push(el);
+  });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: .1, rootMargin: '0px 0px -80px 0px' });
+  targets.forEach(function (el) { io.observe(el); });
+})();
+</script>"""
 
 
 def _real_estate_agent_schema():
@@ -1539,6 +1607,19 @@ def _real_estate_agent_schema():
         "areaServed": [{"@type": "AdministrativeArea", "name": n} for n in area_served],
         "sameAs": [u for u in SITE["social"].values() if u and u != "#"],
         "dateModified": BUILD_DATE,
+        # 2026-08-14: Christine confirmed directly (99 Google reviews, all
+        # 5-star) -- real, current numbers for her actual Google Business
+        # Profile, not an estimate. Schema.org's aggregateRating is exactly
+        # what this data is for, and it's what lets Google/AI answer
+        # engines surface her star rating directly in search results
+        # instead of a visitor having to click through to find it. Update
+        # reviewCount here if/when she reports a new total.
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5.0",
+            "bestRating": "5",
+            "reviewCount": "99",
+        },
     }
     if SITE.get("address"):
         a = SITE["address"]
@@ -1822,9 +1903,11 @@ def page(title, description, path, active, body, extra_head="", schema_extra="")
     html = f"""{head(title, description, path, canonical_extra=extra_head, schema_extra=schema_extra)}
 <body>
 {header_html(active)}
+{_trust_ribbon_html()}
 {body}
 {footer_html()}
 {_qr_share_modal(path)}
+{_scroll_reveal_script()}
 </body>
 </html>"""
     out_path = os.path.join(OUT, path.lstrip("/"))
@@ -1841,8 +1924,7 @@ def build_home():
         for c in COUNTIES
     )
     testimonial_cards = "\n      ".join(
-        f'<div class="testimonial"><p>&ldquo;{esc(t)}&rdquo;</p><div class="who">{esc(who)}</div></div>'
-        for t, who in TESTIMONIALS[:3]
+        _testimonial_card(t, who) for t, who in TESTIMONIALS[:3]
     )
     # 2026-08-13 (luxury repositioning): rewritten to lead unambiguously with
     # luxury-only positioning rather than broad "we help everyone" copy — per
@@ -1913,9 +1995,14 @@ def build_home():
 
 <section>
   <div class="wrap">
+    <span class="eyebrow">99 Five-Star Google Reviews</span>
     <h2 class="section-title">Success Stories</h2>
     <div class="grid-3">
       {testimonial_cards}
+    </div>
+    <div class="btn-row" style="margin-top:48px">
+      <a class="btn btn-dark" href="/testimonials.html">Read All The Reviews</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/sold-homes-map.html">See The Homes We've Sold</a>
     </div>
   </div>
 </section>
@@ -2298,10 +2385,7 @@ def build_city_pages():
         <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/about.html">More About {esc(SITE['agent'].split()[0])} &rarr;</a>
       </div>
     </div>
-    <div class="testimonial">
-      <p>&ldquo;{esc(proof_quote)}&rdquo;</p>
-      <div class="who">{esc(proof_who)}</div>
-    </div>
+    {_testimonial_card(proof_quote, proof_who)}
   </div>
 </section>"""
 
@@ -2491,7 +2575,8 @@ def build_about():
     </div>
     <div class="card">
       <h3>By The Numbers</h3>
-      <p>200+ Homes Sold &amp; $200M+ in Sales Volume<br>
+      <p>&#9733;&#9733;&#9733;&#9733;&#9733; 99 Five-Star Reviews on Google<br>
+      200+ Homes Sold &amp; $200M+ in Sales Volume<br>
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
@@ -2513,6 +2598,39 @@ def build_about():
     </div>
     <div>
       {_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", _fmt_views(521))}
+    </div>
+  </div>
+</section>
+"""
+    # 2026-08-14 (site-wide "flow better from page to page" pass): About
+    # previously ended right after the YouTube tour with only an external
+    # link out to YouTube -- a reader who's just been sold on Christine had
+    # nowhere to go next on the site itself. Closes with three concrete next
+    # steps instead of a dead end, continuing the same story the trust
+    # ribbon opens on every page.
+    body += f"""
+<section>
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Continue The Story</span>
+    <h2 class="section-title">See It For Yourself</h2>
+    <div class="grid-3">
+      <div class="card">
+        <h3>Read The Reviews</h3>
+        <p>99 five-star Google reviews, in her clients' own words &mdash; buyers, sellers,
+        and fellow agents alike.</p>
+        <a class="cta" href="/testimonials.html">Read Testimonials &rarr;</a>
+      </div>
+      <div class="card">
+        <h3>See The Track Record</h3>
+        <p>Every sold home mapped, each pin linking to the real video tour {SITE['agent']}
+        filmed for that property.</p>
+        <a class="cta" href="/sold-homes-map.html">View The Sold Homes Map &rarr;</a>
+      </div>
+      <div class="card">
+        <h3>Start Your Own Story</h3>
+        <p>Buying, selling, or just exploring &mdash; let's talk about what's next for you.</p>
+        <a class="cta" href="/contact.html">Get In Touch &rarr;</a>
+      </div>
     </div>
   </div>
 </section>
@@ -2657,16 +2775,29 @@ def build_sellers():
 
 # --------------------------------------------------------- TESTIMONIALS ---
 def build_testimonials():
-    cards = "\n      ".join(
-        f'<div class="testimonial"><p>&ldquo;{esc(t)}&rdquo;</p><div class="who">{esc(who)}</div></div>'
-        for t, who in TESTIMONIALS
+    cards = "\n      ".join(_testimonial_card(t, who) for t, who in TESTIMONIALS)
+    # 2026-08-14: Christine confirmed 99 five-star reviews on her Google
+    # Business Profile -- these ten quotes are the same real reviews (just
+    # a hand-picked, published-worthy subset; see TESTIMONIALS' own sourcing
+    # note), so the hero now says so explicitly instead of the reader having
+    # to take "great reviews" on faith. Links to a Google search for her
+    # business name rather than a hardcoded Place ID/Maps URL, since that's
+    # what reliably resolves to her real Google Business panel without
+    # risking a stale or wrong link if her profile URL ever changes.
+    google_reviews_url = (
+        "https://www.google.com/search?q=" +
+        urllib.parse.quote(f"{SITE['agent']} The Little Lady Sells Homes {SITE['address']['city']} CO reviews")
     )
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">&#9733;&#9733;&#9733;&#9733;&#9733; 99 Reviews on Google &mdash; Every One 5 Stars</span>
     <h1>Testimonials</h1>
     <p class="lede">Discover what sellers, agents, and buyers have to say about working
-    with {SITE['agent']}.</p>
+    with {SITE['agent']} &mdash; a hand-picked few below, straight from real Google reviews.</p>
+    <div class="btn-row">
+      <a class="btn btn-outline" href="{google_reviews_url}" target="_blank" rel="noopener">Read All 99 On Google &rarr;</a>
+    </div>
   </div>
 </section>
 <section>
@@ -4227,7 +4358,10 @@ def build_sold_homes_map():
     <p class="lede" style="margin-top:24px">Want to see the full library, not just what's
     mapped? Visit the <a href="/past-sales.html" style="text-decoration:underline">Past Sales</a>
     page, or browse every tour on the
-    <a href="/listing-video-portfolio.html" style="text-decoration:underline">Listing Video Portfolio</a>.</p>
+    <a href="/listing-video-portfolio.html" style="text-decoration:underline">Listing Video Portfolio</a>.
+    Curious what it's actually like working with {esc(SITE['agent'].split()[0])}? Read
+    <a href="/testimonials.html" style="text-decoration:underline">what these same sellers said</a>
+    afterward.</p>
   </div>
 </section>
 """

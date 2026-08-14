@@ -96,8 +96,39 @@ nav.primary-nav a {
   letter-spacing: .08em;
   text-transform: uppercase;
   font-weight: 600;
+  text-underline-offset: 4px;
+  text-decoration-color: transparent;
+  transition: text-decoration-color .2s ease, opacity .2s ease;
 }
-nav.primary-nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
+nav.primary-nav a:hover { text-decoration: underline; text-decoration-color: currentColor; opacity: .85; }
+
+/* ---------- Trust ribbon ----------
+   2026-08-14 (site-wide "classier + fuller impact" pass, Christine's
+   request): a persistent thread of real credibility data -- her actual 99
+   five-star Google reviews, 200+ homes sold, $200M+ volume, RealTrends
+   Top 0.5% -- carried on EVERY page via page()'s template (not just the
+   homepage), so a visitor lands on any page of the site already inside the
+   same trust story rather than having to find About or Testimonials to see
+   it. Sits between the header and each page's hero; charcoal to bookend
+   the footer's charcoal and read as one continuous frame around the
+   rose-colored header/content instead of a fourth competing color. */
+.trust-ribbon { background: var(--charcoal); color: rgba(255,255,255,.92); padding: 13px 0; }
+.trust-ribbon .wrap {
+  display: flex; justify-content: center; align-items: center; flex-wrap: wrap;
+  gap: 8px 26px; text-align: center;
+}
+.trust-ribbon span.item {
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;
+}
+.trust-ribbon a.item { color: inherit; text-decoration: none; }
+.trust-ribbon a.item:hover { text-decoration: underline; text-decoration-color: var(--dusty-rose); }
+.trust-ribbon .stars { color: var(--dusty-rose); letter-spacing: 2px; margin-right: 6px; font-size: 12px; }
+.trust-ribbon .divider { opacity: .3; }
+@media (max-width: 700px) {
+  .trust-ribbon { padding: 11px 0; }
+  .trust-ribbon .wrap { gap: 6px 16px; }
+  .trust-ribbon span.item { font-size: 10px; }
+}
 
 /* 2026-08-13 (mobile-nav fix): hidden on desktop by default -- shown only
    inside the max-width:900px block below, where nav.primary-nav itself
@@ -368,6 +399,26 @@ h2.section-title {
 }
 .testimonial p { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: #3a3a3c; line-height: 1.85; font-size: 15.5px; }
 .testimonial .who { margin-top: 22px; font-weight: 600; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: #6a6a6c; }
+/* 2026-08-14: real 5-star rating marker on every testimonial card -- these
+   are genuinely 5-star reviews (99 of them on Google, per Christine), so
+   showing the stars alongside each quote makes that concrete rather than
+   just claimed once in a stat elsewhere. Sits above the opening-quote mark,
+   not competing with it. */
+.testimonial .stars { color: var(--dusty-rose); font-size: 14px; letter-spacing: 3px; margin-bottom: 4px; }
+
+/* ---------- Scroll reveal ----------
+   2026-08-14 (site-wide "flow better" pass): JS-driven-only (added below
+   via a script in every page's footer) -- the .reveal class itself is
+   applied at runtime, never baked into the server-rendered HTML, so a
+   visitor with JS disabled or a slow/failed script load simply sees every
+   section at full opacity immediately (progressive enhancement, not a
+   render-blocking gate). prefers-reduced-motion is honored for anyone with
+   that OS setting, per accessibility best practice. */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.is-visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
 
 /* ---------- Forms ---------- */
 form.lead-form { display: grid; gap: 16px; max-width: 560px; }
