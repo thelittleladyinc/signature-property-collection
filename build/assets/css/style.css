@@ -236,13 +236,14 @@ h2.section-title {
 .section-dark .eyebrow { color: var(--dusty-rose); }
 
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 52px; }
-/* 2026-08-13: uniform card height for Instagram embeds -- see the
-   _instagram_feed_section() comment in build.py for why these vary in
-   native size (landscape video vs. portrait Reel) and why cropping to a
-   fixed height beats a jagged grid. */
+/* 2026-08-14 (Christine's request: equal size regardless of photo/video) --
+   a fixed square tile, like Instagram's own profile grid, instead of a
+   fixed-height box that still let content fill unevenly. The JS watchdog
+   in _instagram_feed_section() scales+centers each rendered iframe to fill
+   this square exactly; overflow:hidden clips whatever spills past it. */
 .instagram-embed-wrap {
-  width: 100%; max-width: 400px; height: 560px; overflow: hidden;
-  border-radius: 8px; display: flex; align-items: flex-start; justify-content: center;
+  width: 100%; max-width: 360px; aspect-ratio: 1 / 1; overflow: hidden;
+  border-radius: 8px; position: relative; background: #fafafa;
 }
 .instagram-embed-wrap > .instagram-media { margin: 0 auto !important; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
@@ -594,7 +595,26 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .fs-actions { margin-top: 26px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 @media (max-width: 700px) { .fs-row { gap: 22px; } }
 
-/* ---------- Neighborhood Quiz (/neighborhood-quiz.html) ---------- */
+/* ---------- Neighborhood Quiz (now a collapsible section on
+   /sold-homes-map.html, see build_sold_homes_map()'s 2026-08-14 comment) --------- */
+.quiz-disclosure {
+  border: 1px solid var(--gray-light); border-radius: 12px; padding: 28px 32px;
+  max-width: 720px; margin: 0 auto; transition: border-color .2s ease, background .2s ease;
+}
+.quiz-disclosure[open] { background: #fbf9f7; }
+.quiz-disclosure:hover { border-color: var(--dusty-rose); }
+.quiz-disclosure summary {
+  cursor: pointer; list-style: none; display: flex; flex-direction: column; align-items: center;
+  text-align: center; position: relative;
+}
+.quiz-disclosure summary::-webkit-details-marker { display: none; }
+.quiz-disclosure summary::after {
+  content: '+'; position: absolute; top: 0; right: 0; font-size: 26px; line-height: 1;
+  color: var(--dusty-rose); font-weight: 300; transition: transform .2s ease;
+}
+.quiz-disclosure[open] summary::after { content: '\2212'; }
+.quiz-disclosure summary .lede { max-width: 560px; }
+.quiz-disclosure .quiz-widget { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--gray-light); }
 .quiz-widget { max-width: 720px; margin: 0 auto; }
 .quiz-progress { display: flex; gap: 8px; margin-bottom: 32px; }
 .quiz-progress-dot { flex: 1; height: 4px; background: var(--gray-light); border-radius: 2px; transition: background .2s ease; }

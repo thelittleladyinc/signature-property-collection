@@ -71,6 +71,9 @@ LEGACY_URL_REDIRECTS = {
     # counterpart in case it was indexed/bookmarked.
     "/blog/the-psychology-of-pricing-why-that-499000-tag-works.html":
         "/blog/psychology-of-pricing-luxury-homes-northern-colorado.html",
+    # 2026-08-14 (Christine's request): Neighborhood Quiz merged onto
+    # /sold-homes-map.html as a collapsible section instead of its own page.
+    "/neighborhood-quiz.html": "/sold-homes-map.html",
 }
 
 # Display name (as used in COUNTIES[]["cities"]) -> CITY_CONTENT data key.
@@ -200,14 +203,28 @@ COUNTIES = [
     },
     {
         "slug": "broomfield", "name": "Broomfield County",
-        "priority": False,
+        # 2026-08-14: flipped True -- Christine confirmed IRES reciprocates
+        # data with REcolorado (the Denver-metro MLS), and this is backed by
+        # real inventory in the synced feed, not just a handful of
+        # dual-listed stragglers (spot-checked live: Denver 240, Aurora 37,
+        # Golden 53, Arvada 41, Broomfield 32, Littleton 52 luxury-tier
+        # active listings, $950K+, at the time of this change). See
+        # build_search_homes()'s docstring for the full picture.
+        "priority": True,
         "cities": ["Broomfield"],
         "blurb": "Broomfield's combined city-and-county convenience, right between "
                  "Boulder and Denver.",
     },
     {
         "slug": "jefferson", "name": "Jefferson County",
-        "priority": False,
+        # 2026-08-14: flipped True -- Christine confirmed IRES reciprocates
+        # data with REcolorado (the Denver-metro MLS), and this is backed by
+        # real inventory in the synced feed, not just a handful of
+        # dual-listed stragglers (spot-checked live: Denver 240, Aurora 37,
+        # Golden 53, Arvada 41, Broomfield 32, Littleton 52 luxury-tier
+        # active listings, $950K+, at the time of this change). See
+        # build_search_homes()'s docstring for the full picture.
+        "priority": True,
         "cities": ["Golden", "Lakewood", "Arvada", "Wheat Ridge", "Evergreen",
                    "Conifer", "Morrison", "Genesee", "Edgewater", "Bow Mar",
                    "Lakeside", "Mountain View"],
@@ -216,14 +233,28 @@ COUNTIES = [
     },
     {
         "slug": "denver", "name": "Denver County",
-        "priority": False,
+        # 2026-08-14: flipped True -- Christine confirmed IRES reciprocates
+        # data with REcolorado (the Denver-metro MLS), and this is backed by
+        # real inventory in the synced feed, not just a handful of
+        # dual-listed stragglers (spot-checked live: Denver 240, Aurora 37,
+        # Golden 53, Arvada 41, Broomfield 32, Littleton 52 luxury-tier
+        # active listings, $950K+, at the time of this change). See
+        # build_search_homes()'s docstring for the full picture.
+        "priority": True,
         "cities": ["Denver"],
         "blurb": "The city and county of Denver — urban living at the center of the "
                  "Front Range.",
     },
     {
         "slug": "arapahoe", "name": "Arapahoe County",
-        "priority": False,
+        # 2026-08-14: flipped True -- Christine confirmed IRES reciprocates
+        # data with REcolorado (the Denver-metro MLS), and this is backed by
+        # real inventory in the synced feed, not just a handful of
+        # dual-listed stragglers (spot-checked live: Denver 240, Aurora 37,
+        # Golden 53, Arvada 41, Broomfield 32, Littleton 52 luxury-tier
+        # active listings, $950K+, at the time of this change). See
+        # build_search_homes()'s docstring for the full picture.
+        "priority": True,
         "cities": ["Aurora", "Centennial", "Littleton", "Englewood",
                    "Greenwood Village", "Cherry Hills Village", "Glendale", "Sheridan"],
         "blurb": "Arapahoe County's established suburbs — Aurora, Centennial, and "
@@ -231,7 +262,14 @@ COUNTIES = [
     },
     {
         "slug": "adams", "name": "Adams County",
-        "priority": False,
+        # 2026-08-14: flipped True -- Christine confirmed IRES reciprocates
+        # data with REcolorado (the Denver-metro MLS), and this is backed by
+        # real inventory in the synced feed, not just a handful of
+        # dual-listed stragglers (spot-checked live: Denver 240, Aurora 37,
+        # Golden 53, Arvada 41, Broomfield 32, Littleton 52 luxury-tier
+        # active listings, $950K+, at the time of this change). See
+        # build_search_homes()'s docstring for the full picture.
+        "priority": True,
         "cities": ["Thornton", "Northglenn", "Brighton", "Commerce City",
                    "Federal Heights", "Westminster", "Bennett"],
         "blurb": "Adams County's growing communities north and east of Denver — "
@@ -1460,6 +1498,32 @@ def _instagram_feed_section():
   var snapshots = {{}};
   wraps.forEach(function (w) {{ snapshots[w.getAttribute('data-ig-fallback-idx')] = w.innerHTML; }});
 
+  // 2026-08-14 (Christine's request: "equal size whether photo or video"):
+  // Instagram's embed.js sizes each iframe to that post's real native
+  // aspect ratio (a landscape video comes back short/wide, a portrait Reel
+  // tall/narrow) -- the old fixed-height-with-overflow-hidden wrapper kept
+  // the outer box the same size, but the visible content inside still
+  // filled wildly different amounts of that box, so the grid still read as
+  // uneven. This crops+scales every rendered iframe to fill an identical
+  // square tile -- like Instagram's own profile grid -- by reading the
+  // iframe's real rendered size, scaling it up so its SHORTER side exactly
+  // fills the square, and centering it (overflow:hidden on the wrapper
+  // clips the overflow on the longer side). Same technique used for
+  // cropped video thumbnails in any masonry-to-grid layout.
+  function normalizeSize(w) {{
+    var frame = w.querySelector('iframe');
+    if (!frame) return;
+    var nativeW = frame.offsetWidth, nativeH = frame.offsetHeight;
+    if (!nativeW || !nativeH) return;
+    var target = w.offsetWidth || 360;
+    var scale = target / Math.min(nativeW, nativeH);
+    frame.style.position = 'absolute';
+    frame.style.top = '50%';
+    frame.style.left = '50%';
+    frame.style.transformOrigin = 'center center';
+    frame.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }}
+
   function watchdog() {{
     // Give embed.js time to fetch + render each post, then check whether
     // anything actually painted. A successful embed replaces the
@@ -1472,6 +1536,8 @@ def _instagram_feed_section():
         var rendered = frame && frame.offsetHeight > 60;
         if (!rendered && snapshots[idx]) {{
           w.innerHTML = snapshots[idx];
+        }} else if (rendered) {{
+          normalizeSize(w);
         }}
       }});
     }}, 4000);
@@ -1888,8 +1954,7 @@ def footer_html():
           <li><a href="/past-sales.html">Past Sales</a></li>
           <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
           <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
-          <li><a href="/neighborhood-quiz.html">Neighborhood Quiz</a></li>
-          <li><a href="/sold-homes-map.html">Sold Homes Map</a></li>
+          <li><a href="/sold-homes-map.html">Sold Homes Map &amp; Neighborhood Quiz</a></li>
           <li><a href="/press-recognition.html">Press &amp; Recognition</a></li>
           <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
@@ -2405,14 +2470,15 @@ def build_city_pages():
   </div>
 </section>"""
 
-            # Priority (IRES-covered) cities get the full interactive live
-            # search embedded right on the page — price slider + beds/baths
-            # pills — instead of just a link out to search-homes.html, per
-            # Christine's request 2026-08-12 ("the search be on the town
-            # page... a slider and more fancy ways that are easy to use").
-            # Non-priority cities (outside Larimer/Weld/Boulder, which is all
-            # IRES actually covers) keep the old "reach out" copy since a
-            # live search there would just always come back empty.
+            # Priority cities get the full interactive live search embedded
+            # right on the page — price slider + beds/baths pills — instead
+            # of just a link out to search-homes.html, per Christine's
+            # request 2026-08-12 ("the search be on the town page... a
+            # slider and more fancy ways that are easy to use"). As of
+            # 2026-08-14 all 8 counties are priority=True (IRES reciprocates
+            # with REcolorado — see the COUNTIES list comment), so every
+            # city page gets this widget now; the else branch below is kept
+            # as a safe fallback in case a county ever gets flipped back.
             search_widget_block = ""
             if c["priority"]:
                 mls_blurb = (
@@ -4595,6 +4661,15 @@ def _sold_homes_map_lazy_loader():
 
 
 def build_sold_homes_map():
+    # 2026-08-14 (Christine's request): the Neighborhood Quiz now lives on
+    # this same page, in a collapsible <details> section below the map, so
+    # visitors who don't want the quiz never have to see it expanded --
+    # native <details>/<summary> gives free, accessible expand/collapse
+    # with no custom JS needed for the toggle itself (the quiz's own
+    # interactive logic below is unrelated to open/closed state -- its
+    # elements exist in the DOM either way, just visually hidden while
+    # collapsed, exactly like the rest of this page's lazy-loaded map).
+    quiz_block = _neighborhood_quiz_block()
     body = f"""
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
@@ -4618,18 +4693,43 @@ def build_sold_homes_map():
     afterward.</p>
   </div>
 </section>
+<section class="tight">
+  <div class="wrap">
+    <details class="quiz-disclosure" id="neighborhood-quiz-disclosure">
+      <summary>
+        <span class="eyebrow" style="color:var(--dusty-rose)">Not Sure Where To Look?</span>
+        <h2 class="section-title" style="margin:6px 0 0">Take The 60-Second Neighborhood Quiz &rsaquo;</h2>
+        <p class="lede" style="margin-top:10px">Four quick questions, one real answer — matched
+        against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients every day.
+        Click to expand.</p>
+      </summary>
+      {quiz_block}
+    </details>
+  </div>
+</section>
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Sold Homes Map", None)])
     extra = _sold_homes_map_lazy_loader()
     page(
-        "Sold Homes Map | Signature Property Collection",
+        "Sold Homes Map & Neighborhood Quiz | Signature Property Collection",
         f"An interactive map of homes {SITE['agent']} has sold across Northern Colorado, "
-        "each pin linking to its real video tour.",
+        "each pin linking to its real video tour — plus a free 4-question quiz to find "
+        "which Northern Colorado neighborhood matches your lifestyle, commute, and budget.",
         "/sold-homes-map.html", None, body, extra, schema_extra=[breadcrumbs],
     )
 
 
-def build_neighborhood_quiz():
+def _neighborhood_quiz_block():
+    """The interactive quiz widget's markup + script, WITHOUT its own hero
+    or page() wrapper -- 2026-08-14 (Christine's request): merged onto
+    /sold-homes-map.html as a collapsible <details> section ("the quiz on
+    the same page as the map, that can compress if they don't want to do
+    the quiz") instead of living on its own /neighborhood-quiz.html page.
+    Old URL 301-redirects to /sold-homes-map.html (see LEGACY_URL_REDIRECTS)
+    in case it's bookmarked or indexed anywhere. Extracted verbatim from the
+    former build_neighborhood_quiz() -- same questions, scoring, and lead
+    form (still tagged "neighborhood-quiz" as its Lofty source so existing
+    lead-routing rules keep working unchanged)."""
     cities_json = json.dumps(QUIZ_CITIES)
     questions_json = json.dumps(QUIZ_QUESTIONS)
     budget_params_json = json.dumps(_QUIZ_BUDGET_PARAMS)
@@ -4640,16 +4740,7 @@ def build_neighborhood_quiz():
             '      <input type="hidden" name="quiz_answers" id="quiz-answers-field">'
         ),
     )
-    body = f"""
-<section class="hero" style="padding:90px 0 50px">
-  <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Find Your Fit</span>
-    <h1>Which Northern Colorado Neighborhood Matches You?</h1>
-    <p class="lede">Four quick questions, one real answer — matched against {len(QUIZ_CITIES)}
-    real towns {esc(SITE['agent'])} shows clients every day, not a generic quiz template.</p>
-  </div>
-</section>
-<section class="tight">
+    return f"""
   <div class="wrap quiz-widget">
     <p class="sr-only" id="quiz-step-announce" role="status" aria-live="polite"></p>
     <div class="quiz-progress" id="quiz-progress" aria-hidden="true"></div>
@@ -4673,7 +4764,6 @@ def build_neighborhood_quiz():
       border:none;cursor:pointer;font:inherit;text-decoration:underline">Retake The Quiz</button>
     </div>
   </div>
-</section>
 <script>
 (function () {{
   var CITIES = {cities_json};
@@ -4825,14 +4915,6 @@ def build_neighborhood_quiz():
 }})();
 </script>
 """
-    breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Neighborhood Quiz", None)])
-    page(
-        "Neighborhood Quiz | Which Northern Colorado Town Fits You? | Signature Property Collection",
-        "Take our free 4-question quiz to find which Northern Colorado neighborhood "
-        "matches your lifestyle, commute, and budget.",
-        "/neighborhood-quiz.html", None, body,
-        schema_extra=[breadcrumbs],
-    )
 
 
 def build_nav_pages():
@@ -5304,10 +5386,12 @@ def build_search_homes():
     and IDX compliance filtering happens; this page is just the search form
     + results UI, calling that function).
 
-    IRES is the MLS for Larimer/Weld/Boulder County — the city dropdown is
-    scoped to COUNTIES marked priority=True (Larimer, Weld, Boulder) since
-    those are the counties IRES actually covers. Searching outside that area
-    would just return zero results.
+    IRES is Christine's home MLS (Larimer/Weld/Boulder), but IRES
+    reciprocates listing data with REcolorado (the Denver-metro MLS) — the
+    city dropdown is scoped to COUNTIES marked priority=True, which as of
+    2026-08-14 is all 8 counties (Christine confirmed the reciprocity
+    directly; spot-checked live against real inventory before flipping the
+    flags -- see the COUNTIES list comment above for the specific numbers).
 
     Confirmed working against Christine's real MLS Grid token on 2026-08-11
     (see notes/verify-mlsgrid-api.mjs) — OriginatingSystemName comes back as
@@ -5804,7 +5888,7 @@ def build_redirects_and_meta():
               "/lifestyle-search.html", "/listing-video-portfolio.html",
               "/past-sales.html", "/mortgage-calculator.html",
               "/search-homes.html", "/current-listings.html",
-              "/neighborhood-quiz.html", "/sold-homes-map.html",
+              "/sold-homes-map.html",
               "/press-recognition.html", "/concierge-experience.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
@@ -5907,8 +5991,7 @@ def build_llms_txt(paths):
         "- [Mortgage Calculator](/mortgage-calculator.html)",
         "- [Past Sales](/past-sales.html)",
         "- [Lifestyle Home Search](/lifestyle-search.html)",
-        "- [Neighborhood Quiz — Find Your Northern Colorado Match](/neighborhood-quiz.html)",
-        f"- [Sold Homes Map — {SITE['agent']}'s Track Record, Mapped](/sold-homes-map.html)",
+        f"- [Sold Homes Map & Neighborhood Quiz — {SITE['agent']}'s Track Record, Mapped, Plus A Personalized Town Match](/sold-homes-map.html)",
         f"- [Press & Recognition — {SITE['agent']}'s Verified Credentials](/press-recognition.html)",
         "- [The Concierge Experience](/concierge-experience.html)",
         "- [Listing Video Portfolio](/listing-video-portfolio.html)",
@@ -6013,7 +6096,6 @@ if __name__ == "__main__":
     build_subdivision_pages()
     build_blog()
     build_rss_feed()
-    build_neighborhood_quiz()
     build_sold_homes_map()
     build_nav_pages()
     build_search_homes()

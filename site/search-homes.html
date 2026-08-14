@@ -88,7 +88,7 @@
     <span class="eyebrow" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
     <h1>Search Northern Colorado Homes For Sale</h1>
     <p class="lede">Real, active listings from IRES MLS — updated live, not a stale
-    snapshot. Search all of Larimer, Weld and Boulder County
+    snapshot. Search all of Larimer, Weld, Boulder, Broomfield, Jefferson, Denver, Arapahoe and Adams County
     at once, or narrow to a single city, then dial in the exact price range, beds,
     and baths you're after.</p>
   </div>
@@ -109,27 +109,51 @@
             <option value="larimer">Larimer County</option>
             <option value="weld">Weld County</option>
             <option value="boulder">Boulder County</option>
+            <option value="broomfield">Broomfield County</option>
+            <option value="jefferson">Jefferson County</option>
+            <option value="denver">Denver County</option>
+            <option value="arapahoe">Arapahoe County</option>
+            <option value="adams">Adams County</option>
           </select>
         </div>
         <div class="fs-block" style="flex:1 1 200px;min-width:180px">
           <span class="fs-label">City</span>
           <select id="fs-city" name="city" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
             <option value="">All Cities</option>
+            <option value="Arvada">Arvada</option>
             <option value="Ault">Ault</option>
+            <option value="Aurora">Aurora</option>
+            <option value="Bennett">Bennett</option>
             <option value="Berthoud">Berthoud</option>
             <option value="Boulder">Boulder</option>
+            <option value="Bow Mar">Bow Mar</option>
+            <option value="Brighton">Brighton</option>
+            <option value="Broomfield">Broomfield</option>
+            <option value="Centennial">Centennial</option>
+            <option value="Cherry Hills Village">Cherry Hills Village</option>
+            <option value="Commerce City">Commerce City</option>
+            <option value="Conifer">Conifer</option>
             <option value="Dacono">Dacono</option>
+            <option value="Denver">Denver</option>
             <option value="Eaton">Eaton</option>
+            <option value="Edgewater">Edgewater</option>
+            <option value="Englewood">Englewood</option>
             <option value="Erie">Erie</option>
             <option value="Estes Park">Estes Park</option>
             <option value="Evans">Evans</option>
+            <option value="Evergreen">Evergreen</option>
+            <option value="Federal Heights">Federal Heights</option>
             <option value="Firestone">Firestone</option>
             <option value="Fort Collins">Fort Collins</option>
             <option value="Fort Lupton">Fort Lupton</option>
             <option value="Frederick">Frederick</option>
             <option value="Garden City">Garden City</option>
+            <option value="Genesee">Genesee</option>
             <option value="Gilcrest">Gilcrest</option>
+            <option value="Glendale">Glendale</option>
+            <option value="Golden">Golden</option>
             <option value="Greeley">Greeley</option>
+            <option value="Greenwood Village">Greenwood Village</option>
             <option value="Grover">Grover</option>
             <option value="Hudson">Hudson</option>
             <option value="Jamestown">Jamestown</option>
@@ -138,7 +162,10 @@
             <option value="Kersey">Kersey</option>
             <option value="LaSalle">LaSalle</option>
             <option value="Lafayette">Lafayette</option>
+            <option value="Lakeside">Lakeside</option>
+            <option value="Lakewood">Lakewood</option>
             <option value="Laporte">Laporte</option>
+            <option value="Littleton">Littleton</option>
             <option value="Lochbuie">Lochbuie</option>
             <option value="Longmont">Longmont</option>
             <option value="Louisville">Louisville</option>
@@ -147,17 +174,24 @@
             <option value="Masonville">Masonville</option>
             <option value="Mead">Mead</option>
             <option value="Milliken">Milliken</option>
+            <option value="Morrison">Morrison</option>
+            <option value="Mountain View">Mountain View</option>
             <option value="Nederland">Nederland</option>
             <option value="New Raymer">New Raymer</option>
+            <option value="Northglenn">Northglenn</option>
             <option value="Nunn">Nunn</option>
             <option value="Pierce">Pierce</option>
             <option value="Platteville">Platteville</option>
             <option value="Red Feather Lakes">Red Feather Lakes</option>
             <option value="Severance">Severance</option>
+            <option value="Sheridan">Sheridan</option>
             <option value="Superior">Superior</option>
+            <option value="Thornton">Thornton</option>
             <option value="Timnath">Timnath</option>
             <option value="Ward">Ward</option>
             <option value="Wellington">Wellington</option>
+            <option value="Westminster">Westminster</option>
+            <option value="Wheat Ridge">Wheat Ridge</option>
             <option value="Windsor">Windsor</option>
           </select>
         </div>
@@ -267,7 +301,7 @@
   var fixedCity = null;
   var supportDeepLinks = true;
   var alwaysNoFloor = true;
-  var countyCityMap = {"larimer": ["Fort Collins", "Loveland", "Estes Park", "Berthoud", "Masonville", "Windsor", "Timnath", "Wellington", "Laporte", "Red Feather Lakes"], "weld": ["Greeley", "Windsor", "Evans", "Severance", "Eaton", "Ault", "Johnstown", "Milliken", "Firestone", "Frederick", "Dacono", "Fort Lupton", "Mead", "Erie", "Platteville", "Kersey", "LaSalle", "Gilcrest", "Hudson", "Keenesburg", "Lochbuie", "Nunn", "Pierce", "Garden City", "Grover", "New Raymer"], "boulder": ["Boulder", "Longmont", "Lafayette", "Louisville", "Superior", "Nederland", "Lyons", "Jamestown", "Ward"]};
+  var countyCityMap = {"larimer": ["Fort Collins", "Loveland", "Estes Park", "Berthoud", "Masonville", "Windsor", "Timnath", "Wellington", "Laporte", "Red Feather Lakes"], "weld": ["Greeley", "Windsor", "Evans", "Severance", "Eaton", "Ault", "Johnstown", "Milliken", "Firestone", "Frederick", "Dacono", "Fort Lupton", "Mead", "Erie", "Platteville", "Kersey", "LaSalle", "Gilcrest", "Hudson", "Keenesburg", "Lochbuie", "Nunn", "Pierce", "Garden City", "Grover", "New Raymer"], "boulder": ["Boulder", "Longmont", "Lafayette", "Louisville", "Superior", "Nederland", "Lyons", "Jamestown", "Ward"], "broomfield": ["Broomfield"], "jefferson": ["Golden", "Lakewood", "Arvada", "Wheat Ridge", "Evergreen", "Conifer", "Morrison", "Genesee", "Edgewater", "Bow Mar", "Lakeside", "Mountain View"], "denver": ["Denver"], "arapahoe": ["Aurora", "Centennial", "Littleton", "Englewood", "Greenwood Village", "Cherry Hills Village", "Glendale", "Sheridan"], "adams": ["Thornton", "Northglenn", "Brighton", "Commerce City", "Federal Heights", "Westminster", "Bennett"]};
   var form = document.getElementById(wid + '-form');
   var resultsEl = document.getElementById(wid + '-results');
   var statusEl = document.getElementById(wid + '-status');
@@ -754,8 +788,7 @@
           <li><a href="/past-sales.html">Past Sales</a></li>
           <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
           <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
-          <li><a href="/neighborhood-quiz.html">Neighborhood Quiz</a></li>
-          <li><a href="/sold-homes-map.html">Sold Homes Map</a></li>
+          <li><a href="/sold-homes-map.html">Sold Homes Map &amp; Neighborhood Quiz</a></li>
           <li><a href="/press-recognition.html">Press &amp; Recognition</a></li>
           <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>

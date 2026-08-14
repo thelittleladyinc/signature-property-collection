@@ -244,6 +244,32 @@
   var snapshots = {};
   wraps.forEach(function (w) { snapshots[w.getAttribute('data-ig-fallback-idx')] = w.innerHTML; });
 
+  // 2026-08-14 (Christine's request: "equal size whether photo or video"):
+  // Instagram's embed.js sizes each iframe to that post's real native
+  // aspect ratio (a landscape video comes back short/wide, a portrait Reel
+  // tall/narrow) -- the old fixed-height-with-overflow-hidden wrapper kept
+  // the outer box the same size, but the visible content inside still
+  // filled wildly different amounts of that box, so the grid still read as
+  // uneven. This crops+scales every rendered iframe to fill an identical
+  // square tile -- like Instagram's own profile grid -- by reading the
+  // iframe's real rendered size, scaling it up so its SHORTER side exactly
+  // fills the square, and centering it (overflow:hidden on the wrapper
+  // clips the overflow on the longer side). Same technique used for
+  // cropped video thumbnails in any masonry-to-grid layout.
+  function normalizeSize(w) {
+    var frame = w.querySelector('iframe');
+    if (!frame) return;
+    var nativeW = frame.offsetWidth, nativeH = frame.offsetHeight;
+    if (!nativeW || !nativeH) return;
+    var target = w.offsetWidth || 360;
+    var scale = target / Math.min(nativeW, nativeH);
+    frame.style.position = 'absolute';
+    frame.style.top = '50%';
+    frame.style.left = '50%';
+    frame.style.transformOrigin = 'center center';
+    frame.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+
   function watchdog() {
     // Give embed.js time to fetch + render each post, then check whether
     // anything actually painted. A successful embed replaces the
@@ -256,6 +282,8 @@
         var rendered = frame && frame.offsetHeight > 60;
         if (!rendered && snapshots[idx]) {
           w.innerHTML = snapshots[idx];
+        } else if (rendered) {
+          normalizeSize(w);
         }
       });
     }, 4000);
@@ -327,8 +355,7 @@
           <li><a href="/past-sales.html">Past Sales</a></li>
           <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
           <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
-          <li><a href="/neighborhood-quiz.html">Neighborhood Quiz</a></li>
-          <li><a href="/sold-homes-map.html">Sold Homes Map</a></li>
+          <li><a href="/sold-homes-map.html">Sold Homes Map &amp; Neighborhood Quiz</a></li>
           <li><a href="/press-recognition.html">Press &amp; Recognition</a></li>
           <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
