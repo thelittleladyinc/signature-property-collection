@@ -5200,16 +5200,164 @@ def build_nav_pages():
     )
 
     # ---- Expired Listings ----
+    # 2026-08-14 (full rebuild, per Christine): this page used to be just a
+    # hero with no real body content. Rebuilt using the framework and copy
+    # from Christine's "When A Luxury Home Deserves A Second Strategy"
+    # advisory brochure (Christine + Kendra, Signature Property Collection),
+    # which is specifically written for this exact situation -- a luxury
+    # listing that didn't sell the first time. Two things deliberately left
+    # out per Christine's explicit instruction elsewhere this session: no
+    # "Bold Collective" sub-branding, and no second phone number (Kendra's)
+    # -- this page keeps one call to action, Christine's own contact info,
+    # same as the rest of the site. Photography is cropped from screenshots
+    # Christine sent of that same brochure (clean, text-free photo pages --
+    # mountain/farmhouse/interior shots) -- lower resolution than the site's
+    # other photography since they're screen captures, so sized as a modest
+    # supporting strip rather than full-bleed hero art.
+    signals = [
+        "Strong online interest, weak showings",
+        "Showings without second visits",
+        "High traffic, zero offers",
+        "Price reductions without conversion",
+        "Agent previews without follow-up",
+        "Extended days on market",
+    ]
+    signals_html = "\n      ".join(
+        f'<div class="card" style="padding:32px 28px"><span style="color:var(--dusty-rose);'
+        f'font-family:var(--font-serif);font-size:15px">{i+1:02d}</span><p style="margin:10px 0 0;'
+        f'color:#3a3a3c;font-size:15.5px;line-height:1.6">{esc(s)}</p></div>'
+        for i, s in enumerate(signals)
+    )
+    diagnostic_points = [
+        "Competitive tier", "Absorption rate", "Psychological price thresholds",
+        "Showing-to-offer ratio", "Objection themes", "Exposure gaps", "Risk positioning",
+    ]
+    diagnostic_html = "".join(f"<li>{esc(p)}</li>" for p in diagnostic_points)
+    relaunch_points = [
+        "A short pre-market positioning window",
+        "Professional staging and presentation review",
+        "Cinematic media standards",
+        "Strategic price-band recalibration",
+        "Private agent preview sequence",
+        "Expanded digital and YouTube distribution",
+        "Structured buyer pathway control",
+    ]
+    relaunch_html = "".join(f"<li>{esc(p)}</li>" for p in relaunch_points)
+    photo_strip = "".join(
+        f'<img src="/assets/img/expired/{f}.jpg" alt="{esc(a)}" loading="lazy" '
+        f'style="width:100%;height:220px;object-fit:cover;border-radius:2px">'
+        for f, a in [
+            ("farmhouse_exterior", "Northern Colorado luxury home exterior"),
+            ("living_room", "Staged luxury living room"),
+            ("kitchen_island", "Modern luxury kitchen"),
+            ("dining_living_combo", "Open-concept dining and living space"),
+            ("dining_table", "Styled luxury dining room"),
+            ("kitchen_bar", "Custom kitchen bar detail"),
+        ]
+    )
     body = f"""
-<section class="hero" style="padding:110px 0 80px">
+<section class="hero" style="padding:110px 0 80px;background-image:linear-gradient(rgba(20,20,21,.55),rgba(20,20,21,.55)),url('/assets/img/expired/pine_mountain_hero.jpg');background-size:cover;background-position:center">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Expired Luxury Listings, Sold</span>
-    <h1>When A Luxury Listing Expires,<br>It's Not The Market — It's The Marketing</h1>
-    <p class="lede">{SITE['name']} runs a relisting program for a limited number of Northern
-    Colorado homes each year. If your property and goals are the right fit, the strategy is
-    rebuilt from the ground up to reach the buyers who are actually in the market for a home
-    like yours.</p>
+    <span class="eyebrow" style="color:var(--dusty-rose)">A Private Advisory</span>
+    <h1 style="color:var(--white)">When A Luxury Listing Expires,<br>It's Not The Market — It's The Marketing</h1>
+    <p class="lede" style="color:rgba(255,255,255,.85)">{SITE['name']} runs a relisting program for
+    a limited number of Northern Colorado homes each year. If your property and goals are the right
+    fit, the strategy is rebuilt from the ground up — positioning, pricing, and distribution — to
+    reach the buyers who are actually in the market for a home like yours.</p>
     <div class="btn-row"><a class="btn btn-primary" href="/contact.html">Request A Consultation</a></div>
+  </div>
+</section>
+<section class="section-dark tight">
+  <div class="wrap" style="max-width:760px">
+    <span class="eyebrow">A More Useful Way To Look At It</span>
+    <h2 class="section-title">An Unsold Listing Is Data</h2>
+    <p class="lede">An unsold listing is not failure. It is feedback. The market responded —
+    before recommending a relaunch, we first diagnose what the market was actually signaling.
+    The response can be measured. Ambition leaves signals; signals reveal where leverage was
+    softened.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">What We Watch</span>
+    <h2 class="section-title">The Signals We Watch</h2>
+    <div class="grid-3" style="margin-top:36px">
+      {signals_html}
+    </div>
+    <p class="lede" style="margin-top:32px;font-style:italic">These signals are not random.
+    They are readable — and every one points toward a specific, fixable cause.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <div class="grid-3" style="margin-top:0">
+      {photo_strip}
+    </div>
+  </div>
+</section>
+<section class="section-dark tight">
+  <div class="wrap">
+    <span class="eyebrow">Before We Recommend Anything</span>
+    <h2 class="section-title">The Signature Diagnostic</h2>
+    <p class="lede">This is not a listing presentation. It is a strategic diagnostic. Before
+    recommending a relaunch, we evaluate:</p>
+    <ul style="columns:2;gap:40px;max-width:640px;margin:28px 0;padding-left:20px;line-height:2.1;color:rgba(255,255,255,.85)">
+      {diagnostic_html}
+    </ul>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap grid-3">
+    <div class="card">
+      <h3>Positioning Precedes Price</h3>
+      <p>Positioning determines who notices, who tours, who hesitates, and who acts. When
+      positioning is precise, price aligns. When positioning is unclear, price becomes
+      resistance.</p>
+    </div>
+    <div class="card">
+      <h3>Pricing Is Architecture</h3>
+      <p>Price communicates structure. We evaluate competitive inventory, buyer search
+      thresholds, appraisal exposure, inspection risk, and net proceeds. The objective is
+      leverage, not visibility alone.</p>
+    </div>
+    <div class="card">
+      <h3>Strategic Distribution</h3>
+      <p>Luxury buyers rarely discover properties by accident. They appear where a property is
+      intentionally placed — cinematic property films, YouTube audience targeting, relocation
+      networks, agent-to-agent introductions, and luxury publication placement.</p>
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap" style="max-width:720px">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Recalibration, Not Repetition</span>
+    <h2 class="section-title">What Changes In A Strategic Relaunch</h2>
+    <p class="lede">A relaunch is not repetition. It is recalibration. Depending on the property,
+    this may include:</p>
+    <ul style="columns:2;gap:40px;margin:28px 0;padding-left:20px;line-height:2.1;color:#3a3a3c">
+      {relaunch_html}
+    </ul>
+    <p class="lede">Each element serves a single objective: restoring leverage before re-entry.</p>
+  </div>
+</section>
+<section class="section-dark tight">
+  <div class="wrap" style="max-width:720px">
+    <h2 class="section-title">Negotiation Protects Value</h2>
+    <p class="lede">Luxury negotiations are disciplined. We evaluate buyer financial strength,
+    probability of closing, contingency structure, timeline control, and privacy. In luxury, the
+    strongest offer is the one that closes cleanly while protecting your leverage and position.</p>
+  </div>
+</section>
+{_trust_ribbon_html()}
+<section class="tight">
+  <div class="wrap" style="max-width:640px;text-align:center">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Invitation</span>
+    <h2 class="section-title">Discipline Over Drama</h2>
+    <p class="lede">Most listings don't fail loudly. They fade quietly over time. A relaunch
+    isn't louder marketing — it's disciplined recalibration, restored before the market sees it
+    again. If a private, confidential second opinion on your property would be valuable, we're
+    available. No pressure — just clarity.</p>
+    <div class="btn-row" style="justify-content:center"><a class="btn btn-primary" href="/contact.html">Request A Confidential Second Opinion</a></div>
   </div>
 </section>
 """
