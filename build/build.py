@@ -57,6 +57,13 @@ BLOG = _load_json("blog.json")  # 60 posts migrated from the live site's blog
 LEGACY_URL_REDIRECTS = {
     "/expiredlisting/": "/expired-listings.html",
     "/expiredlisting": "/expired-listings.html",
+    # 2026-08-14: these two blog posts were removed (not just unpublished)
+    # per Christine's "take out anything ... not luxury" direction -- both
+    # were generic first-time-buyer/rent-vs-buy content that had nothing to
+    # do with the luxury tier. Redirecting rather than letting the old
+    # published URLs 404, in case either is indexed or bookmarked anywhere.
+    "/blog/rent-buy-home.html": "/blog/index.html",
+    "/blog/things-shouldnt-buying-home.html": "/blog/index.html",
 }
 
 # Display name (as used in COUNTIES[]["cities"]) -> CITY_CONTENT data key.
@@ -3226,70 +3233,90 @@ def build_guides():
 
 # ------------------------------------------------------- MARKET TOPICS ----
 # Original content (not scraped from anywhere) targeting real, demonstrated
-# Northern Colorado buyer search demand — surfaced by reviewing real Search
-# Console data for thelittleladysellshomes.com via the market-takeover-template
-# repo: /rent-to-own, /multi-generational-homes-for-sale..., and
-# /whats-the-real-cost-to-develop-raw-land-in-colorado were all getting real
-# impressions with room to convert better. These are genuinely-written,
-# appropriately-hedged articles, not fabricated stats.
+# Northern Colorado search demand — surfaced by reviewing real Search Console
+# data for thelittleladysellshomes.com via the market-takeover-template repo
+# (multi-generational homes, cost to develop raw land) plus, as of
+# 2026-08-14, real current-market reporting for the luxury-seller piece
+# below (the original rent-to-own entry was removed here -- it contradicted
+# the site's luxury-exclusive positioning per Christine's direction).
+# These are genuinely-written, appropriately-hedged articles, not
+# fabricated stats.
 MARKET_TOPIC_PAGES = [
     {
-        "slug": "rent-to-own-homes-northern-colorado",
-        "title": "Rent-To-Own Homes in Northern Colorado: How It Actually Works",
-        "meta": "What rent-to-own really means for buyers in Loveland, Fort Collins, "
-                "and Greeley — how the agreements work, the risks, and the questions "
-                "to ask before signing one.",
-        "intro": "\"Rent-to-own\" gets searched a lot by buyers who aren't quite ready "
-                  "for a traditional mortgage — but the term covers a few very "
-                  "different kinds of agreements, and the details matter enormously. "
-                  "Here's what it actually means before you consider one in Loveland, "
-                  "Fort Collins, Greeley, or anywhere else in Northern Colorado.",
+        # 2026-08-14 (Christine's request: "take out anything that is rent
+        # to own or not luxury and fill it with better optimized noco
+        # seller searches current" -- replaced the old rent-to-own guide,
+        # which contradicted the site's luxury-exclusive positioning, with
+        # this piece). Built from real, current reporting rather than
+        # invented figures: the Fort Collins/Loveland/Greeley numbers and
+        # seller-timing guidance below are pulled from North Forty News's
+        # mid-2026 Northern Colorado market guide and The Levi Group's 2026
+        # "best time to sell" analysis (both fetched and fact-checked
+        # 2026-08-14), reframed for what they mean at the luxury end of the
+        # market specifically -- not just repeated verbatim.
+        "slug": "selling-a-luxury-home-northern-colorado-2026",
+        "title": "Selling A Luxury Home In Northern Colorado: What The 2026 Market Actually Rewards",
+        "meta": "The Northern Colorado market has shifted in 2026 — here's what that "
+                "actually means for pricing and marketing a luxury home in Fort Collins, "
+                "Loveland, or Greeley right now.",
+        "intro": "\"List it and wait\" doesn't work anymore — in every price range and "
+                  "every city across Northern Colorado, according to current market "
+                  "reporting. Inventory is up, days on market are up, and buyers have "
+                  "more to compare against. For a $1M+ estate, that shift matters even "
+                  "more than it does for the median home, because there are fewer truly "
+                  "comparable sales to lean on and far less room for pricing to be off.",
         "paragraphs": [
-            "What Rent-To-Own Actually Means",
-            "A rent-to-own (also called lease-option or lease-purchase) agreement lets "
-            "you rent a home for a set period with the right — or in some agreements, "
-            "the obligation — to buy it before the lease ends. Part of your monthly "
-            "rent is often credited toward a future down payment, though how much and "
-            "under what conditions varies enormously from one agreement to the next.",
-            "Lease-Option vs. Lease-Purchase",
-            "The distinction matters. A lease-option gives you the right to buy the "
-            "home at the end of the term, but you can walk away and simply forfeit "
-            "any option fee or rent credit you've paid. A lease-purchase is a binding "
-            "contract to buy — walking away can mean real legal and financial "
-            "consequences. Know which one you're signing.",
-            "Why Buyers Consider It",
-            "Rent-to-own can make sense if you need time to improve your credit, save "
-            "a larger down payment, or want to \"test drive\" a home or neighborhood "
-            "before committing. It can also help if you're relocating to Northern "
-            "Colorado and want to get familiar with an area — Loveland versus "
-            "Berthoud versus Windsor — before buying.",
-            "What To Watch For",
-            "The purchase price is often locked in at signing, which can work for or "
-            "against you depending on where the market moves. Above-market rent is "
-            "common, since part of it is meant to build your future equity. And if "
-            "the seller has a mortgage on the property, ask how that's handled — you "
-            "want assurance the home won't be foreclosed on out from under you during "
-            "your lease term.",
-            "Talk To A Local Agent And A Real Estate Attorney First",
-            "Rent-to-own agreements aren't standardized the way a typical purchase "
-            "contract is, so the fine print does a lot of the work. Before signing "
-            "anything, have a Colorado real estate attorney review the agreement, and "
-            "talk with a local agent who can tell you honestly whether a traditional "
-            "purchase — even with a smaller down payment program — might actually "
-            "serve you better.",
+            "The Market Has Genuinely Shifted",
+            "Fort Collins single-family homes are now averaging 38 days on market, up "
+            "from 32 a year ago, even as the median sale price holds around $612,000. "
+            "Loveland's inventory is up roughly 12% year-over-year, and Greeley's "
+            "Weld County closings are still climbing — up about 4.2%. None of that "
+            "means the market is soft; it means buyers, including luxury buyers, "
+            "have options again and are taking their time to use them.",
+            "Pricing Precision Matters More At The Top",
+            "Current guidance across the region is to price within 2-3% of recent "
+            "comparable sales. At the median that's a few thousand dollars of margin "
+            "for error. At $1.5M, a 2-3% miss is $30,000-$45,000 — and luxury "
+            "properties rarely have five clean comps sitting a mile away the way a "
+            "median-priced subdivision home does. Getting the number right takes real "
+            "comp analysis specific to estate homes, acreage, and architecturally "
+            "distinct properties, not a generic automated valuation.",
+            "Timing: Spring Still Wins, But It Doesn't Replace Pricing",
+            "Spring (April through June) remains the strongest window for Northern "
+            "Colorado sellers — more buyers, more competition per listing, stronger "
+            "offers. Fall is a real secondary window: fewer listings competing for "
+            "attention, and the buyers still shopping in September and October tend to "
+            "be genuinely motivated. But the core finding holds at every price point: "
+            "an accurately priced home sells in any season, while an overpriced one "
+            "sits regardless of when it lists. Timing amplifies good pricing — it "
+            "doesn't fix bad pricing.",
+            "What Actually Moves A Luxury Listing Right Now",
+            "With buyers taking more time to compare, presentation is doing more work "
+            "than it used to. That means professional staging that photographs the way "
+            "the home actually lives, cinematic video and drone coverage instead of a "
+            "standard MLS photo set, and genuine curb appeal — all things that matter "
+            "at every price point but carry outsized weight once a buyer has a dozen "
+            "estate-tier listings open in other tabs. Sellers willing to offer "
+            "reasonable concessions, like a rate buydown or closing cost credit, are "
+            "also seeing stronger results in the current rate environment.",
+            "Start With A Real Conversation, Not A Guess",
+            "Every one of these numbers changes month to month, and a luxury property's "
+            "correct price depends on specifics no blog post can capture — the lot, "
+            "the finishes, what's actually closed nearby recently. The first real step "
+            "is a conversation and a comp pull specific to your property, not a "
+            "generic online estimate.",
         ],
         "faq": [
-            ("Is rent-to-own common in Loveland or Fort Collins?",
-             "It's less common than traditional financing, but it does come up — "
-             "particularly with individual sellers rather than large institutional "
-             "programs. Availability changes with the market, so it's worth asking a "
-             "local agent what's currently out there."),
-            ("Do I lose my money if I don't buy the home?",
-             "It depends entirely on the agreement. In a lease-option, you typically "
-             "forfeit the option fee and any rent credit if you walk away. In a "
-             "lease-purchase, you may be contractually obligated to buy, so walking "
-             "away can carry real financial and legal consequences. This is exactly "
-             "why an attorney should review the contract before you sign."),
+            ("Is it still a good time to sell a luxury home in Northern Colorado?",
+             "Yes, but the market rewards precision now more than it did a year or two "
+             "ago. Well-priced, well-presented homes are still selling — including "
+             "well above the median — but overpriced listings are sitting longer than "
+             "they used to across every price range."),
+            ("How much does pricing accuracy really matter on a $1M+ home?",
+             "More than it does on a median-priced home, not less. A 2-3% pricing "
+             "miss is a much larger dollar amount at the luxury tier, and there are "
+             "typically fewer truly comparable recent sales to price against, so "
+             "accurate, property-specific comp analysis matters even more."),
         ],
     },
     {
@@ -5330,8 +5357,8 @@ def build_search_homes():
     <h1>Search Northern Colorado Homes For Sale</h1>
     <p class="lede">Real, active listings from IRES MLS — updated live, not a stale
     snapshot. Search all of {', '.join(county_names[:-1])} and {county_names[-1]} County
-    at once, or narrow to a single city, then set your own price range from starter
-    homes to multimillion-dollar estates.</p>
+    at once, or narrow to a single city, then dial in the exact price range, beds,
+    and baths you're after.</p>
   </div>
 </section>
 <section>
@@ -5923,7 +5950,7 @@ def build_llms_txt(paths):
 - 200+ homes sold and $200M+ in sales volume across Northern Colorado
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
 - Certified Negotiation Specialist and Luxury Home Marketing Expert
-- Serves first-time buyers, luxury buyers, sellers, investors, and relocation clients
+- Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
 - Deep local knowledge of Larimer, Weld, and Boulder County — especially Loveland, Berthoud, Masonville, and Fort Collins
 
 ## Frequently Asked Questions

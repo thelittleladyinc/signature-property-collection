@@ -2,3 +2,5 @@
 /status  /.netlify/functions/site-health  200
 /expiredlisting/  /expired-listings.html  301
 /expiredlisting  /expired-listings.html  301
+/blog/rent-buy-home.html  /blog/index.html  301
+/blog/things-shouldnt-buying-home.html  /blog/index.html  301
