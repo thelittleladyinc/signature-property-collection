@@ -263,6 +263,24 @@ section.tight { padding: 64px 0; }
   margin-bottom: 18px;
 }
 .eyebrow::after { content: ''; flex: 0 0 46px; height: 1px; background: rgba(184,111,122,.45); }
+/* 2026-08-14 (Christine's request): the site-wide .eyebrow script font
+   (Corinthia, a calligraphy cursive) reads beautifully for ordinary phrases
+   ("A Private Advisory", "The Signature Duo") but falls apart on jammed-
+   together all-caps acronyms like "IRES MLS" -- cursive letterforms are
+   drawn to join into flowing lowercase, not stand alone as blocky capitals,
+   so acronyms turn into an illegible tangle. Rather than changing the
+   script font site-wide (it works well everywhere else), this is a scoped
+   override for the handful of eyebrows that specifically reference the
+   MLS/IRES feed -- small-caps sans-serif with letter-spacing, the standard
+   readable "eyebrow/kicker" treatment, applied only where an acronym is
+   actually present. */
+.eyebrow-clear {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
 h2.section-title {
   font-family: var(--font-serif);
   font-weight: 400;

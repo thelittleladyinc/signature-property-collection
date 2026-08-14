@@ -163,7 +163,22 @@ const REFRESH_SWEEP_BATCH_SIZE = 5;
 // Stop starting new work (photo caching or the refresh sweep) once less
 // than this much of the time budget remains, so neither one risks pushing
 // a run past Netlify's hard limit.
-const LATE_WORK_TIME_MARGIN_MS = 4000;
+//
+// 2026-08-14 (bumped 4000 -> 6000, paired with the new 4000ms caps on the
+// MLS Grid photo download and Cloudinary upload in _cloudinary.js): real
+// Netlify logs showed 502/499s on sync-listings once photo uploads started
+// actually succeeding (see that file's 2026-08-14 comment for the full
+// story). A single photo attempt can now take up to ~8s worst case (4s
+// download + 4s upload) — requiring 6s of margin before starting one means
+// the absolute worst case (new work starts at TIME_BUDGET_MS - 6000, then
+// runs its full 8s) tops out around TIME_BUDGET_MS + 2000, comfortably
+// under the ~15s the observed 499 suggests Netlify's real limit is here.
+const LATE_WORK_TIME_MARGIN_MS = 6000;
+// 2026-08-14: every raw MLS Grid fetch() in this file used to have no
+// timeout at all — a slow (not failing) response could hang indefinitely,
+// same class of bug as the uncapped photo download/upload calls this
+// pairs with. Applied to every MLS Grid request below.
+const MLS_FETCH_TIMEOUT_MS = 5000;
 
 function statusClause() {
   return "(" + REPLICATED_STATUSES.map((s) => `StandardStatus eq '${s}'`).join(" or ") + ")";
@@ -339,6 +354,7 @@ async function refreshOneListing(listingId, listingsById, store, token, startedA
   });
   const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
   });
   if (res.status === 429) {
     await markSuspended(store, SUSPENSION_COOLDOWN_MS);
@@ -400,6 +416,7 @@ async function discoverHerOfficeMlsId(listingsById, token) {
     });
     const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null; // includes a 400 if this feed rejects the field -- fails silently, retried next run
     const json = await res.json();
@@ -437,7 +454,10 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
     while (url && pages < OFFICE_DISCOVERY_MAX_PAGES) {
       if (Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
       await throttle();
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
+      });
       if (res.status === 429) {
         await markSuspended(store, SUSPENSION_COOLDOWN_MS);
         return { suspended: true, found };
@@ -612,7 +632,10 @@ exports.handler = async () => {
 
         await throttle();
 
-        const res = await fetch(requestUrl, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(requestUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
+        });
         if (res.status === 429) {
           // Same account-wide suspension Listing-Engine's mls.js guards
           // against — open the circuit breaker so neither this run's

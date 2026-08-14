@@ -66,6 +66,19 @@ const MIN_IMAGE_SIZE_BYTES = 2048;
 // not an error page. Per MLS Grid's own docs, the User-Agent header MUST be
 // the literal access token — that's the real credential the media server
 // checks (see the 2026-08-13 file-header note above).
+// 2026-08-14 (real 502/499s found in Netlify's Logs explorer): this was
+// AbortSignal.timeout(10000) — a single photo download was allowed to run
+// LONGER than sync-listings.js's entire TIME_BUDGET_MS (8000ms) for the
+// whole invocation. That's backwards: the loop's own budget checks only run
+// BETWEEN operations (JS has no way to interrupt an in-flight await), so one
+// slow-but-not-failing MLS Grid response could single-handedly blow the
+// function's total duration past whatever Netlify's real platform limit is
+// for this (non-background) scheduled function — which is exactly what real
+// logs showed once the CLOUDINARY_API_KEY/SECRET fix made uploads actually
+// start succeeding instead of failing near-instantly on bad credentials:
+// durations of 11565ms (502, function crashed) and 14965ms (499, platform
+// gave up waiting) on recent invocations. Tightened to well under the
+// budget so one photo can never eat the whole run by itself.
 async function fetchMlsPhotoBuffer(mediaUrl, token) {
   const res = await fetch(mediaUrl, {
     headers: {
@@ -73,7 +86,7 @@ async function fetchMlsPhotoBuffer(mediaUrl, token) {
       "User-Agent": token,
       Accept: "image/*,*/*;q=0.8",
     },
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(4000),
   });
   if (!res.ok) {
     const err = new Error(`HTTP ${res.status} fetching MLS Grid photo`);
@@ -107,6 +120,12 @@ async function cachePhotoToCloudinary(mediaUrl, token, publicId) {
     // matters more here since these are live, publicly-linked listing
     // photos, not an internal admin tool.
     flags: "strip_profile",
+    // 2026-08-14: the Cloudinary Node SDK had NO timeout on this call at
+    // all before — an upload could hang far past sync-listings.js's whole
+    // time budget with nothing to stop it. Same fix as the download above:
+    // bound every individual network operation well under the function's
+    // total budget so one slow call can't take the whole run down with it.
+    timeout: 4000,
   });
   if (!result.secure_url) return null;
   // 2026-08-13 (speed): MLS Grid's original photos are often several

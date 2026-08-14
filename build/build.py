@@ -2593,7 +2593,7 @@ def build_city_pages():
                 county_cities_qs = urllib.parse.quote(",".join(c["cities"]))
                 search_widget_block = f"""<section class="tight">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
     <h2 class="section-title">Search Homes In {esc(city)}</h2>
     <p class="lede">Every active {esc(city)} listing from IRES MLS, any price range —
     updated every 15 minutes, not a stale snapshot. Filter by price, beds, and baths
@@ -4403,7 +4403,7 @@ def build_subdivision_pages():
 </section>
 <section class="tight">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Live, Active IRES MLS Listings</span>
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live, Active IRES MLS Listings</span>
     <h2 class="section-title">{esc(sub['feed_heading'])}</h2>
     {feed_html}
   </div>
@@ -5797,7 +5797,7 @@ def build_search_homes():
     body = f"""
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
     <h1>Search Northern Colorado Homes For Sale</h1>
     <p class="lede">Real, active listings from IRES MLS — updated live, not a stale
     snapshot. Search all of {', '.join(county_names[:-1])} and {county_names[-1]} County
