@@ -288,6 +288,10 @@ TESTIMONIALS = [
      "John Zamora"),
     ("I couldn't be happier with the outcome and highly recommend Christine to anyone "
      "looking for a knowledgeable and supportive agent.", "Rhonda Beach"),
+    ("Kendra is passionate about selling your home. She has amazing marketing skills and "
+     "was a professional while dealing with an underhanded buying agent and sold our home "
+     "in a tough market. I'm convinced there is no better agent than Kendra.",
+     "Rhonda Beach"),
     ("She's one of the best agents on the planet.", "Andrew Vose"),
     ("Christine has done such a wonderful job for us and our home. She is great at "
      "keeping in constant contact with you about what's going on with your home and "
@@ -315,8 +319,14 @@ TESTIMONIALS = [
      "marketing strategies were key in getting so much attention. Highly recommend!",
      "Cassidi G"),
 ]
-# Christine confirmed (Aug 2026) she and Kendra Bajcar work as a duo, so the three
-# reviews naming Kendra as co-agent are accurate and included above.
+# Christine confirmed (Aug 2026) she and Kendra Bajcar work as a duo, so the four
+# reviews naming Kendra as co-agent are accurate and included above. The second
+# Rhonda Beach quote (2026-08-14, sourced from Christine's official "Signature
+# Listing Strategy" marketing brochure) is a distinct, genuine review focused
+# specifically on Kendra -- not a duplicate of her earlier, shorter quote above
+# it, which predates Kendra's review. Google Business Profiles are per-agent,
+# so the same client leaving separate reviews on Christine's and Kendra's
+# individual profiles is expected, not an error.
 
 # Real videos from Christine's own YouTube channel ("The Little Lady Sells Homes",
 # youtube.com/@thelittleladysellshomes — 1,980 subs, 158K+ views, 223 videos as of
@@ -1633,11 +1643,11 @@ def nav_html(active=None):
 def _trust_ribbon_html():
     return f"""<div class="trust-ribbon">
   <div class="wrap">
-    <a class="item" href="https://g.page/r/CZbs8kiTCII_EBM/review" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>99 Five-Star Google Reviews</a>
+    <a class="item" href="https://g.page/r/CZbs8kiTCII_EBM/review" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>158 Five-Star Google Reviews</a>
     <span class="divider">&middot;</span>
-    <span class="item">200+ Homes Sold</span>
+    <span class="item">250+ Homes Sold</span>
     <span class="divider">&middot;</span>
-    <span class="item">$200M+ In Sales Volume</span>
+    <span class="item">$100M+ In Sales Volume</span>
     <span class="divider">&middot;</span>
     <span class="item">RealTrends Top 0.5% Nationwide</span>
   </div>
@@ -2076,7 +2086,7 @@ def build_home():
 <section class="tight">
   <div class="wrap">
     <span class="eyebrow">{SITE['agent']}</span>
-    <h2 class="section-title">With 200+ homes sold and $200M+ in sales volume</h2>
+    <h2 class="section-title">With 250+ homes sold and $100M+ in combined sales volume</h2>
     <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, {SITE['agent']} and
     Signature Property Collection represent Northern Colorado's luxury tier exclusively — the
     estate homes, acreage, and architecturally distinct properties that a generalist local search
@@ -2102,7 +2112,7 @@ def build_home():
 
 <section>
   <div class="wrap">
-    <span class="eyebrow">99 Five-Star Google Reviews</span>
+    <span class="eyebrow">158 Five-Star Google Reviews</span>
     <h2 class="section-title">Success Stories</h2>
     <div class="grid-3">
       {testimonial_cards}
@@ -2483,8 +2493,8 @@ def build_city_pages():
     <div>
       <span class="eyebrow" style="color:var(--dusty-rose)">Meet {esc(SITE['agent'])}</span>
       <h2 class="section-title">Your {esc(city)} Luxury Real Estate Agent</h2>
-      <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 200+
-      homes sold and $200M+ in sales volume across Northern Colorado's luxury tier. A
+      <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 250+
+      homes sold and $100M+ in combined sales volume across Northern Colorado's luxury tier. A
       Certified Negotiation Specialist and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
       represents estate homes, acreage, and architecturally significant properties in and
       around {esc(city)}.</p>
@@ -2686,7 +2696,10 @@ def build_about():
       <p class="lede">A proud member of NAR, CAR, and LBAR, {SITE['agent'].split()[0]} holds a
       Social Media Marketing Certification, a Pricing Strategy Advisor designation, and a
       B.A. and M.Ed. Before real estate, she spent 23 years as an ESL teacher — and today
-      donates 10% of every commission to people in need.</p>
+      donates 10% of every commission to people in need. That commitment isn't just a line
+      item — after Hurricane Helene devastated communities across the Southeast, she personally
+      drove a trailer of food and supplies to families in crisis. No platform, no publicity —
+      just gratitude in motion.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:20px">
         <a class="btn btn-dark" href="/sellers.html">List Your Home</a>
         <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/contact.html">Work With Us</a>
@@ -2694,8 +2707,8 @@ def build_about():
     </div>
     <div class="card">
       <h3>By The Numbers</h3>
-      <p>&#9733;&#9733;&#9733;&#9733;&#9733; 99 Five-Star Reviews on Google<br>
-      200+ Homes Sold &amp; $200M+ in Sales Volume<br>
+      <p>&#9733;&#9733;&#9733;&#9733;&#9733; 158 Five-Star Reviews on Google<br>
+      250+ Homes Sold &amp; $100M+ in Combined Sales Volume<br>
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
@@ -2703,6 +2716,50 @@ def build_about():
       Certified Negotiation Specialist &amp; Luxury Home Marketing Expert</p>
       <a class="cta" href="/press-recognition.html">See The Full Story &rarr;</a>
     </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Signature Duo</span>
+    <h2 class="section-title">Meet The Team</h2>
+    <p class="lede">{SITE['agent']} and Kendra Bajcar met at a luxury real estate convention
+    &mdash; two agents already focused on elevated representation, each looking for a partner
+    who understood what luxury truly demands. What began as a professional connection became
+    the operating model behind every Signature Property Collection listing: a combined record
+    exceeding $100 million in sales, more than 250 homes represented, and a partnership built
+    so that no detail of a sale is left to chance.</p>
+    <img src="/assets/img/team/christine-kendra.jpg" alt="Christine Gwinnup and Kendra Bajcar, Signature Property Collection"
+    style="width:100%;border-radius:4px;margin:32px 0;box-shadow:0 10px 30px rgba(20,20,21,.10)" loading="lazy">
+    <div class="grid-2">
+      <div class="team-card">
+        <img src="/assets/img/team/christine-headshot.jpg" alt="Christine Gwinnup, REALTOR" loading="lazy">
+        <div>
+          <h3>Christine Gwinnup</h3>
+          <p>Christine leads pricing strategy, seller positioning, listing narrative, media
+          direction, and high-stakes negotiation &mdash; with specialized depth in Northern
+          Colorado's land, acreage, and rural luxury market. An active real estate investor
+          since 1992, she brings more than three decades of personal market experience to her
+          work, alongside Big Thompson River residency and direct knowledge of the properties
+          most agents only represent from a distance.</p>
+        </div>
+      </div>
+      <div class="team-card">
+        <img src="/assets/img/team/kendra-headshot.jpg" alt="Kendra Bajcar, REALTOR" loading="lazy">
+        <div>
+          <h3>Kendra Bajcar</h3>
+          <p>Kendra leads transaction strategy, contract discipline, presentation
+          coordination, buyer-behavior insight, and the detailed follow-through that protects
+          the deal from preparation through closing. An investor in her own right, she
+          understands the transaction from the principal's side as well as the agent's &mdash;
+          protecting the details that matter: timelines, terms, inspection exposure, appraisal
+          risk, showing feedback, and seller confidence.</p>
+        </div>
+      </div>
+    </div>
+    <p class="lede" style="margin-top:32px">Selling a luxury home is not just a financial
+    decision. It is a transition, a strategy, and the closing of one chapter before the next
+    one begins. Your home deserves more than exposure &mdash; it deserves precision,
+    protection, and a representation worthy of its value.</p>
   </div>
 </section>
 <section class="tight">
@@ -2736,7 +2793,7 @@ def build_about():
     <div class="grid-3">
       <div class="card">
         <h3>Read The Reviews</h3>
-        <p>99 five-star Google reviews, in her clients' own words &mdash; buyers, sellers,
+        <p>158 five-star Google reviews, in her clients' own words &mdash; buyers, sellers,
         and fellow agents alike.</p>
         <a class="cta" href="/testimonials.html">Read Testimonials &rarr;</a>
       </div>
@@ -3072,6 +3129,36 @@ def build_sellers():
   </div>
 </section>
 """
+    # 2026-08-14 (Christine's official "Signature Listing Strategy" brochure,
+    # "Selected Property Results" section): real, specific recent closings --
+    # exactly the kind of concrete proof a seller deciding whether to list
+    # wants to see, rather than another generic marketing claim.
+    results = [
+        ("3016 Glendevey Drive", "Loveland (Olde Course)", "$599,999", "February 2026",
+         "4 bed | 1,928 sq ft", "Closed in 21 days. Both sides represented — buyer sourced through our community network."),
+        ("913 Green Mountain Drive", "Erie, Colorado", "$1,200,000", "September 2025",
+         "6 bed | 6 bath | 7,096 sq ft", "Erie's top-tier luxury market — positioned, marketed, and closed."),
+        ("50842 County Road 33", "Nunn, Colorado", "$750,000", "June 2025",
+         "4 bed | 3 bath | 1,972 sq ft | working acreage with outbuilding", "Land, residence, and outbuilding — Northern Colorado rural representation, closed as one."),
+        ("9522 Yucca Way", "Arvada, Colorado", "$1,272,500", "Represented the buyers",
+         "4 bed | 4 bath | 5,666 sq ft", "Luxury buyer representation — market expertise on both sides of the transaction."),
+    ]
+    results_html = "\n      ".join(
+        f"""<div class="card"><h3>{esc(addr)}</h3><p style="color:var(--dusty-rose);font-weight:600;margin-bottom:4px">{esc(loc)}</p>
+        <p>Sold: {esc(price)} &middot; {esc(when)}<br>{esc(spec)}<br>{esc(strategy)}</p></div>"""
+        for addr, loc, price, when, spec, strategy in results
+    )
+    body += f"""
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Specific Results Matter</span>
+    <h2 class="section-title">Selected Property Results</h2>
+    <div class="grid-2" style="gap:32px">
+      {results_html}
+    </div>
+  </div>
+</section>
+"""
     # 2026-08-13: same gap as buyers.html -- the hero CTA promised a "Free
     # Home Valuation" but only linked to /contact.html, a generic form with
     # no address field and no seller-specific Lofty source label. Adding a
@@ -3106,23 +3193,25 @@ def build_testimonials():
     # Business Profile -- these ten quotes are the same real reviews (just
     # a hand-picked, published-worthy subset; see TESTIMONIALS' own sourcing
     # note), so the hero now says so explicitly instead of the reader having
-    # to take "great reviews" on faith. Links to a Google search for her
-    # business name rather than a hardcoded Place ID/Maps URL, since that's
-    # what reliably resolves to her real Google Business panel without
-    # risking a stale or wrong link if her profile URL ever changes.
-    google_reviews_url = (
-        "https://www.google.com/search?q=" +
-        urllib.parse.quote(f"{SITE['agent']} The Little Lady Sells Homes {SITE['address']['city']} CO reviews")
-    )
+    # to take "great reviews" on faith.
+    #
+    # 2026-08-14 (later same day): updated to 158 -- Christine's official
+    # marketing materials (The Signature Listing Strategy brochure) state
+    # "158 five-star Google reviews -- a perfect 5.0 across both profiles"
+    # (i.e. Christine's + Kendra's combined). Also swapped the link from a
+    # generic Google search fallback to her real Google Business Profile
+    # review link (g.page/r/... -- the permanent share link, same one now
+    # used site-wide in the trust ribbon) now that we have it.
+    google_reviews_url = "https://g.page/r/CZbs8kiTCII_EBM/review"
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">&#9733;&#9733;&#9733;&#9733;&#9733; 99 Reviews on Google &mdash; Every One 5 Stars</span>
+    <span class="eyebrow" style="color:var(--dusty-rose)">&#9733;&#9733;&#9733;&#9733;&#9733; 158 Reviews on Google &mdash; Every One 5 Stars</span>
     <h1>Testimonials</h1>
     <p class="lede">Discover what sellers, agents, and buyers have to say about working
     with {SITE['agent']} &mdash; a hand-picked few below, straight from real Google reviews.</p>
     <div class="btn-row">
-      <a class="btn btn-outline" href="{google_reviews_url}" target="_blank" rel="noopener">Read All 99 On Google &rarr;</a>
+      <a class="btn btn-outline" href="{google_reviews_url}" target="_blank" rel="noopener">Read All 158 On Google &rarr;</a>
     </div>
   </div>
 </section>
@@ -6051,7 +6140,7 @@ def build_llms_txt(paths):
 
 > {SITE['agent']} is a luxury real estate agent with {SITE['brokerage']}, serving
 > Northern Colorado's Larimer, Weld, and Boulder County Front Range — with priority
-> focus on Loveland, Berthoud, Masonville, and Fort Collins. 200+ homes sold, $200M+ in sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
+> focus on Loveland, Berthoud, Masonville, and Fort Collins. 250+ homes sold, $100M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
 > Phone: {SITE['phone']}. Email: {SITE['email']}.
 > Last updated: {BUILD_DATE}.
 
@@ -6085,7 +6174,7 @@ def build_llms_txt(paths):
 {tool_lines}
 
 ## Why choose Signature Property Collection
-- 200+ homes sold and $200M+ in sales volume across Northern Colorado
+- 250+ homes sold and $100M+ in combined sales volume across Northern Colorado
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
 - Certified Negotiation Specialist and Luxury Home Marketing Expert
 - Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
