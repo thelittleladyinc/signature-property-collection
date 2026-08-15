@@ -107,6 +107,16 @@ function toPin(spot, geo) {
   // restaurant, it's a video a few thousand people have watched.
   if (typeof spot.views === "number" && spot.views > 0) pin.views = spot.views;
   if (spot.googlePostUrl) pin.googlePostUrl = spot.googlePostUrl;
+  // 2026-08-15: a spot can be backed by a Google review INSTEAD of a video.
+  // Christine's review of one Berthoud restaurant has over 10,000 views on its
+  // own -- more than this entire map's YouTube footage combined -- so treating
+  // YouTube as the only real medium would have thrown away her best-performing
+  // local content. reviewViews is kept separate from views so the map can say
+  // which platform the number came from rather than implying they're the same.
+  if (spot.googleReviewUrl) pin.googleReviewUrl = spot.googleReviewUrl;
+  if (typeof spot.reviewViews === "number" && spot.reviewViews > 0) {
+    pin.reviewViews = spot.reviewViews;
+  }
   return pin;
 }
 

@@ -5804,12 +5804,20 @@ def write_local_spots_function_data():
     out_dir = os.path.abspath(os.path.join(HERE, "..", "netlify", "functions", "lib"))
     os.makedirs(out_dir, exist_ok=True)
     spots = LOCAL_SPOTS_DATA.get("spots", [])
-    missing_video = [s["name"] for s in spots if not s.get("videoId")]
-    if missing_video:
-        # The whole point of these pins is that they carry HER footage.
+    # 2026-08-15 (Christine: "i have also done google reviews - for instance i
+    # have over 10k views on the mexican restuarant in berthoud"). This check
+    # used to demand a videoId, which would have rejected her single
+    # best-performing piece of local content: a Google review with more views
+    # than every YouTube video on this map put together. So the rule is what it
+    # always should have been -- a pin must carry HER work, in whichever form
+    # that work exists.
+    unsourced = [s["name"] for s in spots
+                 if not s.get("videoId") and not s.get("googleReviewUrl")]
+    if unsourced:
         raise SystemExit(
-            "local_spots.json: these spots have no videoId, which defeats the "
-            "purpose of the layer: " + ", ".join(missing_video)
+            "local_spots.json: these spots have neither a videoId nor a "
+            "googleReviewUrl, so there is nothing of Christine's behind them: "
+            + ", ".join(unsourced)
         )
     payload = {
         "_generated": "Written by build/build.py from build/data/local_spots.json. "

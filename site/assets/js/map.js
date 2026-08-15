@@ -197,8 +197,9 @@
     // The view count goes in the tooltip because it is the reason to click: it
     // says a few thousand people have already watched this, which no stock
     // amenity pin on a portal map can say.
-    var label = '▶ Watch: ' + poi.name;
-    if (poi.views) label += ' (' + Number(poi.views).toLocaleString() + ' views)';
+    var label = (poi.videoId ? '▶ Watch: ' : '★ Read: ') + poi.name;
+    var count = poi.views || poi.reviewViews;
+    if (count) label += ' (' + Number(count).toLocaleString() + ' views)';
     marker.bindTooltip(label, { direction: 'top', offset: [0, -10] });
     marker.on('click', function () { openPoiModal(poi); });
   }
@@ -251,17 +252,36 @@
     // Two kinds of pin, credited honestly: the two municipal golf-course videos
     // are the City of Loveland's, everything else is Christine's own footage --
     // and saying so is the whole point of the layer.
-    var credit = poi.videoSource
-      ? ('Video: ' + poi.videoSource)
-      : 'Filmed by Christine — The Little Lady Sells Homes';
+    var credit;
+    if (poi.videoSource) {
+      credit = 'Video: ' + poi.videoSource;
+    } else if (poi.videoId) {
+      credit = 'Filmed by Christine — The Little Lady Sells Homes';
+    } else {
+      credit = 'Reviewed by Christine — The Little Lady Sells Homes';
+    }
     if (poi.views) credit += ' · ' + Number(poi.views).toLocaleString() + ' views on YouTube';
+    if (poi.reviewViews) {
+      credit += ' · ' + Number(poi.reviewViews).toLocaleString() + ' views on Google';
+    }
     overlay.querySelector('#poi-source').textContent = credit;
-    overlay.querySelector('#poi-video-wrap').innerHTML =
-      '<iframe width="100%" height="100%" style="display:block" ' +
-      'src="https://www.youtube-nocookie.com/embed/' + poi.videoId + '?rel=0" ' +
-      'title="' + String(poi.videoTitle || poi.name).replace(/"/g, '&quot;') + '" frameborder="0" ' +
-      'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ' +
-      'allowfullscreen></iframe>';
+    // 2026-08-15: a spot may be backed by a Google review rather than a video
+    // ("i have over 10k views on the mexican restuarant in berthoud"). With no
+    // videoId there is nothing to embed, so the media panel is dropped entirely
+    // instead of rendering a black box with a broken player in it.
+    var wrap = overlay.querySelector('#poi-video-wrap');
+    if (poi.videoId) {
+      wrap.style.display = '';
+      wrap.innerHTML =
+        '<iframe width="100%" height="100%" style="display:block" ' +
+        'src="https://www.youtube-nocookie.com/embed/' + poi.videoId + '?rel=0" ' +
+        'title="' + String(poi.videoTitle || poi.name).replace(/"/g, '&quot;') + '" frameborder="0" ' +
+        'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ' +
+        'allowfullscreen></iframe>';
+    } else {
+      wrap.style.display = 'none';
+      wrap.innerHTML = '';
+    }
 
     var actionsEl = overlay.querySelector('#poi-actions');
     actionsEl.innerHTML = '';
@@ -279,14 +299,15 @@
     }
     // Optional, and empty in the data today: her Google Business posts get real
     // views too, so the slot exists for those URLs rather than being invented.
-    if (poi.googlePostUrl) {
+    var googleUrl = poi.googleReviewUrl || poi.googlePostUrl;
+    if (googleUrl) {
       var gLink = document.createElement('a');
       gLink.className = 'btn btn-outline';
       gLink.style.cssText = 'border-color:#fff;color:#fff';
-      gLink.href = poi.googlePostUrl;
+      gLink.href = googleUrl;
       gLink.target = '_blank';
       gLink.rel = 'noopener';
-      gLink.textContent = 'See This On Google';
+      gLink.textContent = poi.googleReviewUrl ? 'Read My Review On Google' : 'See This On Google';
       actionsEl.appendChild(gLink);
     }
     if (poi.cityHref) {
