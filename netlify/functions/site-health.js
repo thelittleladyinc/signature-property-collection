@@ -26,6 +26,7 @@ const {
 } = require("./lib/_mls-shared");
 const { isCloudinaryConfigured } = require("./lib/_cloudinary");
 const { resolveMediaFor, fetchMediaResponse, looksPresigned } = require("./lib/_media");
+const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 
 // Must match SUSPENSION_KEY in sync-listings.js — duplicated here rather
 // than exported since it's a single literal string and this file should
@@ -38,6 +39,9 @@ const GOOGLE_CHECK_KEY = "google-api-check.json";
 const LOFTY_LAST_PUSH_KEY = "lofty-last-push.json";
 const LOFTY_FAILED_PUSH_KEY = "lofty-failed-pushes.json";
 const LOFTY_CHECK_KEY = "lofty-key-check.json";
+const LOFTY_LEAD_CHECK_KEY = "lofty-lead-check.json";
+// Must match TRIGGER_TAG in submission-created.js.
+const LOFTY_TRIGGER_TAG = "Hot Lead - Website";
 const PHOTO_CHECK_KEY = "photo-pipeline-check.json";
 const CLOUDINARY_CHECK_KEY = "cloudinary-usage-check.json";
 
@@ -186,6 +190,66 @@ async function probeLoftyKey(apiKey) {
     };
   }
 }
+// Reads back the LAST lead this site pushed and reports what Lofty says about
+// it. Read-only on purpose -- it creates nothing, changes nothing, and adds no
+// junk contact to her CRM.
+//
+// 2026-08-15 (Christine: "can you check again? just revonnected?"). I can't. Her
+// live site, api.lofty.com and developer.lofty.com are all blocked by this
+// environment's egress proxy, so every question about what Lofty actually
+// returns has had to be relayed through her, one screenshot at a time, and the
+// answer keeps arriving hours later than the question. This probe collapses that
+// loop: one page load answers the three things I have been unable to check.
+//
+//   1. Does GET /leads/{id} work on her account at all? If it 404s, the tag
+//      re-fire can never run, and that would be the whole story.
+//   2. What SHAPE are tags in? Strings, or objects? That is the unknown behind
+//      the data-loss guard in lib/_notify.js -- it currently refuses to touch a
+//      lead whose tags it can't read, which is safe but means the Smart Plan
+//      never re-triggers. Knowing the shape is what lets that be fixed properly.
+//   3. Is "Hot Lead - Website" actually ON that lead right now? That settles
+//      whether the tag is reaching Lofty, independently of any automation.
+//
+// Deliberately reports counts and the trigger tag's presence rather than dumping
+// the lead: this page is reachable by anyone who knows the URL.
+async function probeLoftyLead(apiKey, leadId, triggerTag) {
+  const base = { checkedAt: new Date().toISOString(), leadId: leadId || null };
+  if (!leadId) {
+    return { ...base, ok: false, reason: "no lead has been pushed yet, so there's nothing to read back" };
+  }
+  try {
+    const res = await fetch(`https://api.lofty.com/v1.0/leads/${leadId}`, {
+      headers: { "Authorization": `token ${apiKey}` },
+      signal: AbortSignal.timeout(GOOGLE_PROBE_TIMEOUT_MS),
+    });
+    const text = await res.text().catch(() => "");
+    if (!res.ok) {
+      return { ...base, ok: false, httpStatus: res.status, body: text.slice(0, 200) };
+    }
+    let json = null;
+    try { json = JSON.parse(text); } catch (e) { json = null; }
+    const lead = (json && (json.data || json)) || {};
+    const readable = tagsFromLead(json);
+    return {
+      ...base,
+      ok: true,
+      httpStatus: res.status,
+      tagShape: describeTagShape(json),
+      // Null means lib/_notify.js will refuse to edit tags on this lead.
+      tagsReadable: readable !== null,
+      tagCount: Array.isArray(lead.tags) ? lead.tags.length : null,
+      hasTriggerTag: readable !== null ? readable.includes(triggerTag) : null,
+      // Only when the shape is one we DON'T understand, and trimmed hard -- this
+      // is the sample that lets the reader be fixed.
+      sample: readable === null && Array.isArray(lead.tags) && lead.tags.length
+        ? JSON.stringify(lead.tags[0]).slice(0, 120)
+        : null,
+    };
+  } catch (err) {
+    return { ...base, ok: false, httpStatus: "request failed", body: (err && err.message) || "" };
+  }
+}
+
 const GOOGLE_CHECK_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_PROBE_TIMEOUT_MS = 6000;
 
@@ -247,7 +311,7 @@ exports.handler = async (event) => {
   const wantsJson = params.format === "json";
 
   const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, cachedLoftyKey,
-    cachedPhotoCheck, cachedCloudCheck] = await Promise.all([
+    cachedLoftyLead, cachedPhotoCheck, cachedCloudCheck] = await Promise.all([
     store.get(SYNC_STATE_KEY, { type: "json" }),
     store.get(MINE_LISTINGS_KEY, { type: "json" }),
     store.get(SUSPENSION_KEY, { type: "json" }),
@@ -255,6 +319,7 @@ exports.handler = async (event) => {
     store.get(LOFTY_LAST_PUSH_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_FAILED_PUSH_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_CHECK_KEY, { type: "json" }).catch(() => null),
+    store.get(LOFTY_LEAD_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(PHOTO_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(CLOUDINARY_CHECK_KEY, { type: "json" }).catch(() => null),
   ]);
@@ -298,6 +363,17 @@ exports.handler = async (event) => {
   if (wantsProbe && loftyApiKey && !loftyKeyFresh) {
     loftyKeyCheck = await probeLoftyKey(loftyApiKey);
     await store.setJSON(LOFTY_CHECK_KEY, loftyKeyCheck).catch(() => {});
+  }
+
+  // Reads the last lead back out of Lofty. Cached like the others so refreshing
+  // the page doesn't hammer the API, and only ever a GET.
+  let loftyLeadCheck = cachedLoftyLead;
+  const loftyLeadFresh = loftyLeadCheck && loftyLeadCheck.checkedAt &&
+    Date.now() - Date.parse(loftyLeadCheck.checkedAt) < GOOGLE_CHECK_TTL_MS;
+  if (wantsProbe && loftyApiKey && !loftyLeadFresh) {
+    loftyLeadCheck = await probeLoftyLead(
+      loftyApiKey, loftyLast && loftyLast.leadId, LOFTY_TRIGGER_TAG);
+    await store.setJSON(LOFTY_LEAD_CHECK_KEY, loftyLeadCheck).catch(() => {});
   }
 
   const now = Date.now();
@@ -542,6 +618,43 @@ exports.handler = async (event) => {
       `${String(lastEmail.response || lastEmail.error || "(no detail)").slice(0, 240)}. ` +
       "The lead itself is safe (Netlify Forms and Lofty both have it) — this is only the alert.";
   }
+  // ---- What Lofty says about the last lead, read straight back ------------
+  // The row that exists so nobody has to relay a screenshot to find out.
+  let leadRowOk;
+  let leadRowDetail;
+  if (!loftyApiKey) {
+    leadRowOk = false;
+    leadRowDetail = "LOFTY_API_KEY isn't set.";
+  } else if (!loftyLeadCheck) {
+    leadRowOk = true;
+    leadRowDetail = "Not run yet — add ?probe=1 to this page's URL and it will read your most " +
+      "recent website lead back out of Lofty and report exactly what came back. Read-only: " +
+      "it creates nothing and changes nothing.";
+  } else if (!loftyLeadCheck.leadId) {
+    leadRowOk = true;
+    leadRowDetail = loftyLeadCheck.reason || "No lead pushed yet.";
+  } else if (!loftyLeadCheck.ok) {
+    leadRowOk = false;
+    leadRowDetail = `Lofty would NOT return lead ${loftyLeadCheck.leadId}: ` +
+      `${loftyLeadCheck.httpStatus}${loftyLeadCheck.body ? ` — ${String(loftyLeadCheck.body).slice(0, 200)}` : ""}. ` +
+      "If this is a 404, then GET /leads/{id} isn't available on this account and the trigger " +
+      "tag can never be re-fired — which would explain a Smart Plan that never runs.";
+  } else {
+    // The three answers, in one line, in plain words.
+    leadRowOk = loftyLeadCheck.tagsReadable !== false && loftyLeadCheck.hasTriggerTag !== false;
+    leadRowDetail = `Read lead ${loftyLeadCheck.leadId} back from Lofty ✓ (HTTP 200). ` +
+      `Tags: ${loftyLeadCheck.tagShape}. ` +
+      (loftyLeadCheck.tagsReadable === false
+        ? `This site can't safely edit tags in that shape, so it leaves them alone — ` +
+          `send me this line${loftyLeadCheck.sample ? ` including: ${loftyLeadCheck.sample}` : ""} and I'll fix the reader.`
+        : (loftyLeadCheck.hasTriggerTag
+          ? `"${LOFTY_TRIGGER_TAG}" IS on the lead ✓ — so the tag is reaching Lofty, and if your ` +
+            `Smart Plan still didn't run, the trigger inside the plan is what needs looking at.`
+          : `"${LOFTY_TRIGGER_TAG}" is NOT on the lead ✗ — Lofty accepted the lead but dropped the ` +
+            `tag, which is the reason a tag-triggered Smart Plan wouldn't fire.`));
+  }
+  checks.push({ name: "What Lofty says about your last lead", ok: leadRowOk, detail: leadRowDetail });
+
   checks.push({
     optional: emailOptional,
     name: emailOptional ? "Backup email alert, no CRM needed (optional)" : "New-lead email reaching you",
@@ -611,7 +724,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed, loftyKeyCheck, photoCheck, cloudCheck } }, null, 2),
+      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed, loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck } }, null, 2),
     };
   }
 
