@@ -6796,7 +6796,7 @@ def build_redirects_and_meta():
               "/lifestyle-search.html", "/listing-video-portfolio.html",
               "/past-sales.html", "/mortgage-calculator.html",
               "/search-homes.html", "/current-listings.html",
-              "/sold-homes-map.html",
+              "/sold-homes-map.html", "/luxury-market.html",
               "/press-recognition.html", "/concierge-experience.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
@@ -6817,6 +6817,32 @@ def build_redirects_and_meta():
     )
     with open(os.path.join(OUT, "sitemap.xml"), "w") as f:
         f.write(sitemap)
+
+    # 2026-08-15: `paths` above is hand-maintained, and /luxury-market.html was
+    # added to the site without being added here -- so the one page built
+    # specifically to rank sat outside the sitemap AND llms.txt, which is most
+    # of the point of this file. A hand-maintained list will drift again, so
+    # check it against what was actually written to disk and say so loudly.
+    # 404 is excluded deliberately: it must never be submitted for indexing.
+    import glob as _glob
+    on_disk = {
+        "/" + os.path.relpath(f, OUT).replace(os.sep, "/")
+        for f in _glob.glob(os.path.join(OUT, "**", "*.html"), recursive=True)
+    }
+    listed = set(paths)
+    unlisted = sorted(on_disk - listed - {"/404.html"})
+    stale = sorted(listed - on_disk)
+    if unlisted:
+        print(f"  ! sitemap: {len(unlisted)} built page(s) NOT in the sitemap "
+              f"or llms.txt -- add them to `paths` in build_redirects_and_meta():")
+        for u in unlisted:
+            print(f"      {u}")
+    if stale:
+        print(f"  ! sitemap: {len(stale)} listed path(s) that no longer exist on disk:")
+        for st in stale:
+            print(f"      {st}")
+    if not unlisted and not stale:
+        print(f"  sitemap: all {len(listed)} pages accounted for")
 
     # Explicit AI-crawler allows — some hosting/CMS defaults block these by
     # accident, and you can't get cited in an AI answer if the AI can't
@@ -6900,6 +6926,7 @@ def build_llms_txt(paths):
         "- [Past Sales](/past-sales.html)",
         "- [Lifestyle Home Search](/lifestyle-search.html)",
         f"- [Sold Homes Map — {SITE['agent']}'s Track Record, Mapped](/sold-homes-map.html)",
+        "- [Northern Colorado Homes Over $1 Million — Who Buys, Who Sells, What They Search](/luxury-market.html)",
         f"- [Press & Recognition — {SITE['agent']}'s Verified Credentials](/press-recognition.html)",
         "- [The Concierge Experience](/concierge-experience.html)",
         "- [Listing Video Portfolio](/listing-video-portfolio.html)",
