@@ -36,8 +36,17 @@ const NEARBY_STORE_NAME = "nearby-places-cache";
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Google Places "type" values for each category button in the UI.
+// 2026-08-15 (Christine: "walking distance to a coffee shop or how far from a
+// grocery store?"). Coffee and dining added here rather than as search filters:
+// each category is one Places call per address, so it's affordable exactly
+// because this panel is opened on demand for one listing at a time and cached
+// for 30 days. Filtering all 15,000+ stored listings this way is not
+// affordable, which is why matchesQuery() has no distance filter -- see the
+// note there.
 const CATEGORY_TYPES = {
   grocery: "grocery_or_supermarket",
+  coffee: "cafe",
+  dining: "restaurant",
   school: "school",
   park: "park",
 };

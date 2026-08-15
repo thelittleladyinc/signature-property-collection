@@ -413,6 +413,58 @@ function matchesQuery(listing, params) {
     if (!(listing.waterfront || remarksHit)) return false;
   }
 
+  // ---- Advanced filters, 2026-08-15 -------------------------------------
+  // Christine: "do we want to add an advanced search with riverfront property
+  // or if its esquetarian... how far from a grocery store?" Riverfront already
+  // worked here (it just had no UI); these are the rest of what this feed's
+  // stored fields can actually answer honestly.
+  //
+  // Distance-to-amenity filtering is deliberately NOT here, and can't be:
+  // every listing would need its own Google Places lookups, which is thousands
+  // of calls against a per-address 30-day cache ceiling. It stays where it
+  // already works -- the per-listing "Nearby & Distances" panel (nearby-places
+  // .js, on demand, cached) and the town-level walkability panel.
+  if (params.equestrian === "true") {
+    const remarksLower = (listing.remarks || "").toLowerCase();
+    // Christine's own listings keep their remarks, so they're matched live;
+    // everyone else's were pre-computed into the flag before remarks were
+    // dropped (see slimForStorage in sync-listings.js).
+    const remarksHit = remarksLower.includes("horse property") ||
+      remarksLower.includes("equestrian") || remarksLower.includes("loafing shed") ||
+      remarksLower.includes("riding arena") || remarksLower.includes("horses allowed");
+    if (!(listing.equestrian || remarksHit)) return false;
+  }
+
+  // Coarse categories matched by substring rather than an exact list of
+  // PropertySubType values, because the exact strings this feed emits aren't
+  // documented anywhere we can rely on -- "Single Family Residence",
+  // "Residential-Detached" and "House" have all been seen in Colorado feeds.
+  // A substring test degrades to "no match" instead of silently filtering
+  // everything out if the wording differs.
+  if (params.propertyCategory) {
+    const type = String(listing.propertyType || "").toLowerCase();
+    const cat = String(params.propertyCategory).toLowerCase();
+    const matchers = {
+      house: ["single family", "detached", "house", "residential"],
+      condo: ["condo", "townhouse", "townhome", "attached", "multi-family", "multi family"],
+      land: ["land", "lot", "acreage"],
+      farm: ["farm", "ranch", "agricultur"],
+    };
+    const needles = matchers[cat];
+    if (!needles) return false;               // unknown category: match nothing
+    // "residential" is a broad fallback for feeds that only say that much, but
+    // it must not swallow condos -- so a condo-ish type never counts as house.
+    if (cat === "house" && matchers.condo.some((n) => type.includes(n))) return false;
+    if (!needles.some((n) => type.includes(n))) return false;
+  }
+
+  const minSqft = parseInt(params.minSqft, 10);
+  if (Number.isFinite(minSqft) && minSqft > 0) {
+    // A listing with no LivingArea (land, and some new construction) can't
+    // satisfy a square-footage floor, so it's excluded rather than assumed.
+    if (!(listing.sqft >= minSqft)) return false;
+  }
+
   return true;
 }
 

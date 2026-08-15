@@ -666,10 +666,12 @@ def _nearby_places_js_helpers():
   function nearbyToggleHtml(addr) {
     return '<div class="listing-nearby">' +
       '<button type="button" class="nearby-toggle" onclick="toggleNearby(this)" data-address="' + addr + '">' +
-      '\\ud83d\\udccd Distance To Grocery, Schools &amp; Parks</button>' +
+      '\\ud83d\\udccd What\u2019s Nearby: Coffee, Grocery, Schools &amp; Parks</button>' +
       '<div class="nearby-panel" style="display:none">' +
       '<div class="nearby-tabs">' +
-      '<button type="button" class="nearby-tab active" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
+      '<button type="button" class="nearby-tab active" data-cat="coffee" onclick="showNearbyCat(this)">Coffee</button>' +
+      '<button type="button" class="nearby-tab" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
+      '<button type="button" class="nearby-tab" data-cat="dining" onclick="showNearbyCat(this)">Dining</button>' +
       '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
       '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
       '</div>' +
@@ -699,7 +701,7 @@ def _nearby_places_js_helpers():
         }
         panel.dataset.loaded = 'true';
         panel._nearbyData = data;
-        renderNearbyCat(panel, 'grocery');
+        renderNearbyCat(panel, 'coffee');
       })
       .catch(function () {
         resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\\u2019t look up nearby places right now.</p>';
@@ -714,7 +716,8 @@ def _nearby_places_js_helpers():
     renderNearbyCat(panel, tabBtn.dataset.cat);
   };
 
-  var NEARBY_CAT_LABELS = { grocery: 'grocery stores', school: 'schools', park: 'parks' };
+  var NEARBY_CAT_LABELS = { grocery: 'grocery stores', coffee: 'coffee shops',
+    dining: 'restaurants', school: 'schools', park: 'parks' };
 
   function renderNearbyCat(panel, cat) {
     var data = panel._nearbyData;
@@ -1030,6 +1033,89 @@ _FS_PRICE_CEILING = 5000000
 _FS_PRICE_STEP = 25000
 
 
+def _advanced_filters_block(wid):
+    """The collapsible "More filters" panel shared by every instance of
+    _fancy_search_widget() -- Search Homes and every city page alike.
+    """
+    # ---- Advanced filters, 2026-08-15 -------------------------------------
+    # Christine: "do we want to add an advanced search with riverfront property
+    # or if its esquetarian or walking distance to a coffee shop or how far from
+    # a grocery store?"
+    #
+    # Everything here is a filter the stored data can answer for real. Two of
+    # her four examples are answered elsewhere on purpose, and it matters that
+    # the reason is written down rather than rediscovered later:
+    #
+    #   - Riverfront was already supported end-to-end in matchesQuery() and had
+    #     simply never been given a control. It's now a checkbox.
+    #   - Equestrian is new: a pre-computed keyword flag (see slimForStorage in
+    #     sync-listings.js for why it can't be a query-time remarks scan).
+    #   - Coffee/grocery DISTANCE is not a filter and shouldn't be. Filtering
+    #     15,000+ listings by proximity means a Google Places lookup per
+    #     listing, against a per-address 30-day cache ceiling -- thousands of
+    #     calls to answer one search. It lives where it's affordable instead:
+    #     the per-listing "What's Nearby" panel (on demand, cached 30 days,
+    #     now including Coffee and Dining tabs) and the town-level walkability
+    #     panel on every community page.
+    #
+    # Collapsed by default via <details>: the four controls above cover most
+    # searches, and a wall of filters is the thing that makes IDX search pages
+    # feel like software instead of like help. No JS needed to open it.
+    # Shown on city pages too, not just Search Homes: the town is already fixed
+    # there, but "horse property, 2,000+ sq ft, in Fort Morgan" is exactly the
+    # search someone on that page is trying to run -- and Christine asked for
+    # the search to work the same way across the whole site.
+    type_options = "\n              ".join(
+        f'<option value="{v}">{label}</option>' for v, label in [
+            ("", "Any property type"),
+            ("house", "Houses"),
+            ("condo", "Condos & townhomes"),
+            ("land", "Land & lots"),
+            ("farm", "Farm & ranch"),
+        ]
+    )
+    sqft_options = "\n              ".join(
+        f'<option value="{v}">{label}</option>' for v, label in [
+            ("", "Any size"), ("1000", "1,000+ sq ft"), ("1500", "1,500+ sq ft"),
+            ("2000", "2,000+ sq ft"), ("3000", "3,000+ sq ft"),
+            ("4000", "4,000+ sq ft"), ("5000", "5,000+ sq ft"),
+        ]
+    )
+    return f"""<details class="fs-advanced" id="{wid}-advanced">
+    <summary>More filters &mdash; property type, size, riverfront, horse property</summary>
+    <div class="fs-row" style="margin-top:20px">
+      <div class="fs-block" style="flex:1 1 220px">
+        <span class="fs-label">Property Type</span>
+        <select id="{wid}-propertyCategory" name="propertyCategory" class="fs-select">
+          {type_options}
+        </select>
+      </div>
+      <div class="fs-block" style="flex:1 1 220px">
+        <span class="fs-label">Minimum Size</span>
+        <select id="{wid}-minSqft" name="minSqft" class="fs-select">
+          {sqft_options}
+        </select>
+      </div>
+      <div class="fs-block" style="flex:1 1 260px">
+        <span class="fs-label">Features</span>
+        <label class="fs-check">
+          <input type="checkbox" name="waterfront" value="true" id="{wid}-waterfront">
+          <span>Riverfront &amp; waterfront</span>
+        </label>
+        <label class="fs-check">
+          <input type="checkbox" name="equestrian" value="true" id="{wid}-equestrian">
+          <span>Horse property &amp; equestrian</span>
+        </label>
+      </div>
+    </div>
+    <p class="fs-advanced-note">Riverfront and horse property are read from each
+    listing's own MLS description and features, so a property the listing agent
+    never described that way won't appear. Tell {esc(SITE['agent'].split()[0])} what
+    you're after and she'll search it directly &mdash; including pocket listings that
+    aren't on here at all.</p>
+      </details>"""
+
+
 def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_links=False,
                           price_floor=_FS_PRICE_FLOOR, always_no_floor=False, counties=None):
     """Interactive live-search widget: dual-handle price slider + pill-button
@@ -1164,6 +1250,8 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     beds_group = _pill_group("beds", [("", "Any"), ("1", "1+"), ("2", "2+"), ("3", "3+"), ("4", "4+"), ("5", "5+")])
     baths_group = _pill_group("baths", [("", "Any"), ("1", "1+"), ("2", "2+"), ("3", "3+"), ("4", "4+")])
 
+    advanced_block = _advanced_filters_block(wid)
+
     floor, ceiling, step = price_floor, _FS_PRICE_CEILING, _FS_PRICE_STEP
 
     # 2026-08-13 (buyer-walkthrough fix): every card this widget renders used
@@ -1214,6 +1302,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
         {beds_group}
         {baths_group}
       </div>
+      {advanced_block}
       <input type="hidden" name="minPrice" id="{wid}-minPrice">
       <input type="hidden" name="maxPrice" id="{wid}-maxPrice">
       <input type="hidden" name="beds" id="{wid}-beds">
@@ -1573,7 +1662,11 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
   function paramsFromForm() {{
     var data = new FormData(form);
     var p = {{}};
-    ['minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {{
+    // propertyCategory/minSqft/waterfront/equestrian come from the "More
+    // filters" panel; unchecked checkboxes and empty selects simply aren't in
+    // the FormData, so no special-casing is needed.
+    ['minPrice', 'maxPrice', 'beds', 'baths',
+     'propertyCategory', 'minSqft', 'waterfront', 'equestrian'].forEach(function (k) {{
       var v = data.get(k);
       if (v) p[k] = v;
     }});
@@ -1603,8 +1696,12 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     }}
     if (alwaysNoFloor) p.noFloor = 'true';
     if (supportDeepLinks) {{
+      // subdivision has no control on the page, so it stays a pass-through.
+      // waterfront used to be forced the same way; it's a real checkbox now, so
+      // an incoming ?waterfront=true checks the box (see the deep-link block
+      // below) and is read straight from the form like any other filter --
+      // which also means the visitor can turn it off.
       if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
-      if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
       if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
     }}
     return p;
@@ -1689,6 +1786,28 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
       }}
       refreshGeoUi();
     }}
+    // "More filters" from the URL: check/select them AND open the panel, so an
+    // incoming link's filters are visible and switchable rather than hidden
+    // behind a collapsed <details>.
+    var advancedTouched = false;
+    [['waterfront', wid + '-waterfront'], ['equestrian', wid + '-equestrian']].forEach(function (pair) {{
+      if (urlParams.get(pair[0]) === 'true') {{
+        var cb = document.getElementById(pair[1]);
+        if (cb) {{ cb.checked = true; advancedTouched = true; }}
+      }}
+    }});
+    [['propertyCategory', wid + '-propertyCategory'], ['minSqft', wid + '-minSqft']].forEach(function (pair) {{
+      var v = urlParams.get(pair[0]);
+      if (!v) return;
+      var sel = document.getElementById(pair[1]);
+      if (!sel) return;
+      var match = Array.prototype.slice.call(sel.options).some(function (o) {{ return o.value === v; }});
+      if (match) {{ sel.value = v; advancedTouched = true; }}
+    }});
+    if (advancedTouched) {{
+      var adv = document.getElementById(wid + '-advanced');
+      if (adv) adv.open = true;
+    }}
     if (urlParams.get('minPrice')) {{
       var mp = parseInt(urlParams.get('minPrice'), 10);
       if (mp >= parseInt(minRange.min, 10) && mp <= parseInt(minRange.max, 10)) {{
@@ -1699,13 +1818,12 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     // The town/county part of an incoming link no longer needs explaining --
     // it's visible in the chips and removable there. Only the two filters with
     // no on-page control (subdivision, waterfront) still need a note.
+    // Only subdivision needs explaining now: towns show as chips, and the
+    // "More filters" controls above show their own state once opened.
     var deepLinkNoteEl = document.getElementById(wid + '-deep-link-note');
-    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true')) {{
-      var bits = [];
-      if (urlParams.get('subdivision')) bits.push('the ' + urlParams.get('subdivision') + ' area');
-      if (urlParams.get('waterfront') === 'true') bits.push('waterfront/riverfront features');
-      deepLinkNoteEl.textContent = 'Also filtered to ' + bits.join(' and ') +
-        '. Reload this page without those filters for the full result set.';
+    if (deepLinkNoteEl && urlParams.get('subdivision')) {{
+      deepLinkNoteEl.textContent = 'Also filtered to the ' + urlParams.get('subdivision') +
+        ' area. Reload this page without that filter for the full result set.';
       deepLinkNoteEl.style.display = 'block';
     }}
   }}

@@ -557,6 +557,30 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
 //
 // Christine's own listings are never slimmed, so nothing about her own
 // inventory, photos or galleries is affected.
+// Equine words that mean the property is actually set up for horses, not just
+// rural. "horse" on its own is intentionally excluded: "horseshoe" shows up in
+// street and subdivision names all over Northern Colorado ("Horseshoe Lake",
+// "Horseshoe Bend"), so it's matched as "horse property"/"horses" instead.
+const EQUESTRIAN_STRONG = [
+  "horse property", "horses allowed", "horses welcome", "zoned for horses",
+  "horse setup", "horse facility", "horse barn", "horse arena", "equestrian",
+  "loafing shed", "riding arena", "round pen", "stalls", "corral",
+  "tack room", "hay barn", "irrigated pasture",
+];
+// These only count when paired with one of the words below, since a "barn" or
+// "pasture" by itself describes most acreage out here.
+const EQUESTRIAN_WEAK = ["barn", "pasture", "paddock", "outbuildings"];
+const EQUESTRIAN_WEAK_PARTNER = ["horse", "equine", "livestock", "stall", "arena"];
+
+function hasEquestrianKeywords(remarksLower) {
+  if (!remarksLower) return false;
+  if (EQUESTRIAN_STRONG.some((k) => remarksLower.includes(k))) return true;
+  if (EQUESTRIAN_WEAK.some((k) => remarksLower.includes(k))) {
+    return EQUESTRIAN_WEAK_PARTNER.some((k) => remarksLower.includes(k));
+  }
+  return false;
+}
+
 function slimForStorage(mapped) {
   if (isHerListing(mapped)) return mapped;
 
@@ -566,6 +590,24 @@ function slimForStorage(mapped) {
 
   const slim = { ...mapped };
   slim.waterfront = mapped.waterfront === true || waterfrontByKeyword || null;
+  // 2026-08-15 (Christine: "do we want to add an advanced search with
+  // riverfront property or if its esquetarian"). Same trick as waterfront
+  // above, and for the same reason: the keyword test has to run BEFORE remarks
+  // are discarded, because after this function there is no text left to search.
+  //
+  // Deliberately not a remarks scan at query time and not a new MLS field:
+  // this feed has a documented history of rejecting standard RESO field names
+  // outright (WaterfrontFeatures, ListOfficeName, ListAgentDirectPhone and
+  // ListAgentEmail all 400'd, see SELECT_FIELDS in _mls-shared.js), and a 400
+  // in the main crawl's $select breaks the whole sync. HorseYN/HorseAmenities
+  // are worth probing later in an isolated try/catch the way
+  // discoverHerOfficeMlsId() does, but that needs a live token to verify, so
+  // keywords are what ships today.
+  //
+  // Phrases chosen to be specific enough to avoid obvious false positives:
+  // "pasture" and "barn" alone would catch half the acreage in Weld County, so
+  // they only count alongside an explicitly equine word.
+  slim.equestrian = mapped.equestrian === true || hasEquestrianKeywords(remarks) || null;
   delete slim.remarks;
 
   if (Array.isArray(slim.photos)) {

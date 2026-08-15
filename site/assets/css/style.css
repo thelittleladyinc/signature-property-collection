@@ -940,6 +940,35 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 }
 .fs-chip button:hover { color: var(--rose); }
 
+/* "More filters" — a real <details>, so it opens with no JS and stays keyboard
+   accessible. Collapsed by default: the four primary controls answer most
+   searches, and a wall of filters is what makes an IDX page feel like software
+   instead of like help. */
+.fs-advanced { margin-top: 26px; border-top: 1px solid var(--hairline); padding-top: 18px; }
+.fs-advanced > summary {
+  cursor: pointer; font-family: var(--font-sans); font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--deep-mauve); list-style: none;
+}
+.fs-advanced > summary::-webkit-details-marker { display: none; }
+.fs-advanced > summary::before { content: '+\00a0'; font-weight: 600; }
+.fs-advanced[open] > summary::before { content: '\2212\00a0'; }
+.fs-advanced > summary:hover { color: var(--rose); }
+.fs-select {
+  width: 100%; padding: 12px 14px; background: var(--white);
+  border: 1px solid var(--hairline); color: var(--charcoal);
+  font-family: var(--font-sans); font-size: 14px;
+}
+.fs-select:hover { border-color: var(--rose); }
+.fs-check {
+  display: flex; align-items: center; gap: 10px; font-size: 14px;
+  color: var(--charcoal); cursor: pointer; padding: 6px 0;
+}
+.fs-check input { accent-color: var(--rose); width: 15px; height: 15px; flex: none; }
+.fs-advanced-note {
+  margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: var(--slate-mist);
+  max-width: 70ch;
+}
+
 /* ---------- Neighborhood Quiz (now a collapsible section on
    /sold-homes-map.html, see build_sold_homes_map()'s 2026-08-14 comment) --------- */
 .quiz-disclosure {

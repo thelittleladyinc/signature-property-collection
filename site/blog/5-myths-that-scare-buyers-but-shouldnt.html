@@ -158,10 +158,12 @@
   function nearbyToggleHtml(addr) {
     return '<div class="listing-nearby">' +
       '<button type="button" class="nearby-toggle" onclick="toggleNearby(this)" data-address="' + addr + '">' +
-      '\ud83d\udccd Distance To Grocery, Schools &amp; Parks</button>' +
+      '\ud83d\udccd What’s Nearby: Coffee, Grocery, Schools &amp; Parks</button>' +
       '<div class="nearby-panel" style="display:none">' +
       '<div class="nearby-tabs">' +
-      '<button type="button" class="nearby-tab active" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
+      '<button type="button" class="nearby-tab active" data-cat="coffee" onclick="showNearbyCat(this)">Coffee</button>' +
+      '<button type="button" class="nearby-tab" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
+      '<button type="button" class="nearby-tab" data-cat="dining" onclick="showNearbyCat(this)">Dining</button>' +
       '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
       '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
       '</div>' +
@@ -191,7 +193,7 @@
         }
         panel.dataset.loaded = 'true';
         panel._nearbyData = data;
-        renderNearbyCat(panel, 'grocery');
+        renderNearbyCat(panel, 'coffee');
       })
       .catch(function () {
         resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\u2019t look up nearby places right now.</p>';
@@ -206,7 +208,8 @@
     renderNearbyCat(panel, tabBtn.dataset.cat);
   };
 
-  var NEARBY_CAT_LABELS = { grocery: 'grocery stores', school: 'schools', park: 'parks' };
+  var NEARBY_CAT_LABELS = { grocery: 'grocery stores', coffee: 'coffee shops',
+    dining: 'restaurants', school: 'schools', park: 'parks' };
 
   function renderNearbyCat(panel, cat) {
     var data = panel._nearbyData;
