@@ -2836,6 +2836,7 @@ def build_city_pages():
             # city_content.json's "local_faqs" list as they're researched.
             for q, a in info.get("local_faqs", []):
                 faq_pairs.append((q, a))
+            body += _walkability_block(city, f"{city}, CO")
             faq_html, faq_schema = _faq_block(faq_pairs)
             body += faq_html
             # Someone on a city page has narrowed to one town, but plenty are
@@ -4543,6 +4544,12 @@ def build_subdivision_pages():
 </section>
 {faq_html}
 """
+        _walk = SUBDIVISION_WALK_PLACES.get(sub["slug"])
+        if _walk:
+            # `near` is the parent town, so a neighborhood name that geocodes
+            # somewhere else is rejected rather than scored -- see
+            # MAX_PLACE_DRIFT_MILES in netlify/functions/walkability.js.
+            body += _walkability_block(_walk["label"], _walk["query"], "Loveland, CO")
         body += _quiz_disclosure(
             f"Still comparing neighborhoods? Four quick questions, matched against "
             f"{len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients every day. "
@@ -5295,6 +5302,64 @@ def write_neighborhood_quiz_script():
     with open(os.path.join(out_dir, "neighborhood-quiz.js"), "w") as f:
         f.write(header + "" + js + "")
     print("  wrote /assets/js/neighborhood-quiz.js")
+
+
+# 2026-08-15: geocodable place name + display label per subdivision, for
+# the walkability panel (_walkability_block). Kept separate from each
+# entry's "feed_params" because those subdivision strings are truncated on
+# purpose to match IRES's inconsistent naming ("Mariana", "Waterfront",
+# "Kinston") and would send a geocoder to the wrong place. A subdivision
+# missing from here simply gets no walkability panel -- which is correct for
+# west-loveland-riverfront-homes, a scattered set of river-frontage acreage
+# rather than a neighborhood with a center to measure from.
+SUBDIVISION_WALK_PLACES = {
+    "buckhorn-subdivisions-loveland": {"query": "Buckhorn Road, Loveland, CO", "label": "The Buckhorn Corridor"},
+    "mariana-butte-loveland": {"query": "Mariana Butte, Loveland, CO", "label": "Mariana Butte"},
+    "lakes-at-centerra-loveland": {"query": "Lakes at Centerra, Loveland, CO", "label": "Lakes At Centerra"},
+    "thompson-valley-loveland": {"query": "Thompson Valley, Loveland, CO", "label": "Thompson Valley"},
+    "boyd-lake-north-loveland": {"query": "Boyd Lake, Loveland, CO", "label": "Boyd Lake North"},
+    "waterfront-at-boyd-lake-loveland": {"query": "Boyd Lake, Loveland, CO", "label": "The Waterfront At Boyd Lake"},
+    "namaqua-hills-loveland": {"query": "Namaqua Hills, Loveland, CO", "label": "Namaqua Hills"},
+    "kinston-centerra-loveland": {"query": "Kinston at Centerra, Loveland, CO", "label": "Kinston At Centerra"},
+    "pyrenees-french-country-loveland": {"query": "Pyrenees Drive, Loveland, CO", "label": "Pyrenees"},
+}
+
+def _walkability_block(heading_place, place_query, near_query=None):
+    """The "How Walkable Is <town>?" section for city and subdivision pages.
+
+    2026-08-15 (Christine): "a much more detailed walkability score -- maybe
+    add more than school, park and grocery store?" The three-category
+    grocery/school/park panel she was reacting to is the per-listing one from
+    nearby-places.js; this is the community-page version, and it scores ten
+    weighted categories server-side (netlify/functions/walkability.js) and
+    lists the real named places behind each one.
+
+    County pages deliberately do NOT get this. A county is not a walkable
+    unit -- an average across Larimer would blend Old Town Fort Collins with
+    Red Feather Lakes into a number that describes nowhere.
+
+    The section renders hidden and is revealed by the script only once real
+    data arrives, so an unconfigured API key or a failed lookup shows the
+    visitor nothing rather than an empty heading. `near_query` is the parent
+    town, passed on subdivision pages so the function can reject a
+    neighborhood name that geocoded to the wrong place."""
+    near_attr = f' data-near="{esc(near_query)}"' if near_query else ""
+    # The sentinel sits OUTSIDE the hidden section on purpose: the lazy-load
+    # observer needs something with a layout box at this position in the
+    # document, and a [hidden] section has none.
+    return f"""<div id="walk-sentinel" aria-hidden="true"></div>
+<section class="tight" id="walk-section" hidden>
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Getting Around</span>
+    <h2 class="section-title">How Walkable Is {esc(heading_place)}?</h2>
+    <p class="lede">What you can actually reach on foot from the middle of
+    {esc(heading_place)} &mdash; scored across ten everyday errands, not just the
+    grocery store.</p>
+    <div id="walk-panel" class="walk-panel" data-place="{esc(place_query)}"{near_attr}></div>
+  </div>
+</section>
+<script src="/assets/js/walkability.js" defer></script>
+"""
 
 
 def _quiz_disclosure(intro):

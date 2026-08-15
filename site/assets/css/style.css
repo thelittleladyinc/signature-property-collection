@@ -620,6 +620,46 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .nearby-name { flex: 1; }
 .nearby-distance { color: var(--dusty-rose); font-weight: 600; white-space: nowrap; }
 
+/* ---------- Walkability panel (city + subdivision pages) ----------
+   2026-08-15 (Christine): "a much more detailed walkability score ... maybe
+   add more than school, park and grocery store?" Ten weighted categories,
+   scored server-side by netlify/functions/walkability.js. Deliberately NOT
+   styled to imitate Walk Score(R)'s badge -- this is her own estimate and
+   the panel says so. */
+.walk-panel { margin-top: 28px; }
+.walk-panel[hidden] { display: none; }
+.walk-headline { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.walk-dial {
+  flex: 0 0 auto; width: 104px; height: 104px; border-radius: 50%;
+  display: grid; place-items: center; position: relative;
+  background: var(--white); border: 1px solid var(--gray-light);
+}
+.walk-dial-score {
+  font-family: var(--font-serif); font-size: 34px; line-height: 1; color: var(--charcoal);
+}
+.walk-dial-of { font-size: 11px; color: #6a6a6c; letter-spacing: .04em; margin-top: 3px; }
+.walk-band { font-family: var(--font-serif); font-size: 24px; color: var(--charcoal); margin: 0; }
+.walk-band-sub { font-size: 14px; color: #4a4a4c; margin: 6px 0 0; max-width: 46ch; line-height: 1.6; }
+.walk-cats {
+  list-style: none; padding: 0; margin: 26px 0 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px;
+}
+.walk-cat { border: 1px solid #e4e4d8; border-radius: 10px; padding: 12px 14px; background: var(--white); }
+.walk-cat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.walk-cat-label { font-size: 13px; font-weight: 600; color: var(--charcoal); }
+.walk-cat-dist { font-size: 13px; font-weight: 600; color: var(--rose); white-space: nowrap; }
+.walk-cat-dist.walk-far { color: #8a8a8c; }
+.walk-cat-examples { list-style: none; padding: 0; margin: 8px 0 0; }
+.walk-cat-examples li { font-size: 12px; color: #6a6a6c; line-height: 1.7; }
+.walk-method { font-size: 12px; color: #6a6a6c; line-height: 1.7; margin-top: 20px; }
+.walk-status { font-size: 14px; color: #6a6a6c; }
+@media (max-width: 520px) {
+  .walk-headline { gap: 16px; }
+  .walk-dial { width: 84px; height: 84px; }
+  .walk-dial-score { font-size: 28px; }
+  .walk-band { font-size: 20px; }
+}
+
 /* ---------- Listing media links + inquiry CTAs (Current Listings) ---------- */
 .listing-media { position: relative; }
 /* 2026-08-13: .video-embed's own default box is 16:9 (padding-top: 56.25%),
