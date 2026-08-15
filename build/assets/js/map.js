@@ -152,8 +152,18 @@
   // she asks for restaurants/parks/other amenities (kept deliberately small
   // for now — see notes/websites-strategy.md-style scoping: build what's
   // asked, not a speculative full POI system).
+  // 2026-08-15 (Christine: "make the map way more detailed for how people would
+  // find me - based on local spots?"). One glyph per kind of place, so the map
+  // reads at a glance as somewhere a person actually goes -- eats, hikes,
+  // swims, rides -- rather than a choropleth with two golf flags on it.
   var POI_ICONS = {
     golf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="21" x2="6" y2="3"/><path d="M6 3 L17 7 L6 11 Z" fill="currentColor" stroke="none"/><circle cx="6" cy="21" r="1.6" fill="currentColor" stroke="none"/></svg>',
+    restaurant: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v8a2 2 0 0 0 4 0V3"/><line x1="8" y1="11" x2="8" y2="21"/><path d="M16 3c-1.6 1-2.4 2.6-2.4 4.4S14.4 11 16 11.6V21"/></svg>',
+    winery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8l-.7 5a3.3 3.3 0 0 1-6.6 0Z"/><line x1="12" y1="13" x2="12" y2="19"/><line x1="9" y1="21" x2="15" y2="21"/></svg>',
+    trail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19l6-9 3 4 2-3 7 8Z"/></svg>',
+    lake: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 3-2"/><path d="M3 15c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 3-2"/></svg>',
+    downtown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l5-3v16"/><path d="M9 21V11l6-3v13"/><path d="M15 21V12l5 2v7"/></svg>',
+    scenic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M3 21c2-5 5.5-7 9-7s7 2 9 7"/></svg>',
   };
   var POI_MARKERS = [
     {
@@ -169,20 +179,29 @@
       videoTitle: 'Mariana Butte Golf Course — Loveland, CO',
       videoSource: 'Golf Loveland (City of Loveland)',
     },
-    {
-      name: 'The Olde Course at Loveland',
-      lat: 40.4251, lng: -105.1088,
-      icon: 'golf',
-      cityLabel: 'Loveland',
-      cityHref: '/communities/larimer/loveland.html',
-      searchCity: 'Loveland',
-      blurb: 'A traditional, walkable park-style municipal course in the heart of Loveland — ' +
-        'a favorite for an easy, relaxed round close to home.',
-      videoId: 'lAlc6-nyTiM',
-      videoTitle: 'The Olde Course at Loveland',
-      videoSource: 'Golf Loveland (City of Loveland)',
-    },
+    // 2026-08-15: The Olde Course used to be the second entry here, playing the
+    // City of Loveland's promo video. It moved into build/data/local_spots.json
+    // because Christine has her OWN film of it now ("Why Loveland Buyers Love
+    // The Olde Course"), and hers is about what living on the course is like
+    // rather than about the course. Removed from this list rather than left in,
+    // so the map doesn't grow two pins on the same fairway.
   ];
+
+  // Shared by the built-in POI_MARKERS and the fetched local spots, so both
+  // kinds of pin behave identically -- one place to change the interaction.
+  function addPoiMarker(map, poi) {
+    if (!poi || typeof poi.lat !== 'number' || typeof poi.lng !== 'number') return;
+    var marker = L.marker([poi.lat, poi.lng], {
+      icon: poiIcon(poi), interactive: true, zIndexOffset: 600,
+    }).addTo(map);
+    // The view count goes in the tooltip because it is the reason to click: it
+    // says a few thousand people have already watched this, which no stock
+    // amenity pin on a portal map can say.
+    var label = '▶ Watch: ' + poi.name;
+    if (poi.views) label += ' (' + Number(poi.views).toLocaleString() + ' views)';
+    marker.bindTooltip(label, { direction: 'top', offset: [0, -10] });
+    marker.on('click', function () { openPoiModal(poi); });
+  }
 
   function poiIcon(poi) {
     var glyph = POI_ICONS[poi.icon] || POI_ICONS.golf;
@@ -229,7 +248,14 @@
     var overlay = document.getElementById('map-poi-modal');
     overlay.querySelector('#poi-title').textContent = poi.name;
     overlay.querySelector('#poi-blurb').textContent = poi.blurb || '';
-    overlay.querySelector('#poi-source').textContent = poi.videoSource ? ('Video: ' + poi.videoSource) : '';
+    // Two kinds of pin, credited honestly: the two municipal golf-course videos
+    // are the City of Loveland's, everything else is Christine's own footage --
+    // and saying so is the whole point of the layer.
+    var credit = poi.videoSource
+      ? ('Video: ' + poi.videoSource)
+      : 'Filmed by Christine — The Little Lady Sells Homes';
+    if (poi.views) credit += ' · ' + Number(poi.views).toLocaleString() + ' views on YouTube';
+    overlay.querySelector('#poi-source').textContent = credit;
     overlay.querySelector('#poi-video-wrap').innerHTML =
       '<iframe width="100%" height="100%" style="display:block" ' +
       'src="https://www.youtube-nocookie.com/embed/' + poi.videoId + '?rel=0" ' +
@@ -250,6 +276,18 @@
         openQuickSearch({ label: poi.searchCity, cities: [poi.searchCity], covered: true });
       });
       actionsEl.appendChild(searchBtn);
+    }
+    // Optional, and empty in the data today: her Google Business posts get real
+    // views too, so the slot exists for those URLs rather than being invented.
+    if (poi.googlePostUrl) {
+      var gLink = document.createElement('a');
+      gLink.className = 'btn btn-outline';
+      gLink.style.cssText = 'border-color:#fff;color:#fff';
+      gLink.href = poi.googlePostUrl;
+      gLink.target = '_blank';
+      gLink.rel = 'noopener';
+      gLink.textContent = 'See This On Google';
+      actionsEl.appendChild(gLink);
     }
     if (poi.cityHref) {
       var cityLink = document.createElement('a');
@@ -520,13 +558,22 @@
         // Lifestyle/amenity POI markers (golf courses, restaurants, etc. —
         // see POI_MARKERS above). Distinct rose-colored round icon so they
         // read as "a real place with a video," not just another city pin.
-        POI_MARKERS.forEach(function (poi) {
-          var marker = L.marker([poi.lat, poi.lng], {
-            icon: poiIcon(poi), interactive: true, zIndexOffset: 600,
-          }).addTo(map);
-          marker.bindTooltip('▶ Watch: ' + poi.name, { direction: 'top', offset: [0, -10] });
-          marker.on('click', function () { openPoiModal(poi); });
-        });
+        POI_MARKERS.forEach(function (poi) { addPoiMarker(map, poi); });
+
+        // Christine's own local spots, geocoded and cached server-side (see
+        // netlify/functions/local-spots.js). Fetched rather than baked in
+        // because coordinates have to come from a real geocode -- guessed
+        // coordinates would pin her personal recommendation onto the wrong
+        // building. Failure is silent by design: the counties, cities and
+        // rivers are already drawn by this point, so a spots outage costs
+        // detail, never the map.
+        fetch('/.netlify/functions/local-spots')
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            if (!data || !Array.isArray(data.spots)) return;
+            data.spots.forEach(function (spot) { addPoiMarker(map, spot); });
+          })
+          .catch(function () { /* map already works without them */ });
 
         // River lines + script-font labels, matching the original map's
         // "Cache la Poudre River" / "South Platte River" cursive callouts.

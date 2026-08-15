@@ -49,6 +49,7 @@ BLOG = _load_json("blog.json")  # 60 posts migrated from the live site's blog
 # optional here — see the _README inside the file, and the SOLD MAP section
 # further down, for why that's the whole point of this file existing.
 SOLD_HOMES_DATA = _load_json("sold_homes.json")
+LOCAL_SPOTS_DATA = _load_json("local_spots.json")
 
 # Old AgentFire/WordPress URL -> new site path, for anything printed,
 # bookmarked, or otherwise pointing at a URL that must keep working exactly
@@ -5787,6 +5788,44 @@ def build_luxury_market():
 # a blank or broken map.
 
 
+def write_local_spots_function_data():
+    """Emit the local-spots list that netlify/functions/local-spots.js reads.
+
+    2026-08-15 (Christine: "make the map way more detailed for how people would
+    find me - based on local spots?"). Same generate-don't-duplicate rule as
+    write_sold_homes_function_data below, and for the same reason: the moment a
+    list like this exists in two places, one of them goes stale silently.
+
+    The coordinates deliberately are NOT resolved here. Google's APIs aren't
+    reachable from this build environment, so baking in coordinates would mean
+    typing numbers I can't verify -- and a pin a few hundred metres off puts
+    Christine's personal recommendation on top of somebody else's business. The
+    function geocodes each address once and caches it in Blobs instead."""
+    out_dir = os.path.abspath(os.path.join(HERE, "..", "netlify", "functions", "lib"))
+    os.makedirs(out_dir, exist_ok=True)
+    spots = LOCAL_SPOTS_DATA.get("spots", [])
+    missing_video = [s["name"] for s in spots if not s.get("videoId")]
+    if missing_video:
+        # The whole point of these pins is that they carry HER footage.
+        raise SystemExit(
+            "local_spots.json: these spots have no videoId, which defeats the "
+            "purpose of the layer: " + ", ".join(missing_video)
+        )
+    payload = {
+        "_generated": "Written by build/build.py from build/data/local_spots.json. "
+                      "Do not edit by hand — edit that file and re-run the build.",
+        "_views_as_of": LOCAL_SPOTS_DATA.get("_views_as_of"),
+        "spots": spots,
+    }
+    with open(os.path.join(out_dir, "_local-spots.json"), "w") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    towns = sorted({s.get("city") for s in spots if s.get("city")})
+    total_views = sum(s.get("views") or 0 for s in spots)
+    print(f"  local spots: {len(spots)} pins across {len(towns)} places, "
+          f"{total_views:,} video views behind them")
+
+
 def write_sold_homes_function_data():
     """Emit the pin list the Netlify geocoder function reads at runtime.
 
@@ -7736,6 +7775,7 @@ if __name__ == "__main__":
     build_luxury_market()
     build_sold_homes_map()
     write_sold_homes_function_data()
+    write_local_spots_function_data()
     build_nav_pages()
     build_search_homes()
     build_current_listings()
