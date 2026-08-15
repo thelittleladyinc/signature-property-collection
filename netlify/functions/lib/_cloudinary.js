@@ -114,11 +114,53 @@ async function fetchMlsPhotoBuffer(mediaUrl, token) {
 // Returns the permanent secure_url, or null if Cloudinary isn't configured
 // yet (so callers can fall back to the raw — expiring — MLS Grid URL
 // without breaking anything before Christine adds the env vars).
+// 2026-08-15: the string Christine kept seeing on /site-health --
+// "Server returned unexpected status code - 403" -- comes from
+// node_modules/cloudinary/lib/uploader.js, NOT from this file and NOT from MLS
+// Grid. Confirmed by grepping the installed SDK. So the 403 is CLOUDINARY
+// refusing the upload, which means the earlier "pre-signed URL" fix (still
+// correct, still worth having on the download side) was aimed at the wrong
+// layer. Cloudinary answers 403 for a small number of reasons -- account
+// limit/credits exhausted, a disabled account, a stale-timestamp signature --
+// and its SDK throws away everything except that one line, which is why this
+// was unfalsifiable. Everything the SDK does give us is now captured, and
+// site-health's ?probe=1 asks Cloudinary directly for the account's usage so
+// "is it quota or credentials" stops being a guess.
+function describeCloudinaryError(err, publicId, bytes) {
+  const parts = [];
+  if (err && err.message) parts.push(err.message);
+  if (err && err.http_code) parts.push(`http_code ${err.http_code}`);
+  if (err && err.error && err.error.message && err.error.message !== err.message) {
+    parts.push(err.error.message);
+  }
+  if (err && err.name && err.name !== "Error") parts.push(err.name);
+  parts.push(`publicId ${publicId}`);
+  if (bytes) parts.push(`${bytes} bytes`);
+  return parts.join(" | ");
+}
+
 async function cachePhotoToCloudinary(mediaUrl, token, publicId) {
   if (!configureCloudinary()) return null;
   const buffer = await fetchMlsPhotoBuffer(mediaUrl, token);
   const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
-  const result = await cloudinary.uploader.upload(dataUri, {
+  let result;
+  try {
+    result = await uploadDataUri(dataUri, publicId);
+  } catch (err) {
+    const detailed = new Error(describeCloudinaryError(err, publicId, buffer.length));
+    detailed.http_code = err && err.http_code;
+    throw detailed;
+  }
+  if (!result || !result.secure_url) return null;
+  return cloudinary.url(publicId, {
+    secure: true,
+    resource_type: "image",
+    transformation: [{ quality: "auto", fetch_format: "auto", width: 1600, crop: "limit" }],
+  });
+}
+
+async function uploadDataUri(dataUri, publicId) {
+  return cloudinary.uploader.upload(dataUri, {
     public_id: publicId,
     resource_type: "image",
     overwrite: true,

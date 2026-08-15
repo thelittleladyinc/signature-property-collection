@@ -103,7 +103,27 @@ exports.handler = async (event) => {
     if (data.email) body.emails = [data.email];
     if (data.phone) body.phones = [data.phone];
     body.source = SOURCE_LABELS[formName] || `Signature Property Collection - ${formName}`;
-    body.tags = ["Website Lead", formName];
+    // 2026-08-15 (Christine: "make sure that when the new lead comes in or if it
+    // merges that i am still notified some how in lofty with a hot lead or
+    // something of hte sort"). Her 16:48 test DID reach Lofty -- lead
+    // 1147334685108095 -- but it used her own account-owner email, so Lofty
+    // folded it into an existing contact and it never appeared in "Today's New
+    // Leads". A merge is the case that has to stay visible.
+    //
+    // Tags are the lever, because tags are the one enrichment this API has
+    // already accepted (the full payload went through), and Lofty appends tags on
+    // a merge rather than replacing them. "Hot Lead - Website" is deliberately a
+    // distinct, sortable label rather than a note: a tag can be filtered, saved
+    // as a smart list, and used as a Smart Plan trigger, so it can drive a real
+    // notification instead of sitting in a timeline nobody opens.
+    body.tags = ["Hot Lead - Website", "Website Lead", formName];
+    // Every note starts with this, so even a merged lead's activity timeline shows
+    // at a glance that a NEW website enquiry came in and when.
+    const stamp = new Date().toLocaleString("en-US", {
+      timeZone: "America/Denver", dateStyle: "medium", timeStyle: "short",
+    });
+    const banner = `NEW WEBSITE LEAD (${stamp} MT) — ${SOURCE_LABELS[formName] || formName}`;
+
     if (formName === "listing-alert-request") {
       // 2026-08-15 (Christine: "we have the lofty api that connects to my
       // emails - review it"). Reviewed: Lofty's own Property Alerts -- a Smart
@@ -122,7 +142,7 @@ exports.handler = async (event) => {
       // endpoint couldn't be verified, and a guessed endpoint would fail
       // silently -- the worst outcome for a lead-capture path. The lead arrives
       // tagged and ready; switching the alert on is one step in Lofty.
-      body.notes = `Wants email alerts for new listings matching: ${data.alert_criteria || "(no filters — all new listings)"}` +
+      body.notes = `${banner}\nWants email alerts for new listings matching: ${data.alert_criteria || "(no filters — all new listings)"}` +
         (data.alert_query ? `\nReproduce this search: https://signaturepropertycollection.com/search-homes.html?${data.alert_query}` : "") +
         (data.message ? `\nAlso said: "${data.message}"` : "");
       body.tags.push("Property Alert Request", "Saved Search");
@@ -132,26 +152,31 @@ exports.handler = async (event) => {
       const kind = data.inquiry_type === "Tour" ? "Requested a tour" : "Asked a question";
       const mls = data.listing_mls ? ` (MLS# ${data.listing_mls})` : "";
       const msg = data.message ? ` — "${data.message}"` : "";
-      body.notes = `${kind} about listing: ${data.listing_address}${mls}${msg}`;
+      body.notes = `${banner}\n${kind} about listing: ${data.listing_address}${mls}${msg}`;
       body.tags.push(data.inquiry_type === "Tour" ? "Tour Request" : "Listing Question");
     } else if (data.moving_from) {
       // From the Relocation page's form (build_nav_pages() in build.py).
-      body.notes = `Relocating from: ${data.moving_from}` +
+      body.notes = `${banner}\nRelocating from: ${data.moving_from}` +
         (data.message ? ` — "${data.message}"` : "");
     } else if (data.address) {
-      body.notes = `Requested valuation for: ${data.address}`;
+      body.notes = `${banner}\nRequested valuation for: ${data.address}`;
     } else if (data.message) {
       // From the Buyers page's form (build_buyers() in build.py).
-      body.notes = data.message;
+      body.notes = `${banner}\n${data.message}`;
     } else if (data.quiz_match) {
       // From the Neighborhood Quiz (build_neighborhood_quiz() in build.py) —
       // quiz_match is the top city match (+ runner-up), quiz_answers is a
       // readable summary of what they picked, so the lead lands in Lofty
       // with real context instead of just a name/email.
-      body.notes = `Neighborhood Quiz match: ${data.quiz_match}` +
+      body.notes = `${banner}\nNeighborhood Quiz match: ${data.quiz_match}` +
         (data.quiz_answers ? ` — ${data.quiz_answers}` : "");
       body.tags.push("Neighborhood Quiz");
     }
+
+    // A form with nothing but a name and email (the guide downloads) matches none
+    // of the branches above, and a lead with no note at all is the easiest one to
+    // miss. The banner alone is still worth having.
+    if (!body.notes) body.notes = banner;
 
     const result = await postLead(body, apiKey);
     // The store is only needed for diagnostics, so a Blobs problem must not

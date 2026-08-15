@@ -22,9 +22,10 @@
 // works.
 const { getStore } = require("@netlify/blobs");
 const {
-  SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore,
+  SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS,
 } = require("./lib/_mls-shared");
 const { isCloudinaryConfigured } = require("./lib/_cloudinary");
+const { resolveMediaFor, fetchMediaResponse, looksPresigned } = require("./lib/_media");
 
 // Must match SUSPENSION_KEY in sync-listings.js — duplicated here rather
 // than exported since it's a single literal string and this file should
@@ -37,6 +38,8 @@ const GOOGLE_CHECK_KEY = "google-api-check.json";
 const LOFTY_LAST_PUSH_KEY = "lofty-last-push.json";
 const LOFTY_FAILED_PUSH_KEY = "lofty-failed-pushes.json";
 const LOFTY_CHECK_KEY = "lofty-key-check.json";
+const PHOTO_CHECK_KEY = "photo-pipeline-check.json";
+const CLOUDINARY_CHECK_KEY = "cloudinary-usage-check.json";
 
 // 2026-08-15: Lofty's own API page (Settings > Integrations > API) documents
 // this exact call as its usage example, which makes it the ideal key test --
@@ -49,6 +52,114 @@ const LOFTY_CHECK_KEY = "lofty-key-check.json";
 // asked why a lead never reached Lofty, and without this the only way to test
 // the key was to generate another real lead.
 const LOFTY_ME_URL = "https://api.lofty.com/v1.0/me";
+
+// 2026-08-15 (Christine: "i dont kmow what the problem is - the pics still arent
+// showing", with her own Current Listings page showing a grey box on every card
+// that doesn't have a video). I had already guessed twice at this -- expired
+// URLs, then a pre-signed-URL conflict -- so this stops guessing and walks the
+// real chain end to end, server-side, on one of her own listings: resolve the
+// media URLs from MLS Grid, then actually fetch photo 0 the same way
+// listing-photo.js does, and report exactly which step failed and how.
+//
+// It makes real MLS Grid requests, which is why it only runs under ?probe=1 and
+// caches for 10 minutes like the other probes.
+async function probePhotoPipeline(mineListings, token) {
+  const out = { checkedAt: new Date().toISOString() };
+  const first = (Array.isArray(mineListings) ? mineListings : []).find((l) => l && l.listingId);
+  if (!first) {
+    out.ok = false;
+    out.detail = "No listings of Christine's are known yet, so there is nothing to test.";
+    return out;
+  }
+  out.listingId = first.listingId;
+  if (!token) {
+    out.ok = false;
+    out.detail = "MLSGRID_API_TOKEN isn't set.";
+    return out;
+  }
+  try {
+    const store = getBlobStore(getStore);
+    const resolved = await resolveMediaFor([first.listingId], {
+      store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS, timeoutMs: 6000,
+    });
+    const urls = resolved[first.listingId];
+    if (!urls || !urls.length) {
+      out.ok = false;
+      out.detail = `MLS Grid returned no media for ${first.listingId} — the URL resolve step is what's failing, not the image fetch.`;
+      return out;
+    }
+    out.urlCount = urls.length;
+    // Host only. The signature in the query string is a credential.
+    try { out.mediaHost = new URL(urls[0]).host; } catch (e) { out.mediaHost = "unparseable"; }
+    out.presigned = looksPresigned(urls[0]);
+
+    const attempt = await fetchMediaResponse(urls[0], token, 8000);
+    if (!attempt || !attempt.res) {
+      out.ok = false;
+      out.detail = `Resolved ${urls.length} URL(s) from ${out.mediaHost}, but the image fetch threw with no response.`;
+      return out;
+    }
+    out.fetchStatus = attempt.res.status;
+    out.authMode = attempt.mode;
+    out.contentType = attempt.res.headers.get("content-type") || null;
+    if (!attempt.res.ok) {
+      out.ok = false;
+      out.detail = `Resolved ${urls.length} URL(s) from ${out.mediaHost} ` +
+        `(pre-signed: ${out.presigned ? "yes" : "no"}), but fetching photo 0 returned ` +
+        `HTTP ${attempt.res.status} using the "${attempt.mode}" auth mode. ` +
+        `That is the exact step breaking the photos.`;
+      return out;
+    }
+    const buf = Buffer.from(await attempt.res.arrayBuffer());
+    out.bytes = buf.length;
+    out.ok = buf.length > 1000;
+    out.detail = out.ok
+      ? `Working end to end: resolved ${urls.length} URL(s) from ${out.mediaHost}, ` +
+        `fetched photo 0 as ${out.contentType} (${buf.length.toLocaleString()} bytes) ` +
+        `using the "${attempt.mode}" auth mode.`
+      : `Fetched photo 0 but got only ${buf.length} bytes — that's an error page, not an image.`;
+    return out;
+  } catch (err) {
+    out.ok = false;
+    out.detail = `Photo pipeline probe threw: ${(err && err.message) || err}`;
+    return out;
+  }
+}
+
+// Cloudinary's own account usage. The 403 blocking her permanent photo copies
+// comes from Cloudinary's upload API (proven: that error string lives in
+// node_modules/cloudinary/lib/uploader.js), and Cloudinary answers 403 for a
+// short list of reasons -- credits exhausted, account disabled, bad signature.
+// Asking for usage separates them: it needs valid credentials to answer at all,
+// and its numbers say whether the account is out of room.
+async function probeCloudinaryUsage() {
+  try {
+    const cloudinary = require("cloudinary").v2;
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true,
+    });
+    const usage = await cloudinary.api.usage({ timeout: 6000 });
+    const credits = usage && usage.credits;
+    return {
+      checkedAt: new Date().toISOString(),
+      ok: true,
+      plan: usage && usage.plan,
+      creditsUsed: credits && credits.used_percent != null ? `${credits.used_percent}% of ${credits.limit}` : null,
+      storageBytes: usage && usage.storage && usage.storage.usage,
+      lastUpdated: usage && usage.last_updated,
+    };
+  } catch (err) {
+    return {
+      checkedAt: new Date().toISOString(),
+      ok: false,
+      error: (err && (err.message || (err.error && err.error.message))) || String(err),
+      httpCode: (err && err.http_code) || null,
+    };
+  }
+}
 
 async function probeLoftyKey(apiKey) {
   try {
@@ -135,7 +246,8 @@ exports.handler = async (event) => {
   const params = (event && event.queryStringParameters) || {};
   const wantsJson = params.format === "json";
 
-  const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, cachedLoftyKey] = await Promise.all([
+  const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, cachedLoftyKey,
+    cachedPhotoCheck, cachedCloudCheck] = await Promise.all([
     store.get(SYNC_STATE_KEY, { type: "json" }),
     store.get(MINE_LISTINGS_KEY, { type: "json" }),
     store.get(SUSPENSION_KEY, { type: "json" }),
@@ -143,6 +255,8 @@ exports.handler = async (event) => {
     store.get(LOFTY_LAST_PUSH_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_FAILED_PUSH_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_CHECK_KEY, { type: "json" }).catch(() => null),
+    store.get(PHOTO_CHECK_KEY, { type: "json" }).catch(() => null),
+    store.get(CLOUDINARY_CHECK_KEY, { type: "json" }).catch(() => null),
   ]);
 
   // ---- Google key check (opt-in, cached) ----
@@ -159,6 +273,22 @@ exports.handler = async (event) => {
   if (wantsGoogle && googleKey && !googleFresh) {
     google = await probeGoogle(googleKey);
     await store.setJSON(GOOGLE_CHECK_KEY, google).catch(() => {});
+  }
+
+  let photoCheck = cachedPhotoCheck;
+  const photoFresh = photoCheck && photoCheck.checkedAt &&
+    Date.now() - Date.parse(photoCheck.checkedAt) < GOOGLE_CHECK_TTL_MS;
+  if (wantsProbe && !photoFresh) {
+    photoCheck = await probePhotoPipeline(mine, process.env.MLSGRID_API_TOKEN);
+    await store.setJSON(PHOTO_CHECK_KEY, photoCheck).catch(() => {});
+  }
+
+  let cloudCheck = cachedCloudCheck;
+  const cloudFresh = cloudCheck && cloudCheck.checkedAt &&
+    Date.now() - Date.parse(cloudCheck.checkedAt) < GOOGLE_CHECK_TTL_MS;
+  if (wantsProbe && isCloudinaryConfigured() && !cloudFresh) {
+    cloudCheck = await probeCloudinaryUsage();
+    await store.setJSON(CLOUDINARY_CHECK_KEY, cloudCheck).catch(() => {});
   }
 
   const loftyApiKey = process.env.LOFTY_API_KEY;
@@ -278,6 +408,30 @@ exports.handler = async (event) => {
         : ""),
   });
 
+  // ---- The photo chain, end to end ----
+  checks.push({
+    name: "Listing photos load end to end",
+    ok: !photoCheck ? true : !!photoCheck.ok,
+    detail: photoCheck
+      ? photoCheck.detail
+      : "Not tested yet — add ?probe=1 to this page's URL to walk the whole photo chain " +
+        "(resolve the MLS media URLs, then actually fetch one) and see which step fails.",
+  });
+  checks.push({
+    name: "Cloudinary account healthy",
+    ok: !isCloudinaryConfigured() ? false : (!cloudCheck ? true : !!cloudCheck.ok),
+    detail: !isCloudinaryConfigured()
+      ? "Cloudinary env vars aren't all set."
+      : (!cloudCheck
+        ? "Not tested yet — add ?probe=1 to ask Cloudinary about the account directly."
+        : (cloudCheck.ok
+          ? `Cloudinary answered: plan "${cloudCheck.plan}"` +
+            `${cloudCheck.creditsUsed ? `, credits ${cloudCheck.creditsUsed}` : ""}.` +
+            " If credits are at or near 100%, that is what the upload 403 means."
+          : `Cloudinary refused the account check${cloudCheck.httpCode ? ` (HTTP ${cloudCheck.httpCode})` : ""}: ` +
+            `${cloudCheck.error}. Same credentials the photo uploads use, so this is the 403's cause.`)),
+  });
+
   // ---- Lofty API key valid? ----
   checks.push({
     name: "Lofty API key valid",
@@ -328,7 +482,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed, loftyKeyCheck } }, null, 2),
+      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed, loftyKeyCheck, photoCheck, cloudCheck } }, null, 2),
     };
   }
 
