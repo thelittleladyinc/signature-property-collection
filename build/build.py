@@ -2164,6 +2164,7 @@ def footer_html():
         <h4>Resources</h4>
         <ul>
           <li><a href="/search-homes.html">Search Homes</a></li>
+          <li><a href="/luxury-market.html">Homes Over $1 Million</a></li>
           <li><a href="/current-listings.html">Current Listings</a></li>
           <li><a href="/blog/index.html">Blog</a></li>
           <li><a href="/guides/buyers-guide.html">Buyer's Guide</a></li>
@@ -4950,6 +4951,252 @@ _QUIZ_BUDGET_PARAMS = {
 }
 
 
+# ------------------------------------------------- LUXURY MARKET PAGE ----
+# 2026-08-15 (Christine): "what people are actually searching for? who the
+# sellers are and who the buyers are at this price point."
+#
+# This also closes a gap the README has flagged since the discoverability
+# audit: nothing on the site stated a price threshold, even though "homes over
+# $1,000,000 [city]" is literally what people type, and nothing addressed
+# "best negotiator real estate agent" either. Both are handled here.
+#
+# ON FACTS: the buyer/seller profiles below are qualitative and reflect who
+# actually transacts at this level in Larimer/Weld -- deliberately NOT dressed
+# up with appreciation rates or days-on-market figures. The only numbers on the
+# page that come from outside the business are the equestrian-acreage
+# aggregates, which are attributed and dated inline so they can be checked and
+# refreshed rather than quietly aging into fiction. Everything else is either
+# Christine's own verified track record or a statement that needs no source.
+def build_luxury_market():
+    buyers = [
+        ("Relocating from Denver, Boulder, or out of state",
+         "The single most common call I get at this price. Someone sells in "
+         "Boulder or Denver, looks at what the same money buys an hour north, "
+         "and realizes it's a different house entirely — more land, newer "
+         "build, mountain views, and a commute they actually chose. They are "
+         "rarely in a hurry and almost always doing it for the lifestyle "
+         "rather than the spreadsheet."),
+        ("Move-up buyers using equity from their first Northern Colorado home",
+         "People who bought here years ago, watched their equity build, and are "
+         "now trading up rather than leaving. They know the towns already, so "
+         "the conversation is about specific streets and specific builders, not "
+         "an introduction to the region."),
+        ("Acreage, horse, and ranch buyers",
+         "Land is the whole point for this group — fenced pasture, an arena, "
+         "outbuildings, water, and the room to keep animals. What they want "
+         "sits outside town limits, which means well and septic, access, "
+         "zoning, and water rights matter as much as the house does. This is "
+         "the part of the market with the fewest agents who genuinely know it."),
+        ("Buyers who want new construction in a premier community",
+         "Golf-course and lakefront communities, and the master-planned "
+         "neighborhoods around Centerra and Windsor. They want finish quality "
+         "and amenities without a renovation, and they need someone who will "
+         "read a builder contract properly before they sign it."),
+        ("Privacy-first buyers",
+         "Executives, physicians, and business owners who care more about a "
+         "long driveway and a discreet process than about a marketing "
+         "campaign. Private showings, no sign in the yard where possible, and "
+         "as few people in the transaction as it can be run with."),
+    ]
+    sellers = [
+        ("Empty nesters right-sizing and releasing equity",
+         "The biggest seller group at this level, and the one where timing "
+         "genuinely matters. The house did its job for twenty years, the "
+         "equity in it is now a retirement asset, and the decision is "
+         "financial as much as it is emotional. Most of them are not leaving "
+         "Northern Colorado — they are moving four miles into something "
+         "single-level with less roof to maintain."),
+        ("Owners of large acreage who no longer want the upkeep",
+         "Twenty acres is wonderful at fifty and a lot of work at seventy. "
+         "These sales need a buyer who wants the land for what it is, which is "
+         "a narrower pool and a different marketing approach than an in-town "
+         "listing."),
+        ("Relocating professionals and job transfers",
+         "Usually on somebody else's timeline, which changes the strategy — "
+         "pricing has to be right the first time because there isn't room for "
+         "a long correction."),
+        ("Families settling an estate or a trust",
+         "Often several people in different states making one decision "
+         "together, sometimes a property that hasn't been updated in decades. "
+         "The work here is as much coordination and patience as it is real "
+         "estate."),
+        ("Sellers who tried already and didn't sell",
+         "An expired luxury listing is almost never a bad house. It is usually "
+         "pricing, photography, or a marketing plan built for a $400,000 home "
+         "and applied to a $1.4M one."),
+    ]
+    searches = [
+        ("&ldquo;Homes over $1,000,000&rdquo; and &ldquo;luxury homes for sale&rdquo; in a specific town",
+         "Search by price the way you actually think about it — there's no "
+         "artificial floor on my search, so you'll see everything above your "
+         "number instead of only what an IDX widget decided to show.",
+         "/search-homes.html?minPrice=1000000"),
+        ("&ldquo;Horse property&rdquo; and &ldquo;acreage for sale&rdquo;",
+         "This is the highest-intent search in Northern Colorado and the one "
+         "generic sites handle worst, because acreage doesn't reduce to beds "
+         "and baths. Ask me about a specific parcel and you'll get water, "
+         "zoning, and access, not a photo gallery.",
+         "/search-homes.html?minPrice=1000000"),
+        ("&ldquo;Best negotiator real estate agent&rdquo;",
+         "A fair thing to search for, and hard to verify from a website. I'm a "
+         "Certified Negotiation Specialist, and the more useful proof is the "
+         "track record and what past sellers said about how their deal was "
+         "handled.",
+         "/testimonials.html"),
+        ("&ldquo;What is my home worth&rdquo; at the top of the market",
+         "Automated estimates are least reliable exactly where homes are most "
+         "unusual — custom builds and acreage are what they get most wrong. "
+         "At this price the number needs a person who has walked comparable "
+         "properties.",
+         "/free-home-valuation.html"),
+        ("&ldquo;Homes with a view&rdquo;, &ldquo;lakefront&rdquo;, and &ldquo;golf course homes&rdquo;",
+         "Lifestyle-first searches, and the ones where local knowledge shows "
+         "up fastest — which streets actually hold the mountain view, and "
+         "which back to a fairway you'd rather not back to.",
+         "/lifestyle-search.html"),
+    ]
+
+    def block(items, kind):
+        return "\n".join(
+            f'''      <div class="profile-row">
+        <h3>{title}</h3>
+        <p>{body}</p>
+      </div>'''
+            for title, body in items
+        )
+
+    search_rows = "\n".join(
+        f'''      <div class="profile-row">
+        <h3>{q}</h3>
+        <p>{a} <a href="{href}" class="cta" style="display:inline-block;margin-top:6px">Start there &rarr;</a></p>
+      </div>'''
+        for q, a, href in searches
+    )
+
+    faq_html, faq_schema = _faq_block([
+        ("What counts as a luxury home in Northern Colorado?",
+         "There is no single number, and the honest answer is that it moves by "
+         "town — the line sits meaningfully lower in Greeley or Loveland than "
+         "in Fort Collins or Windsor. What matters more for a buyer coming from "
+         "Denver or Boulder is that $1,000,000 here is not the same house it is "
+         "there: it usually means more land, a newer build, or a view that "
+         "would cost double an hour south."),
+        ("Who is buying homes over $1 million in Northern Colorado?",
+         "Mostly people relocating from Denver, Boulder, or out of state; local "
+         "move-up buyers using equity from a first home here; acreage and horse "
+         "property buyers; and buyers who want new construction in a "
+         "golf-course, lakefront, or master-planned community. Privacy is a "
+         "recurring theme across all of them."),
+        ("Who is selling homes at this price point?",
+         "Most often empty nesters right-sizing and turning home equity into a "
+         "retirement asset, owners of large acreage who no longer want the "
+         "upkeep, relocating professionals on a set timeline, families settling "
+         "an estate, and sellers whose luxury listing already expired once with "
+         "another agent."),
+        (f"Does {SITE['agent']} handle acreage and horse properties?",
+         "Yes — farm, ranch, and acreage work is a specific part of the "
+         "practice rather than an occasional exception, which matters because "
+         "these transactions turn on well and septic, zoning, access, and water "
+         "rights rather than on square footage."),
+    ])
+
+    lead_form = _tool_lead_form("luxury-market", "Start A Private Conversation")
+
+    body = f"""
+<section class="hero" style="padding:150px 0 110px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Over A Million</span>
+    <h1>Northern Colorado Homes Over $1 Million</h1>
+    <p class="lede" style="margin-left:auto;margin-right:auto">A million dollars here is not the
+    same house it is in Boulder or Denver. It usually means land, or a view, or a build quality
+    you would pay double for an hour south. Here is who is buying at this level, who is selling,
+    and what they type into Google before they ever call me.</p>
+    <div class="btn-row" style="justify-content:center">
+      <a class="btn btn-primary" href="/search-homes.html?minPrice=1000000">See Homes Over $1M</a>
+      <a class="btn btn-outline" href="/contact.html">Talk To {esc(SITE['agent'].split()[0])}</a>
+    </div>
+  </div>
+</section>
+
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Buyers</span>
+    <h2 class="section-title">Who Is Buying At This Price</h2>
+    <p class="lede">Five groups, and they want genuinely different things. Knowing which one you
+    are is most of what makes the search efficient.</p>
+    <div class="profile-list">
+{block(buyers, 'buyer')}
+    </div>
+  </div>
+</section>
+
+<section class="section-dark tight">
+  <div class="wrap">
+    <span class="eyebrow">The Sellers</span>
+    <h2 class="section-title">Who Is Selling At This Price</h2>
+    <p class="lede">Almost every seller above a million is solving a problem that isn't really
+    about the house. The strategy follows the problem.</p>
+    <div class="profile-list profile-list-dark">
+{block(sellers, 'seller')}
+    </div>
+  </div>
+</section>
+
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Searches</span>
+    <h2 class="section-title">What People Actually Search For</h2>
+    <p class="lede">These are the searches that bring people to a page like this one, and what
+    I'd tell you about each if you asked me directly.</p>
+    <div class="profile-list">
+{search_rows}
+    </div>
+  </div>
+</section>
+
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Acreage &amp; Equestrian</span>
+    <h2 class="section-title">The Land Market, In Numbers</h2>
+    <p class="lede">Equestrian and acreage property is where this market gets specific. As a
+    rough sense of scale: equestrian listings around Fort Collins have recently averaged about
+    24 acres, with a median asking price near $1.28M and an average closer to $1.57M
+    <span class="fine-note">(aggregated listing data, LandSearch, August 2026 &mdash; a snapshot of
+    what is listed, not what closed)</span>. Land pricing swings hard on water, zoning, and
+    access, so treat any average as a starting point and ask about the actual parcel.</p>
+    <div class="btn-row">
+      <a class="btn btn-dark" href="/contact.html">Ask About A Parcel</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/sold-homes-map.html">See The Track Record</a>
+    </div>
+  </div>
+</section>
+
+{faq_html}
+
+<section class="tight">
+  <div class="wrap" style="max-width:720px">
+    <span class="eyebrow" style="color:var(--dusty-rose)">No Obligation</span>
+    <h2 class="section-title">Start A Private Conversation</h2>
+    <p class="lede">Whether you are two years out or two weeks out. Nothing here is a hard sell,
+    and I would rather tell you to wait than list something that isn't ready.</p>
+    {lead_form}
+  </div>
+</section>
+"""
+    breadcrumbs = _breadcrumb_schema([
+        ("Home", "/index.html"),
+        ("Homes Over $1 Million", None),
+    ])
+    page(
+        "Northern Colorado Homes Over $1 Million | Luxury Buyers & Sellers | Signature Property Collection",
+        f"Who buys and who sells homes over $1 million in Northern Colorado, what they search "
+        f"for, and how {SITE['agent']} handles luxury, acreage, and equestrian property across "
+        f"Larimer, Weld, and Boulder counties.",
+        "/luxury-market.html", None, body,
+        schema_extra=[breadcrumbs, faq_schema],
+    )
+
+
 # --------------------------------------------------------- SOLD MAP ----
 # 2026-08-13 (Christine's request): "map my sold listings and their videos
 # using google api to be able to document homes sold." The addresses in
@@ -6743,6 +6990,7 @@ if __name__ == "__main__":
     build_subdivision_pages()
     build_blog()
     build_rss_feed()
+    build_luxury_market()
     build_sold_homes_map()
     write_sold_homes_function_data()
     build_nav_pages()

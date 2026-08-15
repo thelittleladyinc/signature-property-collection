@@ -29,6 +29,37 @@
   --gray: #A7A9AC;
   --gray-light: #C0C1C4;
 
+  /* 2026-08-15 (Christine: "add slate... think more delicate lines"). Slate is
+     the cool counterweight the palette was missing: the rose is warm and the
+     cream is warm, so every neutral on the page was warm too, which is what
+     makes a layout read "soft" instead of "composed". Slate does the
+     structural work -- rules, borders, fine print -- and leaves the rose free
+     to be the only accent, which is what actually reads as expensive.
+     Deliberately blue-gray rather than another brown-gray, and dark enough to
+     stay legible as body/fine-print text (checks AA on cream). */
+  /* All three are contrast-checked against BOTH grounds they appear on, cream
+     and white, and all three clear WCAG AA (4.5:1) for normal-size text. This
+     matters more than it looks: the first draft of this palette used a prettier
+     #8A98A6 for the mist tone, which came in at 2.73:1 and would have quietly
+     dropped 13 pieces of existing fine print from a passing 5.01:1 to failing
+     — on a site that publishes an accessibility statement. Ratios on cream:
+     slate 9.7, soft 6.5, mist 4.7. Don't lighten these without re-checking. */
+  --slate: #33414F;        /* structural dark — rules, sub-heads, emphasis    */
+  --slate-soft: #4E5B68;   /* secondary body text                            */
+  --slate-mist: #63707D;   /* fine print, captions — the lightest allowed     */
+
+  /* Every line on the site now comes from these three, not from ad-hoc greys.
+     --hairline is the default: slate at 12% is visible as a drawn line but
+     never as a border "box". --hairline-strong is for a rule that has to
+     separate two filled areas; --hairline-light for lines inside a card,
+     where the card edge is already doing the work. Sub-pixel weights get
+     rounded up by browsers, so delicacy comes from LOW ALPHA at 1px rather
+     than from fractional widths. */
+  --hairline: rgba(51,65,79,.12);
+  --hairline-strong: rgba(51,65,79,.20);
+  --hairline-light: rgba(51,65,79,.07);
+  --hairline-rose: rgba(184,111,122,.28);
+
   /* legacy aliases so nothing silently breaks if referenced elsewhere */
   --dusty-rose: var(--rose);
   --deep-mauve: var(--mauve);
@@ -58,13 +89,28 @@ body {
   font-family: var(--font-sans);
   color: var(--charcoal);
   background-color: var(--cream);
+  /* 2026-08-15 (Christine: "still no texture?"). It WAS there, at 3.5% alpha
+     on a 26px grid -- which is to say it was theoretically present and
+     practically invisible, so the honest answer to her question was "no".
+     Rebuilt as a real, tuned surface:
+       - a fine slate cross-hatch (two 1px linear-gradients at 90 degrees) on
+         a tight 7px grid -- this is the layer you can actually see, and
+         weave reads as woven paper where dots read as screen artifact;
+       - the dot grid kept but tightened and lifted, sitting over the weave at
+         a coarser interval so the two don't moire;
+       - the rose corner washes kept, slightly deepened, for the gradient
+         falloff she asked for on 2026-08-14.
+     Still nowhere near a pattern you'd read as decoration -- it's paper
+     grain. Slate rather than black keeps it from greying the cream down. */
   background-image:
-    radial-gradient(circle at 12% -5%, rgba(184,111,122,.06), transparent 38%),
-    radial-gradient(circle at 92% 105%, rgba(184,111,122,.05), transparent 42%),
-    radial-gradient(rgba(20,20,21,.035) 1px, transparent 1px);
-  background-size: auto, auto, 26px 26px;
-  background-position: 0 0, 0 0, 0 0;
-  background-repeat: no-repeat, no-repeat, repeat;
+    radial-gradient(circle at 12% -5%, rgba(184,111,122,.075), transparent 40%),
+    radial-gradient(circle at 92% 105%, rgba(184,111,122,.065), transparent 44%),
+    radial-gradient(rgba(51,65,79,.055) 1px, transparent 1px),
+    linear-gradient(rgba(51,65,79,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(51,65,79,.022) 1px, transparent 1px);
+  background-size: auto, auto, 22px 22px, 7px 7px, 7px 7px;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, repeat;
   -webkit-font-smoothing: antialiased;
   line-height: 1.6;
 }
@@ -202,11 +248,13 @@ nav.primary-nav a:hover { text-decoration: underline; text-decoration-color: cur
   background-color: var(--charcoal);
   background-image:
     radial-gradient(circle at 88% -10%, rgba(184,111,122,.16), transparent 45%),
-    radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px),
     linear-gradient(180deg, rgba(20,20,21,.55), rgba(20,20,21,.75));
-  background-size: cover, 26px 26px, cover;
-  background-position: center, 0 0, center;
-  background-repeat: no-repeat, repeat, no-repeat;
+  background-size: cover, 24px 24px, 7px 7px, 7px 7px, cover;
+  background-position: center, 0 0, 0 0, 0 0, center;
+  background-repeat: no-repeat, repeat, repeat, repeat, no-repeat;
   color: var(--white);
   padding: 170px 0 130px;
   text-align: center;
@@ -262,7 +310,23 @@ section.tight { padding: 64px 0; }
   gap: 14px;
   margin-bottom: 18px;
 }
-.eyebrow::after { content: ''; flex: 0 0 46px; height: 1px; background: rgba(184,111,122,.45); }
+/* A longer, lighter rule that fades out reads as a drawn line; a short solid
+   dash reads as a UI divider. Same idea as the hairlines above -- delicacy
+   from alpha and length, not from weight. */
+.eyebrow::after {
+  content: '';
+  /* Width stays at the original 46px on purpose. Lengthening it to 84px looked
+     better in isolation and wrapped the eyebrow text onto two lines in four
+     places on the homepage alone (.eyebrow is an inline-flex, so a wider rule
+     takes its space out of the text). The refinement here is the fade and the
+     lower alpha, which cost no layout at all. */
+  flex: 0 0 46px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--hairline-rose), rgba(184,111,122,0));
+}
+.section-dark .eyebrow::after {
+  background: linear-gradient(90deg, rgba(184,111,122,.55), rgba(184,111,122,0));
+}
 /* 2026-08-14 (Christine's request): the site-wide .eyebrow script font
    (Corinthia, a calligraphy cursive) reads beautifully for ordinary phrases
    ("A Private Advisory", "The Signature Duo") but falls apart on jammed-
@@ -290,7 +354,9 @@ h2.section-title {
   margin: 0 0 28px;
   max-width: 760px;
 }
-.lede { font-size: 17px; line-height: 1.8; max-width: 680px; color: #3a3a3c; }
+/* Slate rather than a warm near-black: on a warm cream ground a brown-grey
+   body colour muddies, where a cool grey stays crisp. */
+.lede { font-size: 17px; line-height: 1.8; max-width: 680px; color: var(--slate-soft); }
 
 /* 2026-08-14: same subtle rose-glow + dot-texture treatment as .hero above,
    so the site's other full-width dark sections (Success Stories, etc.)
@@ -300,9 +366,11 @@ h2.section-title {
   background-color: var(--charcoal);
   background-image:
     radial-gradient(circle at 10% 110%, rgba(184,111,122,.13), transparent 42%),
-    radial-gradient(rgba(255,255,255,.03) 1px, transparent 1px);
-  background-size: cover, 26px 26px;
-  background-repeat: no-repeat, repeat;
+    radial-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size: cover, 24px 24px, 7px 7px, 7px 7px;
+  background-repeat: no-repeat, repeat, repeat, repeat;
   color: var(--white);
 }
 .section-dark .lede { color: rgba(255,255,255,.78); }
@@ -356,17 +424,30 @@ h2.section-title {
   }
 }
 
+/* 2026-08-15: cards used to be a white rectangle floating on a big soft
+   shadow, with a rose line across the top and no other edge. On a textured
+   ground that reads as a cut-out, not a card. Now the shadow is much lighter
+   and a full slate hairline draws the whole edge -- the line does the work,
+   the shadow only lifts it off the grain. The rose accent stays, but as a
+   finer, lower-alpha line rather than the strongest mark on the card. */
 .card {
   background: var(--white);
   padding: 50px 40px 44px;
   border-radius: 1px;
-  box-shadow: 0 30px 70px rgba(20,20,21,.045);
-  border-top: 1px solid rgba(184,111,122,.35);
-  transition: box-shadow .25s ease, transform .25s ease;
+  box-shadow: 0 18px 44px rgba(51,65,79,.035);
+  border: 1px solid var(--hairline);
+  border-top: 1px solid var(--hairline-rose);
+  transition: box-shadow .25s ease, transform .25s ease, border-color .25s ease;
 }
-.card:hover { box-shadow: 0 36px 84px rgba(20,20,21,.08); transform: translateY(-2px); }
+.card:hover {
+  box-shadow: 0 26px 60px rgba(51,65,79,.07);
+  transform: translateY(-2px);
+  border-color: var(--hairline-strong);
+  border-top-color: var(--rose);
+}
+.card p { color: var(--slate-soft); }
 .card h3 { font-family: var(--font-serif); font-weight: 400; font-size: 21px; margin: 0 0 16px; letter-spacing: .01em; }
-.card p { color: #57575a; line-height: 1.8; font-size: 14.5px; font-weight: 300; }
+.card p { color: var(--slate-soft); line-height: 1.8; font-size: 14.5px; font-weight: 300; }
 .card a.cta {
   display: inline-block; margin-top: 24px; font-size: 11px; font-weight: 600;
   letter-spacing: .14em; text-transform: uppercase; color: var(--deep-mauve);
@@ -385,7 +466,7 @@ h2.section-title {
   flex-shrink: 0; box-shadow: 0 10px 24px rgba(20,20,21,.08);
 }
 .team-card h3 { font-family: var(--font-serif); font-weight: 400; font-size: 20px; margin: 0 0 10px; }
-.team-card p { color: #57575a; line-height: 1.75; font-size: 14px; font-weight: 300; margin: 0; }
+.team-card p { color: var(--slate-soft); line-height: 1.75; font-size: 14px; font-weight: 300; margin: 0; }
 @media (max-width: 560px) {
   .team-card { flex-direction: column; }
   .team-card img { width: 100%; height: 240px; }
@@ -394,7 +475,7 @@ h2.section-title {
 /* ---------- Video embeds ---------- */
 .video-embed { position: relative; width: 100%; padding-top: 56.25%; border-radius: 2px; overflow: hidden; background: #141415; box-shadow: 0 10px 30px rgba(20,20,21,.10); }
 .video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.video-embed-caption { margin-top: 12px; font-size: 14px; color: #6a6a6c; }
+.video-embed-caption { margin-top: 12px; font-size: 14px; color: var(--slate-mist); }
 .video-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 40px; }
 @media (max-width: 900px) { .video-grid { grid-template-columns: 1fr; } }
 
@@ -421,7 +502,7 @@ h2.section-title {
 #sold-homes-map { width: 100%; min-height: 560px; border-radius: 4px; background: var(--charcoal); }
 @media (max-width: 700px) { #sold-homes-map { min-height: 420px; } }
 .sold-homes-map-status {
-  display: none; text-align: center; padding: 20px; color: #6a6a6c;
+  display: none; text-align: center; padding: 20px; color: var(--slate-mist);
   font-size: 14px; background: var(--off-white, #F9F9EC); border-radius: 4px; margin-top: 12px;
 }
 
@@ -469,9 +550,9 @@ h2.section-title {
 .leaflet-control-zoom a { font-size: 20px !important; width: 34px !important; height: 34px !important; line-height: 32px !important; }
 
 /* ---------- FAQ (answer-shaped content for AI/local search) ---------- */
-.faq-item { padding: 32px 0; border-top: 1px solid #e4e4d8; }
+.faq-item { padding: 32px 0; border-top: 1px solid var(--hairline); }
 .faq-item h3 { font-family: var(--font-serif); font-weight: 600; font-size: 19px; margin: 0 0 12px; letter-spacing: -.005em; }
-.faq-item p { color: #4a4a4c; line-height: 1.75; font-size: 15px; margin: 0; }
+.faq-item p { color: var(--slate-soft); line-height: 1.75; font-size: 15px; margin: 0; }
 
 /* ---------- Testimonials ---------- */
 .testimonial {
@@ -489,8 +570,8 @@ h2.section-title {
   display: block;
   margin-bottom: 6px;
 }
-.testimonial p { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: #3a3a3c; line-height: 1.85; font-size: 15.5px; }
-.testimonial .who { margin-top: 22px; font-weight: 600; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: #6a6a6c; }
+.testimonial p { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--slate); line-height: 1.85; font-size: 15.5px; }
+.testimonial .who { margin-top: 22px; font-weight: 600; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--slate-mist); }
 /* 2026-08-14: real 5-star rating marker on every testimonial card -- these
    are genuinely 5-star reviews (99 of them on Google, per Christine), so
    showing the stars alongside each quote makes that concrete rather than
@@ -515,19 +596,21 @@ h2.section-title {
 /* ---------- Forms ---------- */
 form.lead-form { display: grid; gap: 16px; max-width: 560px; }
 form.lead-form input, form.lead-form textarea {
-  padding: 14px 16px; border: 1px solid var(--gray); background: var(--white);
+  padding: 14px 16px; border: 1px solid var(--hairline-strong); background: var(--white);
   font-family: var(--font-sans); font-size: 14px;
 }
-form.lead-form label.consent { font-size: 12px; color: #6a6a6c; display: flex; gap: 8px; align-items: flex-start; }
+form.lead-form label.consent { font-size: 12px; color: var(--slate-mist); display: flex; gap: 8px; align-items: flex-start; }
 
 /* ---------- Footer ---------- */
 .site-footer {
   background-color: var(--charcoal);
   background-image:
     radial-gradient(circle at 15% 0%, rgba(184,111,122,.1), transparent 40%),
-    radial-gradient(rgba(255,255,255,.03) 1px, transparent 1px);
-  background-size: cover, 26px 26px;
-  background-repeat: no-repeat, repeat;
+    radial-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size: cover, 24px 24px, 7px 7px, 7px 7px;
+  background-repeat: no-repeat, repeat, repeat, repeat;
   color: rgba(255,255,255,.8); padding: 90px 0 40px; font-size: 14px;
 }
 .footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1.3fr 1fr; gap: 52px; }
@@ -572,17 +655,17 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 /* ---------- Live property search (MLS Grid / IRES) ---------- */
 .search-form { display: grid; grid-template-columns: repeat(5, 1fr) auto; gap: 12px; align-items: end; margin-top: 30px; }
 .search-form .field { display: flex; flex-direction: column; }
-.search-form label { font-size: 12px; color: #6a6a6c; margin-bottom: 6px; }
+.search-form label { font-size: 12px; color: var(--slate-mist); margin-bottom: 6px; }
 .search-form select, .search-form input {
-  padding: 12px 14px; border: 1px solid var(--gray); background: var(--white);
+  padding: 12px 14px; border: 1px solid var(--hairline-strong); background: var(--white);
   font-family: var(--font-sans); font-size: 14px; width: 100%;
 }
 @media (max-width: 900px) { .search-form { grid-template-columns: 1fr 1fr; } }
 
-.search-status { margin-top: 26px; font-size: 14px; color: #6a6a6c; }
+.search-status { margin-top: 26px; font-size: 14px; color: var(--slate-mist); }
 .listing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; margin-top: 28px; }
 @media (max-width: 900px) { .listing-grid { grid-template-columns: 1fr; } }
-.listing-card { border: 1px solid #e4e4d8; background: var(--white); overflow: hidden; }
+.listing-card { border: 1px solid var(--hairline); background: var(--white); overflow: hidden; }
 .listing-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #eee; }
 .listing-card .listing-body { padding: 24px 24px 22px; }
 .listing-status-badge { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 4px 10px; margin-bottom: 10px; color: var(--white); }
@@ -595,14 +678,14 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
    to the photo, not the whole card. */
 .listing-ribbon { position: absolute; top: 0; left: 0; right: 0; z-index: 2; background: #b7791f; color: var(--white); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; text-align: center; padding: 9px 12px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
 .listing-card .listing-price { font-family: var(--font-serif); font-size: 22px; margin: 0 0 4px; }
-.listing-card .listing-meta { color: #4a4a4c; font-size: 14px; margin: 0 0 8px; }
-.listing-card .listing-address { font-size: 14px; color: #6a6a6c; margin: 0 0 10px; }
-.listing-card .listing-compliance { font-size: 14px; color: #3a3a3c; line-height: 1.5; border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px; }
-.mls-disclaimer { font-size: 12px; color: #6a6a6c; line-height: 1.7; margin-top: 44px; padding-top: 24px; border-top: 1px solid #e4e4d8; }
-.mls-disclaimer .mls-source-badge { font-weight: 700; color: #3a3a3c; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+.listing-card .listing-meta { color: var(--slate-soft); font-size: 14px; margin: 0 0 8px; }
+.listing-card .listing-address { font-size: 14px; color: var(--slate-mist); margin: 0 0 10px; }
+.listing-card .listing-compliance { font-size: 14px; color: var(--slate); line-height: 1.5; border-top: 1px solid var(--hairline-light); padding-top: 10px; margin-top: 10px; }
+.mls-disclaimer { font-size: 12px; color: var(--slate-mist); line-height: 1.7; margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.mls-disclaimer .mls-source-badge { font-weight: 700; color: var(--slate); text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 
 /* ---------- Nearby & Distances (grocery/schools/parks per listing) ---------- */
-.listing-nearby { border-top: 1px solid #eee; margin-top: 12px; padding-top: 12px; }
+.listing-nearby { border-top: 1px solid var(--hairline-light); margin-top: 12px; padding-top: 12px; }
 .nearby-toggle {
   background: none; border: none; padding: 0; margin: 0; cursor: pointer; text-align: left;
   font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--charcoal);
@@ -611,19 +694,50 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .nearby-panel { margin-top: 12px; }
 .nearby-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
 .nearby-tab {
-  padding: 5px 12px; border: 1px solid var(--gray-light); border-radius: 999px; background: var(--white);
+  padding: 5px 12px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--white);
   font-family: var(--font-sans); font-size: 12px; cursor: pointer; color: var(--charcoal);
 }
 .nearby-tab.active { background: var(--charcoal); border-color: var(--charcoal); color: var(--white); }
 .nearby-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-.nearby-list li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #4a4a4c; }
+.nearby-list li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--slate-soft); }
 .nearby-name { flex: 1; }
 .nearby-distance { color: var(--dusty-rose); font-weight: 600; white-space: nowrap; }
 .nearby-name a { color: inherit; text-decoration: underline; text-decoration-color: var(--gray-light); }
 .nearby-name a:hover { color: var(--rose); text-decoration-color: var(--rose); }
 /* Kept clearly legible on purpose -- Places attribution must not be
    obscured or faded into the background. */
-.nearby-attrib { font-size: 11px; color: #3a3a3c; margin: 10px 0 0; line-height: 1.6; }
+.nearby-attrib { font-size: 11px; color: var(--slate); margin: 10px 0 0; line-height: 1.6; }
+
+/* ---------- Buyer/seller profile rows (Homes Over $1M) ----------
+   2026-08-15: deliberately NOT cards. A stack of boxed cards is the busiest
+   possible way to present five paragraphs; a single hairline between rows says
+   the same thing and lets the page breathe, which is most of what reads as
+   expensive. The rose tick on the heading is the only ornament. */
+.profile-list { margin-top: 40px; border-top: 1px solid var(--hairline); }
+.profile-row { padding: 30px 0; border-bottom: 1px solid var(--hairline); }
+.profile-row h3 {
+  font-family: var(--font-serif); font-weight: 400; font-size: 20px;
+  letter-spacing: .01em; margin: 0 0 12px; color: var(--charcoal);
+  display: flex; align-items: baseline; gap: 12px;
+}
+.profile-row h3::before {
+  content: ''; flex: 0 0 18px; height: 1px; background: var(--rose);
+  opacity: .55; transform: translateY(-6px);
+}
+.profile-row p {
+  margin: 0; color: var(--slate-soft); font-size: 15.5px;
+  line-height: 1.85; font-weight: 300; max-width: 74ch;
+}
+.profile-list-dark { border-top-color: rgba(255,255,255,.14); }
+.profile-list-dark .profile-row { border-bottom-color: rgba(255,255,255,.14); }
+.profile-list-dark .profile-row h3 { color: var(--white); }
+.profile-list-dark .profile-row p { color: rgba(255,255,255,.76); }
+.fine-note { color: var(--slate-mist); font-size: 13px; }
+@media (max-width: 600px) {
+  .profile-row { padding: 24px 0; }
+  .profile-row h3 { font-size: 18px; gap: 9px; }
+  .profile-row h3::before { flex-basis: 12px; }
+}
 
 /* ---------- Walkability panel (city + subdivision pages) ----------
    2026-08-15 (Christine): "a much more detailed walkability score ... maybe
@@ -637,33 +751,35 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .walk-dial {
   flex: 0 0 auto; width: 104px; height: 104px; border-radius: 50%;
   display: grid; place-items: center; position: relative;
-  background: var(--white); border: 1px solid var(--gray-light);
+  background: var(--white); border: 1px solid var(--hairline);
 }
 .walk-dial-score {
   font-family: var(--font-serif); font-size: 34px; line-height: 1; color: var(--charcoal);
 }
-.walk-dial-of { font-size: 11px; color: #6a6a6c; letter-spacing: .04em; margin-top: 3px; }
+.walk-dial-of { font-size: 11px; color: var(--slate-mist); letter-spacing: .04em; margin-top: 3px; }
 .walk-band { font-family: var(--font-serif); font-size: 24px; color: var(--charcoal); margin: 0; }
-.walk-band-sub { font-size: 14px; color: #4a4a4c; margin: 6px 0 0; max-width: 46ch; line-height: 1.6; }
+.walk-band-sub { font-size: 14px; color: var(--slate-soft); margin: 6px 0 0; max-width: 46ch; line-height: 1.6; }
 .walk-cats {
   list-style: none; padding: 0; margin: 26px 0 0;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px;
 }
-.walk-cat { border: 1px solid #e4e4d8; border-radius: 10px; padding: 12px 14px; background: var(--white); }
+.walk-cat { border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; background: var(--white); }
 .walk-cat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .walk-cat-label { font-size: 13px; font-weight: 600; color: var(--charcoal); }
 .walk-cat-dist { font-size: 13px; font-weight: 600; color: var(--rose); white-space: nowrap; }
-.walk-cat-dist.walk-far { color: #8a8a8c; }
+/* --slate-mist, not a lighter grey: this still reads as de-emphasised next
+   to the rose used for close-by distances, and unlike #8a8a8c it clears AA. */
+.walk-cat-dist.walk-far { color: var(--slate-mist); }
 .walk-cat-examples { list-style: none; padding: 0; margin: 8px 0 0; }
-.walk-cat-examples li { font-size: 12px; color: #6a6a6c; line-height: 1.7; }
-.walk-method { font-size: 12px; color: #6a6a6c; line-height: 1.7; margin-top: 20px; }
+.walk-cat-examples li { font-size: 12px; color: var(--slate-mist); line-height: 1.7; }
+.walk-method { font-size: 12px; color: var(--slate-mist); line-height: 1.7; margin-top: 20px; }
 /* Google requires Places attribution to be clearly visible and not obscured,
    so this is a touch darker than the surrounding fine print rather than
    lighter. */
-.walk-attrib { color: #3a3a3c; }
+.walk-attrib { color: var(--slate); }
 .walk-cat-examples a { color: inherit; text-decoration: underline; text-decoration-color: var(--gray-light); }
 .walk-cat-examples a:hover { color: var(--rose); text-decoration-color: var(--rose); }
-.walk-status { font-size: 14px; color: #6a6a6c; }
+.walk-status { font-size: 14px; color: var(--slate-mist); }
 @media (max-width: 520px) {
   .walk-headline { gap: 16px; }
   .walk-dial { width: 84px; height: 84px; }
@@ -703,7 +819,7 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 /* ---------- Map click-to-search popup (build/assets/js/map.js) ---------- */
 .quick-price-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .quick-price-btn {
-  background: var(--white); border: 1px solid var(--gray-light); color: var(--charcoal);
+  background: var(--white); border: 1px solid var(--hairline); color: var(--charcoal);
   padding: 10px 16px; font-family: var(--font-sans); font-size: 13px; font-weight: 500;
   cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
@@ -715,7 +831,7 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .fs-widget { margin-top: 30px; }
 .fs-row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
 .fs-block { flex: 1 1 260px; min-width: 220px; }
-.fs-label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #6a6a6c; margin-bottom: 12px; display: block; }
+.fs-label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--slate-mist); margin-bottom: 12px; display: block; }
 
 .fs-price-values { display: flex; justify-content: space-between; font-family: var(--font-serif); font-size: 19px; color: var(--charcoal); margin-bottom: 14px; }
 .fs-price-values span { color: var(--deep-mauve); }
@@ -744,7 +860,7 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 
 .fs-pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
 .fs-pill {
-  background: var(--white); border: 1px solid var(--gray-light); color: var(--charcoal);
+  background: var(--white); border: 1px solid var(--hairline); color: var(--charcoal);
   padding: 10px 18px; font-family: var(--font-sans); font-size: 13px; font-weight: 500;
   cursor: pointer; border-radius: 999px; transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
@@ -757,7 +873,7 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 /* ---------- Neighborhood Quiz (now a collapsible section on
    /sold-homes-map.html, see build_sold_homes_map()'s 2026-08-14 comment) --------- */
 .quiz-disclosure {
-  border: 1px solid var(--gray-light); border-radius: 12px; padding: 28px 32px;
+  border: 1px solid var(--hairline); border-radius: 12px; padding: 28px 32px;
   max-width: 720px; margin: 0 auto; transition: border-color .2s ease, background .2s ease;
 }
 .quiz-disclosure[open] { background: #fbf9f7; }
@@ -773,7 +889,7 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 }
 .quiz-disclosure[open] summary::after { content: '\2212'; }
 .quiz-disclosure summary .lede { max-width: 560px; }
-.quiz-disclosure .quiz-widget { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--gray-light); }
+.quiz-disclosure .quiz-widget { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--hairline); }
 .quiz-widget { max-width: 720px; margin: 0 auto; }
 .quiz-progress { display: flex; gap: 8px; margin-bottom: 32px; }
 .quiz-progress-dot { flex: 1; height: 4px; background: var(--gray-light); border-radius: 2px; transition: background .2s ease; }
