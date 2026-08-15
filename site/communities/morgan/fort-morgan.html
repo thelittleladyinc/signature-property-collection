@@ -107,12 +107,587 @@
     <div>
       <div class="card">
         <h3>Homes &amp; Real Estate in Fort Morgan</h3>
-        <p>Reach out and we'll send you a curated list of Fort Morgan listings matched to what you're looking for.</p>
+        <p>Browse live, active IRES MLS listings in Fort Morgan below — updated in real time, not a stale snapshot — or reach out and we'll send you a curated list matched to what you're looking for.</p>
       </div>
     </div>
   </div>
 </section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
+    <h2 class="section-title">Search Homes In Fort Morgan</h2>
+    <p class="lede">Every active Fort Morgan listing from IRES MLS, any price range —
+    updated every 15 minutes, not a stale snapshot. Filter by price, beds, and baths
+    below, or <a href="/search-homes.html?cities=Fort%20Morgan%2CBrush%2CWiggins%2CLog%20Lane%20Village" style="text-decoration:underline">search
+    all of Morgan County at once</a>.</p>
+    <div class="fs-widget">
+    <form id="fs-fort-morgan-form">
+      <input type="hidden" name="city" value="Fort Morgan">
+      <div class="fs-row" style="margin-top:22px">
+        <div class="fs-block" style="flex:1 1 320px">
+          <span class="fs-label">Price Range</span>
+          <div class="fs-price-values"><span id="fs-fort-morgan-min-label">$0</span><span>&mdash;</span><span id="fs-fort-morgan-max-label">$5,000,000+</span></div>
+          <div class="fs-slider">
+            <div class="fs-slider-track"></div>
+            <div class="fs-slider-range" id="fs-fort-morgan-range-fill"></div>
+            <input type="range" id="fs-fort-morgan-min-range" min="0" max="5000000" step="25000" value="0" aria-label="Minimum price">
+            <input type="range" id="fs-fort-morgan-max-range" min="0" max="5000000" step="25000" value="5000000" aria-label="Maximum price">
+          </div>
+        </div>
+        <div class="fs-block">
+        <span class="fs-label">Beds</span>
+        <div class="fs-pill-group" data-field="beds">
+          <button type="button" class="fs-pill active" data-value="">Any</button>
+          <button type="button" class="fs-pill" data-value="1">1+</button>
+          <button type="button" class="fs-pill" data-value="2">2+</button>
+          <button type="button" class="fs-pill" data-value="3">3+</button>
+          <button type="button" class="fs-pill" data-value="4">4+</button>
+          <button type="button" class="fs-pill" data-value="5">5+</button>
+        </div>
+      </div>
+        <div class="fs-block">
+        <span class="fs-label">Baths</span>
+        <div class="fs-pill-group" data-field="baths">
+          <button type="button" class="fs-pill active" data-value="">Any</button>
+          <button type="button" class="fs-pill" data-value="1">1+</button>
+          <button type="button" class="fs-pill" data-value="2">2+</button>
+          <button type="button" class="fs-pill" data-value="3">3+</button>
+          <button type="button" class="fs-pill" data-value="4">4+</button>
+        </div>
+      </div>
+      </div>
+      <input type="hidden" name="minPrice" id="fs-fort-morgan-minPrice">
+      <input type="hidden" name="maxPrice" id="fs-fort-morgan-maxPrice">
+      <input type="hidden" name="beds" id="fs-fort-morgan-beds">
+      <input type="hidden" name="baths" id="fs-fort-morgan-baths">
+      <div class="fs-actions">
+        <button class="btn btn-dark" type="submit">Search Homes</button>
+      </div>
+    </form>
+    <p class="search-status" id="fs-fort-morgan-deep-link-note" style="display:none;font-weight:600"></p>
+    <p class="search-status" id="fs-fort-morgan-status">Loading listings&hellip;</p>
+    <div class="listing-grid" id="fs-fort-morgan-results"></div>
+    <div class="btn-row" style="margin-top:32px">
+      <button type="button" id="fs-fort-morgan-load-more" class="btn btn-outline" style="border-color:#141415;color:#141415;cursor:pointer;display:none">Load More Listings</button>
+    </div>
+    <div class="mls-disclaimer">
+      <p><span class="mls-source-badge">Source: IRES MLS</span> — Listings courtesy of IRES MLS
+      as distributed by MLS Grid. Based on information submitted to MLS Grid as of
+      <span id="fs-fort-morgan-fetched-at">page load</span>. All data is obtained from various sources and may
+      not have been verified by broker or MLS Grid. Supplied open house information is subject to
+      change without notice. All information should be independently reviewed and verified for
+      accuracy. Properties may or may not be listed by the office/agent presenting the information.
+      Some IDX listings have been excluded from this website. Offer of compensation is made only to
+      participants of the MLS where the listing is filed.</p>
+    </div>
+  </div>
 
+  <div class="lb-overlay" id="gallery-overlay" role="dialog" aria-modal="true" aria-label="Listing photo gallery" onclick="if (event.target === this) closeGallery()">
+    <div class="lb-box lb-box-media">
+      <button type="button" class="lb-close" onclick="closeGallery()" aria-label="Close photo gallery">&times;</button>
+      <img id="gallery-img" src="" alt="Listing photo">
+      <div class="gallery-nav">
+        <button type="button" onclick="galleryNav(-1)">&larr; Prev</button>
+        <span id="gallery-counter"></span>
+        <button type="button" onclick="galleryNav(1)">Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lb-overlay" id="inquiry-overlay" role="dialog" aria-modal="true" aria-labelledby="inquiry-heading" onclick="if (event.target === this) closeInquiry()">
+    <div class="lb-box">
+      <button type="button" class="lb-close" onclick="closeInquiry()" aria-label="Close">&times;</button>
+      <h3 id="inquiry-heading">Ask A Question</h3>
+      <p id="inquiry-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
+      <form class="lead-form" name="listing-inquiry" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name" value="listing-inquiry">
+      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <input type="text" name="name" placeholder="Full Name" required>
+      <input type="email" name="email" placeholder="Email" required>
+      <input type="tel" name="phone" placeholder="Phone">
+      
+      <input type="hidden" name="listing_address" id="li-address">
+      <input type="hidden" name="listing_mls" id="li-mls">
+      <input type="hidden" name="inquiry_type" id="li-kind">
+      <textarea name="message" placeholder="Your message (optional)" rows="3"></textarea>
+      <label class="consent">
+        <input type="checkbox" required>
+        I agree to receive marketing communication via call, text, or similar automated
+        means from Signature Property Collection. Consent is not a condition of purchase. Msg/data rates
+        may apply. Reply STOP to unsubscribe.
+      </label>
+      <button class="btn btn-dark" type="submit">Send My Message</button>
+    </form>
+    </div>
+  </div>
+  </div>
+</section>
+<script>
+(function () {
+  var wid = "fs-fort-morgan";
+  var fixedCity = "Fort Morgan";
+  var supportDeepLinks = false;
+  var alwaysNoFloor = true;
+  var countyCityMap = {};
+  var form = document.getElementById(wid + '-form');
+  var resultsEl = document.getElementById(wid + '-results');
+  var statusEl = document.getElementById(wid + '-status');
+  var loadMoreBtn = document.getElementById(wid + '-load-more');
+  var fetchedAtEl = document.getElementById(wid + '-fetched-at');
+  var minRange = document.getElementById(wid + '-min-range');
+  var maxRange = document.getElementById(wid + '-max-range');
+  var minLabel = document.getElementById(wid + '-min-label');
+  var maxLabel = document.getElementById(wid + '-max-label');
+  var rangeFill = document.getElementById(wid + '-range-fill');
+  var minPriceInput = document.getElementById(wid + '-minPrice');
+  var maxPriceInput = document.getElementById(wid + '-maxPrice');
+  var bedsInput = document.getElementById(wid + '-beds');
+  var bathsInput = document.getElementById(wid + '-baths');
+  var citySelect = document.getElementById(wid + '-city');
+  var countySelect = document.getElementById(wid + '-county');
+  var CEILING = 5000000;
+  var skip = 0;
+  var TOP = 12;
+
+  var LISTING_VIDEOS = {"32 victoria dr": {"id": "9aIGz-SvCtI", "title": "Affordable Luxury at 32 Victoria Dr \u2014 Johnstown Home Tour"}, "32 victoria drive": {"id": "9aIGz-SvCtI", "title": "Affordable Luxury at 32 Victoria Dr \u2014 Johnstown Home Tour"}, "16225 county road 98": {"id": "N57_J3llZCQ", "title": "45 Acres + Heated Shop \u2014 Custom Colorado Ranch, No HOA | 16225 County Road 98"}, "16225 county rd 98": {"id": "N57_J3llZCQ", "title": "45 Acres + Heated Shop \u2014 Custom Colorado Ranch, No HOA | 16225 County Road 98"}, "929 independent ave": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "929 w independent ave": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "929 west independent ave": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "929 independent avenue": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "929 w independent avenue": {"id": "TpjE36J71zc", "title": "Tour 929 W Independent Ave \u2014 Modern 4-Bed Home in LaSalle, Colorado"}, "294 gila trail": {"id": "JvtRGf01JXU", "title": "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail"}, "294 gila trl": {"id": "JvtRGf01JXU", "title": "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail"}, "39243 boulevard e": {"id": "L-uEVzq1bv4", "title": "Eaton, CO Home Under $400K \u2014 39243 Boulevard E"}, "39243 blvd e": {"id": "L-uEVzq1bv4", "title": "Eaton, CO Home Under $400K \u2014 39243 Boulevard E"}, "1110 quitman st": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "1110 s quitman st": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "1110 south quitman st": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "1110 quitman street": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "1110 s quitman street": {"id": "e7kMY1yV7GI", "title": "Denver Home Tour \u2014 Charming Mid-Century Ranch at 1110 S Quitman St"}, "45615 county rd 27": {"id": "dVonJhu_zCo", "title": "Dream Ranch on 20 Acres \u2014 45615 County Rd 27, Pierce CO"}, "45615 county road 27": {"id": "dVonJhu_zCo", "title": "Dream Ranch on 20 Acres \u2014 45615 County Rd 27, Pierce CO"}, "504 graefe ave": {"id": "eiFurERq_As", "title": "Charming Home for Sale at 504 Graefe Ave, Ault CO"}, "504 graefe avenue": {"id": "eiFurERq_As", "title": "Charming Home for Sale at 504 Graefe Ave, Ault CO"}, "1316 cimarron cir": {"id": "xWcrj6foJ-Q", "title": "Aspen Meadows Ranch Home in Eaton, CO \u2014 1316 Cimarron Cir"}, "1316 cimarron circle": {"id": "xWcrj6foJ-Q", "title": "Aspen Meadows Ranch Home in Eaton, CO \u2014 1316 Cimarron Cir"}, "4869 stuart st": {"id": "oNZBc-MxzUg", "title": "Stunning Home for Sale \u2014 4986 Stuart St, Denver (Tennyson Art District)"}, "4869 stuart street": {"id": "oNZBc-MxzUg", "title": "Stunning Home for Sale \u2014 4986 Stuart St, Denver (Tennyson Art District)"}, "4986 stuart st": {"id": "oNZBc-MxzUg", "title": "Stunning Home for Sale \u2014 4986 Stuart St, Denver (Tennyson Art District)"}, "4986 stuart street": {"id": "oNZBc-MxzUg", "title": "Stunning Home for Sale \u2014 4986 Stuart St, Denver (Tennyson Art District)"}, "5705 snow mesa ct": {"id": "MDfyzESb1Yk", "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? \u2014 5705 Snow Mesa Dr"}, "5705 snow mesa court": {"id": "MDfyzESb1Yk", "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? \u2014 5705 Snow Mesa Dr"}, "5705 snow mesa dr": {"id": "MDfyzESb1Yk", "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? \u2014 5705 Snow Mesa Dr"}, "5705 snow mesa drive": {"id": "MDfyzESb1Yk", "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? \u2014 5705 Snow Mesa Dr"}, "945 maplebrook dr": {"id": "SAZceZQJrAs", "title": "Is This the Cutest Home in Windsor, Colorado? \u2014 945 Maplebrook Dr Tour"}, "945 maplebrook drive": {"id": "SAZceZQJrAs", "title": "Is This the Cutest Home in Windsor, Colorado? \u2014 945 Maplebrook Dr Tour"}, "475 homestead ln": {"id": "6Hrdv6LZIDM", "title": "Tour This Stunning Johnstown Home \u2014 475 Homestead Ln (Johnstown Farms)"}, "475 homestead lane": {"id": "6Hrdv6LZIDM", "title": "Tour This Stunning Johnstown Home \u2014 475 Homestead Ln (Johnstown Farms)"}, "913 green mountain dr": {"id": "e-_3Qs3liQ0", "title": "Inside a $1.35M Luxury Home in Small-Town Colorado \u2014 913 Green Mountain Dr, Erie"}, "913 green mountain drive": {"id": "e-_3Qs3liQ0", "title": "Inside a $1.35M Luxury Home in Small-Town Colorado \u2014 913 Green Mountain Dr, Erie"}, "45920 gold stone creek ct": {"id": "Dr5RN8_VfbU", "title": "Custom Ranch Home with 4000+ Sq Ft \u2014 45920 Gold Stone Creek Ct"}, "45920 gold stone creek court": {"id": "Dr5RN8_VfbU", "title": "Custom Ranch Home with 4000+ Sq Ft \u2014 45920 Gold Stone Creek Ct"}, "616 41st ave": {"id": "MLbFLWZc-j4", "title": "Why This Corner Lot in Greeley Stands Out \u2014 616 41st Ave Tour"}, "616 41st avenue": {"id": "MLbFLWZc-j4", "title": "Why This Corner Lot in Greeley Stands Out \u2014 616 41st Ave Tour"}, "1082 lilac ct": {"id": "06q7rZAWEaY", "title": "Inside This 4-Bedroom Broomfield Home \u2014 1082 Lilac Ct Tour"}, "1082 lilac court": {"id": "06q7rZAWEaY", "title": "Inside This 4-Bedroom Broomfield Home \u2014 1082 Lilac Ct Tour"}};
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function nearbyToggleHtml(addr) {
+    return '<div class="listing-nearby">' +
+      '<button type="button" class="nearby-toggle" onclick="toggleNearby(this)" data-address="' + addr + '">' +
+      '\ud83d\udccd Distance To Grocery, Schools &amp; Parks</button>' +
+      '<div class="nearby-panel" style="display:none">' +
+      '<div class="nearby-tabs">' +
+      '<button type="button" class="nearby-tab active" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
+      '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
+      '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
+      '</div>' +
+      '<div class="nearby-results"><p class="search-status" style="margin-top:0">Loading nearby places\u2026</p></div>' +
+      '</div></div>';
+  }
+
+  window.toggleNearby = function (btn) {
+    var panel = btn.nextElementSibling;
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    if (isOpen) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    if (panel.dataset.loaded === 'true') return;
+    var address = btn.dataset.address;
+    var resultsEl = panel.querySelector('.nearby-results');
+    fetch('/.netlify/functions/nearby-places?address=' + encodeURIComponent(address))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error === 'not_configured') {
+          resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Distance lookup isn\u2019t connected yet.</p>';
+          return;
+        }
+        if (data.error) {
+          resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\u2019t look up nearby places right now.</p>';
+          return;
+        }
+        panel.dataset.loaded = 'true';
+        panel._nearbyData = data;
+        renderNearbyCat(panel, 'grocery');
+      })
+      .catch(function () {
+        resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\u2019t look up nearby places right now.</p>';
+      });
+  };
+
+  window.showNearbyCat = function (tabBtn) {
+    var tabs = tabBtn.parentElement;
+    tabs.querySelectorAll('.nearby-tab').forEach(function (t) { t.classList.remove('active'); });
+    tabBtn.classList.add('active');
+    var panel = tabs.parentElement;
+    renderNearbyCat(panel, tabBtn.dataset.cat);
+  };
+
+  var NEARBY_CAT_LABELS = { grocery: 'grocery stores', school: 'schools', park: 'parks' };
+
+  function renderNearbyCat(panel, cat) {
+    var data = panel._nearbyData;
+    var resultsEl = panel.querySelector('.nearby-results');
+    if (!data) return;
+    var items = (data.categories && data.categories[cat]) || [];
+    if (!items.length) {
+      resultsEl.innerHTML = '<p class="search-status" style="margin-top:0">No nearby ' +
+        (NEARBY_CAT_LABELS[cat] || cat) + ' found.</p>';
+      return;
+    }
+    // 2026-08-15: names now link to Google Maps via place_id, and the panel
+    // carries a visible "Google Maps" attribution -- it had been rendering
+    // Google Places names with none, which Google's Places policy requires
+    // whenever Places content is displayed without a Google map. Entries
+    // cached before placeId existed fall back to plain text.
+    resultsEl.innerHTML = '<ul class="nearby-list">' + items.map(function (p) {
+      var name = esc(p.name);
+      var inner = p.placeId
+        ? '<a href="https://www.google.com/maps/place/?q=place_id:' +
+          encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
+        : name;
+      return '<li><span class="nearby-name">' + inner + '</span>' +
+        '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
+    }).join('') + '</ul>' +
+      '<p class="nearby-attrib">Straight-line distances. Places data from ' +
+      '<strong>Google Maps</strong>.</p>';
+  }
+
+  function fmtPrice(n) {
+    if (n == null) return 'Price N/A';
+    return '$' + Number(n).toLocaleString('en-US');
+  }
+
+  function matchVideo(l) {
+    if (!l.address) return null;
+    var key = String(l.address).toLowerCase().trim();
+    return LISTING_VIDEOS[key] || null;
+  }
+
+  // Normalizes MLS Grid's raw StandardStatus (whatever exact wording IRES
+  // uses — "Active", "Active Under Contract", "Pending", etc., see
+  // MINE_STATUSES in listings-search.js) into a plain-language badge. Only
+  // "Active" itself is treated as available-to-tour; anything else with
+  // "contract" or "pending" in it is shown as Under Contract and loses the
+  // Request A Tour button (touring a home already under contract isn't
+  // normally something to invite, though Ask A Question stays available).
+  function statusInfo(status) {
+    var s = String(status || '').toLowerCase();
+    if (s === 'active') return { label: 'Active', cls: 'status-active', tourable: true };
+    if (s.indexOf('contract') !== -1 || s.indexOf('pending') !== -1) {
+      return { label: 'Under Contract', cls: 'status-pending', tourable: false };
+    }
+    return { label: status || 'Status Unknown', cls: 'status-other', tourable: false };
+  }
+
+  function mediaHtml(l, full) {
+    var video = matchVideo(l);
+    // 2026-08-13 (performance fix): the API now sends only the cover photo
+    // (l.photo) plus a photoCount, not the full photos[] array — see the
+    // listingId block in listings-search.js. The full gallery is fetched
+    // on demand, only if/when "View All N Photos" is actually clicked
+    // (openGallery below), instead of every card shipping every photo's
+    // URL whether anyone ever opens the gallery or not.
+    var cover = l.photo || null;
+    var photoCount = typeof l.photoCount === 'number' ? l.photoCount : (cover ? 1 : 0);
+    var top;
+    if (video) {
+      top = '<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/' +
+        esc(video.id) + '" title="' + esc(video.title) + '" loading="lazy" allow="accelerometer; autoplay; ' +
+        'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
+        'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
+    } else if (cover) {
+      top = '<img src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+        'onerror="this.onerror=null;this.style.background=\'#eee\';this.style.aspectRatio=\'4/3\';this.removeAttribute(\'src\')">';
+    } else {
+      top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
+    }
+    // 2026-08-13 (Christine's request): a small text pill already existed
+    // in the card body below the photo (see badgeHtml in listingCardHtml),
+    // but she asked for something more visually prominent for under-contract
+    // listings specifically -- so this adds a bold ribbon banner across the
+    // top of the photo itself. Deliberately only for the "under contract /
+    // pending" case (statusInfo's status-pending class), not Active -- an
+    // active listing doesn't need a callout, it's the default expectation.
+    var ribbonBadge = statusInfo(l.status);
+    var ribbon = ribbonBadge.cls === 'status-pending'
+      ? '<div class="listing-ribbon">Under Contract</div>' : '';
+    if (!full) return '<div class="listing-media">' + ribbon + top + '</div>';
+    var links = '';
+    if (video) {
+      links += '<a class="media-link" href="https://www.youtube.com/watch?v=' + esc(video.id) +
+        '" target="_blank" rel="noopener">Watch Full Video Tour \u2197</a>';
+    }
+    if (photoCount > 1) {
+      links += '<button type="button" class="media-link" onclick="openGallery(this)" data-listing-id="' +
+        esc(l.listingId || '') + '">View All ' + photoCount + ' Photos</button>';
+    }
+    return '<div class="listing-media">' + ribbon + top + (links ? '<div class="media-links">' + links + '</div>' : '') + '</div>';
+  }
+
+  function listingCardHtml(l, full) {
+    var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
+    var meta = esc([
+      l.beds ? l.beds + ' bd' : null,
+      l.baths ? l.baths + ' ba' : null,
+      l.sqft ? Number(l.sqft).toLocaleString() + ' sqft' : null,
+    ].filter(Boolean).join(' \u00b7 '));
+    var compliance = esc([l.officeName, l.listingId ? ('MLS# ' + l.listingId) : null, l.agentPhone || l.agentEmail, l.status]
+      .filter(Boolean).join(' \u00b7 '));
+    var badge = statusInfo(l.status);
+    var badgeHtml = '<span class="listing-status-badge ' + badge.cls + '">' + esc(badge.label) + '</span>';
+    var actions;
+    if (full) {
+      var tourBtn = badge.tourable
+        ? ('<button type="button" class="btn btn-dark" onclick="openListingInquiry(this)" data-address="' + addr +
+           '" data-mls="' + esc(l.listingId || '') + '" data-kind="Tour">Request A Tour</button>')
+        : '';
+      actions = '<div class="listing-actions">' +
+        '<button type="button" class="btn btn-outline" style="border-color:#141415;color:#141415" ' +
+        'onclick="openListingInquiry(this)" data-address="' + addr + '" data-mls="' + esc(l.listingId || '') +
+        '" data-kind="Question">Ask A Question</button>' + tourBtn +
+        '</div>';
+    } else {
+      actions = '<p class="listing-address" style="margin-top:10px">' +
+        '<a href="/current-listings.html" style="text-decoration:underline">View Full Details &amp; Ask A Question &rarr;</a></p>';
+    }
+    return '<div class="listing-card">' + mediaHtml(l, full) +
+      '<div class="listing-body">' +
+      badgeHtml +
+      '<p class="listing-price">' + esc(fmtPrice(l.price)) + '</p>' +
+      '<p class="listing-meta">' + meta + '</p>' +
+      '<p class="listing-address">' + addr + '</p>' +
+      '<p class="listing-compliance">' + compliance + '</p>' +
+      actions +
+      nearbyToggleHtml(addr) +
+      '</div></div>';
+  }
+
+  // ---- Photo gallery + Ask A Question / Request A Tour modals ----
+  // 2026-08-13 (buyer-walkthrough fix): identical to build_current_listings()'s
+  // copy of this same block -- listingCardHtml(l, true) (in the shared
+  // helpers above) hardcodes onclick="openGallery(this)" /
+  // onclick="openListingInquiry(this)", so these have to stay attached to
+  // window under these exact names, matching the modal markup this widget
+  // now also renders (see form_html above).
+  var galleryState = { photos: [], index: 0 };
+  var lastFocused = null;
+
+  function renderGallery() {
+    var img = document.getElementById('gallery-img');
+    img.style.background = '';
+    img.style.aspectRatio = '';
+    img.onerror = function () {
+      this.onerror = null;
+      this.removeAttribute('src');
+      this.style.background = '#eee';
+      this.style.aspectRatio = '4/3';
+    };
+    img.src = galleryState.photos[galleryState.index];
+    document.getElementById('gallery-counter').textContent =
+      (galleryState.index + 1) + ' / ' + galleryState.photos.length;
+  }
+
+  window.openGallery = function (btn) {
+    var listingId = btn.dataset.listingId || '';
+    if (!listingId) return;
+    lastFocused = btn;
+    var overlay = document.getElementById('gallery-overlay');
+    var counterEl = document.getElementById('gallery-counter');
+    var img = document.getElementById('gallery-img');
+    galleryState.photos = [];
+    galleryState.index = 0;
+    img.removeAttribute('src');
+    img.style.background = '#eee';
+    img.style.aspectRatio = '4/3';
+    counterEl.textContent = 'Loading\u2026';
+    overlay.classList.add('open');
+    overlay.querySelector('.lb-close').focus();
+    fetch('/.netlify/functions/listings-search?listingId=' + encodeURIComponent(listingId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var photos = (data && data.photos) || [];
+        if (!photos.length) {
+          counterEl.textContent = 'No photos available';
+          return;
+        }
+        galleryState.photos = photos;
+        galleryState.index = 0;
+        renderGallery();
+      })
+      .catch(function () {
+        counterEl.textContent = 'Couldn\u2019t load photos \u2014 please try again';
+      });
+  };
+  window.galleryNav = function (dir) {
+    var n = galleryState.photos.length;
+    if (!n) return;
+    galleryState.index = (galleryState.index + dir + n) % n;
+    renderGallery();
+  };
+  window.closeGallery = function () {
+    document.getElementById('gallery-overlay').classList.remove('open');
+    if (lastFocused) { lastFocused.focus(); lastFocused = null; }
+  };
+
+  window.openListingInquiry = function (btn) {
+    var address = btn.dataset.address || '';
+    var mls = btn.dataset.mls || '';
+    var kind = btn.dataset.kind || 'Question';
+    document.getElementById('li-address').value = address;
+    document.getElementById('li-mls').value = mls;
+    document.getElementById('li-kind').value = kind;
+    document.getElementById('inquiry-heading').textContent =
+      kind === 'Tour' ? 'Request A Tour' : 'Ask A Question';
+    document.getElementById('inquiry-subheading').textContent =
+      'Regarding: ' + address + (mls ? ' (MLS# ' + mls + ')' : '');
+    lastFocused = btn;
+    var overlay = document.getElementById('inquiry-overlay');
+    overlay.classList.add('open');
+    overlay.querySelector('.lb-close').focus();
+  };
+  window.closeInquiry = function () {
+    document.getElementById('inquiry-overlay').classList.remove('open');
+    if (lastFocused) { lastFocused.focus(); lastFocused = null; }
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeGallery(); closeInquiry(); }
+  });
+
+  // ---- Price slider: two overlapping range inputs, kept from crossing,
+  // painted as one filled bar between the two thumbs. ----
+  function updateSlider() {
+    var lo = parseInt(minRange.value, 10);
+    var hi = parseInt(maxRange.value, 10);
+    if (lo > hi) { lo = hi; minRange.value = String(lo); }
+    var pct1 = ((lo - minRange.min) / (minRange.max - minRange.min)) * 100;
+    var pct2 = ((hi - maxRange.min) / (maxRange.max - maxRange.min)) * 100;
+    rangeFill.style.left = pct1 + '%';
+    rangeFill.style.right = (100 - pct2) + '%';
+    minLabel.textContent = fmtPrice(lo);
+    maxLabel.textContent = hi >= CEILING ? fmtPrice(CEILING) + '+' : fmtPrice(hi);
+    minPriceInput.value = lo > 0 ? String(lo) : '';
+    maxPriceInput.value = hi >= CEILING ? '' : String(hi);
+  }
+  minRange.addEventListener('input', updateSlider);
+  maxRange.addEventListener('input', updateSlider);
+  updateSlider();
+
+  // ---- Beds/baths pill buttons ----
+  function wirePills(groupEl, hiddenInput) {
+    var btns = groupEl.querySelectorAll('.fs-pill');
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btns.forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        hiddenInput.value = btn.dataset.value || '';
+      });
+    });
+  }
+  form.querySelectorAll('.fs-pill-group').forEach(function (g) {
+    wirePills(g, g.dataset.field === 'beds' ? bedsInput : bathsInput);
+  });
+
+  // ---- County -> City cascade: picking a county narrows the City dropdown
+  // to just that county's cities (plus "All Cities In <County>"); leaving
+  // City on "All" while a county is picked searches every city in that
+  // county at once via listings-search.js's existing `cities` param. ----
+  var allCityOptionsHtml = citySelect ? citySelect.innerHTML : '';
+  if (countySelect && citySelect) {
+    countySelect.addEventListener('change', function () {
+      var slug = countySelect.value;
+      citySelect.value = '';
+      if (!slug) {
+        citySelect.innerHTML = allCityOptionsHtml;
+        return;
+      }
+      var cities = countyCityMap[slug] || [];
+      citySelect.innerHTML = '<option value="">All Cities</option>' +
+        cities.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    });
+  }
+
+  var urlParams = supportDeepLinks ? new URLSearchParams(window.location.search) : new URLSearchParams('');
+
+  function paramsFromForm() {
+    var data = new FormData(form);
+    var p = {};
+    ['city', 'minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {
+      var v = data.get(k);
+      if (v) p[k] = v;
+    });
+    if (fixedCity) p.city = fixedCity;
+    if (!p.city && countySelect && countySelect.value) {
+      var selCities = countyCityMap[countySelect.value] || [];
+      if (selCities.length) p.cities = selCities.join(',');
+    }
+    if (alwaysNoFloor) p.noFloor = 'true';
+    if (supportDeepLinks) {
+      if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
+      if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
+      if (urlParams.get('cities') && !p.cities) p.cities = urlParams.get('cities');
+      if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
+    }
+    return p;
+  }
+
+  function runSearch(reset) {
+    if (reset) { skip = 0; resultsEl.innerHTML = ''; }
+    var p = paramsFromForm();
+    p.top = TOP;
+    p.skip = skip;
+    var qs = new URLSearchParams(p).toString();
+    statusEl.textContent = 'Searching live IRES listings\u2026';
+    fetch('/.netlify/functions/listings-search?' + qs)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error === 'not_configured') {
+          statusEl.textContent = 'Live search isn\u2019t connected yet \u2014 contact us directly for current listings.';
+          loadMoreBtn.style.display = 'none';
+          return;
+        }
+        if (data.error) {
+          statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
+          loadMoreBtn.style.display = 'none';
+          return;
+        }
+        var listings = data.listings || [];
+        if (reset && listings.length === 0) {
+          statusEl.textContent = 'No active listings match those filters right now \u2014 try widening your search, or contact us and we\u2019ll help you find it before it hits the market.';
+        } else {
+          statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
+        }
+        resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) { return listingCardHtml(l, true); }).join(''));
+        skip += listings.length;
+        loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
+        if (fetchedAtEl) {
+          fetchedAtEl.textContent = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+        }
+      })
+      .catch(function () {
+        statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
+      });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    runSearch(true);
+  });
+  loadMoreBtn.addEventListener('click', function () { runSearch(false); });
+
+  if (supportDeepLinks) {
+    if (urlParams.get('city')) {
+      var citySelect = document.getElementById(wid + '-city');
+      if (citySelect) citySelect.value = urlParams.get('city');
+    }
+    if (urlParams.get('minPrice')) {
+      var mp = parseInt(urlParams.get('minPrice'), 10);
+      if (mp >= parseInt(minRange.min, 10) && mp <= parseInt(minRange.max, 10)) {
+        minRange.value = String(mp);
+        updateSlider();
+      }
+    }
+    var deepLinkNoteEl = document.getElementById(wid + '-deep-link-note');
+    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true' || urlParams.get('cities'))) {
+      var bits = [];
+      if (urlParams.get('subdivision')) bits.push('the ' + urlParams.get('subdivision') + ' area');
+      if (urlParams.get('waterfront') === 'true') bits.push('waterfront/riverfront features');
+      if (urlParams.get('cities')) bits.push(urlParams.get('cities').split(',').join(', '));
+      deepLinkNoteEl.textContent = 'Showing listings filtered to ' + bits.join(' and ') +
+        '. Clear the filters below and search again for the full, unfiltered result set.';
+      deepLinkNoteEl.style.display = 'block';
+    }
+  }
+
+  runSearch(true);
+})();
+</script>
 <section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Life In Fort Morgan</span>

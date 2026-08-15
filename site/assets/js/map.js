@@ -46,9 +46,20 @@
       'Mead', 'Erie', 'Platteville', 'Kersey', 'LaSalle', 'Gilcrest', 'Hudson',
       'Keenesburg', 'Lochbuie', 'Nunn', 'Pierce', 'Garden City', 'Grover', 'New Raymer'],
     'Boulder': ['Boulder', 'Longmont', 'Lafayette', 'Louisville', 'Superior',
-      'Nederland', 'Lyons', 'Jamestown', 'Ward']
+      'Nederland', 'Lyons', 'Jamestown', 'Ward'],
+    'Morgan': ['Fort Morgan', 'Brush', 'Wiggins', 'Log Lane Village']
   };
-  var IRES_COUNTIES = { 'Larimer': true, 'Weld': true, 'Boulder': true };
+  // 2026-08-15 (Christine: "it needs to be a live search - yes - i can pull
+  // them in ires"): Morgan added. NOTE the drift this list still carries --
+  // build.py now treats all nine counties as live-search, but only the four
+  // listed here offer live results from the map popup; clicking Denver,
+  // Jefferson, Arapahoe, Adams or Broomfield still gets the county-guide link
+  // only, even though their own city pages run a live search. That's a
+  // pre-existing gap, not a Morgan one, and fixing it means hand-copying five
+  // more city lists into the block above -- the same duplication that already
+  // went stale once (see the COUNTY_CITIES comment). Flagged rather than
+  // half-fixed.
+  var IRES_COUNTIES = { 'Larimer': true, 'Weld': true, 'Boulder': true, 'Morgan': true };
 
   // Quick price-floor presets for the popup. $950K+ matches the site's
   // luxury default; the lower presets are the deliberate, narrow exception

@@ -283,14 +283,20 @@ COUNTIES = [
         # footer. Not flagged priority: this is a real service area, not one of
         # the farm areas the luxury-tier search is tuned around.
         #
-        # priority=False has one visible consequence now that these towns have
-        # city pages: they show the "we'll send you a curated list" card where
-        # the other 26 city pages embed the live IRES search widget (see
-        # build_city_pages()). Deliberate, and reversible with one word -- but
-        # confirm IRES actually returns Fort Morgan / Brush / Wiggins listings
-        # first. An empty search widget on a brand-new page reads as broken,
-        # while the curated-list card is true either way. OPERATING_COUNTIES is
-        # unset, so nothing on our side is filtering Morgan listings out.
+        # live_search=True, priority=False -- and those are two different
+        # questions, which is why they're now two different flags (2026-08-15,
+        # Christine: "it needs to be a live search - yes - i can pull them in
+        # ires"). She can pull Morgan listings in IRES, so these towns get the
+        # on-page search widget, the county search CTA, and their own entries
+        # in the Search Homes city dropdown, where a missing town is invisible
+        # to anyone searching for it. What they don't get is priority's "one of
+        # our core farm areas... we know this market block by block" line --
+        # that's Christine's claim to make about Fort Morgan, not something to
+        # infer from a search setting. See _live_search().
+        #
+        # If the widget ever comes up empty here, the cause is upstream, not
+        # this flag: OPERATING_COUNTIES is unset, so nothing on our side
+        # filters Morgan out -- it would mean the feed isn't returning it.
         #
         # All four towns below got real city sub-pages 2026-08-15 (Christine:
         # "do the city pages for morgan the same way we did the others") --
@@ -301,6 +307,7 @@ COUNTIES = [
         # a page of invented local copy. That gate is the same reason the Ault
         # data bug was caught -- don't work around it.
         "priority": False,
+        "live_search": True,
         "cities": ["Fort Morgan", "Brush", "Wiggins", "Log Lane Village"],
         "blurb": "Morgan County sits east along I-76 and the South Platte, with "
                  "Fort Morgan and Brush anchoring some of the most attainable "
@@ -2448,6 +2455,32 @@ def _city_url(county_slug, city_name):
     return None
 
 
+def _live_search(c):
+    """Does this county get the live IRES search UI (city-page widget, county
+    page CTA, Search Homes city dropdown)?
+
+    2026-08-15 (Christine: "it needs to be a live search - yes - i can pull
+    them in ires"). This used to be the same flag as "priority", which
+    conflated two unrelated questions:
+
+      1. Does the MLS feed actually return listings here? -> a factual
+         question about coverage, and the only thing the search UI should
+         depend on.
+      2. Is this one of the farm areas we claim to know block by block? -> a
+         marketing claim about Christine's own business.
+
+    They were identical for the first 8 counties, so nothing forced them
+    apart until Morgan. Christine confirmed she can pull Morgan listings in
+    IRES, so Morgan gets the live search -- but she never claimed Fort Morgan,
+    Brush and Wiggins as core farm areas, and the county page's "we know this
+    market block by block" line is hers to make, not ours to infer from a
+    search setting. So: live_search here, priority stays with the claim.
+
+    Defaults to priority so the other 8 counties are untouched.
+    """
+    return c.get("live_search", c["priority"])
+
+
 def build_county_pages():
     for c in COUNTIES:
         cities_pills = "\n        ".join(
@@ -2461,7 +2494,7 @@ def build_county_pages():
             + ", ".join(c["cities"][:3]) + ', we know this market block by block.</p>'
             if c["priority"] else ""
         )
-        if c["priority"]:
+        if _live_search(c):
             mls_blurb = (
                 f'<a href="/search-homes.html" style="text-decoration:underline">Search live, '
                 f"active IRES MLS listings</a> in {c['name']} directly, or reach out and we'll "
@@ -2469,8 +2502,13 @@ def build_county_pages():
             )
             mls_cta = f'<a class="btn btn-dark" href="/search-homes.html">Search {c["name"]} Listings</a>'
         else:
+            # 2026-08-15: this used to name "Larimer, Weld, and Boulder County"
+            # as the live-search coverage, which stopped being true when the
+            # other five counties flipped on 2026-08-14 -- and Morgan was the
+            # only county still reading it. Now that Morgan has live search too
+            # this branch is unreached, so it says nothing it would have to
+            # keep in sync with a county list.
             mls_blurb = (
-                f"Our live IRES MLS search currently covers Larimer, Weld, and Boulder County. "
                 f"Reach out and we'll send you a curated list of {c['name']} listings matched to "
                 f"what you're looking for."
             )
@@ -2772,17 +2810,16 @@ def build_city_pages():
   </div>
 </section>"""
 
-            # Priority cities get the full interactive live search embedded
-            # right on the page — price slider + beds/baths pills — instead
-            # of just a link out to search-homes.html, per Christine's
+            # Cities in a live-search county get the full interactive search
+            # embedded right on the page — price slider + beds/baths pills —
+            # instead of just a link out to search-homes.html, per Christine's
             # request 2026-08-12 ("the search be on the town page... a
             # slider and more fancy ways that are easy to use"). As of
-            # 2026-08-14 all 8 counties are priority=True (IRES reciprocates
-            # with REcolorado — see the COUNTIES list comment), so every
-            # city page gets this widget now; the else branch below is kept
+            # 2026-08-15 that's all 9 counties (see _live_search()), so every
+            # city page gets this widget; the else branch below is kept
             # as a safe fallback in case a county ever gets flipped back.
             search_widget_block = ""
-            if c["priority"]:
+            if _live_search(c):
                 mls_blurb = (
                     f"Browse live, active IRES MLS listings in {esc(city)} below — updated in "
                     f"real time, not a stale snapshot — or reach out and we'll send you a "
@@ -6352,10 +6389,11 @@ def build_search_homes():
 
     IRES is Christine's home MLS (Larimer/Weld/Boulder), but IRES
     reciprocates listing data with REcolorado (the Denver-metro MLS) — the
-    city dropdown is scoped to COUNTIES marked priority=True, which as of
-    2026-08-14 is all 8 counties (Christine confirmed the reciprocity
-    directly; spot-checked live against real inventory before flipping the
-    flags -- see the COUNTIES list comment above for the specific numbers).
+    city dropdown is scoped to counties where _live_search() is true, which as
+    of 2026-08-15 is all 9 (Christine confirmed the REcolorado reciprocity
+    directly, spot-checked live against real inventory before flipping those
+    flags -- see the COUNTIES list comment above for the specific numbers --
+    and confirmed Morgan separately: "i can pull them in ires").
 
     Confirmed working against Christine's real MLS Grid token on 2026-08-11
     (see notes/verify-mlsgrid-api.mjs) — OriginatingSystemName comes back as
@@ -6397,12 +6435,17 @@ def build_search_homes():
     paragraph down to the part that wasn't redundant: the actionable
     county-vs-city tip and the Current Listings cross-link."""
 
-    priority_counties = [c for c in COUNTIES if c.get("priority")]
-    search_cities = sorted({city for county in priority_counties for city in county["cities"]})
-    county_names = [c["name"].replace(" County", "") for c in priority_counties]
+    # 2026-08-15: scoped by _live_search() rather than priority, so Morgan's
+    # towns appear in the CITY dropdown too. Christine confirmed she can pull
+    # Fort Morgan / Brush / Wiggins in IRES, and a town missing from this
+    # dropdown is invisible to anyone searching for it -- the single most
+    # consequential effect of the old combined flag.
+    search_counties = [c for c in COUNTIES if _live_search(c)]
+    search_cities = sorted({city for county in search_counties for city in county["cities"]})
+    county_names = [c["name"].replace(" County", "") for c in search_counties]
     widget_html, widget_js = _fancy_search_widget(
         "fs", search_cities=search_cities, support_deep_links=True,
-        price_floor=0, always_no_floor=True, counties=priority_counties,
+        price_floor=0, always_no_floor=True, counties=search_counties,
     )
 
     body = f"""
