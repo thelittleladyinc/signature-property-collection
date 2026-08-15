@@ -53,6 +53,10 @@
 - [Nederland, Boulder County](/communities/boulder/nederland.html)
 - [Broomfield, Broomfield County](/communities/broomfield/broomfield.html)
 - [Denver, Denver County](/communities/denver/denver.html)
+- [Fort Morgan, Morgan County](/communities/morgan/fort-morgan.html)
+- [Brush, Morgan County](/communities/morgan/brush.html)
+- [Wiggins, Morgan County](/communities/morgan/wiggins.html)
+- [Log Lane Village, Morgan County](/communities/morgan/log-lane-village.html)
 
 ## Free guides
 - [11 Tips To Buy Like A Pro | Signature Property Collection](/guides/buy-like-a-pro.html)

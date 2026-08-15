@@ -97,6 +97,14 @@ CITY_DATA_SLUG = {
     "Boulder": "boulder", "Lafayette": "lafayette", "Louisville": "louisville",
     "Nederland": "nederland", "Broomfield": "broomfield-city",
     "Denver": "denver-city", "Erie": "erie",
+    # 2026-08-15 (Christine: "do the city pages for morgan the same way we
+    # did the others"). Added with real researched content in
+    # city_content.json, not placeholders -- the gate above is only worth
+    # having if it stays honest. Where one of these towns genuinely has no
+    # restaurant, no dog park or no trail, its entry says so and names the
+    # nearest real option instead of inventing a local one.
+    "Fort Morgan": "fort-morgan", "Brush": "brush", "Wiggins": "wiggins",
+    "Log Lane Village": "log-lane-village",
 }
 
 # Real photography from Christine's own Google Drive -- her photographer's
@@ -275,11 +283,23 @@ COUNTIES = [
         # footer. Not flagged priority: this is a real service area, not one of
         # the farm areas the luxury-tier search is tuned around.
         #
-        # NOTE for whoever adds content here: the cities below deliberately have
-        # no city sub-pages yet. build_city_pages() only builds one where real
-        # captured content exists in city_content.json, so these list on the
-        # county page and in search without inventing local copy. That gate is
-        # the same reason the Ault data bug was caught -- don't work around it.
+        # priority=False has one visible consequence now that these towns have
+        # city pages: they show the "we'll send you a curated list" card where
+        # the other 26 city pages embed the live IRES search widget (see
+        # build_city_pages()). Deliberate, and reversible with one word -- but
+        # confirm IRES actually returns Fort Morgan / Brush / Wiggins listings
+        # first. An empty search widget on a brand-new page reads as broken,
+        # while the curated-list card is true either way. OPERATING_COUNTIES is
+        # unset, so nothing on our side is filtering Morgan listings out.
+        #
+        # All four towns below got real city sub-pages 2026-08-15 (Christine:
+        # "do the city pages for morgan the same way we did the others") --
+        # researched entries in city_content.json, same shape and same sections
+        # as the other 26 cities. build_city_pages() only builds a page where
+        # that content exists, so the gate stays intact: adding a town to the
+        # list below is still safe, and still produces a plain pill rather than
+        # a page of invented local copy. That gate is the same reason the Ault
+        # data bug was caught -- don't work around it.
         "priority": False,
         "cities": ["Fort Morgan", "Brush", "Wiggins", "Log Lane Village"],
         "blurb": "Morgan County sits east along I-76 and the South Platte, with "

@@ -17,7 +17,14 @@
     'Jefferson': 'jefferson',
     'Denver': 'denver',
     'Arapahoe': 'arapahoe',
-    'Adams': 'adams'
+    'Adams': 'adams',
+    // 2026-08-15 (Christine: "lets add morgan into the geojapn map too").
+    // The Morgan County polygon was appended to noco-counties.geojson from
+    // the same US Census cartographic-boundary data the other eight came
+    // from (GEO_ID 0500000US08087, CENSUSAREA 1280.433 sq mi). Without this
+    // entry the polygon would still draw and label itself, but clicking it
+    // would open a popup with no link to /communities/morgan.html.
+    'Morgan': 'morgan'
   };
 
   // City lists per county, kept in sync by hand with COUNTIES[].cities in
@@ -248,7 +255,17 @@
       name: 'South Platte River',
       labelAt: [40.30, -104.80],
       labelRotate: -22,
+      // The first six points below are the Morgan County reach, added
+      // 2026-08-15 when that county joined the map -- the river is the whole
+      // reason Fort Morgan and Brush are where they are, and the line
+      // stopping dead at the Poudre confluence in Greeley looked like the
+      // county had been pasted on. Schematic, like the rest of this
+      // polyline: drawn east from the confluence past the river towns
+      // (Kersey, Weldona, then just north of Fort Morgan and Brush) out to
+      // the county line, not traced from survey data.
       points: [
+        [40.31, -103.47], [40.29, -103.63], [40.27, -103.80],
+        [40.32, -104.02], [40.36, -104.30], [40.39, -104.55],
         [40.42, -104.69], [40.38, -104.72], [40.33, -104.78],
         [40.27, -104.83], [40.18, -104.90], [40.08, -104.94],
         [39.98, -104.98], [39.85, -105.00],
