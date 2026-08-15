@@ -429,7 +429,13 @@ exports.handler = async (event) => {
             `${cloudCheck.creditsUsed ? `, credits ${cloudCheck.creditsUsed}` : ""}.` +
             " If credits are at or near 100%, that is what the upload 403 means."
           : `Cloudinary refused the account check${cloudCheck.httpCode ? ` (HTTP ${cloudCheck.httpCode})` : ""}: ` +
-            `${cloudCheck.error}. Same credentials the photo uploads use, so this is the 403's cause.`)),
+            `${cloudCheck.error}. Same credentials the photo uploads use, so this IS the 403's cause. ` +
+            (/cloud_name mismatch/i.test(String(cloudCheck.error))
+              ? "FIX: the three CLOUDINARY_* variables in Netlify are not all from the same " +
+                "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
+                "to another. Open cloudinary.com → Dashboard, copy Cloud name, API Key and API Secret " +
+                "from that same page, and replace all three in Netlify → Environment variables."
+              : "Check the three CLOUDINARY_* variables in Netlify against cloudinary.com → Dashboard."))),
   });
 
   // ---- Lofty API key valid? ----

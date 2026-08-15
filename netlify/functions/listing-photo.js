@@ -65,6 +65,10 @@ const {
 const BLOB_STORE_NAME = "mls-listings";
 const IMAGE_FETCH_TIMEOUT_MS = 8000;
 
+// Netlify caps a function response at 6 MB, and base64 encoding adds ~33%, so
+// 4.4 MB of image is the real ceiling for returning bytes inline.
+const MAX_INLINE_IMAGE_BYTES = 4_400_000;
+
 // How long the CDN may serve our copy of a photo. Listing photos do change
 // (a re-shoot, a re-ordering), so this isn't immutable -- a day of hard
 // caching with a week of stale-while-revalidate keeps MLS Grid traffic near
@@ -144,12 +148,49 @@ exports.handler = async (event) => {
     if (!contentType.startsWith("image/")) return placeholder("not_an_image");
 
     const buf = Buffer.from(await imgRes.arrayBuffer());
+
+    // 2026-08-15: Content-Length used to be set here from buf.length. That's a
+    // bug in a base64 function response -- the platform decodes the body and
+    // computes its own length, and a header that disagrees is exactly how a
+    // browser ends up drawing a blank box for an image the server fetched
+    // perfectly. Christine's site-health probe proved the server side works
+    // ("resolved 47 URL(s), fetched photo 0 as image/jpeg, 286,081 bytes") while
+    // her cards were still grey, which pointed the finger here rather than at
+    // MLS Grid. Let the platform set it.
+    //
+    // The size guard is the other half. A Netlify function response is capped at
+    // 6 MB and base64 inflates by a third, so any photo over roughly 4.4 MB
+    // cannot be returned this way at all -- it fails as a 502 with nothing in the
+    // page to explain it. MLS Grid originals are routinely several megabytes, so
+    // this is a real ceiling, not a theoretical one, and it would hit exactly the
+    // biggest photos: "some photos come up and some don't".
+    if (buf.length > MAX_INLINE_IMAGE_BYTES) {
+      console.error(`listing-photo: ${listingId} photo ${index} is ${buf.length} bytes — ` +
+        `over the ${MAX_INLINE_IMAGE_BYTES}-byte inline ceiling.`);
+      return placeholder("too_large_" + buf.length);
+    }
+
+    if (params.debug === "1") {
+      // One URL Christine can open to see what happened, instead of a grey box.
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+        body: JSON.stringify({
+          listingId, index, ok: true, bytes: buf.length, contentType,
+          authMode: attempt.mode, urlCount: urls.length,
+          mediaHost: (() => { try { return new URL(urls[index]).host; } catch (e) { return null; } })(),
+        }, null, 2),
+      };
+    }
+
     return {
       statusCode: 200,
       headers: {
         "Content-Type": contentType,
         "Cache-Control": IMAGE_CACHE_CONTROL,
-        "Content-Length": String(buf.length),
+        // Handy in the network tab when a card still looks wrong.
+        "X-Photo-Bytes": String(buf.length),
+        "X-Photo-Auth-Mode": attempt.mode,
       },
       body: buf.toString("base64"),
       isBase64Encoded: true,
