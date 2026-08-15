@@ -174,6 +174,33 @@ const REFRESH_SWEEP_BATCH_SIZE = 5;
 // runs its full 8s) tops out around TIME_BUDGET_MS + 2000, comfortably
 // under the ~15s the observed 499 suggests Netlify's real limit is here.
 const LATE_WORK_TIME_MARGIN_MS = 6000;
+// 2026-08-15 -- THE REASON ZERO PHOTOS WERE EVER CACHED.
+//
+// Every call site of cacheCoverPhotoIfHers() is gated behind
+// `elapsed < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS`, which after the
+// 4000 -> 6000 bump above means "only in the first 2000ms of a run". But every
+// one of those call sites sits downstream of at least one throttle() +
+// $expand=Media fetch, and REQUEST_DELAY_MS alone is 1500ms before that heavy
+// request even starts. So in practice the window had already closed by the time
+// any listing was in hand, on every run, forever. Site health showed the exact
+// signature of this: Cloudinary configured, zero Cloudinary errors, and 0 of 11
+// listings cached -- the code was never called, so it could not error.
+//
+// The bump wasn't wrong (it fixed real 499/502 timeouts once uploads started
+// succeeding); it just had this side effect. Rather than loosen the margin and
+// re-introduce the timeouts, Christine's OWN listings now get their photos
+// cached by a dedicated pass that runs FIRST, before any crawling, with its own
+// budget derived from the real ceiling instead of from leftover time.
+//
+// Sizing: a photo attempt is capped at 4s download + 4s upload = ~8s worst
+// case, and observed 499s put Netlify's real limit near 15s. So a new attempt
+// only starts while elapsed < 7000ms, keeping the worst case at ~15s including
+// the attempt itself. Starting from elapsed ~= 0 that reliably yields one
+// attempt per run, and a second when the first was quick.
+const OWN_PHOTO_START_CUTOFF_MS = 7000;
+// Belt and braces on top of the time cutoff, so a run can never queue an
+// unbounded number of uploads if every one returns instantly.
+const OWN_PHOTO_MAX_ATTEMPTS_PER_RUN = 3;
 // 2026-08-14: every raw MLS Grid fetch() in this file used to have no
 // timeout at all — a slow (not failing) response could hang indefinitely,
 // same class of bug as the uncapped photo download/upload calls this
@@ -283,7 +310,13 @@ const CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN = 4;
 // the same account-wide throttle() gate as every other MLS Grid request
 // this run, since the unthrottled photo fetches were also the direct cause
 // of the logged 429s (a real risk of another full account suspension).
-async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle) {
+// `deadlineMs` (2026-08-15): how far into the run this function may still START
+// a photo attempt. The crawl call sites pass nothing and keep the original
+// conservative late-work window; the dedicated own-photo pass passes its own,
+// larger budget. Without this parameter the pass was pointless -- it ran first,
+// then hit this same 2000ms window from the inside and broke immediately, which
+// is the second half of why 0 of 11 photos were ever cached.
+async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, deadlineMs) {
   if (!mapped.photos || !mapped.photos.length || !isHerListing(mapped)) return 0;
   if (!isCloudinaryConfigured()) {
     _lastCloudinaryError = "not_configured: one or more of CLOUDINARY_CLOUD_NAME/" +
@@ -305,7 +338,8 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt,
     // listing where every attempt fails must still stop after this many
     // tries per run, or it consumes the whole time budget forever.
     if (attemptsThisCall >= CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN) break;
-    if (startedAt && Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
+    const cutoff = deadlineMs != null ? deadlineMs : TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS;
+    if (startedAt && Date.now() - startedAt > cutoff) break;
     attemptsThisCall += 1;
     if (throttle) await throttle();
     try {
@@ -345,7 +379,7 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt,
 // priority pass (Christine's own listings, below) and the refresh sweep
 // (everyone else's stale listings, below) so both go through identical
 // logic.
-async function refreshOneListing(listingId, listingsById, store, token, startedAt, throttle) {
+async function refreshOneListing(listingId, listingsById, store, token, startedAt, throttle, photoDeadlineMs) {
   const qs = new URLSearchParams({
     "$filter": `ListingId eq '${listingId}' and MlgCanView eq true`,
     "$select": SELECT_FIELDS,
@@ -371,7 +405,7 @@ async function refreshOneListing(listingId, listingsById, store, token, startedA
     return { removed: true };
   }
   const previouslyStored = listingsById[mapped.listingId];
-  const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle);
+  const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, photoDeadlineMs);
   mapped.photosRefreshedAt = new Date().toISOString();
   listingsById[mapped.listingId] = mapped;
   return { refreshed: true, cached: photosCached > 0, photosCached };
@@ -493,6 +527,65 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
   return { found };
 }
 
+// 2026-08-15: caches cover photos for Christine's OWN listings ahead of
+// everything else. Only touches listings that don't already have a permanent
+// Cloudinary photo, so once they're all cached this returns immediately and the
+// bootstrap crawl gets the full time budget back.
+//
+// It re-fetches each listing rather than reusing the stored photo URLs on
+// purpose: MLS Grid media URLs are signed, single-use and expire in an hour
+// (see _cloudinary.js), so anything already in Blobs is dead by now and only a
+// fresh $expand=Media response carries a usable link.
+function hasPermanentPhoto(listing) {
+  if (!listing || !listing.photo) return false;
+  try {
+    return new URL(listing.photo).host.indexOf("cloudinary") !== -1;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function cacheOwnPhotosFirst(listingsById, store, token, startedAt, throttle) {
+  const needsPhoto = Object.values(listingsById)
+    .filter((l) => l.listingId && isHerListing(l) && !hasPermanentPhoto(l))
+    // Oldest-touched first so one stubborn listing can't monopolise every run.
+    .sort((a, b) => {
+      const at = a.photosRefreshedAt ? Date.parse(a.photosRefreshedAt) : 0;
+      const bt = b.photosRefreshedAt ? Date.parse(b.photosRefreshedAt) : 0;
+      return at - bt;
+    });
+
+  if (!needsPhoto.length) return { attempted: 0, cached: 0, remaining: 0 };
+
+  let attempted = 0;
+  let cached = 0;
+  for (const listing of needsPhoto) {
+    if (attempted >= OWN_PHOTO_MAX_ATTEMPTS_PER_RUN) break;
+    if (Date.now() - startedAt >= OWN_PHOTO_START_CUTOFF_MS) break;
+    attempted += 1;
+    await throttle();
+    try {
+      const result = await refreshOneListing(
+        listing.listingId, listingsById, store, token, startedAt, throttle,
+        OWN_PHOTO_START_CUTOFF_MS,
+      );
+      if (result.suspended) {
+        console.error("sync-listings: own-photo pass hit 429 — suspension breaker opened, stopping pass.");
+        break;
+      }
+      if (result.photosCached) cached += result.photosCached;
+    } catch (err) {
+      console.warn(`sync-listings: own-photo pass failed for ${listing.listingId}: ${err && err.message}`);
+    }
+  }
+  const remaining = needsPhoto.length - cached;
+  console.log(
+    `sync-listings: own-photo pass — ${attempted} attempted, ${cached} cached, ` +
+    `${remaining} of Christine's listings still without a permanent photo.`
+  );
+  return { attempted, cached, remaining };
+}
+
 exports.handler = async () => {
   const token = process.env.MLSGRID_API_TOKEN;
   if (!token) {
@@ -533,6 +626,12 @@ exports.handler = async () => {
     if (anyRequestMadeThisRun) await sleep(REQUEST_DELAY_MS);
     anyRequestMadeThisRun = true;
   }
+
+  // ---- Christine's own photos, FIRST. Before any crawling, because the
+  // leftover-time window this used to depend on never actually opened -- see
+  // OWN_PHOTO_START_CUTOFF_MS above. No-ops once they're all cached. ----
+  const ownPhotoResult = await cacheOwnPhotosFirst(listingsById, store, token, startedAt, throttle);
+  coverPhotosCached += ownPhotoResult.cached;
 
   // ---- Office-wide discovery: learn Christine's ListOfficeMlsId once (if
   // this feed allows it -- see discoverHerOfficeMlsId's comment above for
