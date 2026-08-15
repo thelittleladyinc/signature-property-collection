@@ -38,6 +38,7 @@
 // browser — it's out of spec and it will only ever work for the first
 // visitor to load it.
 const cloudinary = require("cloudinary").v2;
+const { fetchMediaResponse } = require("./_media");
 
 let _configured = false;
 function configureCloudinary() {
@@ -80,16 +81,22 @@ const MIN_IMAGE_SIZE_BYTES = 2048;
 // gave up waiting) on recent invocations. Tightened to well under the
 // budget so one photo can never eat the whole run by itself.
 async function fetchMlsPhotoBuffer(mediaUrl, token) {
-  const res = await fetch(mediaUrl, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "User-Agent": token,
-      Accept: "image/*,*/*;q=0.8",
-    },
-    signal: AbortSignal.timeout(4000),
-  });
+  // 2026-08-15: was an unconditional `Authorization: Bearer` fetch, which is why
+  // site-health reported "0 of 11" of Christine's listings cached alongside
+  // "IRE1062480 photo 3: Server returned unexpected status code - 403". MLS Grid
+  // serves media through pre-signed URLs and a pre-signed request that also
+  // carries an Authorization header is rejected as two auth mechanisms. The
+  // shared helper picks the right mode per URL and retries the other way on a
+  // 401/403. See fetchMediaResponse in _media.js.
+  const attempt = await fetchMediaResponse(mediaUrl, token, 4000);
+  const res = attempt && attempt.res;
+  if (!res) {
+    const err = new Error("MLS Grid photo fetch failed with no response");
+    err.status = 0;
+    throw err;
+  }
   if (!res.ok) {
-    const err = new Error(`HTTP ${res.status} fetching MLS Grid photo`);
+    const err = new Error(`HTTP ${res.status} fetching MLS Grid photo (auth mode ${attempt.mode})`);
     err.status = res.status;
     throw err;
   }

@@ -166,6 +166,64 @@ async function prewarmPhotoUrls(listings, { store, token, baseUrl, selectFields,
   return Object.keys(resolved).length;
 }
 
+
+// ---- Fetching the image bytes -------------------------------------------
+// 2026-08-15, third pass (Christine: "some photos still arent coming up", plus
+// her /site-health page showing BOTH "0 of 11" of her own listings on a
+// permanent Cloudinary photo AND a Cloudinary error reading:
+//     IRE1062480 photo 3: Server returned unexpected status code - 403
+//
+// A 403 is the giveaway. Every path in this codebase fetched MLS Grid media with
+// `Authorization: Bearer <token>` unconditionally, and MLS Grid serves media
+// through pre-signed URLs -- the signature is IN the query string. S3 and
+// CloudFront reject a request that carries a pre-signed signature AND an
+// Authorization header, because that's two auth mechanisms for one request. The
+// result is a 403 on exactly the media that is pre-signed, and success on the
+// media that isn't, which is precisely the "some photos work and some don't"
+// pattern on the page and the reason none of her own photos have ever cached.
+//
+// So the header is chosen per URL instead of always sent: a URL carrying
+// signature parameters is fetched anonymously (it is already authenticated),
+// anything else keeps the Bearer token. On a 401/403 the other mode is tried
+// once, because the point is to be right under either regime rather than to be
+// right about my diagnosis. Which mode succeeded is returned so callers can log
+// it and this can be pinned once real traffic proves it.
+const PRESIGNED_QUERY_HINTS = [
+  "x-amz-signature", "x-amz-credential", "x-amz-security-token",
+  "signature=", "expires=", "sig=", "se=", "st=", "token=", "key-pair-id",
+];
+
+function looksPresigned(url) {
+  const query = (String(url).split("?")[1] || "").toLowerCase();
+  if (!query) return false;
+  return PRESIGNED_QUERY_HINTS.some((hint) => query.includes(hint));
+}
+
+// Returns { res, mode } for the attempt that succeeded, or the last failure.
+// Never throws on an HTTP error -- the caller decides what a bad status means.
+async function fetchMediaResponse(url, token, timeoutMs) {
+  const modes = looksPresigned(url) ? ["anon", "auth"] : ["auth", "anon"];
+  let last = null;
+  for (const mode of modes) {
+    const headers = mode === "auth"
+      ? {
+        Authorization: `Bearer ${token}`,
+        // Inherited from Listing-Engine, which found MLS Grid wants the token
+        // echoed here too. Only sent alongside the Authorization header.
+        "User-Agent": token,
+        Accept: "image/*,*/*;q=0.8",
+      }
+      : { Accept: "image/*,*/*;q=0.8" };
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
+    if (res.ok) return { res, mode };
+    last = { res, mode };
+    // Only an auth-shaped rejection is worth retrying the other way. A 404 or a
+    // 500 means something else entirely.
+    if (res.status !== 401 && res.status !== 403) break;
+  }
+  return last;
+}
+
 module.exports = {
   PHOTO_URL_CACHE_PREFIX,
   URL_CACHE_TTL_MS,
@@ -179,4 +237,6 @@ module.exports = {
   mediaUrlsFrom,
   resolveMediaFor,
   prewarmPhotoUrls,
+  looksPresigned,
+  fetchMediaResponse,
 };

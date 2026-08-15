@@ -59,7 +59,7 @@
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore, BASE_URL, SELECT_FIELDS } = require("./lib/_mls-shared");
 const {
-  readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS,
+  readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
 } = require("./lib/_media");
 
 const BLOB_STORE_NAME = "mls-listings";
@@ -129,11 +129,16 @@ exports.handler = async (event) => {
     if (!urls || !urls.length) return placeholder("no_media");
     if (index >= urls.length) return placeholder("index_out_of_range");
 
-    const imgRes = await fetch(urls[index], {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
-    });
-    if (!imgRes.ok) return placeholder("image_http_" + imgRes.status);
+    // 2026-08-15: the Authorization header is chosen per URL rather than always
+    // sent -- MLS Grid's pre-signed media URLs 403 when a second auth mechanism
+    // rides along, which is what was blanking some cards. See fetchMediaResponse.
+    const attempt = await fetchMediaResponse(urls[index], token, IMAGE_FETCH_TIMEOUT_MS);
+    const imgRes = attempt && attempt.res;
+    if (!imgRes) return placeholder("image_fetch_failed");
+    if (!imgRes.ok) {
+      console.error(`listing-photo: ${listingId} photo ${index} -> HTTP ${imgRes.status} (mode ${attempt.mode})`);
+      return placeholder("image_http_" + imgRes.status);
+    }
 
     const contentType = imgRes.headers.get("content-type") || "image/jpeg";
     if (!contentType.startsWith("image/")) return placeholder("not_an_image");
