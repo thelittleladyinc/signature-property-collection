@@ -47,6 +47,7 @@
       "address": "504 Graefe Ave",
       "city": "Ault",
       "state": "CO",
+      "year": "2024",
       "videoId": "eiFurERq_As",
       "title": "Charming Home for Sale at 504 Graefe Ave, Ault CO"
     },
@@ -58,16 +59,18 @@
       "title": "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir"
     },
     {
-      "address": "4986 Stuart St",
+      "address": "4869 Stuart St",
       "city": "Denver",
       "state": "CO",
+      "year": "2024",
       "videoId": "oNZBc-MxzUg",
       "title": "Stunning Home for Sale — 4986 Stuart St, Denver (Tennyson Art District)"
     },
     {
-      "address": "5705 Snow Mesa Dr",
+      "address": "5705 Snow Mesa Ct",
       "city": "Loveland",
       "state": "CO",
+      "year": "2024",
       "videoId": "MDfyzESb1Yk",
       "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? — 5705 Snow Mesa Dr"
     },
@@ -84,6 +87,234 @@
       "state": "CO",
       "videoId": "e-_3Qs3liQ0",
       "title": "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie"
+    },
+    {
+      "address": "3500 Lilac Ln",
+      "city": "Evans",
+      "state": "CO",
+      "year": "2026"
+    },
+    {
+      "address": "144 N 25th Ave",
+      "city": "Greeley",
+      "state": "CO",
+      "year": "2026"
+    },
+    {
+      "address": "1598 Carriage Dr",
+      "city": "Eaton",
+      "state": "CO",
+      "year": "2026"
+    },
+    {
+      "address": "3016 Glendevey Dr",
+      "city": "Loveland",
+      "state": "CO",
+      "year": "2026"
+    },
+    {
+      "address": "2238 11th St",
+      "city": "Greeley",
+      "state": "CO",
+      "year": "2026"
+    },
+    {
+      "address": "54175 County Rd 27",
+      "city": "Carr",
+      "state": "CO",
+      "year": "2026"
+    },
+    {
+      "address": "535 Ash Ave",
+      "city": "Ault",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "315 Laurel Ave",
+      "city": "Eaton",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "12734 Anhawa Ave",
+      "city": "Longmont",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "50842 County Rd 33",
+      "city": "Nunn",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "1006 4th St",
+      "city": "Pierce",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "620 4th St",
+      "city": "Pierce",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "2140 Bowen St",
+      "city": "Longmont",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "3654 Mount Spalding St",
+      "city": "Wellington",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "551 County Rd 67J",
+      "city": "Red Feather Lakes",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "210 S Frances Ave",
+      "city": "Milliken",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "107 N Ethel Ave",
+      "city": "Milliken",
+      "state": "CO",
+      "year": "2025"
+    },
+    {
+      "address": "14775 County Rd 88",
+      "city": "Pierce",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "205 8th St",
+      "city": "Gilcrest",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "4110 Julesberg Dr",
+      "city": "Loveland",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "5112 W 9th St",
+      "city": "Greeley",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "4953 W 5th St",
+      "city": "Greeley",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "446 Pony Express Trl",
+      "city": "Ault",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "621 Nokomis Rd",
+      "city": "Red Feather Lakes",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "13909 Dahlia St",
+      "city": "Thornton",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "1648 S Kenton St",
+      "city": "Aurora",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "375 Cherokee Trl",
+      "city": "Ault",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "111 2nd St",
+      "city": "Ault",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "1121 Walnut St",
+      "city": "Windsor",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "23570 County Rd 1",
+      "city": "Loveland",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "1022 1st St",
+      "city": "Nunn",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "304 W 52nd St",
+      "city": "Loveland",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "4986 W 5th St",
+      "city": "Greeley",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "1591 Sunflower Way",
+      "city": "Johnstown",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "810 S Rachel Ave",
+      "city": "Milliken",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "1608 E 1st St",
+      "city": "Loveland",
+      "state": "CO",
+      "year": "2024"
+    },
+    {
+      "address": "2200 37th St",
+      "city": "Evans",
+      "state": "CO",
+      "year": "2023"
+    },
+    {
+      "address": "47986 County Rd 122",
+      "city": "Grover",
+      "state": "CO",
+      "year": "2023"
     }
   ]
 }

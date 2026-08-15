@@ -434,9 +434,15 @@ _LISTING_VIDEO_ENTRIES = [
      "eiFurERq_As", "Charming Home for Sale at 504 Graefe Ave, Ault CO", "sold"),
     (["1316 cimarron cir", "1316 cimarron circle"],
      "xWcrj6foJ-Q", "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir", "sold"),
-    (["4986 stuart st", "4986 stuart street"],
+    # 2026-08-15: the MLS record for this sale is 4869 Stuart St, not 4986 --
+    # the video title has the digits transposed (there IS a real 4986 W 5th St
+    # in Greeley, which is likely where the mix-up came from). Both forms kept
+    # so the feed matches either way; sold_homes.json uses the MLS one.
+    (["4869 stuart st", "4869 stuart street", "4986 stuart st", "4986 stuart street"],
      "oNZBc-MxzUg", "Stunning Home for Sale — 4986 Stuart St, Denver (Tennyson Art District)", "sold"),
-    (["5705 snow mesa dr", "5705 snow mesa drive"],
+    # 2026-08-15: MLS record says Snow Mesa Ct, the video title says Dr. Both
+    # kept for feed matching; sold_homes.json uses Ct.
+    (["5705 snow mesa ct", "5705 snow mesa court", "5705 snow mesa dr", "5705 snow mesa drive"],
      "MDfyzESb1Yk", 'Why Is Loveland, CO Called the "Sweetheart City"? — 5705 Snow Mesa Dr', "sold"),
     # 2026-08-12: kdR6wbWPMQU (the previous ID here) turned out to be a
     # 27-second vertical Short, not a proper listing tour -- Christine
