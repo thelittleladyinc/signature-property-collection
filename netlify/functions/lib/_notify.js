@@ -103,9 +103,40 @@ async function addLoftyNote(leadId, content, apiKey) {
   }
 }
 
+// Returns the lead's current tags as strings, or NULL when they can't be read
+// confidently. The null case matters more than it looks.
+//
+// 2026-08-15, reviewing this after her test still failed: the first version
+// returned [] both when a lead genuinely had no tags AND when Lofty's response
+// wasn't the shape I guessed. That second case is a data-loss bug. Lofty's GET
+// response for a lead isn't something I can check from this environment
+// (developer.lofty.com and api.lofty.com are both blocked by the egress proxy),
+// and sellerintelligence only ever reads `lead.tags` on leads IT created. If
+// this account returns tags as objects like [{name:"..."}] instead of plain
+// strings, the filter would drop every one, the code would conclude the lead had
+// no tags, and the very next PUT would overwrite the lead's whole tag list with
+// just the trigger tag -- silently deleting whatever else was on a real client's
+// record. A notification feature must not be able to do that.
+//
+// So: unreadable means null, null means make no changes at all, and the shape we
+// actually got is reported to /site-health so this can be settled with evidence
+// rather than another guess.
 function tagsFromLead(payload) {
   const lead = (payload && (payload.data || payload)) || {};
-  return Array.isArray(lead.tags) ? lead.tags.filter((t) => typeof t === "string") : [];
+  if (!Array.isArray(lead.tags)) return null;
+  const strings = lead.tags.filter((t) => typeof t === "string");
+  // Some tags present but none of them strings => a shape we don't understand.
+  if (lead.tags.length > 0 && strings.length === 0) return null;
+  return strings;
+}
+
+// Describes what came back, for the health page, without dumping lead data.
+function describeTagShape(payload) {
+  const lead = (payload && (payload.data || payload)) || {};
+  if (!("tags" in lead)) return "response had no 'tags' field";
+  if (!Array.isArray(lead.tags)) return `'tags' was ${typeof lead.tags}, not an array`;
+  const kinds = Array.from(new Set(lead.tags.map((t) => (t === null ? "null" : typeof t))));
+  return `'tags' was an array of ${lead.tags.length} item(s) of type ${kinds.join("/") || "—"}`;
 }
 
 // Guarantees that `triggerTag` counts as newly ADDED on this lead, so a Smart
@@ -125,6 +156,16 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
       return { attempted: true, ok: false, step: "read", httpStatus: current.httpStatus, response: current.text };
     }
     const tags = tagsFromLead(current.json);
+    if (tags === null) {
+      // Don't touch the lead. Writing a tag list we can't reconcile with what's
+      // already there risks wiping a real client's tags -- see tagsFromLead.
+      const shape = describeTagShape(current.json);
+      console.error(`Lofty tag refire skipped for lead ${leadId}: couldn't read current tags (${shape}).`);
+      return {
+        attempted: true, ok: false, step: "unreadable-tags", tagRestored: true,
+        tagShape: shape,
+      };
+    }
     const had = tags.includes(triggerTag);
 
     if (!had) {
@@ -134,6 +175,7 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
       const put = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: withTag });
       return {
         attempted: true, ok: put.ok, step: "added", tagRestored: put.ok,
+        tagShape: describeTagShape(current.json), tagsSeen: tags.length,
         httpStatus: put.httpStatus, response: put.ok ? undefined : put.text,
       };
     }
@@ -145,6 +187,7 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
       // Nothing was changed, so nothing needs undoing -- the lead keeps its tag.
       return {
         attempted: true, ok: false, step: "remove", tagRestored: true,
+        tagShape: describeTagShape(current.json), tagsSeen: tags.length,
         httpStatus: off.httpStatus, response: off.text,
       };
     }
@@ -156,6 +199,7 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
     }
     return {
       attempted: true, ok: back.ok, step: "refired", tagRestored: back.ok,
+      tagShape: describeTagShape(current.json), tagsSeen: tags.length,
       httpStatus: back.httpStatus, response: back.ok ? undefined : back.text,
     };
   } catch (err) {
@@ -233,6 +277,7 @@ module.exports = {
   addLoftyNote,
   refireLoftyTag,
   tagsFromLead,
+  describeTagShape,
   alertEmailHtml,
   sendLeadAlertEmail,
 };

@@ -566,7 +566,18 @@ exports.handler = async (event) => {
   } else if (tag.ok) {
     parts.push(tag.step === "refired"
       ? `Trigger tag: removed and re-added, so "Hot Lead - Website" counts as a NEW tag and your Smart Plan fires even for a repeat enquiry ✓.`
-      : `Trigger tag: added to the lead ✓.`);
+      : `Trigger tag: added to the lead ✓ (this lead already had ${tag.tagsSeen ?? "?"} other tag(s)).`);
+  } else if (tag.step === "read") {
+    // 2026-08-15: worth calling out separately. If Lofty won't let us READ the
+    // lead we just created, the tag can never be re-fired, and that is a
+    // different problem from the tag edit being refused.
+    parts.push(`Trigger tag: could NOT read the lead back from Lofty ` +
+      `(HTTP ${tag.httpStatus}${tag.response ? ` — ${String(tag.response).slice(0, 120)}` : ""}). ` +
+      `The tag from the original push should still be on the lead, but it could not be re-fired.`);
+  } else if (tag.step === "unreadable-tags") {
+    parts.push(`Trigger tag: left alone on purpose — Lofty returned tags in a shape this code ` +
+      `doesn't recognise (${tag.tagShape || "unknown"}), and overwriting them could have deleted ` +
+      `tags on a real client's record. Nothing was changed. Send me this line and I'll fix the reader.`);
   } else if (tag.tagRestored === false) {
     parts.push(`Trigger tag: the re-add FAILED (${tag.httpStatus || tag.error || "unknown"}) — ` +
       `the lead is currently missing "Hot Lead - Website". Add it by hand on that lead in Lofty.`);
@@ -578,7 +589,8 @@ exports.handler = async (event) => {
     // Named for what she cares about, not for the mechanism: this row is the
     // primary notification path now that the tag genuinely changes.
     name: "Your Lofty notification will fire",
-    ok: (!note || !note.attempted) ? true : (!!note.ok && (!tag || !tag.attempted || tag.tagRestored !== false)),
+    ok: (!note || !note.attempted) ? true
+      : (!!note.ok && (!tag || !tag.attempted || (tag.ok && tag.tagRestored !== false))),
     detail: parts.join(" ") +
       " These are what make a lead that MERGED into an existing contact still show up — " +
       "the case that hid your own test submissions, because they used your account-owner email.",
