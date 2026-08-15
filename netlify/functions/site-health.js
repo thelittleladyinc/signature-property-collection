@@ -36,6 +36,45 @@ const GOOGLE_CHECK_KEY = "google-api-check.json";
 // working one from outside, which is how a real form submission went missing.
 const LOFTY_LAST_PUSH_KEY = "lofty-last-push.json";
 const LOFTY_FAILED_PUSH_KEY = "lofty-failed-pushes.json";
+const LOFTY_CHECK_KEY = "lofty-key-check.json";
+
+// 2026-08-15: Lofty's own API page (Settings > Integrations > API) documents
+// this exact call as its usage example, which makes it the ideal key test --
+// GET, read-only, and it either recognizes the key or it doesn't:
+//
+//   curl --request GET --url https://api.lofty.com/v1.0/me \
+//        --header 'Authorization: token <your apiKey>'
+//
+// Worth having because the alternative was "submit a form and wait": Christine
+// asked why a lead never reached Lofty, and without this the only way to test
+// the key was to generate another real lead.
+const LOFTY_ME_URL = "https://api.lofty.com/v1.0/me";
+
+async function probeLoftyKey(apiKey) {
+  try {
+    const res = await fetch(LOFTY_ME_URL, {
+      headers: { "Authorization": `token ${apiKey}` },
+      signal: AbortSignal.timeout(GOOGLE_PROBE_TIMEOUT_MS),
+    });
+    const text = await res.text().catch(() => "");
+    return {
+      checkedAt: new Date().toISOString(),
+      ok: res.ok,
+      httpStatus: res.status,
+      // Trimmed hard: /me returns the account's own details and this page is
+      // reachable by anyone who knows the URL, so only enough to confirm which
+      // account answered, never the full payload.
+      body: text.slice(0, 160),
+    };
+  } catch (err) {
+    return {
+      checkedAt: new Date().toISOString(),
+      ok: false,
+      httpStatus: "request failed",
+      body: (err && err.message) || "",
+    };
+  }
+}
 const GOOGLE_CHECK_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_PROBE_TIMEOUT_MS = 6000;
 
@@ -96,24 +135,39 @@ exports.handler = async (event) => {
   const params = (event && event.queryStringParameters) || {};
   const wantsJson = params.format === "json";
 
-  const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed] = await Promise.all([
+  const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, cachedLoftyKey] = await Promise.all([
     store.get(SYNC_STATE_KEY, { type: "json" }),
     store.get(MINE_LISTINGS_KEY, { type: "json" }),
     store.get(SUSPENSION_KEY, { type: "json" }),
     store.get(GOOGLE_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_LAST_PUSH_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_FAILED_PUSH_KEY, { type: "json" }).catch(() => null),
+    store.get(LOFTY_CHECK_KEY, { type: "json" }).catch(() => null),
   ]);
 
   // ---- Google key check (opt-in, cached) ----
   const googleKey = process.env.GOOGLE_MAPS_API_KEY;
-  const wantsGoogle = params.google === "1" || params.google === "true";
+  // ?probe=1 runs every live check; ?google=1 is kept working since that URL
+  // has already been handed to Christine.
+  const wantsProbe = params.probe === "1" || params.probe === "true" ||
+    params.google === "1" || params.google === "true" ||
+    params.lofty === "1" || params.lofty === "true";
+  const wantsGoogle = wantsProbe;
   let google = cachedGoogle;
   const googleFresh = google && google.checkedAt &&
     Date.now() - Date.parse(google.checkedAt) < GOOGLE_CHECK_TTL_MS;
   if (wantsGoogle && googleKey && !googleFresh) {
     google = await probeGoogle(googleKey);
     await store.setJSON(GOOGLE_CHECK_KEY, google).catch(() => {});
+  }
+
+  const loftyApiKey = process.env.LOFTY_API_KEY;
+  let loftyKeyCheck = cachedLoftyKey;
+  const loftyKeyFresh = loftyKeyCheck && loftyKeyCheck.checkedAt &&
+    Date.now() - Date.parse(loftyKeyCheck.checkedAt) < GOOGLE_CHECK_TTL_MS;
+  if (wantsProbe && loftyApiKey && !loftyKeyFresh) {
+    loftyKeyCheck = await probeLoftyKey(loftyApiKey);
+    await store.setJSON(LOFTY_CHECK_KEY, loftyKeyCheck).catch(() => {});
   }
 
   const now = Date.now();
@@ -224,6 +278,21 @@ exports.handler = async (event) => {
         : ""),
   });
 
+  // ---- Lofty API key valid? ----
+  checks.push({
+    name: "Lofty API key valid",
+    ok: !process.env.LOFTY_API_KEY ? false : (!loftyKeyCheck ? true : loftyKeyCheck.ok),
+    detail: !process.env.LOFTY_API_KEY
+      ? "LOFTY_API_KEY isn't set in Netlify."
+      : (!loftyKeyCheck
+        ? "Not tested yet — add ?probe=1 to this page's URL to test the key against Lofty's /v1.0/me endpoint."
+        : (loftyKeyCheck.ok
+          ? `Lofty accepted the key (HTTP ${loftyKeyCheck.httpStatus}, checked ${loftyKeyCheck.checkedAt}).`
+          : `Lofty REJECTED the key: HTTP ${loftyKeyCheck.httpStatus}. ${loftyKeyCheck.body || ""} ` +
+            "Create a key for this website in Lofty → Settings → Integrations → API, " +
+            "then replace LOFTY_API_KEY in Netlify with it.")),
+  });
+
   // ---- Website leads reaching Lofty ----
   const loftyKeySet = !!process.env.LOFTY_API_KEY;
   const failedCount = Array.isArray(loftyFailed) ? loftyFailed.length : 0;
@@ -256,7 +325,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed } }, null, 2),
+      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed, loftyKeyCheck } }, null, 2),
     };
   }
 
@@ -286,7 +355,7 @@ exports.handler = async (event) => {
 <h1>Signature Property Collection — Site Health</h1>
 <p class="status-line ${allOk ? "ok" : "bad"}">${allOk ? "✅ Everything looks clean." : "⚠️ Something needs attention — see below."}</p>
 <table>${rows}</table>
-<p class="refresh">Checked live just now — reload anytime. This page only reads stored status; it never calls MLS Grid or Cloudinary itself, so checking it is always free. Add <code>?google=1</code> to run two real Google API probes (cached 10 minutes), or <code>?format=json</code> for raw data.</p>
+<p class="refresh">Checked live just now — reload anytime. This page only reads stored status; it never calls MLS Grid or Cloudinary itself, so checking it is always free. Add <code>?probe=1</code> to live-test the Google APIs and the Lofty key (cached 10 minutes), or <code>?format=json</code> for raw data.</p>
 </div></body></html>`;
 
   return {

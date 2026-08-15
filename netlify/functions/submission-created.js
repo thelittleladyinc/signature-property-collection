@@ -32,15 +32,23 @@
 //      so a lead is never lost to an outage and can be replayed once the cause
 //      is fixed, instead of asking Christine to re-type it out of the Netlify
 //      dashboard.
-//   3. Lofty documents two auth styles -- an API key from Settings >
-//      Integrations > API, and OAuth 2.0 bearer tokens -- and its docs aren't
-//      reachable from this build environment to confirm which one an API key
-//      wants. So the request is tried as "token <key>" (the style inherited
-//      from Christine's sellerintelligence project) and, ONLY if that returns
-//      401/403, retried once as "Bearer <key>". Which style worked is recorded,
-//      so this can be pinned to the single correct one rather than left
-//      guessing forever. A 401 means the first attempt failed anyway, so the
-//      retry costs nothing and can't mask a working path.
+//   3. The auth header is now CONFIRMED rather than inferred. Christine sent a
+//      screenshot of her Lofty Settings > Integrations > API page, whose own
+//      usage example reads:
+//
+//        curl --request GET --url https://api.lofty.com/v1.0/me \
+//             --header 'Authorization: token <your apiKey>'
+//
+//      So "token <key>" is correct and the brief "retry as Bearer on a 401"
+//      fallback added an hour earlier has been removed -- with the format
+//      confirmed, a 401 means the KEY is wrong, and retrying it with a
+//      different header only wastes a call and muddies the diagnosis.
+//
+//      That same page also showed six active keys (Expired-Listings, Listing
+//      Engine API, Listing Engine Most, Listing Engine, RTO Key, Legacy Token)
+//      and none named for this website -- so whatever is in LOFTY_API_KEY was
+//      borrowed from another app. site-health can now test the key directly
+//      against /v1.0/me, which is why that endpoint is worth knowing about.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
 
@@ -50,30 +58,25 @@ const LAST_PUSH_KEY = "lofty-last-push.json";
 const FAILED_PUSH_KEY = "lofty-failed-pushes.json";
 const MAX_QUEUED_FAILURES = 25;
 
-// Posts the lead, trying the API-key header style first and the OAuth bearer
-// style only on an auth rejection. Returns everything the caller needs to record
-// what happened.
+// Posts the lead using the header format Lofty's own API page documents.
+// Returns everything the caller needs to record what happened.
 async function postLead(body, apiKey) {
-  const styles = [
-    { style: "token", value: `token ${apiKey}` },
-    { style: "bearer", value: `Bearer ${apiKey}` },
-  ];
-  let last = null;
-  for (const attempt of styles) {
-    const res = await fetch(`${LOFTY_BASE_URL}/leads`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": attempt.value },
-      body: JSON.stringify(body),
-    });
-    const text = await res.text().catch(() => "");
-    last = { ok: res.ok, httpStatus: res.status, authStyle: attempt.style, responseBody: text.slice(0, 500) };
-    if (res.ok) return last;
-    // Anything other than an auth rejection is a real answer from Lofty (a
-    // rejected field, a moved endpoint) -- retrying with a different header
-    // would only obscure it.
-    if (res.status !== 401 && res.status !== 403) return last;
-  }
-  return last;
+  const res = await fetch(`${LOFTY_BASE_URL}/leads`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // Verbatim from Lofty's usage example -- lowercase "token", not "Bearer".
+      "Authorization": `token ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text().catch(() => "");
+  return {
+    ok: res.ok,
+    httpStatus: res.status,
+    authStyle: "token",
+    responseBody: text.slice(0, 500),
+  };
 }
 
 async function recordPush(result, formName) {
