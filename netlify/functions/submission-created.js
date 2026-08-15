@@ -32,7 +32,7 @@
 //      so a lead is never lost to an outage and can be replayed once the cause
 //      is fixed, instead of asking Christine to re-type it out of the Netlify
 //      dashboard.
-//   3. The auth header is now CONFIRMED rather than inferred. Christine sent a
+//   3. The auth header is CONFIRMED rather than inferred. Christine sent a
 //      screenshot of her Lofty Settings > Integrations > API page, whose own
 //      usage example reads:
 //
@@ -51,48 +51,9 @@
 //      against /v1.0/me, which is why that endpoint is worth knowing about.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
+const { postLead, recordPush } = require("./lib/_lofty");
 
-const LOFTY_BASE_URL = "https://api.lofty.com/v1.0";
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
-const LAST_PUSH_KEY = "lofty-last-push.json";
-const FAILED_PUSH_KEY = "lofty-failed-pushes.json";
-const MAX_QUEUED_FAILURES = 25;
-
-// Posts the lead using the header format Lofty's own API page documents.
-// Returns everything the caller needs to record what happened.
-async function postLead(body, apiKey) {
-  const res = await fetch(`${LOFTY_BASE_URL}/leads`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      // Verbatim from Lofty's usage example -- lowercase "token", not "Bearer".
-      "Authorization": `token ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text().catch(() => "");
-  return {
-    ok: res.ok,
-    httpStatus: res.status,
-    authStyle: "token",
-    responseBody: text.slice(0, 500),
-  };
-}
-
-async function recordPush(result, formName) {
-  try {
-    const store = getBlobStore(getStore, DIAG_STORE);
-    await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, ...result });
-    if (!result.ok) {
-      const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
-      queue.unshift({ at: new Date().toISOString(), formName, ...result });
-      await store.setJSON(FAILED_PUSH_KEY, queue.slice(0, MAX_QUEUED_FAILURES));
-    }
-  } catch (err) {
-    // Diagnostics must never be the reason a lead push fails.
-    console.error("could not record Lofty push result:", err && err.message);
-  }
-}
 
 // Human-friendly source label per form-name, so leads are easy to tell apart
 // inside Lofty. Falls back to the raw form name for anything not listed.
@@ -193,21 +154,25 @@ exports.handler = async (event) => {
     }
 
     const result = await postLead(body, apiKey);
+    // The store is only needed for diagnostics, so a Blobs problem must not
+    // prevent the push itself -- it's fetched after the lead has already gone.
+    let store = null;
+    try { store = getBlobStore(getStore, DIAG_STORE); } catch (e) { store = null; }
 
     if (!result.ok) {
-      console.error(`Lofty API ${result.httpStatus} (auth style "${result.authStyle}"): ${result.responseBody}`);
-      // The lead itself is queued by recordPush() and is also sitting in
-      // Netlify Forms, so nothing is lost. Still returns 200: failing here
-      // would not help the visitor, whose submission already succeeded.
-      await recordPush({ ...result, lead: body }, formName);
+      console.error(`Lofty API ${result.httpStatus} (payload shape "${result.payloadShape}"): ${result.responseBody}`);
+      // The lead is queued for retry by the next sync run and is also sitting in
+      // Netlify Forms, so nothing is lost. Still returns 200: failing here would
+      // not help the visitor, whose submission already succeeded.
+      if (store) await recordPush(store, result, formName, body);
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
     let json = {};
     try { json = JSON.parse(result.responseBody || "{}"); } catch (e) { json = {}; }
     const leadId = json?.data?.leadId ?? json?.data?.id ?? json?.leadId ?? json?.id ?? null;
-    console.log(`Pushed lead to Lofty${leadId ? ` (leadId ${leadId})` : ""} from form "${formName}" using the "${result.authStyle}" auth style.`);
-    await recordPush({ ...result, leadId }, formName);
+    console.log(`Pushed lead to Lofty${leadId ? ` (leadId ${leadId})` : ""} from form "${formName}" (${result.payloadShape} payload).`);
+    if (store) await recordPush(store, { ...result, leadId }, formName, body);
     return { statusCode: 200, body: "ok" };
   } catch (err) {
     console.error("submission-created function error:", err);

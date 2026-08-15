@@ -71,6 +71,7 @@ const {
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
+const { drainFailedPushes } = require("./lib/_lofty");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
 // her own listings are still all serving raw MLS Grid URLs. cacheCoverPhoto
@@ -738,6 +739,24 @@ exports.handler = async () => {
   // Shrink what's already stored before doing anything else -- see
   // pruneAndSlimStore's comment. Cheap (pure in-memory) and idempotent.
   pruneAndSlimStore(listingsById);
+
+  // ---- Retry any website lead that failed to reach Lofty ----------------
+  // 2026-08-15 (Christine: "submitted - but still didnt come into lofty"). A
+  // lead that fails the live push is queued with its full payload; this drains
+  // that queue so it arrives on a later run instead of waiting for someone to
+  // notice. Deliberately first, tiny (at most 3 per run), and fully isolated:
+  // Lofty has nothing to do with listing replication, so it must never be able
+  // to slow it down or fail it.
+  let loftyDrain = { attempted: 0, recovered: 0 };
+  try {
+    loftyDrain = await drainFailedPushes(store, process.env.LOFTY_API_KEY);
+    if (loftyDrain.attempted) {
+      console.log(`sync-listings: retried ${loftyDrain.attempted} queued Lofty lead(s), ` +
+        `${loftyDrain.recovered} recovered, ${loftyDrain.stillQueued} still queued.`);
+    }
+  } catch (err) {
+    console.error("sync-listings: Lofty queue drain failed (ignored):", err && err.message);
+  }
 
   let lastRunError = null;
   let httpErrorOccurred = false;

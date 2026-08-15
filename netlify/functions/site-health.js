@@ -308,12 +308,13 @@ exports.handler = async (event) => {
   } else if (loftyLast.ok) {
     loftyOk = failedCount === 0;
     loftyDetail = `Last lead from "${loftyLast.formName}" reached Lofty at ${loftyLast.at}` +
-      `${loftyLast.leadId ? ` (lead ${loftyLast.leadId})` : ""}, using the "${loftyLast.authStyle}" auth style.` +
+      `${loftyLast.leadId ? ` (lead ${loftyLast.leadId})` : ""}` +
+      `${loftyLast.payloadShape ? `, ${loftyLast.payloadShape} payload` : ""}.` +
       (failedCount ? ` ${failedCount} earlier push(es) failed and are queued.` : "");
   } else {
     loftyOk = false;
     loftyDetail = `Last lead from "${loftyLast.formName}" FAILED at ${loftyLast.at}: ` +
-      `Lofty returned HTTP ${loftyLast.httpStatus} (tried the "${loftyLast.authStyle}" auth style). ` +
+      `Lofty returned HTTP ${loftyLast.httpStatus} (payload shape: ${loftyLast.payloadShape || "full"}). ` +
       `Lofty said: ${String(loftyLast.responseBody || "(empty response)").slice(0, 240)}. ` +
       `${failedCount} lead(s) queued and recoverable — nothing is lost, the submissions are also in Netlify Forms.`;
   }
