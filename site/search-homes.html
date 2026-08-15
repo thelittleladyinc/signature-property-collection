@@ -105,105 +105,115 @@
     <div class="fs-widget">
     <form id="fs-form">
       <div class="fs-row">
-        <div class="fs-block" style="flex:1 1 200px;min-width:180px">
-          <span class="fs-label">County</span>
-          <select id="fs-county" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
-            <option value="">All Counties</option>
-            <option value="larimer">Larimer County</option>
-            <option value="weld">Weld County</option>
-            <option value="boulder">Boulder County</option>
-            <option value="broomfield">Broomfield County</option>
-            <option value="jefferson">Jefferson County</option>
-            <option value="denver">Denver County</option>
-            <option value="arapahoe">Arapahoe County</option>
-            <option value="morgan">Morgan County</option>
-            <option value="adams">Adams County</option>
-          </select>
+        <div class="fs-block fs-multi" style="flex:1 1 240px;min-width:210px">
+          <span class="fs-label" id="fs-county-label">Counties</span>
+          <button type="button" class="fs-multi-toggle" id="fs-county-toggle"
+                  aria-expanded="false" aria-controls="fs-county-panel"
+                  aria-describedby="fs-county-label">All Counties</button>
+          <div class="fs-multi-panel" id="fs-county-panel" hidden>
+            <span class="fs-multi-heading">Pick any number of counties</span>
+            <label class="fs-multi-option"><input type="checkbox" value="larimer"><span>Larimer County</span></label>
+            <label class="fs-multi-option"><input type="checkbox" value="weld"><span>Weld County</span></label>
+            <label class="fs-multi-option"><input type="checkbox" value="boulder"><span>Boulder County</span></label>
+            <label class="fs-multi-option"><input type="checkbox" value="broomfield"><span>Broomfield County</span></label>
+            <label class="fs-multi-option"><input type="checkbox" value="jefferson"><span>Jefferson County</span></label>
+            <label class="fs-multi-option"><input type="checkbox" value="denver"><span>Denver County</span></label>
+            <label class="fs-multi-option"><input type="checkbox" value="arapahoe"><span>Arapahoe County</span></label>
+            <label class="fs-multi-option"><input type="checkbox" value="morgan"><span>Morgan County</span></label>
+            <label class="fs-multi-option"><input type="checkbox" value="adams"><span>Adams County</span></label>
+            <div class="fs-multi-foot"><button type="button" data-clear="county">Clear Counties</button></div>
+          </div>
         </div>
-        <div class="fs-block" style="flex:1 1 200px;min-width:180px">
-          <span class="fs-label">City</span>
-          <select id="fs-city" name="city" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
-            <option value="">All Cities</option>
-            <option value="Arvada">Arvada</option>
-            <option value="Ault">Ault</option>
-            <option value="Aurora">Aurora</option>
-            <option value="Bennett">Bennett</option>
-            <option value="Berthoud">Berthoud</option>
-            <option value="Boulder">Boulder</option>
-            <option value="Bow Mar">Bow Mar</option>
-            <option value="Brighton">Brighton</option>
-            <option value="Broomfield">Broomfield</option>
-            <option value="Brush">Brush</option>
-            <option value="Centennial">Centennial</option>
-            <option value="Cherry Hills Village">Cherry Hills Village</option>
-            <option value="Commerce City">Commerce City</option>
-            <option value="Conifer">Conifer</option>
-            <option value="Dacono">Dacono</option>
-            <option value="Denver">Denver</option>
-            <option value="Eaton">Eaton</option>
-            <option value="Edgewater">Edgewater</option>
-            <option value="Englewood">Englewood</option>
-            <option value="Erie">Erie</option>
-            <option value="Estes Park">Estes Park</option>
-            <option value="Evans">Evans</option>
-            <option value="Evergreen">Evergreen</option>
-            <option value="Federal Heights">Federal Heights</option>
-            <option value="Firestone">Firestone</option>
-            <option value="Fort Collins">Fort Collins</option>
-            <option value="Fort Lupton">Fort Lupton</option>
-            <option value="Fort Morgan">Fort Morgan</option>
-            <option value="Frederick">Frederick</option>
-            <option value="Garden City">Garden City</option>
-            <option value="Genesee">Genesee</option>
-            <option value="Gilcrest">Gilcrest</option>
-            <option value="Glendale">Glendale</option>
-            <option value="Golden">Golden</option>
-            <option value="Greeley">Greeley</option>
-            <option value="Greenwood Village">Greenwood Village</option>
-            <option value="Grover">Grover</option>
-            <option value="Hudson">Hudson</option>
-            <option value="Jamestown">Jamestown</option>
-            <option value="Johnstown">Johnstown</option>
-            <option value="Keenesburg">Keenesburg</option>
-            <option value="Kersey">Kersey</option>
-            <option value="LaSalle">LaSalle</option>
-            <option value="Lafayette">Lafayette</option>
-            <option value="Lakeside">Lakeside</option>
-            <option value="Lakewood">Lakewood</option>
-            <option value="Laporte">Laporte</option>
-            <option value="Littleton">Littleton</option>
-            <option value="Lochbuie">Lochbuie</option>
-            <option value="Log Lane Village">Log Lane Village</option>
-            <option value="Longmont">Longmont</option>
-            <option value="Louisville">Louisville</option>
-            <option value="Loveland">Loveland</option>
-            <option value="Lyons">Lyons</option>
-            <option value="Masonville">Masonville</option>
-            <option value="Mead">Mead</option>
-            <option value="Milliken">Milliken</option>
-            <option value="Morrison">Morrison</option>
-            <option value="Mountain View">Mountain View</option>
-            <option value="Nederland">Nederland</option>
-            <option value="New Raymer">New Raymer</option>
-            <option value="Northglenn">Northglenn</option>
-            <option value="Nunn">Nunn</option>
-            <option value="Pierce">Pierce</option>
-            <option value="Platteville">Platteville</option>
-            <option value="Red Feather Lakes">Red Feather Lakes</option>
-            <option value="Severance">Severance</option>
-            <option value="Sheridan">Sheridan</option>
-            <option value="Superior">Superior</option>
-            <option value="Thornton">Thornton</option>
-            <option value="Timnath">Timnath</option>
-            <option value="Ward">Ward</option>
-            <option value="Wellington">Wellington</option>
-            <option value="Westminster">Westminster</option>
-            <option value="Wheat Ridge">Wheat Ridge</option>
-            <option value="Wiggins">Wiggins</option>
-            <option value="Windsor">Windsor</option>
-          </select>
+        <div class="fs-block fs-multi" style="flex:1 1 240px;min-width:210px">
+          <span class="fs-label" id="fs-city-label">Towns</span>
+          <button type="button" class="fs-multi-toggle" id="fs-city-toggle"
+                  aria-expanded="false" aria-controls="fs-city-panel"
+                  aria-describedby="fs-city-label">All Towns</button>
+          <div class="fs-multi-panel" id="fs-city-panel" hidden>
+            <span class="fs-multi-heading">Pick any number of towns</span>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Arvada"><span>Arvada</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Ault"><span>Ault</span></label>
+            <label class="fs-multi-option" data-counties="arapahoe"><input type="checkbox" value="Aurora"><span>Aurora</span></label>
+            <label class="fs-multi-option" data-counties="adams"><input type="checkbox" value="Bennett"><span>Bennett</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Berthoud"><span>Berthoud</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Boulder"><span>Boulder</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Bow Mar"><span>Bow Mar</span></label>
+            <label class="fs-multi-option" data-counties="adams"><input type="checkbox" value="Brighton"><span>Brighton</span></label>
+            <label class="fs-multi-option" data-counties="broomfield"><input type="checkbox" value="Broomfield"><span>Broomfield</span></label>
+            <label class="fs-multi-option" data-counties="morgan"><input type="checkbox" value="Brush"><span>Brush</span></label>
+            <label class="fs-multi-option" data-counties="arapahoe"><input type="checkbox" value="Centennial"><span>Centennial</span></label>
+            <label class="fs-multi-option" data-counties="arapahoe"><input type="checkbox" value="Cherry Hills Village"><span>Cherry Hills Village</span></label>
+            <label class="fs-multi-option" data-counties="adams"><input type="checkbox" value="Commerce City"><span>Commerce City</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Conifer"><span>Conifer</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Dacono"><span>Dacono</span></label>
+            <label class="fs-multi-option" data-counties="denver"><input type="checkbox" value="Denver"><span>Denver</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Eaton"><span>Eaton</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Edgewater"><span>Edgewater</span></label>
+            <label class="fs-multi-option" data-counties="arapahoe"><input type="checkbox" value="Englewood"><span>Englewood</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Erie"><span>Erie</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Estes Park"><span>Estes Park</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Evans"><span>Evans</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Evergreen"><span>Evergreen</span></label>
+            <label class="fs-multi-option" data-counties="adams"><input type="checkbox" value="Federal Heights"><span>Federal Heights</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Firestone"><span>Firestone</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Fort Collins"><span>Fort Collins</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Fort Lupton"><span>Fort Lupton</span></label>
+            <label class="fs-multi-option" data-counties="morgan"><input type="checkbox" value="Fort Morgan"><span>Fort Morgan</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Frederick"><span>Frederick</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Garden City"><span>Garden City</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Genesee"><span>Genesee</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Gilcrest"><span>Gilcrest</span></label>
+            <label class="fs-multi-option" data-counties="arapahoe"><input type="checkbox" value="Glendale"><span>Glendale</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Golden"><span>Golden</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Greeley"><span>Greeley</span></label>
+            <label class="fs-multi-option" data-counties="arapahoe"><input type="checkbox" value="Greenwood Village"><span>Greenwood Village</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Grover"><span>Grover</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Hudson"><span>Hudson</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Jamestown"><span>Jamestown</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Johnstown"><span>Johnstown</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Keenesburg"><span>Keenesburg</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Kersey"><span>Kersey</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="LaSalle"><span>LaSalle</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Lafayette"><span>Lafayette</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Lakeside"><span>Lakeside</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Lakewood"><span>Lakewood</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Laporte"><span>Laporte</span></label>
+            <label class="fs-multi-option" data-counties="arapahoe"><input type="checkbox" value="Littleton"><span>Littleton</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Lochbuie"><span>Lochbuie</span></label>
+            <label class="fs-multi-option" data-counties="morgan"><input type="checkbox" value="Log Lane Village"><span>Log Lane Village</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Longmont"><span>Longmont</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Louisville"><span>Louisville</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Loveland"><span>Loveland</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Lyons"><span>Lyons</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Masonville"><span>Masonville</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Mead"><span>Mead</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Milliken"><span>Milliken</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Morrison"><span>Morrison</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Mountain View"><span>Mountain View</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Nederland"><span>Nederland</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="New Raymer"><span>New Raymer</span></label>
+            <label class="fs-multi-option" data-counties="adams"><input type="checkbox" value="Northglenn"><span>Northglenn</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Nunn"><span>Nunn</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Pierce"><span>Pierce</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Platteville"><span>Platteville</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Red Feather Lakes"><span>Red Feather Lakes</span></label>
+            <label class="fs-multi-option" data-counties="weld"><input type="checkbox" value="Severance"><span>Severance</span></label>
+            <label class="fs-multi-option" data-counties="arapahoe"><input type="checkbox" value="Sheridan"><span>Sheridan</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Superior"><span>Superior</span></label>
+            <label class="fs-multi-option" data-counties="adams"><input type="checkbox" value="Thornton"><span>Thornton</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Timnath"><span>Timnath</span></label>
+            <label class="fs-multi-option" data-counties="boulder"><input type="checkbox" value="Ward"><span>Ward</span></label>
+            <label class="fs-multi-option" data-counties="larimer"><input type="checkbox" value="Wellington"><span>Wellington</span></label>
+            <label class="fs-multi-option" data-counties="adams"><input type="checkbox" value="Westminster"><span>Westminster</span></label>
+            <label class="fs-multi-option" data-counties="jefferson"><input type="checkbox" value="Wheat Ridge"><span>Wheat Ridge</span></label>
+            <label class="fs-multi-option" data-counties="morgan"><input type="checkbox" value="Wiggins"><span>Wiggins</span></label>
+            <label class="fs-multi-option" data-counties="larimer,weld"><input type="checkbox" value="Windsor"><span>Windsor</span></label>
+            <p class="fs-multi-empty" hidden>No towns listed for that county yet.</p>
+            <div class="fs-multi-foot"><button type="button" data-clear="city">Clear Towns</button></div>
+          </div>
         </div>
       </div>
+      <div class="fs-chips" id="fs-chips" aria-live="polite"></div>
       <div class="fs-row" style="margin-top:24px">
         <div class="fs-block" style="flex:1 1 320px">
           <span class="fs-label">Price Range</span>
@@ -324,8 +334,12 @@
   var maxPriceInput = document.getElementById(wid + '-maxPrice');
   var bedsInput = document.getElementById(wid + '-beds');
   var bathsInput = document.getElementById(wid + '-baths');
-  var citySelect = document.getElementById(wid + '-city');
-  var countySelect = document.getElementById(wid + '-county');
+  var cityCountyMap = {"Fort Collins": ["larimer"], "Loveland": ["larimer"], "Estes Park": ["larimer"], "Berthoud": ["larimer"], "Masonville": ["larimer"], "Windsor": ["larimer", "weld"], "Timnath": ["larimer"], "Wellington": ["larimer"], "Laporte": ["larimer"], "Red Feather Lakes": ["larimer"], "Greeley": ["weld"], "Evans": ["weld"], "Severance": ["weld"], "Eaton": ["weld"], "Ault": ["weld"], "Johnstown": ["weld"], "Milliken": ["weld"], "Firestone": ["weld"], "Frederick": ["weld"], "Dacono": ["weld"], "Fort Lupton": ["weld"], "Mead": ["weld"], "Erie": ["weld"], "Platteville": ["weld"], "Kersey": ["weld"], "LaSalle": ["weld"], "Gilcrest": ["weld"], "Hudson": ["weld"], "Keenesburg": ["weld"], "Lochbuie": ["weld"], "Nunn": ["weld"], "Pierce": ["weld"], "Garden City": ["weld"], "Grover": ["weld"], "New Raymer": ["weld"], "Boulder": ["boulder"], "Longmont": ["boulder"], "Lafayette": ["boulder"], "Louisville": ["boulder"], "Superior": ["boulder"], "Nederland": ["boulder"], "Lyons": ["boulder"], "Jamestown": ["boulder"], "Ward": ["boulder"], "Broomfield": ["broomfield"], "Golden": ["jefferson"], "Lakewood": ["jefferson"], "Arvada": ["jefferson"], "Wheat Ridge": ["jefferson"], "Evergreen": ["jefferson"], "Conifer": ["jefferson"], "Morrison": ["jefferson"], "Genesee": ["jefferson"], "Edgewater": ["jefferson"], "Bow Mar": ["jefferson"], "Lakeside": ["jefferson"], "Mountain View": ["jefferson"], "Denver": ["denver"], "Aurora": ["arapahoe"], "Centennial": ["arapahoe"], "Littleton": ["arapahoe"], "Englewood": ["arapahoe"], "Greenwood Village": ["arapahoe"], "Cherry Hills Village": ["arapahoe"], "Glendale": ["arapahoe"], "Sheridan": ["arapahoe"], "Fort Morgan": ["morgan"], "Brush": ["morgan"], "Wiggins": ["morgan"], "Log Lane Village": ["morgan"], "Thornton": ["adams"], "Northglenn": ["adams"], "Brighton": ["adams"], "Commerce City": ["adams"], "Federal Heights": ["adams"], "Westminster": ["adams"], "Bennett": ["adams"]};
+  var cityPanel = document.getElementById(wid + '-city-panel');
+  var cityToggle = document.getElementById(wid + '-city-toggle');
+  var countyPanel = document.getElementById(wid + '-county-panel');
+  var countyToggle = document.getElementById(wid + '-county-toggle');
+  var chipsEl = document.getElementById(wid + '-chips');
   var CEILING = 5000000;
   var skip = 0;
   var TOP = 12;
@@ -655,44 +669,197 @@
     wirePills(g, g.dataset.field === 'beds' ? bedsInput : bathsInput);
   });
 
-  // ---- County -> City cascade: picking a county narrows the City dropdown
-  // to just that county's cities (plus "All Cities In <County>"); leaving
-  // City on "All" while a county is picked searches every city in that
-  // county at once via listings-search.js's existing `cities` param. ----
-  var allCityOptionsHtml = citySelect ? citySelect.innerHTML : '';
-  if (countySelect && citySelect) {
-    countySelect.addEventListener('change', function () {
-      var slug = countySelect.value;
-      citySelect.value = '';
-      if (!slug) {
-        citySelect.innerHTML = allCityOptionsHtml;
-        return;
+  // ---- Multi-select counties + towns ------------------------------------
+  // Counties scope which towns are offered; towns narrow within that scope.
+  // Pick neither and the search covers everything. Checked state lives in the
+  // checkboxes themselves (options are hidden, never rebuilt, so a town stays
+  // checked if you toggle counties around it) -- with one deliberate
+  // exception: unchecking a county drops its towns, because leaving a town
+  // selected from a county you just removed is the kind of invisible filter
+  // that makes a search look broken.
+  function checkedValues(panel) {
+    if (!panel) return [];
+    return Array.prototype.slice
+      .call(panel.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(function (cb) { return cb.value; });
+  }
+
+  function selectedCities() { return checkedValues(cityPanel); }
+  function selectedCounties() { return checkedValues(countyPanel); }
+
+  // Deep-linked town names that aren't in this widget's own list (see the
+  // ?cities= handling below) still have to reach the server, or following a
+  // link would silently widen the search it promised to narrow.
+  var extraCities = [];
+
+  function countyNameFor(slug) {
+    var label = countyPanel && countyPanel.querySelector('input[value="' + slug + '"]');
+    return label && label.parentNode ? label.parentNode.textContent.trim() : slug;
+  }
+
+  function summarize(names, allLabel, oneMoreLabel) {
+    if (!names.length) return allLabel;
+    if (names.length <= 2) return names.join(', ');
+    return names.slice(0, 2).join(', ') + ' +' + (names.length - 2) + ' ' + oneMoreLabel;
+  }
+
+  function syncCityVisibility() {
+    if (!cityPanel) return;
+    var counties = selectedCounties();
+    var anyVisible = false;
+    cityPanel.querySelectorAll('.fs-multi-option').forEach(function (opt) {
+      var owners = (opt.dataset.counties || '').split(',').filter(Boolean);
+      var show = !counties.length || !owners.length ||
+        owners.some(function (slug) { return counties.indexOf(slug) !== -1; });
+      opt.hidden = !show;
+      if (show) anyVisible = true;
+    });
+    var empty = cityPanel.querySelector('.fs-multi-empty');
+    if (empty) empty.hidden = anyVisible;
+  }
+
+  function renderChips() {
+    if (!chipsEl) return;
+    var chips = selectedCounties().map(function (slug) {
+      return { kind: 'county', value: slug, label: countyNameFor(slug) };
+    }).concat(selectedCities().map(function (city) {
+      return { kind: 'city', value: city, label: city };
+    })).concat(extraCities.map(function (city) {
+      // A town this widget doesn't list, arrived via ?cities= -- it gets a
+      // chip like any other, so it's never an invisible filter.
+      return { kind: 'extra', value: city, label: city };
+    }));
+    chipsEl.innerHTML = chips.map(function (c) {
+      return '<span class="fs-chip">' + esc(c.label) +
+        '<button type="button" data-kind="' + c.kind + '" data-value="' + esc(c.value) +
+        '" aria-label="Remove ' + esc(c.label) + '">&times;</button></span>';
+    }).join('');
+  }
+
+  function refreshGeoUi() {
+    syncCityVisibility();
+    renderChips();
+    if (cityToggle) {
+      cityToggle.textContent = summarize(
+        selectedCities().concat(extraCities), 'All Towns', 'more');
+    }
+    if (countyToggle) {
+      countyToggle.textContent = summarize(
+        selectedCounties().map(countyNameFor), 'All Counties', 'more');
+    }
+  }
+
+  function wirePicker(toggle, panel) {
+    if (!toggle || !panel) return;
+    toggle.addEventListener('click', function () {
+      var open = toggle.getAttribute('aria-expanded') === 'true';
+      // Only one panel open at a time -- they overlap on narrow screens.
+      [[cityToggle, cityPanel], [countyToggle, countyPanel]].forEach(function (pair) {
+        if (pair[0] && pair[1]) {
+          pair[0].setAttribute('aria-expanded', 'false');
+          pair[1].hidden = true;
+        }
+      });
+      if (!open) {
+        toggle.setAttribute('aria-expanded', 'true');
+        panel.hidden = false;
       }
-      var cities = countyCityMap[slug] || [];
-      citySelect.innerHTML = '<option value="">All Cities</option>' +
-        cities.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    });
+    panel.addEventListener('change', function (e) {
+      if (e.target.type !== 'checkbox') return;
+      if (panel === countyPanel && !e.target.checked) {
+        // County unchecked -> drop any of its towns that are still checked.
+        var dropped = countyCityMap[e.target.value] || [];
+        var stillOffered = selectedCounties().reduce(function (acc, slug) {
+          return acc.concat(countyCityMap[slug] || []);
+        }, []);
+        cityPanel && cityPanel.querySelectorAll('input:checked').forEach(function (cb) {
+          if (dropped.indexOf(cb.value) !== -1 && stillOffered.indexOf(cb.value) === -1) {
+            cb.checked = false;
+          }
+        });
+      }
+      refreshGeoUi();
+    });
+    panel.querySelectorAll('[data-clear]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        panel.querySelectorAll('input:checked').forEach(function (cb) { cb.checked = false; });
+        // "Clear Towns" clears deep-linked towns too -- they're towns, they
+        // show as chips alongside the rest, and leaving them behind would make
+        // the button look broken.
+        if (panel === cityPanel) extraCities = [];
+        refreshGeoUi();
+      });
     });
   }
+
+  wirePicker(cityToggle, cityPanel);
+  wirePicker(countyToggle, countyPanel);
+
+  if (chipsEl) {
+    chipsEl.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-kind]');
+      if (!btn) return;
+      if (btn.dataset.kind === 'extra') {
+        extraCities = extraCities.filter(function (c) { return c !== btn.dataset.value; });
+        refreshGeoUi();
+        return;
+      }
+      var panel = btn.dataset.kind === 'county' ? countyPanel : cityPanel;
+      var cb = panel && panel.querySelector('input[value="' + btn.dataset.value.replace(/"/g, '\\"') + '"]');
+      if (cb) { cb.checked = false; }
+      refreshGeoUi();
+    });
+  }
+
+  // Click outside closes whichever panel is open.
+  document.addEventListener('click', function (e) {
+    [[cityToggle, cityPanel], [countyToggle, countyPanel]].forEach(function (pair) {
+      if (!pair[0] || !pair[1] || pair[1].hidden) return;
+      if (!pair[1].contains(e.target) && e.target !== pair[0]) {
+        pair[0].setAttribute('aria-expanded', 'false');
+        pair[1].hidden = true;
+      }
+    });
+  });
 
   var urlParams = supportDeepLinks ? new URLSearchParams(window.location.search) : new URLSearchParams('');
 
   function paramsFromForm() {
     var data = new FormData(form);
     var p = {};
-    ['city', 'minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {
+    ['minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {
       var v = data.get(k);
       if (v) p[k] = v;
     });
-    if (fixedCity) p.city = fixedCity;
-    if (!p.city && countySelect && countySelect.value) {
-      var selCities = countyCityMap[countySelect.value] || [];
-      if (selCities.length) p.cities = selCities.join(',');
+    if (fixedCity) {
+      p.city = fixedCity;
+    } else {
+      // Towns beat counties: checking Loveland inside Larimer means Loveland,
+      // not all of Larimer. `cities` carries a single town perfectly well
+      // (matchesQuery treats it as a one-item list), so the old single-value
+      // `city` param is only used for the fixed-city widget now.
+      var cities = selectedCities().concat(extraCities);
+      if (!cities.length) {
+        cities = selectedCounties().reduce(function (acc, slug) {
+          return acc.concat(countyCityMap[slug] || []);
+        }, []);
+      }
+      // De-dupe: towns straddling two selected counties (Windsor, Erie) would
+      // otherwise appear twice and pad the query string for nothing.
+      var seen = {};
+      cities = cities.filter(function (c) {
+        var k = c.toLowerCase();
+        if (seen[k]) return false;
+        seen[k] = true;
+        return true;
+      });
+      if (cities.length) p.cities = cities.join(',');
     }
     if (alwaysNoFloor) p.noFloor = 'true';
     if (supportDeepLinks) {
       if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
       if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
-      if (urlParams.get('cities') && !p.cities) p.cities = urlParams.get('cities');
       if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
     }
     return p;
@@ -743,9 +910,39 @@
   loadMoreBtn.addEventListener('click', function () { runSearch(false); });
 
   if (supportDeepLinks) {
-    if (urlParams.get('city')) {
-      var citySelect = document.getElementById(wid + '-city');
-      if (citySelect) citySelect.value = urlParams.get('city');
+    // ?city= and ?cities= now pre-CHECK the pickers instead of setting a
+    // dropdown, so an incoming link's scope is visible and editable rather
+    // than an invisible filter the visitor has to be told about in prose.
+    // Anything that doesn't match a town we offer is kept in extraCities so
+    // the link still filters exactly as it promised.
+    var deepCities = []
+      .concat(urlParams.get('city') ? [urlParams.get('city')] : [])
+      .concat((urlParams.get('cities') || '').split(',').map(function (s) { return s.trim(); }))
+      .filter(Boolean);
+    if (deepCities.length && cityPanel) {
+      var offered = {};
+      cityPanel.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+        offered[cb.value.toLowerCase()] = cb;
+      });
+      var matchedCounties = {};
+      deepCities.forEach(function (name) {
+        var cb = offered[name.toLowerCase()];
+        if (cb) {
+          cb.checked = true;
+          (cityCountyMap[cb.value] || []).forEach(function (slug) { matchedCounties[slug] = true; });
+        } else if (extraCities.indexOf(name) === -1) {
+          extraCities.push(name);
+        }
+      });
+      // Check the counties those towns belong to, so the town list isn't
+      // filtered down to nothing the first time the visitor opens it.
+      if (countyPanel) {
+        Object.keys(matchedCounties).forEach(function (slug) {
+          var cb = countyPanel.querySelector('input[value="' + slug + '"]');
+          if (cb) cb.checked = true;
+        });
+      }
+      refreshGeoUi();
     }
     if (urlParams.get('minPrice')) {
       var mp = parseInt(urlParams.get('minPrice'), 10);
@@ -754,14 +951,16 @@
         updateSlider();
       }
     }
+    // The town/county part of an incoming link no longer needs explaining --
+    // it's visible in the chips and removable there. Only the two filters with
+    // no on-page control (subdivision, waterfront) still need a note.
     var deepLinkNoteEl = document.getElementById(wid + '-deep-link-note');
-    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true' || urlParams.get('cities'))) {
+    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true')) {
       var bits = [];
       if (urlParams.get('subdivision')) bits.push('the ' + urlParams.get('subdivision') + ' area');
       if (urlParams.get('waterfront') === 'true') bits.push('waterfront/riverfront features');
-      if (urlParams.get('cities')) bits.push(urlParams.get('cities').split(',').join(', '));
-      deepLinkNoteEl.textContent = 'Showing listings filtered to ' + bits.join(' and ') +
-        '. Clear the filters below and search again for the full, unfiltered result set.';
+      deepLinkNoteEl.textContent = 'Also filtered to ' + bits.join(' and ') +
+        '. Reload this page without those filters for the full result set.';
       deepLinkNoteEl.style.display = 'block';
     }
   }

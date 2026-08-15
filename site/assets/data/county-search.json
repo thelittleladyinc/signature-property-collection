@@ -1,0 +1,137 @@
+{
+  "_generated": "Written by build/build.py from COUNTIES. Do not edit by hand.",
+  "counties": {
+    "Larimer": {
+      "slug": "larimer",
+      "cities": [
+        "Fort Collins",
+        "Loveland",
+        "Estes Park",
+        "Berthoud",
+        "Masonville",
+        "Windsor",
+        "Timnath",
+        "Wellington",
+        "Laporte",
+        "Red Feather Lakes"
+      ],
+      "liveSearch": true
+    },
+    "Weld": {
+      "slug": "weld",
+      "cities": [
+        "Greeley",
+        "Windsor",
+        "Evans",
+        "Severance",
+        "Eaton",
+        "Ault",
+        "Johnstown",
+        "Milliken",
+        "Firestone",
+        "Frederick",
+        "Dacono",
+        "Fort Lupton",
+        "Mead",
+        "Erie",
+        "Platteville",
+        "Kersey",
+        "LaSalle",
+        "Gilcrest",
+        "Hudson",
+        "Keenesburg",
+        "Lochbuie",
+        "Nunn",
+        "Pierce",
+        "Garden City",
+        "Grover",
+        "New Raymer"
+      ],
+      "liveSearch": true
+    },
+    "Boulder": {
+      "slug": "boulder",
+      "cities": [
+        "Boulder",
+        "Longmont",
+        "Lafayette",
+        "Louisville",
+        "Superior",
+        "Nederland",
+        "Lyons",
+        "Jamestown",
+        "Ward"
+      ],
+      "liveSearch": true
+    },
+    "Broomfield": {
+      "slug": "broomfield",
+      "cities": [
+        "Broomfield"
+      ],
+      "liveSearch": true
+    },
+    "Jefferson": {
+      "slug": "jefferson",
+      "cities": [
+        "Golden",
+        "Lakewood",
+        "Arvada",
+        "Wheat Ridge",
+        "Evergreen",
+        "Conifer",
+        "Morrison",
+        "Genesee",
+        "Edgewater",
+        "Bow Mar",
+        "Lakeside",
+        "Mountain View"
+      ],
+      "liveSearch": true
+    },
+    "Denver": {
+      "slug": "denver",
+      "cities": [
+        "Denver"
+      ],
+      "liveSearch": true
+    },
+    "Arapahoe": {
+      "slug": "arapahoe",
+      "cities": [
+        "Aurora",
+        "Centennial",
+        "Littleton",
+        "Englewood",
+        "Greenwood Village",
+        "Cherry Hills Village",
+        "Glendale",
+        "Sheridan"
+      ],
+      "liveSearch": true
+    },
+    "Morgan": {
+      "slug": "morgan",
+      "cities": [
+        "Fort Morgan",
+        "Brush",
+        "Wiggins",
+        "Log Lane Village"
+      ],
+      "liveSearch": true
+    },
+    "Adams": {
+      "slug": "adams",
+      "cities": [
+        "Thornton",
+        "Northglenn",
+        "Brighton",
+        "Commerce City",
+        "Federal Heights",
+        "Westminster",
+        "Bennett"
+      ],
+      "liveSearch": true
+    }
+  }
+}

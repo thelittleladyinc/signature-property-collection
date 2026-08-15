@@ -243,8 +243,12 @@
   var maxPriceInput = document.getElementById(wid + '-maxPrice');
   var bedsInput = document.getElementById(wid + '-beds');
   var bathsInput = document.getElementById(wid + '-baths');
-  var citySelect = document.getElementById(wid + '-city');
-  var countySelect = document.getElementById(wid + '-county');
+  var cityCountyMap = {};
+  var cityPanel = document.getElementById(wid + '-city-panel');
+  var cityToggle = document.getElementById(wid + '-city-toggle');
+  var countyPanel = document.getElementById(wid + '-county-panel');
+  var countyToggle = document.getElementById(wid + '-county-toggle');
+  var chipsEl = document.getElementById(wid + '-chips');
   var CEILING = 5000000;
   var skip = 0;
   var TOP = 12;
@@ -574,44 +578,197 @@
     wirePills(g, g.dataset.field === 'beds' ? bedsInput : bathsInput);
   });
 
-  // ---- County -> City cascade: picking a county narrows the City dropdown
-  // to just that county's cities (plus "All Cities In <County>"); leaving
-  // City on "All" while a county is picked searches every city in that
-  // county at once via listings-search.js's existing `cities` param. ----
-  var allCityOptionsHtml = citySelect ? citySelect.innerHTML : '';
-  if (countySelect && citySelect) {
-    countySelect.addEventListener('change', function () {
-      var slug = countySelect.value;
-      citySelect.value = '';
-      if (!slug) {
-        citySelect.innerHTML = allCityOptionsHtml;
-        return;
+  // ---- Multi-select counties + towns ------------------------------------
+  // Counties scope which towns are offered; towns narrow within that scope.
+  // Pick neither and the search covers everything. Checked state lives in the
+  // checkboxes themselves (options are hidden, never rebuilt, so a town stays
+  // checked if you toggle counties around it) -- with one deliberate
+  // exception: unchecking a county drops its towns, because leaving a town
+  // selected from a county you just removed is the kind of invisible filter
+  // that makes a search look broken.
+  function checkedValues(panel) {
+    if (!panel) return [];
+    return Array.prototype.slice
+      .call(panel.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(function (cb) { return cb.value; });
+  }
+
+  function selectedCities() { return checkedValues(cityPanel); }
+  function selectedCounties() { return checkedValues(countyPanel); }
+
+  // Deep-linked town names that aren't in this widget's own list (see the
+  // ?cities= handling below) still have to reach the server, or following a
+  // link would silently widen the search it promised to narrow.
+  var extraCities = [];
+
+  function countyNameFor(slug) {
+    var label = countyPanel && countyPanel.querySelector('input[value="' + slug + '"]');
+    return label && label.parentNode ? label.parentNode.textContent.trim() : slug;
+  }
+
+  function summarize(names, allLabel, oneMoreLabel) {
+    if (!names.length) return allLabel;
+    if (names.length <= 2) return names.join(', ');
+    return names.slice(0, 2).join(', ') + ' +' + (names.length - 2) + ' ' + oneMoreLabel;
+  }
+
+  function syncCityVisibility() {
+    if (!cityPanel) return;
+    var counties = selectedCounties();
+    var anyVisible = false;
+    cityPanel.querySelectorAll('.fs-multi-option').forEach(function (opt) {
+      var owners = (opt.dataset.counties || '').split(',').filter(Boolean);
+      var show = !counties.length || !owners.length ||
+        owners.some(function (slug) { return counties.indexOf(slug) !== -1; });
+      opt.hidden = !show;
+      if (show) anyVisible = true;
+    });
+    var empty = cityPanel.querySelector('.fs-multi-empty');
+    if (empty) empty.hidden = anyVisible;
+  }
+
+  function renderChips() {
+    if (!chipsEl) return;
+    var chips = selectedCounties().map(function (slug) {
+      return { kind: 'county', value: slug, label: countyNameFor(slug) };
+    }).concat(selectedCities().map(function (city) {
+      return { kind: 'city', value: city, label: city };
+    })).concat(extraCities.map(function (city) {
+      // A town this widget doesn't list, arrived via ?cities= -- it gets a
+      // chip like any other, so it's never an invisible filter.
+      return { kind: 'extra', value: city, label: city };
+    }));
+    chipsEl.innerHTML = chips.map(function (c) {
+      return '<span class="fs-chip">' + esc(c.label) +
+        '<button type="button" data-kind="' + c.kind + '" data-value="' + esc(c.value) +
+        '" aria-label="Remove ' + esc(c.label) + '">&times;</button></span>';
+    }).join('');
+  }
+
+  function refreshGeoUi() {
+    syncCityVisibility();
+    renderChips();
+    if (cityToggle) {
+      cityToggle.textContent = summarize(
+        selectedCities().concat(extraCities), 'All Towns', 'more');
+    }
+    if (countyToggle) {
+      countyToggle.textContent = summarize(
+        selectedCounties().map(countyNameFor), 'All Counties', 'more');
+    }
+  }
+
+  function wirePicker(toggle, panel) {
+    if (!toggle || !panel) return;
+    toggle.addEventListener('click', function () {
+      var open = toggle.getAttribute('aria-expanded') === 'true';
+      // Only one panel open at a time -- they overlap on narrow screens.
+      [[cityToggle, cityPanel], [countyToggle, countyPanel]].forEach(function (pair) {
+        if (pair[0] && pair[1]) {
+          pair[0].setAttribute('aria-expanded', 'false');
+          pair[1].hidden = true;
+        }
+      });
+      if (!open) {
+        toggle.setAttribute('aria-expanded', 'true');
+        panel.hidden = false;
       }
-      var cities = countyCityMap[slug] || [];
-      citySelect.innerHTML = '<option value="">All Cities</option>' +
-        cities.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    });
+    panel.addEventListener('change', function (e) {
+      if (e.target.type !== 'checkbox') return;
+      if (panel === countyPanel && !e.target.checked) {
+        // County unchecked -> drop any of its towns that are still checked.
+        var dropped = countyCityMap[e.target.value] || [];
+        var stillOffered = selectedCounties().reduce(function (acc, slug) {
+          return acc.concat(countyCityMap[slug] || []);
+        }, []);
+        cityPanel && cityPanel.querySelectorAll('input:checked').forEach(function (cb) {
+          if (dropped.indexOf(cb.value) !== -1 && stillOffered.indexOf(cb.value) === -1) {
+            cb.checked = false;
+          }
+        });
+      }
+      refreshGeoUi();
+    });
+    panel.querySelectorAll('[data-clear]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        panel.querySelectorAll('input:checked').forEach(function (cb) { cb.checked = false; });
+        // "Clear Towns" clears deep-linked towns too -- they're towns, they
+        // show as chips alongside the rest, and leaving them behind would make
+        // the button look broken.
+        if (panel === cityPanel) extraCities = [];
+        refreshGeoUi();
+      });
     });
   }
+
+  wirePicker(cityToggle, cityPanel);
+  wirePicker(countyToggle, countyPanel);
+
+  if (chipsEl) {
+    chipsEl.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-kind]');
+      if (!btn) return;
+      if (btn.dataset.kind === 'extra') {
+        extraCities = extraCities.filter(function (c) { return c !== btn.dataset.value; });
+        refreshGeoUi();
+        return;
+      }
+      var panel = btn.dataset.kind === 'county' ? countyPanel : cityPanel;
+      var cb = panel && panel.querySelector('input[value="' + btn.dataset.value.replace(/"/g, '\\"') + '"]');
+      if (cb) { cb.checked = false; }
+      refreshGeoUi();
+    });
+  }
+
+  // Click outside closes whichever panel is open.
+  document.addEventListener('click', function (e) {
+    [[cityToggle, cityPanel], [countyToggle, countyPanel]].forEach(function (pair) {
+      if (!pair[0] || !pair[1] || pair[1].hidden) return;
+      if (!pair[1].contains(e.target) && e.target !== pair[0]) {
+        pair[0].setAttribute('aria-expanded', 'false');
+        pair[1].hidden = true;
+      }
+    });
+  });
 
   var urlParams = supportDeepLinks ? new URLSearchParams(window.location.search) : new URLSearchParams('');
 
   function paramsFromForm() {
     var data = new FormData(form);
     var p = {};
-    ['city', 'minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {
+    ['minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {
       var v = data.get(k);
       if (v) p[k] = v;
     });
-    if (fixedCity) p.city = fixedCity;
-    if (!p.city && countySelect && countySelect.value) {
-      var selCities = countyCityMap[countySelect.value] || [];
-      if (selCities.length) p.cities = selCities.join(',');
+    if (fixedCity) {
+      p.city = fixedCity;
+    } else {
+      // Towns beat counties: checking Loveland inside Larimer means Loveland,
+      // not all of Larimer. `cities` carries a single town perfectly well
+      // (matchesQuery treats it as a one-item list), so the old single-value
+      // `city` param is only used for the fixed-city widget now.
+      var cities = selectedCities().concat(extraCities);
+      if (!cities.length) {
+        cities = selectedCounties().reduce(function (acc, slug) {
+          return acc.concat(countyCityMap[slug] || []);
+        }, []);
+      }
+      // De-dupe: towns straddling two selected counties (Windsor, Erie) would
+      // otherwise appear twice and pad the query string for nothing.
+      var seen = {};
+      cities = cities.filter(function (c) {
+        var k = c.toLowerCase();
+        if (seen[k]) return false;
+        seen[k] = true;
+        return true;
+      });
+      if (cities.length) p.cities = cities.join(',');
     }
     if (alwaysNoFloor) p.noFloor = 'true';
     if (supportDeepLinks) {
       if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
       if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
-      if (urlParams.get('cities') && !p.cities) p.cities = urlParams.get('cities');
       if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
     }
     return p;
@@ -662,9 +819,39 @@
   loadMoreBtn.addEventListener('click', function () { runSearch(false); });
 
   if (supportDeepLinks) {
-    if (urlParams.get('city')) {
-      var citySelect = document.getElementById(wid + '-city');
-      if (citySelect) citySelect.value = urlParams.get('city');
+    // ?city= and ?cities= now pre-CHECK the pickers instead of setting a
+    // dropdown, so an incoming link's scope is visible and editable rather
+    // than an invisible filter the visitor has to be told about in prose.
+    // Anything that doesn't match a town we offer is kept in extraCities so
+    // the link still filters exactly as it promised.
+    var deepCities = []
+      .concat(urlParams.get('city') ? [urlParams.get('city')] : [])
+      .concat((urlParams.get('cities') || '').split(',').map(function (s) { return s.trim(); }))
+      .filter(Boolean);
+    if (deepCities.length && cityPanel) {
+      var offered = {};
+      cityPanel.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+        offered[cb.value.toLowerCase()] = cb;
+      });
+      var matchedCounties = {};
+      deepCities.forEach(function (name) {
+        var cb = offered[name.toLowerCase()];
+        if (cb) {
+          cb.checked = true;
+          (cityCountyMap[cb.value] || []).forEach(function (slug) { matchedCounties[slug] = true; });
+        } else if (extraCities.indexOf(name) === -1) {
+          extraCities.push(name);
+        }
+      });
+      // Check the counties those towns belong to, so the town list isn't
+      // filtered down to nothing the first time the visitor opens it.
+      if (countyPanel) {
+        Object.keys(matchedCounties).forEach(function (slug) {
+          var cb = countyPanel.querySelector('input[value="' + slug + '"]');
+          if (cb) cb.checked = true;
+        });
+      }
+      refreshGeoUi();
     }
     if (urlParams.get('minPrice')) {
       var mp = parseInt(urlParams.get('minPrice'), 10);
@@ -673,14 +860,16 @@
         updateSlider();
       }
     }
+    // The town/county part of an incoming link no longer needs explaining --
+    // it's visible in the chips and removable there. Only the two filters with
+    // no on-page control (subdivision, waterfront) still need a note.
     var deepLinkNoteEl = document.getElementById(wid + '-deep-link-note');
-    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true' || urlParams.get('cities'))) {
+    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true')) {
       var bits = [];
       if (urlParams.get('subdivision')) bits.push('the ' + urlParams.get('subdivision') + ' area');
       if (urlParams.get('waterfront') === 'true') bits.push('waterfront/riverfront features');
-      if (urlParams.get('cities')) bits.push(urlParams.get('cities').split(',').join(', '));
-      deepLinkNoteEl.textContent = 'Showing listings filtered to ' + bits.join(' and ') +
-        '. Clear the filters below and search again for the full, unfiltered result set.';
+      deepLinkNoteEl.textContent = 'Also filtered to ' + bits.join(' and ') +
+        '. Reload this page without those filters for the full result set.';
       deepLinkNoteEl.style.display = 'block';
     }
   }

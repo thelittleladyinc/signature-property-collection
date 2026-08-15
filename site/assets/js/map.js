@@ -3,7 +3,7 @@
  * Built with Leaflet + OpenStreetMap-based tiles (both free, no API key)
  * and real US Census county boundary data, styled to the audited brand
  * palette (dusty rose #B86F7A / mauve #BA8C84 — no red). Click a county to
- * go to its page; hover to preview. Priority counties (Larimer, Weld,
+ * go to its page; hover to preview. The three core counties (Larimer, Weld,
  * Boulder) get labeled city markers for extra detail.
  *
  * County slugs must match /communities/<slug>.html
@@ -27,17 +27,21 @@
     'Morgan': 'morgan'
   };
 
-  // City lists per county, kept in sync by hand with COUNTIES[].cities in
-  // build.py (same pattern already used for CITY_ICONS below) — this is what
-  // powers the "click a county -> search all its cities at once" popup.
-  // Only the three IRES-covered counties (priority=True in build.py) get
-  // live MLS results; the rest fall back to the county guide page link only
-  // since a live search there would just return zero matches.
-  // 2026-08-13 (audit fix): kept out of sync with build.py's COUNTIES for a
-  // while -- that list grew from a handful of well-known towns to every
-  // incorporated city/town per county (Christine's request), but this
-  // hand-duplicated copy wasn't updated to match, so the map's "quick
-  // search" popup was still only offering the old short list. Re-synced.
+  // 2026-08-15 (Christine: "i need it to be the same through the entire
+  // site"): the county -> cities map and the live-search list are no longer
+  // maintained here. build.py generates /assets/data/county-search.json from
+  // COUNTIES -- the same source the county pages, city pages and Search Homes
+  // dropdown are built from -- and loadCountyData() below fills these in from
+  // it. Hand-syncing this failed twice: the city lists went stale for a while
+  // in August 2026, and the live-search list below still named three counties
+  // after five more had gone live, so clicking Denver or Adams on the map told
+  // visitors live search didn't cover them while their own city pages searched
+  // live.
+  //
+  // What's left below is a deliberately minimal FALLBACK for the case where
+  // that fetch fails: the three original IRES counties. A stale-but-correct
+  // subset degrades to "guide link only" for the rest, which is honest; an
+  // empty object would make every popup a dead end.
   var COUNTY_CITIES = {
     'Larimer': ['Fort Collins', 'Loveland', 'Estes Park', 'Berthoud', 'Masonville',
       'Windsor', 'Timnath', 'Wellington', 'Laporte', 'Red Feather Lakes'],
@@ -46,20 +50,30 @@
       'Mead', 'Erie', 'Platteville', 'Kersey', 'LaSalle', 'Gilcrest', 'Hudson',
       'Keenesburg', 'Lochbuie', 'Nunn', 'Pierce', 'Garden City', 'Grover', 'New Raymer'],
     'Boulder': ['Boulder', 'Longmont', 'Lafayette', 'Louisville', 'Superior',
-      'Nederland', 'Lyons', 'Jamestown', 'Ward'],
-    'Morgan': ['Fort Morgan', 'Brush', 'Wiggins', 'Log Lane Village']
+      'Nederland', 'Lyons', 'Jamestown', 'Ward']
   };
-  // 2026-08-15 (Christine: "it needs to be a live search - yes - i can pull
-  // them in ires"): Morgan added. NOTE the drift this list still carries --
-  // build.py now treats all nine counties as live-search, but only the four
-  // listed here offer live results from the map popup; clicking Denver,
-  // Jefferson, Arapahoe, Adams or Broomfield still gets the county-guide link
-  // only, even though their own city pages run a live search. That's a
-  // pre-existing gap, not a Morgan one, and fixing it means hand-copying five
-  // more city lists into the block above -- the same duplication that already
-  // went stale once (see the COUNTY_CITIES comment). Flagged rather than
-  // half-fixed.
-  var IRES_COUNTIES = { 'Larimer': true, 'Weld': true, 'Boulder': true, 'Morgan': true };
+  var IRES_COUNTIES = { 'Larimer': true, 'Weld': true, 'Boulder': true };
+
+  // Replaces the three constants above with build.py's generated copy. Resolves
+  // either way -- a failed or malformed fetch just leaves the fallbacks in
+  // place, so the map still draws and still links to every county guide.
+  function loadCountyData() {
+    return fetch('/assets/data/county-search.json')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var counties = data && data.counties;
+        if (!counties) return;
+        Object.keys(counties).forEach(function (name) {
+          var c = counties[name] || {};
+          if (c.slug) COUNTY_SLUGS[name] = c.slug;
+          if (Array.isArray(c.cities) && c.cities.length) COUNTY_CITIES[name] = c.cities;
+          if (c.liveSearch) IRES_COUNTIES[name] = true;
+        });
+      })
+      .catch(function () {
+        console.warn('map: county-search.json unavailable; using built-in county list.');
+      });
+  }
 
   // Quick price-floor presets for the popup. $950K+ matches the site's
   // luxury default; the lower presets are the deliberate, narrow exception
@@ -401,7 +415,11 @@
     overlay.querySelector('#mqs-title').textContent = 'Homes in ' + opts.label;
     overlay.querySelector('#mqs-sub').textContent = opts.covered
       ? 'Live, active IRES MLS listings — defaults to $950K+, adjust below to include more homes.'
-      : 'Live search covers Larimer, Weld & Boulder County. Browse the area guide below instead.';
+      // 2026-08-15: this used to name the three counties live search covered.
+      // It covers all nine now (see loadCountyData), so the only way to reach
+      // this line is a failed data fetch -- which is a "try the guide" problem,
+      // not a coverage fact to state.
+      : 'Browse the full area guide below for this county.';
     var goBtn = overlay.querySelector('#mqs-go');
     var guideBtn = overlay.querySelector('#mqs-guide');
     if (opts.guideHref) {
@@ -439,7 +457,10 @@
       maxZoom: 18,
     }).addTo(map);
 
-    fetch('/assets/data/noco-counties.geojson')
+    // County data first: the popup's live-search decision and city list come
+    // from it, and a polygon is clickable the moment it's drawn.
+    loadCountyData()
+      .then(function () { return fetch('/assets/data/noco-counties.geojson'); })
       .then(function (r) { return r.json(); })
       .then(function (geojson) {
         var layer = L.geoJSON(geojson, {

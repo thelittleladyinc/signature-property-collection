@@ -1075,34 +1075,67 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     county at once via listings-search.js's existing `cities` param
     (already supported server-side — no backend change needed)."""
 
+    # 2026-08-15 (Christine: "i also want them to be able to pick mu;tiple towns
+    # or counties to search"). Both of these were single-<select> dropdowns, so
+    # a buyer deciding between Loveland and Berthoud -- the single most common
+    # real search on this site -- had to run two searches and compare them from
+    # memory. Now both are checkbox pickers.
+    #
+    # No backend change was needed: listings-search.js already accepted a
+    # comma-separated `cities` param (matchesQuery() in _mls-shared.js), which
+    # the county pages and the map popup have been deep-linking into all along.
+    # This just exposes it in the UI. Selecting counties scopes the town list;
+    # selecting towns narrows within it; picking neither searches everything.
     city_field_html = ""
     county_field_html = ""
     county_city_map_js = "{}"
+    city_county_map_js = "{}"
     if fixed_city:
         city_field_html = f'<input type="hidden" name="city" value="{esc(fixed_city)}">'
     else:
+        cities_list = list(search_cities or [])
+        # data-county lets the panel hide towns outside the chosen counties
+        # without rebuilding the DOM (and so without losing checked state).
+        city_to_counties = {}
+        for c in (counties or []):
+            for city in c["cities"]:
+                city_to_counties.setdefault(city, []).append(c["slug"])
         city_options = "\n            ".join(
-            f'<option value="{esc(c)}">{esc(c)}</option>' for c in (search_cities or [])
+            f'<label class="fs-multi-option" data-counties="{esc(",".join(city_to_counties.get(c, [])))}">'
+            f'<input type="checkbox" value="{esc(c)}"><span>{esc(c)}</span></label>'
+            for c in cities_list
         )
-        city_field_html = f"""<div class="fs-block" style="flex:1 1 200px;min-width:180px">
-          <span class="fs-label">City</span>
-          <select id="{wid}-city" name="city" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
-            <option value="">All Cities</option>
+        city_field_html = f"""<div class="fs-block fs-multi" style="flex:1 1 240px;min-width:210px">
+          <span class="fs-label" id="{wid}-city-label">Towns</span>
+          <button type="button" class="fs-multi-toggle" id="{wid}-city-toggle"
+                  aria-expanded="false" aria-controls="{wid}-city-panel"
+                  aria-describedby="{wid}-city-label">All Towns</button>
+          <div class="fs-multi-panel" id="{wid}-city-panel" hidden>
+            <span class="fs-multi-heading">Pick any number of towns</span>
             {city_options}
-          </select>
+            <p class="fs-multi-empty" hidden>No towns listed for that county yet.</p>
+            <div class="fs-multi-foot"><button type="button" data-clear="city">Clear Towns</button></div>
+          </div>
         </div>"""
         if counties:
             county_options = "\n            ".join(
-                f'<option value="{esc(c["slug"])}">{esc(c["name"])}</option>' for c in counties
+                f'<label class="fs-multi-option">'
+                f'<input type="checkbox" value="{esc(c["slug"])}"><span>{esc(c["name"])}</span></label>'
+                for c in counties
             )
-            county_field_html = f"""<div class="fs-block" style="flex:1 1 200px;min-width:180px">
-          <span class="fs-label">County</span>
-          <select id="{wid}-county" style="padding:12px 14px;border:1px solid var(--gray);background:var(--white);font-family:var(--font-sans);font-size:14px;width:100%">
-            <option value="">All Counties</option>
+            county_field_html = f"""<div class="fs-block fs-multi" style="flex:1 1 240px;min-width:210px">
+          <span class="fs-label" id="{wid}-county-label">Counties</span>
+          <button type="button" class="fs-multi-toggle" id="{wid}-county-toggle"
+                  aria-expanded="false" aria-controls="{wid}-county-panel"
+                  aria-describedby="{wid}-county-label">All Counties</button>
+          <div class="fs-multi-panel" id="{wid}-county-panel" hidden>
+            <span class="fs-multi-heading">Pick any number of counties</span>
             {county_options}
-          </select>
+            <div class="fs-multi-foot"><button type="button" data-clear="county">Clear Counties</button></div>
+          </div>
         </div>"""
             county_city_map_js = json.dumps({c["slug"]: c["cities"] for c in counties})
+            city_county_map_js = json.dumps(city_to_counties)
 
     if fixed_city:
         geo_row_html = city_field_html
@@ -1110,9 +1143,11 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
         geo_row_html = f"""<div class="fs-row">
         {county_field_html}
         {city_field_html}
-      </div>"""
+      </div>
+      <div class="fs-chips" id="{wid}-chips" aria-live="polite"></div>"""
     else:
-        geo_row_html = city_field_html
+        geo_row_html = f"""{city_field_html}
+      <div class="fs-chips" id="{wid}-chips" aria-live="polite"></div>"""
 
     def _pill_group(field, options):
         btns = "\n          ".join(
@@ -1242,8 +1277,12 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
   var maxPriceInput = document.getElementById(wid + '-maxPrice');
   var bedsInput = document.getElementById(wid + '-beds');
   var bathsInput = document.getElementById(wid + '-baths');
-  var citySelect = document.getElementById(wid + '-city');
-  var countySelect = document.getElementById(wid + '-county');
+  var cityCountyMap = {city_county_map_js};
+  var cityPanel = document.getElementById(wid + '-city-panel');
+  var cityToggle = document.getElementById(wid + '-city-toggle');
+  var countyPanel = document.getElementById(wid + '-county-panel');
+  var countyToggle = document.getElementById(wid + '-county-toggle');
+  var chipsEl = document.getElementById(wid + '-chips');
   var CEILING = {ceiling};
   var skip = 0;
   var TOP = 12;
@@ -1375,44 +1414,197 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     wirePills(g, g.dataset.field === 'beds' ? bedsInput : bathsInput);
   }});
 
-  // ---- County -> City cascade: picking a county narrows the City dropdown
-  // to just that county's cities (plus "All Cities In <County>"); leaving
-  // City on "All" while a county is picked searches every city in that
-  // county at once via listings-search.js's existing `cities` param. ----
-  var allCityOptionsHtml = citySelect ? citySelect.innerHTML : '';
-  if (countySelect && citySelect) {{
-    countySelect.addEventListener('change', function () {{
-      var slug = countySelect.value;
-      citySelect.value = '';
-      if (!slug) {{
-        citySelect.innerHTML = allCityOptionsHtml;
-        return;
+  // ---- Multi-select counties + towns ------------------------------------
+  // Counties scope which towns are offered; towns narrow within that scope.
+  // Pick neither and the search covers everything. Checked state lives in the
+  // checkboxes themselves (options are hidden, never rebuilt, so a town stays
+  // checked if you toggle counties around it) -- with one deliberate
+  // exception: unchecking a county drops its towns, because leaving a town
+  // selected from a county you just removed is the kind of invisible filter
+  // that makes a search look broken.
+  function checkedValues(panel) {{
+    if (!panel) return [];
+    return Array.prototype.slice
+      .call(panel.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(function (cb) {{ return cb.value; }});
+  }}
+
+  function selectedCities() {{ return checkedValues(cityPanel); }}
+  function selectedCounties() {{ return checkedValues(countyPanel); }}
+
+  // Deep-linked town names that aren't in this widget's own list (see the
+  // ?cities= handling below) still have to reach the server, or following a
+  // link would silently widen the search it promised to narrow.
+  var extraCities = [];
+
+  function countyNameFor(slug) {{
+    var label = countyPanel && countyPanel.querySelector('input[value="' + slug + '"]');
+    return label && label.parentNode ? label.parentNode.textContent.trim() : slug;
+  }}
+
+  function summarize(names, allLabel, oneMoreLabel) {{
+    if (!names.length) return allLabel;
+    if (names.length <= 2) return names.join(', ');
+    return names.slice(0, 2).join(', ') + ' +' + (names.length - 2) + ' ' + oneMoreLabel;
+  }}
+
+  function syncCityVisibility() {{
+    if (!cityPanel) return;
+    var counties = selectedCounties();
+    var anyVisible = false;
+    cityPanel.querySelectorAll('.fs-multi-option').forEach(function (opt) {{
+      var owners = (opt.dataset.counties || '').split(',').filter(Boolean);
+      var show = !counties.length || !owners.length ||
+        owners.some(function (slug) {{ return counties.indexOf(slug) !== -1; }});
+      opt.hidden = !show;
+      if (show) anyVisible = true;
+    }});
+    var empty = cityPanel.querySelector('.fs-multi-empty');
+    if (empty) empty.hidden = anyVisible;
+  }}
+
+  function renderChips() {{
+    if (!chipsEl) return;
+    var chips = selectedCounties().map(function (slug) {{
+      return {{ kind: 'county', value: slug, label: countyNameFor(slug) }};
+    }}).concat(selectedCities().map(function (city) {{
+      return {{ kind: 'city', value: city, label: city }};
+    }})).concat(extraCities.map(function (city) {{
+      // A town this widget doesn't list, arrived via ?cities= -- it gets a
+      // chip like any other, so it's never an invisible filter.
+      return {{ kind: 'extra', value: city, label: city }};
+    }}));
+    chipsEl.innerHTML = chips.map(function (c) {{
+      return '<span class="fs-chip">' + esc(c.label) +
+        '<button type="button" data-kind="' + c.kind + '" data-value="' + esc(c.value) +
+        '" aria-label="Remove ' + esc(c.label) + '">&times;</button></span>';
+    }}).join('');
+  }}
+
+  function refreshGeoUi() {{
+    syncCityVisibility();
+    renderChips();
+    if (cityToggle) {{
+      cityToggle.textContent = summarize(
+        selectedCities().concat(extraCities), 'All Towns', 'more');
+    }}
+    if (countyToggle) {{
+      countyToggle.textContent = summarize(
+        selectedCounties().map(countyNameFor), 'All Counties', 'more');
+    }}
+  }}
+
+  function wirePicker(toggle, panel) {{
+    if (!toggle || !panel) return;
+    toggle.addEventListener('click', function () {{
+      var open = toggle.getAttribute('aria-expanded') === 'true';
+      // Only one panel open at a time -- they overlap on narrow screens.
+      [[cityToggle, cityPanel], [countyToggle, countyPanel]].forEach(function (pair) {{
+        if (pair[0] && pair[1]) {{
+          pair[0].setAttribute('aria-expanded', 'false');
+          pair[1].hidden = true;
+        }}
+      }});
+      if (!open) {{
+        toggle.setAttribute('aria-expanded', 'true');
+        panel.hidden = false;
       }}
-      var cities = countyCityMap[slug] || [];
-      citySelect.innerHTML = '<option value="">All Cities</option>' +
-        cities.map(function (c) {{ return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }}).join('');
+    }});
+    panel.addEventListener('change', function (e) {{
+      if (e.target.type !== 'checkbox') return;
+      if (panel === countyPanel && !e.target.checked) {{
+        // County unchecked -> drop any of its towns that are still checked.
+        var dropped = countyCityMap[e.target.value] || [];
+        var stillOffered = selectedCounties().reduce(function (acc, slug) {{
+          return acc.concat(countyCityMap[slug] || []);
+        }}, []);
+        cityPanel && cityPanel.querySelectorAll('input:checked').forEach(function (cb) {{
+          if (dropped.indexOf(cb.value) !== -1 && stillOffered.indexOf(cb.value) === -1) {{
+            cb.checked = false;
+          }}
+        }});
+      }}
+      refreshGeoUi();
+    }});
+    panel.querySelectorAll('[data-clear]').forEach(function (btn) {{
+      btn.addEventListener('click', function () {{
+        panel.querySelectorAll('input:checked').forEach(function (cb) {{ cb.checked = false; }});
+        // "Clear Towns" clears deep-linked towns too -- they're towns, they
+        // show as chips alongside the rest, and leaving them behind would make
+        // the button look broken.
+        if (panel === cityPanel) extraCities = [];
+        refreshGeoUi();
+      }});
     }});
   }}
+
+  wirePicker(cityToggle, cityPanel);
+  wirePicker(countyToggle, countyPanel);
+
+  if (chipsEl) {{
+    chipsEl.addEventListener('click', function (e) {{
+      var btn = e.target.closest('button[data-kind]');
+      if (!btn) return;
+      if (btn.dataset.kind === 'extra') {{
+        extraCities = extraCities.filter(function (c) {{ return c !== btn.dataset.value; }});
+        refreshGeoUi();
+        return;
+      }}
+      var panel = btn.dataset.kind === 'county' ? countyPanel : cityPanel;
+      var cb = panel && panel.querySelector('input[value="' + btn.dataset.value.replace(/"/g, '\\\\"') + '"]');
+      if (cb) {{ cb.checked = false; }}
+      refreshGeoUi();
+    }});
+  }}
+
+  // Click outside closes whichever panel is open.
+  document.addEventListener('click', function (e) {{
+    [[cityToggle, cityPanel], [countyToggle, countyPanel]].forEach(function (pair) {{
+      if (!pair[0] || !pair[1] || pair[1].hidden) return;
+      if (!pair[1].contains(e.target) && e.target !== pair[0]) {{
+        pair[0].setAttribute('aria-expanded', 'false');
+        pair[1].hidden = true;
+      }}
+    }});
+  }});
 
   var urlParams = supportDeepLinks ? new URLSearchParams(window.location.search) : new URLSearchParams('');
 
   function paramsFromForm() {{
     var data = new FormData(form);
     var p = {{}};
-    ['city', 'minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {{
+    ['minPrice', 'maxPrice', 'beds', 'baths'].forEach(function (k) {{
       var v = data.get(k);
       if (v) p[k] = v;
     }});
-    if (fixedCity) p.city = fixedCity;
-    if (!p.city && countySelect && countySelect.value) {{
-      var selCities = countyCityMap[countySelect.value] || [];
-      if (selCities.length) p.cities = selCities.join(',');
+    if (fixedCity) {{
+      p.city = fixedCity;
+    }} else {{
+      // Towns beat counties: checking Loveland inside Larimer means Loveland,
+      // not all of Larimer. `cities` carries a single town perfectly well
+      // (matchesQuery treats it as a one-item list), so the old single-value
+      // `city` param is only used for the fixed-city widget now.
+      var cities = selectedCities().concat(extraCities);
+      if (!cities.length) {{
+        cities = selectedCounties().reduce(function (acc, slug) {{
+          return acc.concat(countyCityMap[slug] || []);
+        }}, []);
+      }}
+      // De-dupe: towns straddling two selected counties (Windsor, Erie) would
+      // otherwise appear twice and pad the query string for nothing.
+      var seen = {{}};
+      cities = cities.filter(function (c) {{
+        var k = c.toLowerCase();
+        if (seen[k]) return false;
+        seen[k] = true;
+        return true;
+      }});
+      if (cities.length) p.cities = cities.join(',');
     }}
     if (alwaysNoFloor) p.noFloor = 'true';
     if (supportDeepLinks) {{
       if (urlParams.get('subdivision')) p.subdivision = urlParams.get('subdivision');
       if (urlParams.get('waterfront') === 'true') p.waterfront = 'true';
-      if (urlParams.get('cities') && !p.cities) p.cities = urlParams.get('cities');
       if (urlParams.get('noFloor') === 'true') p.noFloor = 'true';
     }}
     return p;
@@ -1463,9 +1655,39 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
   loadMoreBtn.addEventListener('click', function () {{ runSearch(false); }});
 
   if (supportDeepLinks) {{
-    if (urlParams.get('city')) {{
-      var citySelect = document.getElementById(wid + '-city');
-      if (citySelect) citySelect.value = urlParams.get('city');
+    // ?city= and ?cities= now pre-CHECK the pickers instead of setting a
+    // dropdown, so an incoming link's scope is visible and editable rather
+    // than an invisible filter the visitor has to be told about in prose.
+    // Anything that doesn't match a town we offer is kept in extraCities so
+    // the link still filters exactly as it promised.
+    var deepCities = []
+      .concat(urlParams.get('city') ? [urlParams.get('city')] : [])
+      .concat((urlParams.get('cities') || '').split(',').map(function (s) {{ return s.trim(); }}))
+      .filter(Boolean);
+    if (deepCities.length && cityPanel) {{
+      var offered = {{}};
+      cityPanel.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {{
+        offered[cb.value.toLowerCase()] = cb;
+      }});
+      var matchedCounties = {{}};
+      deepCities.forEach(function (name) {{
+        var cb = offered[name.toLowerCase()];
+        if (cb) {{
+          cb.checked = true;
+          (cityCountyMap[cb.value] || []).forEach(function (slug) {{ matchedCounties[slug] = true; }});
+        }} else if (extraCities.indexOf(name) === -1) {{
+          extraCities.push(name);
+        }}
+      }});
+      // Check the counties those towns belong to, so the town list isn't
+      // filtered down to nothing the first time the visitor opens it.
+      if (countyPanel) {{
+        Object.keys(matchedCounties).forEach(function (slug) {{
+          var cb = countyPanel.querySelector('input[value="' + slug + '"]');
+          if (cb) cb.checked = true;
+        }});
+      }}
+      refreshGeoUi();
     }}
     if (urlParams.get('minPrice')) {{
       var mp = parseInt(urlParams.get('minPrice'), 10);
@@ -1474,14 +1696,16 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
         updateSlider();
       }}
     }}
+    // The town/county part of an incoming link no longer needs explaining --
+    // it's visible in the chips and removable there. Only the two filters with
+    // no on-page control (subdivision, waterfront) still need a note.
     var deepLinkNoteEl = document.getElementById(wid + '-deep-link-note');
-    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true' || urlParams.get('cities'))) {{
+    if (deepLinkNoteEl && (urlParams.get('subdivision') || urlParams.get('waterfront') === 'true')) {{
       var bits = [];
       if (urlParams.get('subdivision')) bits.push('the ' + urlParams.get('subdivision') + ' area');
       if (urlParams.get('waterfront') === 'true') bits.push('waterfront/riverfront features');
-      if (urlParams.get('cities')) bits.push(urlParams.get('cities').split(',').join(', '));
-      deepLinkNoteEl.textContent = 'Showing listings filtered to ' + bits.join(' and ') +
-        '. Clear the filters below and search again for the full, unfiltered result set.';
+      deepLinkNoteEl.textContent = 'Also filtered to ' + bits.join(' and ') +
+        '. Reload this page without those filters for the full result set.';
       deepLinkNoteEl.style.display = 'block';
     }}
   }}
@@ -7111,9 +7335,51 @@ def copy_static_assets():
     shutil.copytree(src, dst)
 
 
+def write_map_county_data():
+    """Emit the county -> {slug, cities, liveSearch} map that map.js reads.
+
+    2026-08-15 (Christine: "i need it to be the same through the entire site").
+    map.js used to carry its own hand-typed copies of this: COUNTY_SLUGS,
+    COUNTY_CITIES and IRES_COUNTIES, with a comment conceding they were "kept
+    in sync by hand with COUNTIES[].cities in build.py". They weren't. The city
+    lists went stale once already (fixed 2026-08-13), and IRES_COUNTIES still
+    named only Larimer/Weld/Boulder months after five more counties went live,
+    so clicking Denver or Adams on the map told visitors live search didn't
+    cover them while those counties' own city pages ran a live search.
+
+    Same fix as _sold-homes-data.json: generate it from the one source of
+    truth, so the map cannot disagree with the rest of the site again. Keyed by
+    the county NAME in noco-counties.geojson (no " County" suffix), which is
+    what map.js matches features on.
+
+    map.js keeps a small built-in fallback for the case where this file fails
+    to load, so a fetch error degrades to "guide link only" rather than a map
+    with dead popups.
+    """
+    out_dir = os.path.join(OUT, "assets", "data")
+    os.makedirs(out_dir, exist_ok=True)
+    payload = {
+        "_generated": "Written by build/build.py from COUNTIES. Do not edit by hand.",
+        "counties": {
+            c["name"].replace(" County", ""): {
+                "slug": c["slug"],
+                "cities": c["cities"],
+                "liveSearch": bool(_live_search(c)),
+            }
+            for c in COUNTIES
+        },
+    }
+    path = os.path.join(out_dir, "county-search.json")
+    with open(path, "w") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+    print(f"  map data: {len(payload['counties'])} counties "
+          f"({sum(1 for v in payload['counties'].values() if v['liveSearch'])} live-search)")
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     copy_static_assets()
+    write_map_county_data()   # must follow copy_static_assets: writes into site/assets
     write_neighborhood_quiz_script()
     build_home()
     build_communities_index()
