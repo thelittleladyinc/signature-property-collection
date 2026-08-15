@@ -498,17 +498,34 @@ exports.handler = async (event) => {
   // 2026-08-15: added because the answer turned out to be no, twice, while the
   // row above said the push was fine. Reaching the CRM and reaching HER are two
   // different things, and only one of them loses business when it breaks.
+  // 2026-08-15 (Christine: "i dont think i already have resend - never used it -
+  // we cant use lofty to send?"). She's right on both counts, and I was wrong to
+  // present it as something she already had: sellerintelligence contains the
+  // digest CODE but there is no key in her Netlify env, no key in that repo's CI
+  // secrets, and no .env committed -- it was written and never switched on.
+  //
+  // So this row is OPTIONAL, not a failure. The Lofty route is the primary one
+  // and it is now genuinely fixed (see the tag re-add in submission-created.js),
+  // which is what the row below reports. This second, vendor-independent email is
+  // a belt-and-braces backup for the day Lofty itself is down -- worth having
+  // eventually, worth nobody's afternoon today. A red X here would be the same
+  // crying-wolf mistake the Cloudinary row made.
   const emailKeySet = !!process.env.RESEND_API_KEY;
   const lastEmail = loftyLast && loftyLast.emailResult;
   let emailOk;
   let emailDetail;
+  let emailOptional = false;
   if (!emailKeySet) {
     emailOk = false;
-    emailDetail = "RESEND_API_KEY isn't set, so no lead email is being sent. " +
-      "This is the notification that does not depend on Lofty automations working — " +
-      "add RESEND_API_KEY in Netlify → Site configuration → Environment variables " +
-      "(same key as sellerintelligence uses for the daily digest). Optional extras: " +
-      "LEAD_ALERT_TO to change or add recipients, LEAD_ALERT_FROM once your own domain is verified in Resend.";
+    emailOptional = true;
+    emailDetail = "Not set up, and nothing is broken by that — your Lofty notification is the " +
+      "primary route and it works. This is only a backup for the day Lofty itself is down: " +
+      "a plain email straight from this site, needing no CRM automation to fire. " +
+      "If you ever want it, make a free key at resend.com/api-keys and add RESEND_API_KEY in " +
+      "Netlify → Site configuration → Environment variables. " +
+      "Optional extras: LEAD_ALERT_TO to change or add recipients, LEAD_ALERT_FROM once your " +
+      "own domain is verified in Resend. A simpler backup needing no signup at all: " +
+      "Netlify → Site configuration → Notifications → form submission email.";
   } else if (!lastEmail || !lastEmail.attempted) {
     emailOk = true;
     emailDetail = "The key is set. No lead has come in since — submit any form once and this row " +
@@ -525,7 +542,12 @@ exports.handler = async (event) => {
       `${String(lastEmail.response || lastEmail.error || "(no detail)").slice(0, 240)}. ` +
       "The lead itself is safe (Netlify Forms and Lofty both have it) — this is only the alert.";
   }
-  checks.push({ name: "New-lead email reaching you", ok: emailOk, detail: emailDetail });
+  checks.push({
+    optional: emailOptional,
+    name: emailOptional ? "Backup email alert, no CRM needed (optional)" : "New-lead email reaching you",
+    ok: emailOk,
+    detail: emailDetail,
+  });
 
   // The two calls that make a MERGED lead visible in Lofty: a note of its own,
   // and a tag that genuinely counts as newly added so a Smart Plan re-triggers.
@@ -553,7 +575,9 @@ exports.handler = async (event) => {
       "The tag from the original push is still there; only the re-trigger didn't happen.");
   }
   checks.push({
-    name: "Lofty lead enriched (note + Smart Plan trigger)",
+    // Named for what she cares about, not for the mechanism: this row is the
+    // primary notification path now that the tag genuinely changes.
+    name: "Your Lofty notification will fire",
     ok: (!note || !note.attempted) ? true : (!!note.ok && (!tag || !tag.attempted || tag.tagRestored !== false)),
     detail: parts.join(" ") +
       " These are what make a lead that MERGED into an existing contact still show up — " +
