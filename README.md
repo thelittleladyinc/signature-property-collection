@@ -711,6 +711,14 @@ call it done:
    so the leads submission function actually pushes into Lofty, and
    `/search-homes.html` goes live with real IRES listings — see "What's NOT
    done yet" #2 and #3.
+   - `OPERATING_COUNTIES` = `larimer,weld,boulder,broomfield,jefferson,denver,arapahoe,adams`
+     restricts stored MLS listings to the 8 counties the site has pages for, so
+     search results match the stated service area. Not secret. Note it only
+     drops a listing whose county can be inferred from its city, and the lookup
+     table doesn't cover all of Colorado — unrecognised towns are deliberately
+     kept rather than silently hidden. It is a coverage choice, not a
+     performance one: see the measured figures next to OPERATING_COUNTIES in
+     `netlify/functions/lib/_mls-shared.js`.
    - `GOOGLE_MAPS_API_KEY` gates **three** features that are all built and
      currently invisible without it: the Sold Homes Map's pins, every
      walkability panel, and the per-listing "Nearby & Distances" panel. It

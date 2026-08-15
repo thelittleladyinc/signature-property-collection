@@ -140,10 +140,26 @@ function inferCountyFromCity(cityLower) {
   return CO_CITY_COUNTY[cityLower] || null;
 }
 
-// 2026-08-14: OFF by default (empty = no filtering at all, current behavior
-// unchanged) -- set OPERATING_COUNTIES in Netlify's env vars (comma-
-// separated, e.g. "larimer,weld") once Christine has confirmed which
-// counties the public search/current-listings pages should actually cover.
+// 2026-08-14: OFF by default (empty = no filtering at all) -- set
+// OPERATING_COUNTIES in Netlify's env vars (comma-separated) to restrict what
+// gets stored.
+//
+// 2026-08-15 (Christine: "i want all 8 counties"): the intended value is the
+// same 8 counties the site has pages for, so search results match the stated
+// service area:
+//     larimer,weld,boulder,broomfield,jefferson,denver,arapahoe,adams
+// All 8 are emitted by CO_CITY_COUNTY below, so all 8 actually match.
+//
+// MEASURED, so this isn't re-argued later. Against a reconstructed
+// 18,925-record store with realistic field sizes, after the field slimming
+// added to sync-listings.js the same day:
+//     no filter          -> 9.1 MB
+//     all 8 counties     -> 8.2 MB   (1,892 records dropped)
+//     larimer/weld/boulder only -> 5.5 MB
+// i.e. the slimming does nearly all the work (44.3 MB -> 9.1 MB) and the county
+// filter adds under a megabyte at 8 counties. So this setting is a BUSINESS
+// choice about which listings the public search should return, not a
+// performance lever. Don't narrow it hoping to speed anything up.
 // Deliberately never applied to Christine's OWN listings (see the
 // isHerListing() exclusion everywhere this is used) -- she should never
 // lose one of her own listings to a geography filter even if it happens to
