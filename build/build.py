@@ -76,9 +76,11 @@ LEGACY_URL_REDIRECTS = {
     # counterpart in case it was indexed/bookmarked.
     "/blog/the-psychology-of-pricing-why-that-499000-tag-works.html":
         "/blog/psychology-of-pricing-luxury-homes-northern-colorado.html",
-    # 2026-08-14 (Christine's request): Neighborhood Quiz merged onto
-    # /sold-homes-map.html as a collapsible section instead of its own page.
-    "/neighborhood-quiz.html": "/sold-homes-map.html",
+    # 2026-08-14: Neighborhood Quiz stopped being its own page. It briefly
+    # redirected to /sold-homes-map.html; 2026-08-15 (Christine) it moved to
+    # the community pages, so the old URL now lands on the communities index,
+    # which carries the quiz and is the right entry point for "which town?".
+    "/neighborhood-quiz.html": "/communities/index.html",
 }
 
 # Display name (as used in COUNTIES[]["cities"]) -> CITY_CONTENT data key.
@@ -2162,7 +2164,7 @@ def footer_html():
           <li><a href="/past-sales.html">Past Sales</a></li>
           <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
           <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
-          <li><a href="/sold-homes-map.html">Sold Homes Map &amp; Neighborhood Quiz</a></li>
+          <li><a href="/sold-homes-map.html">Sold Homes Map</a></li>
           <li><a href="/press-recognition.html">Press &amp; Recognition</a></li>
           <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
@@ -2335,6 +2337,10 @@ def build_communities_index():
   </div>
 </section>
 """
+    body += _quiz_disclosure(
+        f"Four quick questions, one real answer — matched against {len(QUIZ_CITIES)} real "
+        f"towns {esc(SITE['agent'])} shows clients every day. Click to expand."
+    )
     extra = _leaflet_lazy_loader_extra()
     page(
         "Explore Northern Colorado Communities | Signature Property Collection",
@@ -2417,6 +2423,11 @@ def build_county_pages():
   </div>
 </section>
 """
+        body += _quiz_disclosure(
+            f"Not sure which {esc(c['name'])} town fits? Four quick questions, matched "
+            f"against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients "
+            f"every day. Click to expand."
+        )
         breadcrumbs = _breadcrumb_schema([
             ("Home", "/index.html"),
             ("Communities", "/communities/index.html"),
@@ -2827,6 +2838,15 @@ def build_city_pages():
                 faq_pairs.append((q, a))
             faq_html, faq_schema = _faq_block(faq_pairs)
             body += faq_html
+            # Someone on a city page has narrowed to one town, but plenty are
+            # still comparing it against the next town over -- that's exactly
+            # what the quiz settles, so it goes here too (Christine, 2026-08-15,
+            # naming Fort Collins specifically).
+            body += _quiz_disclosure(
+                f"Weighing {esc(city)} against somewhere else? Four quick questions, matched "
+                f"against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients "
+                f"every day. Click to expand."
+            )
             breadcrumbs = _breadcrumb_schema([
                 ("Home", "/index.html"),
                 ("Communities", "/communities/index.html"),
@@ -4523,6 +4543,11 @@ def build_subdivision_pages():
 </section>
 {faq_html}
 """
+        body += _quiz_disclosure(
+            f"Still comparing neighborhoods? Four quick questions, matched against "
+            f"{len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients every day. "
+            f"Click to expand."
+        )
         breadcrumbs = _breadcrumb_schema([
             ("Home", "/index.html"), ("Communities", "/communities/index.html"),
             ("Loveland", loveland_url), (sub["title"], None),
@@ -4981,15 +5006,14 @@ def _sold_homes_map_lazy_loader():
 
 
 def build_sold_homes_map():
-    # 2026-08-14 (Christine's request): the Neighborhood Quiz now lives on
-    # this same page, in a collapsible <details> section below the map, so
-    # visitors who don't want the quiz never have to see it expanded --
-    # native <details>/<summary> gives free, accessible expand/collapse
-    # with no custom JS needed for the toggle itself (the quiz's own
-    # interactive logic below is unrelated to open/closed state -- its
-    # elements exist in the DOM either way, just visually hidden while
-    # collapsed, exactly like the rest of this page's lazy-loaded map).
-    quiz_block = _neighborhood_quiz_block()
+    # 2026-08-15 (Christine): the Neighborhood Quiz is no longer on this
+    # page. It sat here for a day after being merged off its own URL, and
+    # her read on seeing it was that it belonged "on the community page --
+    # like larimer weld, fort collins, buckhorn" instead: the quiz asks
+    # which town to look in, which is not the question someone is asking
+    # while reading her sold-homes track record. It now renders on the
+    # communities index, county, city, and subdivision pages via
+    # _quiz_disclosure().
     # 2026-08-14: rewritten after Christine's read on the old version ("this
     # is sooo not human sounding"). The old lede was three sentences of
     # reassurance that the homes were real ("Every pin below is a real home",
@@ -5021,46 +5045,38 @@ def build_sold_homes_map():
     <a href="/testimonials.html" style="text-decoration:underline">these reviews</a>.</p>
   </div>
 </section>
-<section class="tight">
-  <div class="wrap">
-    <details class="quiz-disclosure" id="neighborhood-quiz-disclosure">
-      <summary>
-        <span class="eyebrow" style="color:var(--dusty-rose)">Not Sure Where To Look?</span>
-        <h2 class="section-title" style="margin:6px 0 0">Take The 60-Second Neighborhood Quiz &rsaquo;</h2>
-        <p class="lede" style="margin-top:10px">Four quick questions, one real answer — matched
-        against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients every day.
-        Click to expand.</p>
-      </summary>
-      {quiz_block}
-    </details>
-  </div>
-</section>
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Sold Homes Map", None)])
     extra = _sold_homes_map_lazy_loader()
     page(
-        "Sold Homes Map & Neighborhood Quiz | Signature Property Collection",
-        f"An interactive map of homes {SITE['agent']} has sold across Northern Colorado, "
-        "each pin linking to its real video tour — plus a free 4-question quiz to find "
-        "which Northern Colorado neighborhood matches your lifestyle, commute, and budget.",
+        "Sold Homes Map | Signature Property Collection",
+        f"A map of homes {SITE['agent']} has sold across Northern Colorado, "
+        "with a video tour behind the pins she filmed one for.",
         "/sold-homes-map.html", None, body, extra, schema_extra=[breadcrumbs],
     )
 
 
 def _neighborhood_quiz_block():
-    """The interactive quiz widget's markup + script, WITHOUT its own hero
-    or page() wrapper -- 2026-08-14 (Christine's request): merged onto
-    /sold-homes-map.html as a collapsible <details> section ("the quiz on
-    the same page as the map, that can compress if they don't want to do
-    the quiz") instead of living on its own /neighborhood-quiz.html page.
-    Old URL 301-redirects to /sold-homes-map.html (see LEGACY_URL_REDIRECTS)
-    in case it's bookmarked or indexed anywhere. Extracted verbatim from the
-    former build_neighborhood_quiz() -- same questions, scoring, and lead
-    form (still tagged "neighborhood-quiz" as its Lofty source so existing
-    lead-routing rules keep working unchanged)."""
-    cities_json = json.dumps(QUIZ_CITIES)
-    questions_json = json.dumps(QUIZ_QUESTIONS)
-    budget_params_json = json.dumps(_QUIZ_BUDGET_PARAMS)
+    """The interactive quiz widget's markup, WITHOUT its own hero or page()
+    wrapper, for embedding inside a collapsible <details> section.
+
+    2026-08-15 (Christine): "the one I wanted it to be on was the community
+    page -- like larimer weld, fort collins, buckhorn". The quiz answers
+    "which town should I be looking in?", so it belongs where someone is
+    choosing between towns, not appended to her sold-homes track record.
+    It now renders on the communities index, every county page, every city
+    page, and every subdivision page (see _quiz_disclosure()), and is gone
+    from /sold-homes-map.html.
+
+    Its behavior moved out to /assets/js/neighborhood-quiz.js at the same
+    time. It used to be inlined per page, which was fine for one page and
+    wasteful across ~40 -- the town list and question set alone are ~6KB of
+    JSON that is identical everywhere, so it is now fetched once and cached
+    for every subsequent community page.
+
+    Same questions, scoring, and lead form as before (still tagged
+    "neighborhood-quiz" as its Lofty source so existing lead-routing rules
+    keep working unchanged)."""
     lead_form = _tool_lead_form(
         "neighborhood-quiz", "Get My Full Match Report",
         extra_fields=(
@@ -5092,12 +5108,15 @@ def _neighborhood_quiz_block():
       border:none;cursor:pointer;font:inherit;text-decoration:underline">Retake The Quiz</button>
     </div>
   </div>
-<script>
-(function () {{
-  var CITIES = {cities_json};
-  var QUESTIONS = {questions_json};
-  var BUDGET_PARAMS = {budget_params_json};
-  var answers = {{}};
+<script src="/assets/js/neighborhood-quiz.js" defer></script>
+"""
+
+
+_QUIZ_SCRIPT_TEMPLATE = r'''(function () {
+  var CITIES = __CITIES_JSON__;
+  var QUESTIONS = __QUESTIONS_JSON__;
+  var BUDGET_PARAMS = __BUDGET_PARAMS_JSON__;
+  var answers = {};
   var current = 0;
 
   var COMMUTE_ORDER = ['close', 'moderate', 'far'];
@@ -5107,25 +5126,29 @@ def _neighborhood_quiz_block():
   var resultContainer = document.getElementById('quiz-result-container');
   var announceEl = document.getElementById('quiz-step-announce');
 
-  function renderProgress() {{
-    progressEl.innerHTML = QUESTIONS.map(function (_, i) {{
-      return '<div class="quiz-progress-dot' + (i < current ? ' done' : '') + '"></div>';
-    }}).join('');
-  }}
+  // Inert on any page without the widget markup -- this file is now
+  // shared across ~40 community pages rather than inlined on one.
+  if (!progressEl || !qContainer || !resultContainer) return;
 
-  function renderQuestion() {{
+  function renderProgress() {
+    progressEl.innerHTML = QUESTIONS.map(function (_, i) {
+      return '<div class="quiz-progress-dot' + (i < current ? ' done' : '') + '"></div>';
+    }).join('');
+  }
+
+  function renderQuestion() {
     renderProgress();
     var q = QUESTIONS[current];
     var selected = answers[q.key];
-    if (announceEl) {{
+    if (announceEl) {
       announceEl.textContent = 'Question ' + (current + 1) + ' of ' + QUESTIONS.length + ': ' + q.prompt;
-    }}
-    var optsHtml = q.options.map(function (opt, i) {{
+    }
+    var optsHtml = q.options.map(function (opt, i) {
       var isSelected = selected === i;
       var cls = 'quiz-option' + (isSelected ? ' selected' : '');
       return '<button type="button" class="' + cls + '" data-index="' + i + '" role="radio" ' +
         'aria-checked="' + (isSelected ? 'true' : 'false') + '">' + opt.label + '</button>';
-    }}).join('');
+    }).join('');
     qContainer.innerHTML =
       '<div class="quiz-question"><h3 id="quiz-q-heading">' + q.prompt + '</h3>' +
       '<div class="quiz-options" role="radiogroup" aria-labelledby="quiz-q-heading">' + optsHtml + '</div>' +
@@ -5137,23 +5160,23 @@ def _neighborhood_quiz_block():
       (current === QUESTIONS.length - 1 ? 'See My Match' : 'Next') + '</button>' +
       '</div></div>';
 
-    qContainer.querySelectorAll('.quiz-option').forEach(function (btn) {{
-      btn.addEventListener('click', function () {{
+    qContainer.querySelectorAll('.quiz-option').forEach(function (btn) {
+      btn.addEventListener('click', function () {
         answers[q.key] = parseInt(btn.dataset.index, 10);
         renderQuestion();
-      }});
-    }});
-    document.getElementById('quiz-back').addEventListener('click', function () {{
-      if (current > 0) {{ current -= 1; renderQuestion(); }}
-    }});
-    document.getElementById('quiz-next').addEventListener('click', function () {{
+      });
+    });
+    document.getElementById('quiz-back').addEventListener('click', function () {
+      if (current > 0) { current -= 1; renderQuestion(); }
+    });
+    document.getElementById('quiz-next').addEventListener('click', function () {
       if (answers[q.key] === undefined) return;
-      if (current < QUESTIONS.length - 1) {{ current += 1; renderQuestion(); }}
-      else {{ showResults(); }}
-    }});
-  }}
+      if (current < QUESTIONS.length - 1) { current += 1; renderQuestion(); }
+      else { showResults(); }
+    });
+  }
 
-  function scoreCity(city, picked) {{
+  function scoreCity(city, picked) {
     var score = 0;
     if (picked.q1.views && city.views.indexOf(picked.q1.views[0]) !== -1) score += 2;
     if (picked.q1.lifestyle && city.lifestyle.indexOf(picked.q1.lifestyle[0]) !== -1) score += 2;
@@ -5163,23 +5186,23 @@ def _neighborhood_quiz_block():
     // close-in town, just not a perfect one.
     var pickedIdx = COMMUTE_ORDER.indexOf(picked.q2.commute);
     var cityIdx = COMMUTE_ORDER.indexOf(city.commute);
-    if (pickedIdx !== -1 && cityIdx !== -1) {{
+    if (pickedIdx !== -1 && cityIdx !== -1) {
       var dist = Math.abs(pickedIdx - cityIdx);
       score += dist === 0 ? 2 : (dist === 1 ? 1 : 0);
-    }}
+    }
     if (picked.q3.priorities && city.priorities.indexOf(picked.q3.priorities[0]) !== -1) score += 2;
     return score;
-  }}
+  }
 
-  function showResults() {{
-    var picked = {{
+  function showResults() {
+    var picked = {
       q1: QUESTIONS[0].options[answers.q1],
       q2: QUESTIONS[1].options[answers.q2],
       q3: QUESTIONS[2].options[answers.q3],
       q4: QUESTIONS[3].options[answers.q4],
-    }};
-    var ranked = CITIES.map(function (c) {{ return {{ city: c, score: scoreCity(c, picked) }}; }})
-      .sort(function (a, b) {{ return b.score - a.score; }});
+    };
+    var ranked = CITIES.map(function (c) { return { city: c, score: scoreCity(c, picked) }; })
+      .sort(function (a, b) { return b.score - a.score; });
     var top = ranked[0].city;
     var runnerUp = ranked[1] ? ranked[1].city : null;
     var budgetKey = picked.q4.budget;
@@ -5193,20 +5216,20 @@ def _neighborhood_quiz_block():
     document.getElementById('quiz-match-blurb').textContent = top.blurb;
     if (announceEl) announceEl.textContent = 'Your best match is ' + top.name + '.';
     var photoEl = document.getElementById('quiz-match-photo');
-    if (top.photo) {{
+    if (top.photo) {
       photoEl.src = '/assets/img/communities/' + top.photo + '.jpg';
       photoEl.alt = top.name + ', Colorado';
       photoEl.style.display = 'block';
-    }} else {{
+    } else {
       photoEl.style.display = 'none';
-    }}
+    }
     var runnerUpEl = document.getElementById('quiz-runner-up');
-    if (runnerUp) {{
+    if (runnerUp) {
       runnerUpEl.textContent = 'Also worth a look: ' + runnerUp.name;
       runnerUpEl.style.display = '';
-    }} else {{
+    } else {
       runnerUpEl.style.display = 'none';
-    }}
+    }
     document.getElementById('quiz-explore-link').href = top.url;
     document.getElementById('quiz-search-link').href = '/search-homes.html?' + searchQs;
     document.getElementById('quiz-report-lede').textContent =
@@ -5216,32 +5239,80 @@ def _neighborhood_quiz_block():
     var matchField = document.getElementById('quiz-match-field');
     var answersField = document.getElementById('quiz-answers-field');
     if (matchField) matchField.value = top.name + (runnerUp ? ' (runner-up: ' + runnerUp.name + ')' : '');
-    if (answersField) {{
+    if (answersField) {
       answersField.value = [
         'Saturday: ' + picked.q1.label,
         'Commute: ' + picked.q2.label,
         'Priority: ' + picked.q3.label,
         'Budget: ' + picked.q4.label,
       ].join(' | ');
-    }}
-  }}
+    }
+  }
 
   var retakeBtn = document.getElementById('quiz-retake');
-  if (retakeBtn) {{
-    retakeBtn.addEventListener('click', function () {{
-      answers = {{}};
+  if (retakeBtn) {
+    retakeBtn.addEventListener('click', function () {
+      answers = {};
       current = 0;
       resultContainer.style.display = 'none';
       qContainer.style.display = '';
       progressEl.style.display = '';
       renderQuestion();
-      qContainer.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-    }});
-  }}
+      qContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 
   renderQuestion();
-}})();
-</script>
+})();
+'''
+
+
+def write_neighborhood_quiz_script():
+    """Emit /assets/js/neighborhood-quiz.js.
+
+    Generated rather than hand-written because the town list and questions
+    live in Python (QUIZ_CITIES / QUIZ_QUESTIONS) and are shared with the
+    search-homes budget params. Written straight into OUT, after
+    copy_static_assets() has already mirrored the hand-written assets."""
+    js = (_QUIZ_SCRIPT_TEMPLATE
+          .replace("__CITIES_JSON__", json.dumps(QUIZ_CITIES))
+          .replace("__QUESTIONS_JSON__", json.dumps(QUIZ_QUESTIONS))
+          .replace("__BUDGET_PARAMS_JSON__", json.dumps(_QUIZ_BUDGET_PARAMS)))
+    out_dir = os.path.join(OUT, "assets", "js")
+    os.makedirs(out_dir, exist_ok=True)
+    header = (
+        "/*\n"
+        " * Neighborhood Quiz -- GENERATED by build/build.py\n"
+        " * (write_neighborhood_quiz_script). Do not edit here; edit\n"
+        " * QUIZ_CITIES / QUIZ_QUESTIONS / _QUIZ_SCRIPT_TEMPLATE in build.py\n"
+        " * and re-run the build.\n"
+        " *\n"
+        " * Shared by the communities index, every county page, every city\n"
+        " * page, and every subdivision page, so it is fetched once and\n"
+        " * cached rather than inlined ~40 times.\n"
+        " */\n"
+    )
+    with open(os.path.join(out_dir, "neighborhood-quiz.js"), "w") as f:
+        f.write(header + "" + js + "")
+    print("  wrote /assets/js/neighborhood-quiz.js")
+
+
+def _quiz_disclosure(intro):
+    """The quiz wrapped in the collapsed <details> section used on every
+    community page. `intro` is the one line above the fold, so a county page
+    can say something different from a subdivision page."""
+    return f"""<section class="tight">
+  <div class="wrap">
+    <details class="quiz-disclosure" id="neighborhood-quiz-disclosure">
+      <summary>
+        <span class="eyebrow" style="color:var(--dusty-rose)">Not Sure Where To Look?</span>
+        <h2 class="section-title" style="margin:6px 0 0">Take The 60-Second Neighborhood Quiz &rsaquo;</h2>
+        <p class="lede" style="margin-top:10px">{intro}</p>
+      </summary>
+      {_neighborhood_quiz_block()}
+    </details>
+  </div>
+</section>
 """
 
 
@@ -6489,7 +6560,7 @@ def build_llms_txt(paths):
         "- [Mortgage Calculator](/mortgage-calculator.html)",
         "- [Past Sales](/past-sales.html)",
         "- [Lifestyle Home Search](/lifestyle-search.html)",
-        f"- [Sold Homes Map & Neighborhood Quiz — {SITE['agent']}'s Track Record, Mapped, Plus A Personalized Town Match](/sold-homes-map.html)",
+        f"- [Sold Homes Map — {SITE['agent']}'s Track Record, Mapped](/sold-homes-map.html)",
         f"- [Press & Recognition — {SITE['agent']}'s Verified Credentials](/press-recognition.html)",
         "- [The Concierge Experience](/concierge-experience.html)",
         "- [Listing Video Portfolio](/listing-video-portfolio.html)",
@@ -6578,6 +6649,7 @@ def copy_static_assets():
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     copy_static_assets()
+    write_neighborhood_quiz_script()
     build_home()
     build_communities_index()
     build_county_pages()
