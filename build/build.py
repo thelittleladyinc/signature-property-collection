@@ -45,6 +45,11 @@ GUIDES = _load_json("guides.json")
 LEGAL = _load_json("legal.json")
 BLOG = _load_json("blog.json")  # 60 posts migrated from the live site's blog
 
+# Christine's past sales, plotted on /sold-homes-map.html. A video is
+# optional here — see the _README inside the file, and the SOLD MAP section
+# further down, for why that's the whole point of this file existing.
+SOLD_HOMES_DATA = _load_json("sold_homes.json")
+
 # Old AgentFire/WordPress URL -> new site path, for anything printed,
 # bookmarked, or otherwise pointing at a URL that must keep working exactly
 # as-is after DNS cuts over — a 301 redirect, not a rename of our own page,
@@ -71,9 +76,11 @@ LEGACY_URL_REDIRECTS = {
     # counterpart in case it was indexed/bookmarked.
     "/blog/the-psychology-of-pricing-why-that-499000-tag-works.html":
         "/blog/psychology-of-pricing-luxury-homes-northern-colorado.html",
-    # 2026-08-14 (Christine's request): Neighborhood Quiz merged onto
-    # /sold-homes-map.html as a collapsible section instead of its own page.
-    "/neighborhood-quiz.html": "/sold-homes-map.html",
+    # 2026-08-14: Neighborhood Quiz stopped being its own page. It briefly
+    # redirected to /sold-homes-map.html; 2026-08-15 (Christine) it moved to
+    # the community pages, so the old URL now lands on the communities index,
+    # which carries the quiz and is the right entry point for "which town?".
+    "/neighborhood-quiz.html": "/communities/index.html",
 }
 
 # Display name (as used in COUNTIES[]["cities"]) -> CITY_CONTENT data key.
@@ -475,6 +482,88 @@ SOLD_HOME_VIDEOS = [
 ]
 
 
+# ----------------------------------------------------- SOLD HOME PINS ----
+# 2026-08-14 (Christine, on seeing only 12 pins): "I have sold 150 plus
+# homes! why arent they on there?" — a fair question, and the answer was a
+# real design flaw, not missing data entry.
+#
+# The map used to be built straight from the "sold"-status rows of
+# _LISTING_VIDEO_ENTRIES above. That list exists to match YouTube listing
+# TOURS to addresses, so a home could only ever get a pin if Christine had
+# also filmed and uploaded a video for it. It was a map of "sold homes I
+# happened to film", displayed under copy that claimed it was her track
+# record. Twelve of 150+.
+#
+# The pin list now comes from build/data/sold_homes.json instead, where the
+# video is optional and the minimum viable entry is an address plus a city.
+# The sold video entries above are still merged in automatically, so no pin
+# that used to appear can be lost by an editing slip in the JSON — and any
+# video entry missing from the JSON prints a build warning rather than
+# silently geocoding without a city (which is how a pin lands on the wrong
+# "Main St" in the wrong town).
+def _street_key(street):
+    """Normalized street-only key, used to dedupe the JSON against the
+    video list. Deliberately street-only: the video list has no city, so
+    the street is the only field the two sources share."""
+    return " ".join(street.strip().lower().split())
+
+
+def _build_sold_home_pins():
+    pins = []
+    seen = set()
+
+    for home in SOLD_HOMES_DATA.get("homes", []):
+        street = (home.get("address") or "").strip()
+        city = (home.get("city") or "").strip()
+        if not street:
+            print("  ! sold_homes.json: skipping an entry with no address")
+            continue
+        if not city:
+            print(f"  ! sold_homes.json: '{street}' has no city — the geocoder "
+                  f"will have to guess which town it's in")
+        key = _street_key(street)
+        if key in seen:
+            print(f"  ! sold_homes.json: '{street}' is listed twice — keeping the first")
+            continue
+        seen.add(key)
+        pin = {
+            "address": street,
+            "city": city,
+            "state": (home.get("state") or "CO").strip(),
+        }
+        if home.get("year"):
+            pin["year"] = str(home["year"])
+        if home.get("videoId"):
+            pin["videoId"] = home["videoId"]
+            pin["title"] = home.get("title") or f"{street} home tour"
+        pins.append(pin)
+
+    # Safety net: any sold video entry that isn't in the JSON still gets a
+    # pin, so the map can only ever gain homes from this refactor.
+    for addrs, vid, title, status in _LISTING_VIDEO_ENTRIES:
+        if status != "sold":
+            continue
+        # Test every spelling variant, not just the first: the video list
+        # carries several forms per property ("929 independent ave", "929 w
+        # independent ave", ...) precisely because MLS address formatting
+        # varies, and sold_homes.json will naturally use whichever form
+        # reads best. Matching on addrs[0] alone double-pinned two homes.
+        if any(_street_key(a) in seen for a in addrs):
+            continue
+        print(f"  ! '{addrs[0]}' has a sold listing video but no entry in "
+              f"sold_homes.json — pinning it without a city, add one for accuracy")
+        seen.add(_street_key(addrs[0]))
+        pins.append({
+            "address": addrs[0].title(), "city": "", "state": "CO",
+            "videoId": vid, "title": title,
+        })
+
+    return pins
+
+
+SOLD_HOME_PINS = _build_sold_home_pins()
+
+
 def _fmt_views(n):
     return f"{n:,} views"
 
@@ -585,10 +674,22 @@ def _nearby_places_js_helpers():
         (NEARBY_CAT_LABELS[cat] || cat) + ' found.</p>';
       return;
     }
+    // 2026-08-15: names now link to Google Maps via place_id, and the panel
+    // carries a visible "Google Maps" attribution -- it had been rendering
+    // Google Places names with none, which Google's Places policy requires
+    // whenever Places content is displayed without a Google map. Entries
+    // cached before placeId existed fall back to plain text.
     resultsEl.innerHTML = '<ul class="nearby-list">' + items.map(function (p) {
-      return '<li><span class="nearby-name">' + esc(p.name) + '</span>' +
+      var name = esc(p.name);
+      var inner = p.placeId
+        ? '<a href="https://www.google.com/maps/place/?q=place_id:' +
+          encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
+        : name;
+      return '<li><span class="nearby-name">' + inner + '</span>' +
         '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
-    }).join('') + '</ul>';
+    }).join('') + '</ul>' +
+      '<p class="nearby-attrib">Straight-line distances. Places data from ' +
+      '<strong>Google Maps</strong>.</p>';
   }
 """
 
@@ -1611,7 +1712,8 @@ HOME_FAQ = [
     ("Who is the best luxury real estate agent in Loveland, Berthoud, and Masonville?",
      f"{SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a "
      f"luxury real estate agent based in Loveland, serving Berthoud, Masonville, and the "
-     f"rest of Larimer County with 200+ homes sold and expertise in luxury "
+     f"rest of Larimer County with 150+ homes sold personally (250+ as a duo with "
+     f"Kendra Bajcar) and expertise in luxury "
      f"marketing and negotiation."),
     ("What areas does Signature Property Collection serve?",
      f"{SITE['agent']} and {SITE['name']} serve Northern Colorado's Larimer, Weld, and "
@@ -1671,7 +1773,10 @@ def nav_html(active=None):
 # 2026-08-14 (later still, per Christine's official "Signature Listing
 # Strategy" brochure): reviews/homes/volume updated from Christine's solo
 # figures to her and Kendra Bajcar's combined-team numbers (158 reviews,
-# 250+ homes, $200M+ volume) -- Christine confirmed $200M+ is their real
+# 250+ homes, $200M+ volume) -- Christine confirmed 2026-08-15 that 250+ is
+# the COMBINED duo figure with Kendra Bajcar, and that she personally has sold
+# 150+. Both numbers are real; they are not interchangeable, and anything
+# stated about Christine alone uses 150+. Christine confirmed $200M+ is their real
 # joint total, not a solo figure (an earlier pass here had briefly used
 # the brochure's more conservative $100M+ before she corrected it).
 #
@@ -1692,9 +1797,9 @@ def _trust_ribbon_html():
   <div class="wrap">
     <a class="item" href="{GOOGLE_REVIEWS_URL}" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>158 Five-Star Google Reviews</a>
     <span class="divider">&middot;</span>
-    <span class="item">250+ Homes Sold</span>
+    <span class="item">250+ Homes Sold As A Team</span>
     <span class="divider">&middot;</span>
-    <span class="item">$200M+ In Sales Volume</span>
+    <span class="item">$200M+ Combined Volume</span>
     <span class="divider">&middot;</span>
     <span class="item">RealTrends Top 0.5% Nationwide</span>
   </div>
@@ -1725,7 +1830,16 @@ def _scroll_reveal_script():
         io.unobserve(entry.target);
       }
     });
-  }, { threshold: .1, rootMargin: '0px 0px -80px 0px' });
+    // threshold 0, NOT .1 -- 2026-08-15 (Christine: "nothing in blog at all").
+    // A ratio threshold is a trap for tall sections: 10% of the blog index's
+    // single 8,190px section is 819px, so the reveal could only ever fire on a
+    // browser window taller than that. On any laptop viewport shorter than
+    // ~819px -- which is most of them once browser chrome is subtracted -- the
+    // entire 58-post archive stayed at opacity 0 forever, with no error and
+    // nothing in the console. It "worked" for anyone with a tall enough window,
+    // which is why it survived this long. threshold 0 fires on the first
+    // intersecting pixel and cannot be defeated by section height.
+  }, { threshold: 0, rootMargin: '0px 0px -80px 0px' });
   targets.forEach(function (el) { io.observe(el); });
 })();
 </script>"""
@@ -2063,6 +2177,7 @@ def footer_html():
         <h4>Resources</h4>
         <ul>
           <li><a href="/search-homes.html">Search Homes</a></li>
+          <li><a href="/luxury-market.html">Homes Over $1 Million</a></li>
           <li><a href="/current-listings.html">Current Listings</a></li>
           <li><a href="/blog/index.html">Blog</a></li>
           <li><a href="/guides/buyers-guide.html">Buyer's Guide</a></li>
@@ -2075,7 +2190,7 @@ def footer_html():
           <li><a href="/past-sales.html">Past Sales</a></li>
           <li><a href="/listing-video-portfolio.html">Listing Video Portfolio</a></li>
           <li><a href="/lifestyle-search.html">Lifestyle Home Search</a></li>
-          <li><a href="/sold-homes-map.html">Sold Homes Map &amp; Neighborhood Quiz</a></li>
+          <li><a href="/sold-homes-map.html">Sold Homes Map</a></li>
           <li><a href="/press-recognition.html">Press &amp; Recognition</a></li>
           <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
@@ -2171,7 +2286,7 @@ def build_home():
 <section class="tight">
   <div class="wrap">
     <span class="eyebrow">{SITE['agent']}</span>
-    <h2 class="section-title">With 250+ homes sold and $200M+ in combined sales volume</h2>
+    <h2 class="section-title">With 250+ homes sold as a team and $200M+ in combined sales volume</h2>
     <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, {SITE['agent']} and
     Signature Property Collection represent Northern Colorado's luxury tier exclusively — the
     estate homes, acreage, and architecturally distinct properties that a generalist local search
@@ -2248,6 +2363,10 @@ def build_communities_index():
   </div>
 </section>
 """
+    body += _quiz_disclosure(
+        f"Four quick questions, one real answer — matched against {len(QUIZ_CITIES)} real "
+        f"towns {esc(SITE['agent'])} shows clients every day. Click to expand."
+    )
     extra = _leaflet_lazy_loader_extra()
     page(
         "Explore Northern Colorado Communities | Signature Property Collection",
@@ -2330,6 +2449,11 @@ def build_county_pages():
   </div>
 </section>
 """
+        body += _quiz_disclosure(
+            f"Not sure which {esc(c['name'])} town fits? Four quick questions, matched "
+            f"against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients "
+            f"every day. Click to expand."
+        )
         breadcrumbs = _breadcrumb_schema([
             ("Home", "/index.html"),
             ("Communities", "/communities/index.html"),
@@ -2579,7 +2703,8 @@ def build_city_pages():
       <span class="eyebrow" style="color:var(--dusty-rose)">Meet {esc(SITE['agent'])}</span>
       <h2 class="section-title">Your {esc(city)} Luxury Real Estate Agent</h2>
       <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 250+
-      homes sold and $200M+ in combined sales volume across Northern Colorado's luxury tier. A
+      homes sold as a duo and $200M+ in combined sales volume across Northern Colorado's luxury
+      tier. A
       Certified Negotiation Specialist and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
       represents estate homes, acreage, and architecturally significant properties in and
       around {esc(city)}.</p>
@@ -2715,7 +2840,7 @@ def build_city_pages():
             faq_pairs = [
                 (f"Who is the best real estate agent in {city}, CO?",
                  f"{SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a luxury real "
-                 f"estate agent serving {city} and the rest of {c['name']} — with 200+ homes "
+                 f"estate agent serving {city} and the rest of {c['name']} — with 150+ homes "
                  f"sold across Northern Colorado's Larimer, Weld, and Boulder County "
                  f"Front Range."),
                 (f"Does {SITE['agent']} work with buyers and sellers in {city}?",
@@ -2738,8 +2863,18 @@ def build_city_pages():
             # city_content.json's "local_faqs" list as they're researched.
             for q, a in info.get("local_faqs", []):
                 faq_pairs.append((q, a))
+            body += _walkability_block(city, f"{city}, CO")
             faq_html, faq_schema = _faq_block(faq_pairs)
             body += faq_html
+            # Someone on a city page has narrowed to one town, but plenty are
+            # still comparing it against the next town over -- that's exactly
+            # what the quiz settles, so it goes here too (Christine, 2026-08-15,
+            # naming Fort Collins specifically).
+            body += _quiz_disclosure(
+                f"Weighing {esc(city)} against somewhere else? Four quick questions, matched "
+                f"against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients "
+                f"every day. Click to expand."
+            )
             breadcrumbs = _breadcrumb_schema([
                 ("Home", "/index.html"),
                 ("Communities", "/communities/index.html"),
@@ -2793,7 +2928,7 @@ def build_about():
     <div class="card">
       <h3>By The Numbers</h3>
       <p>&#9733;&#9733;&#9733;&#9733;&#9733; 158 Five-Star Reviews on Google<br>
-      250+ Homes Sold &amp; $200M+ in Combined Sales Volume<br>
+      250+ Homes Sold &amp; $200M+ in Sales Volume &mdash; combined with Kendra Bajcar<br>
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
@@ -4436,6 +4571,17 @@ def build_subdivision_pages():
 </section>
 {faq_html}
 """
+        _walk = SUBDIVISION_WALK_PLACES.get(sub["slug"])
+        if _walk:
+            # `near` is the parent town, so a neighborhood name that geocodes
+            # somewhere else is rejected rather than scored -- see
+            # MAX_PLACE_DRIFT_MILES in netlify/functions/walkability.js.
+            body += _walkability_block(_walk["label"], _walk["query"], "Loveland, CO")
+        body += _quiz_disclosure(
+            f"Still comparing neighborhoods? Four quick questions, matched against "
+            f"{len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients every day. "
+            f"Click to expand."
+        )
         breadcrumbs = _breadcrumb_schema([
             ("Home", "/index.html"), ("Communities", "/communities/index.html"),
             ("Loveland", loveland_url), (sub["title"], None),
@@ -4819,11 +4965,257 @@ _QUIZ_BUDGET_PARAMS = {
 }
 
 
+# ------------------------------------------------- LUXURY MARKET PAGE ----
+# 2026-08-15 (Christine): "what people are actually searching for? who the
+# sellers are and who the buyers are at this price point."
+#
+# This also closes a gap the README has flagged since the discoverability
+# audit: nothing on the site stated a price threshold, even though "homes over
+# $1,000,000 [city]" is literally what people type, and nothing addressed
+# "best negotiator real estate agent" either. Both are handled here.
+#
+# ON FACTS: the buyer/seller profiles below are qualitative and reflect who
+# actually transacts at this level in Larimer/Weld -- deliberately NOT dressed
+# up with appreciation rates or days-on-market figures. The only numbers on the
+# page that come from outside the business are the equestrian-acreage
+# aggregates, which are attributed and dated inline so they can be checked and
+# refreshed rather than quietly aging into fiction. Everything else is either
+# Christine's own verified track record or a statement that needs no source.
+def build_luxury_market():
+    buyers = [
+        ("Relocating from Denver, Boulder, or out of state",
+         "The single most common call I get at this price. Someone sells in "
+         "Boulder or Denver, looks at what the same money buys an hour north, "
+         "and realizes it's a different house entirely — more land, newer "
+         "build, mountain views, and a commute they actually chose. They are "
+         "rarely in a hurry and almost always doing it for the lifestyle "
+         "rather than the spreadsheet."),
+        ("Move-up buyers using equity from their first Northern Colorado home",
+         "People who bought here years ago, watched their equity build, and are "
+         "now trading up rather than leaving. They know the towns already, so "
+         "the conversation is about specific streets and specific builders, not "
+         "an introduction to the region."),
+        ("Acreage, horse, and ranch buyers",
+         "Land is the whole point for this group — fenced pasture, an arena, "
+         "outbuildings, water, and the room to keep animals. What they want "
+         "sits outside town limits, which means well and septic, access, "
+         "zoning, and water rights matter as much as the house does. This is "
+         "the part of the market with the fewest agents who genuinely know it."),
+        ("Buyers who want new construction in a premier community",
+         "Golf-course and lakefront communities, and the master-planned "
+         "neighborhoods around Centerra and Windsor. They want finish quality "
+         "and amenities without a renovation, and they need someone who will "
+         "read a builder contract properly before they sign it."),
+        ("Privacy-first buyers",
+         "Executives, physicians, and business owners who care more about a "
+         "long driveway and a discreet process than about a marketing "
+         "campaign. Private showings, no sign in the yard where possible, and "
+         "as few people in the transaction as it can be run with."),
+    ]
+    sellers = [
+        ("Empty nesters right-sizing and releasing equity",
+         "The biggest seller group at this level, and the one where timing "
+         "genuinely matters. The house did its job for twenty years, the "
+         "equity in it is now a retirement asset, and the decision is "
+         "financial as much as it is emotional. Most of them are not leaving "
+         "Northern Colorado — they are moving four miles into something "
+         "single-level with less roof to maintain."),
+        ("Owners of large acreage who no longer want the upkeep",
+         "Twenty acres is wonderful at fifty and a lot of work at seventy. "
+         "These sales need a buyer who wants the land for what it is, which is "
+         "a narrower pool and a different marketing approach than an in-town "
+         "listing."),
+        ("Relocating professionals and job transfers",
+         "Usually on somebody else's timeline, which changes the strategy — "
+         "pricing has to be right the first time because there isn't room for "
+         "a long correction."),
+        ("Families settling an estate or a trust",
+         "Often several people in different states making one decision "
+         "together, sometimes a property that hasn't been updated in decades. "
+         "The work here is as much coordination and patience as it is real "
+         "estate."),
+        ("Sellers who tried already and didn't sell",
+         "An expired luxury listing is almost never a bad house. It is usually "
+         "pricing, photography, or a marketing plan built for a $400,000 home "
+         "and applied to a $1.4M one."),
+    ]
+    searches = [
+        ("&ldquo;Homes over $1,000,000&rdquo; and &ldquo;luxury homes for sale&rdquo; in a specific town",
+         "Search by price the way you actually think about it — there's no "
+         "artificial floor on my search, so you'll see everything above your "
+         "number instead of only what an IDX widget decided to show.",
+         "/search-homes.html?minPrice=1000000"),
+        ("&ldquo;Horse property&rdquo; and &ldquo;acreage for sale&rdquo;",
+         "This is the highest-intent search in Northern Colorado and the one "
+         "generic sites handle worst, because acreage doesn't reduce to beds "
+         "and baths. Ask me about a specific parcel and you'll get water, "
+         "zoning, and access, not a photo gallery.",
+         "/search-homes.html?minPrice=1000000"),
+        ("&ldquo;Best negotiator real estate agent&rdquo;",
+         "A fair thing to search for, and hard to verify from a website. I'm a "
+         "Certified Negotiation Specialist, and the more useful proof is the "
+         "track record and what past sellers said about how their deal was "
+         "handled.",
+         "/testimonials.html"),
+        ("&ldquo;What is my home worth&rdquo; at the top of the market",
+         "Automated estimates are least reliable exactly where homes are most "
+         "unusual — custom builds and acreage are what they get most wrong. "
+         "At this price the number needs a person who has walked comparable "
+         "properties.",
+         "/free-home-valuation.html"),
+        ("&ldquo;Homes with a view&rdquo;, &ldquo;lakefront&rdquo;, and &ldquo;golf course homes&rdquo;",
+         "Lifestyle-first searches, and the ones where local knowledge shows "
+         "up fastest — which streets actually hold the mountain view, and "
+         "which back to a fairway you'd rather not back to.",
+         "/lifestyle-search.html"),
+    ]
+
+    def block(items, kind):
+        return "\n".join(
+            f'''      <div class="profile-row">
+        <h3>{title}</h3>
+        <p>{body}</p>
+      </div>'''
+            for title, body in items
+        )
+
+    search_rows = "\n".join(
+        f'''      <div class="profile-row">
+        <h3>{q}</h3>
+        <p>{a} <a href="{href}" class="cta" style="display:inline-block;margin-top:6px">Start there &rarr;</a></p>
+      </div>'''
+        for q, a, href in searches
+    )
+
+    faq_html, faq_schema = _faq_block([
+        ("What counts as a luxury home in Northern Colorado?",
+         "There is no single number, and the honest answer is that it moves by "
+         "town — the line sits meaningfully lower in Greeley or Loveland than "
+         "in Fort Collins or Windsor. What matters more for a buyer coming from "
+         "Denver or Boulder is that $1,000,000 here is not the same house it is "
+         "there: it usually means more land, a newer build, or a view that "
+         "would cost double an hour south."),
+        ("Who is buying homes over $1 million in Northern Colorado?",
+         "Mostly people relocating from Denver, Boulder, or out of state; local "
+         "move-up buyers using equity from a first home here; acreage and horse "
+         "property buyers; and buyers who want new construction in a "
+         "golf-course, lakefront, or master-planned community. Privacy is a "
+         "recurring theme across all of them."),
+        ("Who is selling homes at this price point?",
+         "Most often empty nesters right-sizing and turning home equity into a "
+         "retirement asset, owners of large acreage who no longer want the "
+         "upkeep, relocating professionals on a set timeline, families settling "
+         "an estate, and sellers whose luxury listing already expired once with "
+         "another agent."),
+        (f"Does {SITE['agent']} handle acreage and horse properties?",
+         "Yes — farm, ranch, and acreage work is a specific part of the "
+         "practice rather than an occasional exception, which matters because "
+         "these transactions turn on well and septic, zoning, access, and water "
+         "rights rather than on square footage."),
+    ])
+
+    lead_form = _tool_lead_form("luxury-market", "Start A Private Conversation")
+
+    body = f"""
+<section class="hero" style="padding:150px 0 110px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Over A Million</span>
+    <h1>Northern Colorado Homes Over $1 Million</h1>
+    <p class="lede" style="margin-left:auto;margin-right:auto">A million dollars here is not the
+    same house it is in Boulder or Denver. It usually means land, or a view, or a build quality
+    you would pay double for an hour south. Here is who is buying at this level, who is selling,
+    and what they type into Google before they ever call me.</p>
+    <div class="btn-row" style="justify-content:center">
+      <a class="btn btn-primary" href="/search-homes.html?minPrice=1000000">See Homes Over $1M</a>
+      <a class="btn btn-outline" href="/contact.html">Talk To {esc(SITE['agent'].split()[0])}</a>
+    </div>
+  </div>
+</section>
+
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Buyers</span>
+    <h2 class="section-title">Who Is Buying At This Price</h2>
+    <p class="lede">Five groups, and they want genuinely different things. Knowing which one you
+    are is most of what makes the search efficient.</p>
+    <div class="profile-list">
+{block(buyers, 'buyer')}
+    </div>
+  </div>
+</section>
+
+<section class="section-dark tight">
+  <div class="wrap">
+    <span class="eyebrow">The Sellers</span>
+    <h2 class="section-title">Who Is Selling At This Price</h2>
+    <p class="lede">Almost every seller above a million is solving a problem that isn't really
+    about the house. The strategy follows the problem.</p>
+    <div class="profile-list profile-list-dark">
+{block(sellers, 'seller')}
+    </div>
+  </div>
+</section>
+
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Searches</span>
+    <h2 class="section-title">What People Actually Search For</h2>
+    <p class="lede">These are the searches that bring people to a page like this one, and what
+    I'd tell you about each if you asked me directly.</p>
+    <div class="profile-list">
+{search_rows}
+    </div>
+  </div>
+</section>
+
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Acreage &amp; Equestrian</span>
+    <h2 class="section-title">The Land Market, In Numbers</h2>
+    <p class="lede">Equestrian and acreage property is where this market gets specific. As a
+    rough sense of scale: equestrian listings around Fort Collins have recently averaged about
+    24 acres, with a median asking price near $1.28M and an average closer to $1.57M
+    <span class="fine-note">(aggregated listing data, LandSearch, August 2026 &mdash; a snapshot of
+    what is listed, not what closed)</span>. Land pricing swings hard on water, zoning, and
+    access, so treat any average as a starting point and ask about the actual parcel.</p>
+    <div class="btn-row">
+      <a class="btn btn-dark" href="/contact.html">Ask About A Parcel</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/sold-homes-map.html">See The Track Record</a>
+    </div>
+  </div>
+</section>
+
+{faq_html}
+
+<section class="tight">
+  <div class="wrap" style="max-width:720px">
+    <span class="eyebrow" style="color:var(--dusty-rose)">No Obligation</span>
+    <h2 class="section-title">Start A Private Conversation</h2>
+    <p class="lede">Whether you are two years out or two weeks out. Nothing here is a hard sell,
+    and I would rather tell you to wait than list something that isn't ready.</p>
+    {lead_form}
+  </div>
+</section>
+"""
+    breadcrumbs = _breadcrumb_schema([
+        ("Home", "/index.html"),
+        ("Homes Over $1 Million", None),
+    ])
+    page(
+        "Northern Colorado Homes Over $1 Million | Luxury Buyers & Sellers | Signature Property Collection",
+        f"Who buys and who sells homes over $1 million in Northern Colorado, what they search "
+        f"for, and how {SITE['agent']} handles luxury, acreage, and equestrian property across "
+        f"Larimer, Weld, and Boulder counties.",
+        "/luxury-market.html", None, body,
+        schema_extra=[breadcrumbs, faq_schema],
+    )
+
+
 # --------------------------------------------------------- SOLD MAP ----
 # 2026-08-13 (Christine's request): "map my sold listings and their videos
-# using google api to be able to document homes sold." The 12 sold-status
-# addresses already tracked in _LISTING_VIDEO_ENTRIES (see that list's own
-# comment above) get geocoded server-side by
+# using google api to be able to document homes sold." The addresses in
+# SOLD_HOME_PINS (see that section's comment for where they come from and
+# why it changed on 2026-08-14) get geocoded server-side by
 # netlify/functions/sold-homes-geocode.js and plotted here with Leaflet —
 # same "Google API for geocoding, Leaflet for the actual map" split as the
 # Communities county map, so no Google Maps JS key (billed per map load)
@@ -4835,6 +5227,30 @@ _QUIZ_BUDGET_PARAMS = {
 # she confirmed 2026-08-13 she already has a key. Until then the page
 # still renders cleanly with a friendly "almost ready" message instead of
 # a blank or broken map.
+
+
+def write_sold_homes_function_data():
+    """Emit the pin list the Netlify geocoder function reads at runtime.
+
+    The function used to carry its own hand-copied duplicate of the address
+    list, with a comment admitting it "needs a manual update any time that
+    list grows -- flagged clearly so it isn't missed." It got missed, which
+    is part of why the map stalled at 12 pins. Generating it from the same
+    source as the page removes the chance to forget. Netlify runs no build
+    step for this site (see netlify.toml), so the generated file is
+    committed alongside /site."""
+    out_dir = os.path.abspath(os.path.join(HERE, "..", "netlify", "functions", "lib"))
+    os.makedirs(out_dir, exist_ok=True)
+    payload = {
+        "_generated": "Written by build/build.py from build/data/sold_homes.json. "
+                      "Do not edit by hand — edit that file and re-run the build.",
+        "homes": SOLD_HOME_PINS,
+    }
+    with open(os.path.join(out_dir, "_sold-homes-data.json"), "w") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print(f"  sold homes map: {len(SOLD_HOME_PINS)} pins "
+          f"({sum(1 for p in SOLD_HOME_PINS if p.get('videoId'))} with video tours)")
 def _sold_homes_map_lazy_loader():
     return (
         "<script>\n"
@@ -4870,78 +5286,77 @@ def _sold_homes_map_lazy_loader():
 
 
 def build_sold_homes_map():
-    # 2026-08-14 (Christine's request): the Neighborhood Quiz now lives on
-    # this same page, in a collapsible <details> section below the map, so
-    # visitors who don't want the quiz never have to see it expanded --
-    # native <details>/<summary> gives free, accessible expand/collapse
-    # with no custom JS needed for the toggle itself (the quiz's own
-    # interactive logic below is unrelated to open/closed state -- its
-    # elements exist in the DOM either way, just visually hidden while
-    # collapsed, exactly like the rest of this page's lazy-loaded map).
-    quiz_block = _neighborhood_quiz_block()
+    # 2026-08-15 (Christine): the Neighborhood Quiz is no longer on this
+    # page. It sat here for a day after being merged off its own URL, and
+    # her read on seeing it was that it belonged "on the community page --
+    # like larimer weld, fort collins, buckhorn" instead: the quiz asks
+    # which town to look in, which is not the question someone is asking
+    # while reading her sold-homes track record. It now renders on the
+    # communities index, county, city, and subdivision pages via
+    # _quiz_disclosure().
+    # 2026-08-14: rewritten after Christine's read on the old version ("this
+    # is sooo not human sounding"). The old lede was three sentences of
+    # reassurance that the homes were real ("Every pin below is a real home",
+    # "the actual video tour", "Real homes, real results") and referred to
+    # her in the third person on a page about her own work. Plain first
+    # person, no insisting, no closing triad.
+    n_with_video = sum(1 for p in SOLD_HOME_PINS if p.get("videoId"))
     body = f"""
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">The Track Record, On A Map</span>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Homes I've Sold</span>
     <h1>Sold Homes Map</h1>
-    <p class="lede">Every pin below is a real home {esc(SITE['agent'])} has represented —
-    click one to watch the actual video tour she filmed for that property. Real homes,
-    real results, mapped across Northern Colorado.</p>
+    <p class="lede">These are homes I've sold around Northern Colorado. Click a pin to see
+    the address, and where I filmed a tour, to watch it. I've closed more than 150 of
+    these since I started, in Loveland and Greeley and Fort Collins and most of the
+    small towns in between.</p>
   </div>
 </section>
 <section>
   <div class="wrap">
     <div id="sold-homes-map"></div>
     <p id="sold-homes-map-status" class="sold-homes-map-status"></p>
-    <p class="lede" style="margin-top:24px">Want to see the full library, not just what's
-    mapped? Visit the <a href="/past-sales.html" style="text-decoration:underline">Past Sales</a>
-    page, or browse every tour on the
+    <p class="lede" style="margin-top:24px">I'm still adding older sales to the map, so it
+    isn't every home yet. {n_with_video} of the ones here have a full video tour, and
+    those are all collected on
+    <a href="/past-sales.html" style="text-decoration:underline">Past Sales</a> and the
     <a href="/listing-video-portfolio.html" style="text-decoration:underline">Listing Video Portfolio</a>.
-    Curious what it's actually like working with {esc(SITE['agent'].split()[0])}? Read
-    <a href="/testimonials.html" style="text-decoration:underline">what these same sellers said</a>
-    afterward.</p>
-  </div>
-</section>
-<section class="tight">
-  <div class="wrap">
-    <details class="quiz-disclosure" id="neighborhood-quiz-disclosure">
-      <summary>
-        <span class="eyebrow" style="color:var(--dusty-rose)">Not Sure Where To Look?</span>
-        <h2 class="section-title" style="margin:6px 0 0">Take The 60-Second Neighborhood Quiz &rsaquo;</h2>
-        <p class="lede" style="margin-top:10px">Four quick questions, one real answer — matched
-        against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients every day.
-        Click to expand.</p>
-      </summary>
-      {quiz_block}
-    </details>
+    The sellers behind them wrote
+    <a href="/testimonials.html" style="text-decoration:underline">these reviews</a>.</p>
   </div>
 </section>
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Sold Homes Map", None)])
     extra = _sold_homes_map_lazy_loader()
     page(
-        "Sold Homes Map & Neighborhood Quiz | Signature Property Collection",
-        f"An interactive map of homes {SITE['agent']} has sold across Northern Colorado, "
-        "each pin linking to its real video tour — plus a free 4-question quiz to find "
-        "which Northern Colorado neighborhood matches your lifestyle, commute, and budget.",
+        "Sold Homes Map | Signature Property Collection",
+        f"A map of homes {SITE['agent']} has sold across Northern Colorado, "
+        "with a video tour behind the pins she filmed one for.",
         "/sold-homes-map.html", None, body, extra, schema_extra=[breadcrumbs],
     )
 
 
 def _neighborhood_quiz_block():
-    """The interactive quiz widget's markup + script, WITHOUT its own hero
-    or page() wrapper -- 2026-08-14 (Christine's request): merged onto
-    /sold-homes-map.html as a collapsible <details> section ("the quiz on
-    the same page as the map, that can compress if they don't want to do
-    the quiz") instead of living on its own /neighborhood-quiz.html page.
-    Old URL 301-redirects to /sold-homes-map.html (see LEGACY_URL_REDIRECTS)
-    in case it's bookmarked or indexed anywhere. Extracted verbatim from the
-    former build_neighborhood_quiz() -- same questions, scoring, and lead
-    form (still tagged "neighborhood-quiz" as its Lofty source so existing
-    lead-routing rules keep working unchanged)."""
-    cities_json = json.dumps(QUIZ_CITIES)
-    questions_json = json.dumps(QUIZ_QUESTIONS)
-    budget_params_json = json.dumps(_QUIZ_BUDGET_PARAMS)
+    """The interactive quiz widget's markup, WITHOUT its own hero or page()
+    wrapper, for embedding inside a collapsible <details> section.
+
+    2026-08-15 (Christine): "the one I wanted it to be on was the community
+    page -- like larimer weld, fort collins, buckhorn". The quiz answers
+    "which town should I be looking in?", so it belongs where someone is
+    choosing between towns, not appended to her sold-homes track record.
+    It now renders on the communities index, every county page, every city
+    page, and every subdivision page (see _quiz_disclosure()), and is gone
+    from /sold-homes-map.html.
+
+    Its behavior moved out to /assets/js/neighborhood-quiz.js at the same
+    time. It used to be inlined per page, which was fine for one page and
+    wasteful across ~40 -- the town list and question set alone are ~6KB of
+    JSON that is identical everywhere, so it is now fetched once and cached
+    for every subsequent community page.
+
+    Same questions, scoring, and lead form as before (still tagged
+    "neighborhood-quiz" as its Lofty source so existing lead-routing rules
+    keep working unchanged)."""
     lead_form = _tool_lead_form(
         "neighborhood-quiz", "Get My Full Match Report",
         extra_fields=(
@@ -4973,12 +5388,15 @@ def _neighborhood_quiz_block():
       border:none;cursor:pointer;font:inherit;text-decoration:underline">Retake The Quiz</button>
     </div>
   </div>
-<script>
-(function () {{
-  var CITIES = {cities_json};
-  var QUESTIONS = {questions_json};
-  var BUDGET_PARAMS = {budget_params_json};
-  var answers = {{}};
+<script src="/assets/js/neighborhood-quiz.js" defer></script>
+"""
+
+
+_QUIZ_SCRIPT_TEMPLATE = r'''(function () {
+  var CITIES = __CITIES_JSON__;
+  var QUESTIONS = __QUESTIONS_JSON__;
+  var BUDGET_PARAMS = __BUDGET_PARAMS_JSON__;
+  var answers = {};
   var current = 0;
 
   var COMMUTE_ORDER = ['close', 'moderate', 'far'];
@@ -4988,25 +5406,29 @@ def _neighborhood_quiz_block():
   var resultContainer = document.getElementById('quiz-result-container');
   var announceEl = document.getElementById('quiz-step-announce');
 
-  function renderProgress() {{
-    progressEl.innerHTML = QUESTIONS.map(function (_, i) {{
-      return '<div class="quiz-progress-dot' + (i < current ? ' done' : '') + '"></div>';
-    }}).join('');
-  }}
+  // Inert on any page without the widget markup -- this file is now
+  // shared across ~40 community pages rather than inlined on one.
+  if (!progressEl || !qContainer || !resultContainer) return;
 
-  function renderQuestion() {{
+  function renderProgress() {
+    progressEl.innerHTML = QUESTIONS.map(function (_, i) {
+      return '<div class="quiz-progress-dot' + (i < current ? ' done' : '') + '"></div>';
+    }).join('');
+  }
+
+  function renderQuestion() {
     renderProgress();
     var q = QUESTIONS[current];
     var selected = answers[q.key];
-    if (announceEl) {{
+    if (announceEl) {
       announceEl.textContent = 'Question ' + (current + 1) + ' of ' + QUESTIONS.length + ': ' + q.prompt;
-    }}
-    var optsHtml = q.options.map(function (opt, i) {{
+    }
+    var optsHtml = q.options.map(function (opt, i) {
       var isSelected = selected === i;
       var cls = 'quiz-option' + (isSelected ? ' selected' : '');
       return '<button type="button" class="' + cls + '" data-index="' + i + '" role="radio" ' +
         'aria-checked="' + (isSelected ? 'true' : 'false') + '">' + opt.label + '</button>';
-    }}).join('');
+    }).join('');
     qContainer.innerHTML =
       '<div class="quiz-question"><h3 id="quiz-q-heading">' + q.prompt + '</h3>' +
       '<div class="quiz-options" role="radiogroup" aria-labelledby="quiz-q-heading">' + optsHtml + '</div>' +
@@ -5018,23 +5440,23 @@ def _neighborhood_quiz_block():
       (current === QUESTIONS.length - 1 ? 'See My Match' : 'Next') + '</button>' +
       '</div></div>';
 
-    qContainer.querySelectorAll('.quiz-option').forEach(function (btn) {{
-      btn.addEventListener('click', function () {{
+    qContainer.querySelectorAll('.quiz-option').forEach(function (btn) {
+      btn.addEventListener('click', function () {
         answers[q.key] = parseInt(btn.dataset.index, 10);
         renderQuestion();
-      }});
-    }});
-    document.getElementById('quiz-back').addEventListener('click', function () {{
-      if (current > 0) {{ current -= 1; renderQuestion(); }}
-    }});
-    document.getElementById('quiz-next').addEventListener('click', function () {{
+      });
+    });
+    document.getElementById('quiz-back').addEventListener('click', function () {
+      if (current > 0) { current -= 1; renderQuestion(); }
+    });
+    document.getElementById('quiz-next').addEventListener('click', function () {
       if (answers[q.key] === undefined) return;
-      if (current < QUESTIONS.length - 1) {{ current += 1; renderQuestion(); }}
-      else {{ showResults(); }}
-    }});
-  }}
+      if (current < QUESTIONS.length - 1) { current += 1; renderQuestion(); }
+      else { showResults(); }
+    });
+  }
 
-  function scoreCity(city, picked) {{
+  function scoreCity(city, picked) {
     var score = 0;
     if (picked.q1.views && city.views.indexOf(picked.q1.views[0]) !== -1) score += 2;
     if (picked.q1.lifestyle && city.lifestyle.indexOf(picked.q1.lifestyle[0]) !== -1) score += 2;
@@ -5044,23 +5466,23 @@ def _neighborhood_quiz_block():
     // close-in town, just not a perfect one.
     var pickedIdx = COMMUTE_ORDER.indexOf(picked.q2.commute);
     var cityIdx = COMMUTE_ORDER.indexOf(city.commute);
-    if (pickedIdx !== -1 && cityIdx !== -1) {{
+    if (pickedIdx !== -1 && cityIdx !== -1) {
       var dist = Math.abs(pickedIdx - cityIdx);
       score += dist === 0 ? 2 : (dist === 1 ? 1 : 0);
-    }}
+    }
     if (picked.q3.priorities && city.priorities.indexOf(picked.q3.priorities[0]) !== -1) score += 2;
     return score;
-  }}
+  }
 
-  function showResults() {{
-    var picked = {{
+  function showResults() {
+    var picked = {
       q1: QUESTIONS[0].options[answers.q1],
       q2: QUESTIONS[1].options[answers.q2],
       q3: QUESTIONS[2].options[answers.q3],
       q4: QUESTIONS[3].options[answers.q4],
-    }};
-    var ranked = CITIES.map(function (c) {{ return {{ city: c, score: scoreCity(c, picked) }}; }})
-      .sort(function (a, b) {{ return b.score - a.score; }});
+    };
+    var ranked = CITIES.map(function (c) { return { city: c, score: scoreCity(c, picked) }; })
+      .sort(function (a, b) { return b.score - a.score; });
     var top = ranked[0].city;
     var runnerUp = ranked[1] ? ranked[1].city : null;
     var budgetKey = picked.q4.budget;
@@ -5074,20 +5496,20 @@ def _neighborhood_quiz_block():
     document.getElementById('quiz-match-blurb').textContent = top.blurb;
     if (announceEl) announceEl.textContent = 'Your best match is ' + top.name + '.';
     var photoEl = document.getElementById('quiz-match-photo');
-    if (top.photo) {{
+    if (top.photo) {
       photoEl.src = '/assets/img/communities/' + top.photo + '.jpg';
       photoEl.alt = top.name + ', Colorado';
       photoEl.style.display = 'block';
-    }} else {{
+    } else {
       photoEl.style.display = 'none';
-    }}
+    }
     var runnerUpEl = document.getElementById('quiz-runner-up');
-    if (runnerUp) {{
+    if (runnerUp) {
       runnerUpEl.textContent = 'Also worth a look: ' + runnerUp.name;
       runnerUpEl.style.display = '';
-    }} else {{
+    } else {
       runnerUpEl.style.display = 'none';
-    }}
+    }
     document.getElementById('quiz-explore-link').href = top.url;
     document.getElementById('quiz-search-link').href = '/search-homes.html?' + searchQs;
     document.getElementById('quiz-report-lede').textContent =
@@ -5097,32 +5519,138 @@ def _neighborhood_quiz_block():
     var matchField = document.getElementById('quiz-match-field');
     var answersField = document.getElementById('quiz-answers-field');
     if (matchField) matchField.value = top.name + (runnerUp ? ' (runner-up: ' + runnerUp.name + ')' : '');
-    if (answersField) {{
+    if (answersField) {
       answersField.value = [
         'Saturday: ' + picked.q1.label,
         'Commute: ' + picked.q2.label,
         'Priority: ' + picked.q3.label,
         'Budget: ' + picked.q4.label,
       ].join(' | ');
-    }}
-  }}
+    }
+  }
 
   var retakeBtn = document.getElementById('quiz-retake');
-  if (retakeBtn) {{
-    retakeBtn.addEventListener('click', function () {{
-      answers = {{}};
+  if (retakeBtn) {
+    retakeBtn.addEventListener('click', function () {
+      answers = {};
       current = 0;
       resultContainer.style.display = 'none';
       qContainer.style.display = '';
       progressEl.style.display = '';
       renderQuestion();
-      qContainer.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-    }});
-  }}
+      qContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 
   renderQuestion();
-}})();
-</script>
+})();
+'''
+
+
+def write_neighborhood_quiz_script():
+    """Emit /assets/js/neighborhood-quiz.js.
+
+    Generated rather than hand-written because the town list and questions
+    live in Python (QUIZ_CITIES / QUIZ_QUESTIONS) and are shared with the
+    search-homes budget params. Written straight into OUT, after
+    copy_static_assets() has already mirrored the hand-written assets."""
+    js = (_QUIZ_SCRIPT_TEMPLATE
+          .replace("__CITIES_JSON__", json.dumps(QUIZ_CITIES))
+          .replace("__QUESTIONS_JSON__", json.dumps(QUIZ_QUESTIONS))
+          .replace("__BUDGET_PARAMS_JSON__", json.dumps(_QUIZ_BUDGET_PARAMS)))
+    out_dir = os.path.join(OUT, "assets", "js")
+    os.makedirs(out_dir, exist_ok=True)
+    header = (
+        "/*\n"
+        " * Neighborhood Quiz -- GENERATED by build/build.py\n"
+        " * (write_neighborhood_quiz_script). Do not edit here; edit\n"
+        " * QUIZ_CITIES / QUIZ_QUESTIONS / _QUIZ_SCRIPT_TEMPLATE in build.py\n"
+        " * and re-run the build.\n"
+        " *\n"
+        " * Shared by the communities index, every county page, every city\n"
+        " * page, and every subdivision page, so it is fetched once and\n"
+        " * cached rather than inlined ~40 times.\n"
+        " */\n"
+    )
+    with open(os.path.join(out_dir, "neighborhood-quiz.js"), "w") as f:
+        f.write(header + "" + js + "")
+    print("  wrote /assets/js/neighborhood-quiz.js")
+
+
+# 2026-08-15: geocodable place name + display label per subdivision, for
+# the walkability panel (_walkability_block). Kept separate from each
+# entry's "feed_params" because those subdivision strings are truncated on
+# purpose to match IRES's inconsistent naming ("Mariana", "Waterfront",
+# "Kinston") and would send a geocoder to the wrong place. A subdivision
+# missing from here simply gets no walkability panel -- which is correct for
+# west-loveland-riverfront-homes, a scattered set of river-frontage acreage
+# rather than a neighborhood with a center to measure from.
+SUBDIVISION_WALK_PLACES = {
+    "buckhorn-subdivisions-loveland": {"query": "Buckhorn Road, Loveland, CO", "label": "The Buckhorn Corridor"},
+    "mariana-butte-loveland": {"query": "Mariana Butte, Loveland, CO", "label": "Mariana Butte"},
+    "lakes-at-centerra-loveland": {"query": "Lakes at Centerra, Loveland, CO", "label": "Lakes At Centerra"},
+    "thompson-valley-loveland": {"query": "Thompson Valley, Loveland, CO", "label": "Thompson Valley"},
+    "boyd-lake-north-loveland": {"query": "Boyd Lake, Loveland, CO", "label": "Boyd Lake North"},
+    "waterfront-at-boyd-lake-loveland": {"query": "Boyd Lake, Loveland, CO", "label": "The Waterfront At Boyd Lake"},
+    "namaqua-hills-loveland": {"query": "Namaqua Hills, Loveland, CO", "label": "Namaqua Hills"},
+    "kinston-centerra-loveland": {"query": "Kinston at Centerra, Loveland, CO", "label": "Kinston At Centerra"},
+    "pyrenees-french-country-loveland": {"query": "Pyrenees Drive, Loveland, CO", "label": "Pyrenees"},
+}
+
+def _walkability_block(heading_place, place_query, near_query=None):
+    """The "How Walkable Is <town>?" section for city and subdivision pages.
+
+    2026-08-15 (Christine): "a much more detailed walkability score -- maybe
+    add more than school, park and grocery store?" The three-category
+    grocery/school/park panel she was reacting to is the per-listing one from
+    nearby-places.js; this is the community-page version, and it scores ten
+    weighted categories server-side (netlify/functions/walkability.js) and
+    lists the real named places behind each one.
+
+    County pages deliberately do NOT get this. A county is not a walkable
+    unit -- an average across Larimer would blend Old Town Fort Collins with
+    Red Feather Lakes into a number that describes nowhere.
+
+    The section renders hidden and is revealed by the script only once real
+    data arrives, so an unconfigured API key or a failed lookup shows the
+    visitor nothing rather than an empty heading. `near_query` is the parent
+    town, passed on subdivision pages so the function can reject a
+    neighborhood name that geocoded to the wrong place."""
+    near_attr = f' data-near="{esc(near_query)}"' if near_query else ""
+    # The sentinel sits OUTSIDE the hidden section on purpose: the lazy-load
+    # observer needs something with a layout box at this position in the
+    # document, and a [hidden] section has none.
+    return f"""<div id="walk-sentinel" aria-hidden="true"></div>
+<section class="tight" id="walk-section" hidden>
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Getting Around</span>
+    <h2 class="section-title">How Walkable Is {esc(heading_place)}?</h2>
+    <p class="lede">What you can actually reach on foot from the middle of
+    {esc(heading_place)} &mdash; scored across ten everyday errands, not just the
+    grocery store.</p>
+    <div id="walk-panel" class="walk-panel" data-place="{esc(place_query)}"{near_attr}></div>
+  </div>
+</section>
+<script src="/assets/js/walkability.js" defer></script>
+"""
+
+
+def _quiz_disclosure(intro):
+    """The quiz wrapped in the collapsed <details> section used on every
+    community page. `intro` is the one line above the fold, so a county page
+    can say something different from a subdivision page."""
+    return f"""<section class="tight">
+  <div class="wrap">
+    <details class="quiz-disclosure" id="neighborhood-quiz-disclosure">
+      <summary>
+        <span class="eyebrow" style="color:var(--dusty-rose)">Not Sure Where To Look?</span>
+        <h2 class="section-title" style="margin:6px 0 0">Take The 60-Second Neighborhood Quiz &rsaquo;</h2>
+        <p class="lede" style="margin-top:10px">{intro}</p>
+      </summary>
+      {_neighborhood_quiz_block()}
+    </details>
+  </div>
+</section>
 """
 
 
@@ -5621,7 +6149,8 @@ def build_nav_pages():
     <span class="eyebrow" style="color:var(--dusty-rose)">The Track Record</span>
     <h1>Past Sales In Northern Colorado</h1>
     <p class="lede">From luxury estates to acreage properties and everything in between,
-    {SITE['agent']} has sold 200+ homes across Northern Colorado — delivering
+    {SITE['agent']} has sold 150+ homes across Northern Colorado herself, 250+ as a
+    duo with Kendra Bajcar — delivering
     top-dollar results and seamless transactions for clients throughout the Front Range.</p>
     <p class="lede">Looking for current inventory? <a href="/search-homes.html"
     style="text-decoration:underline">Search live, active IRES MLS listings</a> across
@@ -6370,7 +6899,7 @@ def build_llms_txt(paths):
         "- [Mortgage Calculator](/mortgage-calculator.html)",
         "- [Past Sales](/past-sales.html)",
         "- [Lifestyle Home Search](/lifestyle-search.html)",
-        f"- [Sold Homes Map & Neighborhood Quiz — {SITE['agent']}'s Track Record, Mapped, Plus A Personalized Town Match](/sold-homes-map.html)",
+        f"- [Sold Homes Map — {SITE['agent']}'s Track Record, Mapped](/sold-homes-map.html)",
         f"- [Press & Recognition — {SITE['agent']}'s Verified Credentials](/press-recognition.html)",
         "- [The Concierge Experience](/concierge-experience.html)",
         "- [Listing Video Portfolio](/listing-video-portfolio.html)",
@@ -6382,7 +6911,7 @@ def build_llms_txt(paths):
 
 > {SITE['agent']} is a luxury real estate agent with {SITE['brokerage']}, serving
 > Northern Colorado's Larimer, Weld, and Boulder County Front Range — with priority
-> focus on Loveland, Berthoud, Masonville, and Fort Collins. 250+ homes sold, $200M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
+> focus on Loveland, Berthoud, Masonville, and Fort Collins. 150+ homes sold personally and 250+ as a duo with Kendra Bajcar, $200M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
 > Phone: {SITE['phone']}. Email: {SITE['email']}.
 > Last updated: {BUILD_DATE}.
 
@@ -6416,7 +6945,7 @@ def build_llms_txt(paths):
 {tool_lines}
 
 ## Why choose Signature Property Collection
-- 250+ homes sold and $200M+ in combined sales volume across Northern Colorado
+- 150+ homes sold personally; 250+ and $200M+ in sales volume combined with Kendra Bajcar
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
 - Certified Negotiation Specialist and Luxury Home Marketing Expert
 - Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
@@ -6459,6 +6988,7 @@ def copy_static_assets():
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     copy_static_assets()
+    write_neighborhood_quiz_script()
     build_home()
     build_communities_index()
     build_county_pages()
@@ -6475,7 +7005,9 @@ if __name__ == "__main__":
     build_subdivision_pages()
     build_blog()
     build_rss_feed()
+    build_luxury_market()
     build_sold_homes_map()
+    write_sold_homes_function_data()
     build_nav_pages()
     build_search_homes()
     build_current_listings()

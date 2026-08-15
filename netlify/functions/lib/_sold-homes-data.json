@@ -1,0 +1,89 @@
+{
+  "_generated": "Written by build/build.py from build/data/sold_homes.json. Do not edit by hand — edit that file and re-run the build.",
+  "homes": [
+    {
+      "address": "32 Victoria Dr",
+      "city": "Johnstown",
+      "state": "CO",
+      "videoId": "9aIGz-SvCtI",
+      "title": "Affordable Luxury at 32 Victoria Dr — Johnstown Home Tour"
+    },
+    {
+      "address": "929 W Independent Ave",
+      "city": "LaSalle",
+      "state": "CO",
+      "videoId": "TpjE36J71zc",
+      "title": "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado"
+    },
+    {
+      "address": "294 Gila Trail",
+      "city": "Ault",
+      "state": "CO",
+      "videoId": "JvtRGf01JXU",
+      "title": "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail"
+    },
+    {
+      "address": "39243 Boulevard E",
+      "city": "Eaton",
+      "state": "CO",
+      "videoId": "L-uEVzq1bv4",
+      "title": "Eaton, CO Home Under $400K — 39243 Boulevard E"
+    },
+    {
+      "address": "1110 S Quitman St",
+      "city": "Denver",
+      "state": "CO",
+      "videoId": "e7kMY1yV7GI",
+      "title": "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St"
+    },
+    {
+      "address": "45615 County Rd 27",
+      "city": "Pierce",
+      "state": "CO",
+      "videoId": "dVonJhu_zCo",
+      "title": "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO"
+    },
+    {
+      "address": "504 Graefe Ave",
+      "city": "Ault",
+      "state": "CO",
+      "videoId": "eiFurERq_As",
+      "title": "Charming Home for Sale at 504 Graefe Ave, Ault CO"
+    },
+    {
+      "address": "1316 Cimarron Cir",
+      "city": "Eaton",
+      "state": "CO",
+      "videoId": "xWcrj6foJ-Q",
+      "title": "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir"
+    },
+    {
+      "address": "4986 Stuart St",
+      "city": "Denver",
+      "state": "CO",
+      "videoId": "oNZBc-MxzUg",
+      "title": "Stunning Home for Sale — 4986 Stuart St, Denver (Tennyson Art District)"
+    },
+    {
+      "address": "5705 Snow Mesa Dr",
+      "city": "Loveland",
+      "state": "CO",
+      "videoId": "MDfyzESb1Yk",
+      "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? — 5705 Snow Mesa Dr"
+    },
+    {
+      "address": "475 Homestead Ln",
+      "city": "Johnstown",
+      "state": "CO",
+      "videoId": "6Hrdv6LZIDM",
+      "title": "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)"
+    },
+    {
+      "address": "913 Green Mountain Dr",
+      "city": "Erie",
+      "state": "CO",
+      "videoId": "e-_3Qs3liQ0",
+      "title": "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie"
+    }
+  ]
+}

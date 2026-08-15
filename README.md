@@ -18,8 +18,17 @@ build/
   build.py            — the site generator (run this to regenerate /site)
   assets/             — source CSS, JS, vendored Leaflet, county GeoJSON
 site/                 — GENERATED output — this is what Netlify publishes
-netlify.toml          — Netlify build config (runs build.py automatically)
+netlify.toml          — Netlify config: publish dir + function schedules
+                        (NO build step — see the warning below)
+netlify/functions/    — server-side bits (MLS sync, Google lookups, lead push)
 ```
+
+> **Netlify does not build this site.** `netlify.toml` sets `publish = "site"`
+> and nothing else, so Netlify serves the committed `site/` folder as-is. That
+> means **editing `build/build.py` alone changes nothing on the live site** —
+> you have to run `python3 build/build.py` yourself and commit the regenerated
+> `site/` along with it. Every content change is a two-part commit: the source
+> under `build/`, and the generated output under `site/`.
 
 Don't hand-edit files in `site/` — they get overwritten every time
 `build.py` runs. Edit `build/build.py` (content/copy) or `build/assets/`
@@ -382,6 +391,53 @@ last 7 nav pages" below). What's left needs credentials/files only you have
    hidden if nothing's active). Add a new address/video ID to
    `LISTING_VIDEOS` any time you film a new listing tour.
 
+## Sold Homes Map — how to add a home
+
+`/sold-homes-map.html` plots homes Christine has sold, each pin optionally
+linking to the YouTube tour she filmed for it. **A video is not required** — a
+home with no tour still gets a pin with an address-only popup.
+
+To add homes, edit **`build/data/sold_homes.json`** and nothing else:
+
+```json
+{ "address": "1234 Example St", "city": "Loveland" }
+```
+
+`address` and `city` are required (the city matters — without it the geocoder
+guesses between same-named streets in different towns). `state` defaults to CO;
+`year`, `videoId`, and `title` are optional. Then run `python3 build/build.py`
+and commit both `build/` and `site/`, plus the regenerated
+`netlify/functions/lib/_sold-homes-data.json` — the build writes that from the
+same source so the page and the geocoder function can't drift apart. The build
+prints the pin count and warns about any entry missing a city or listed twice.
+
+Scale is handled: on a cold cache the geocoder resolves addresses in bounded
+batches and the map fills itself in over the first couple of page loads rather
+than timing out. Geocoded coordinates are cached for 30 days — that is Google's
+contractual ceiling, not a tuning knob (see the note at the top of
+`netlify/functions/sold-homes-geocode.js` before changing it).
+
+## Walkability panels — how they work
+
+Every city page and 9 of the 10 Loveland subdivision pages carry a "How
+Walkable Is <town>?" panel: ten weighted categories (grocery, restaurants,
+schools, coffee, parks, pharmacy, transit, gyms, library, doctors) scored out
+of 100 by `netlify/functions/walkability.js`, with the real named places behind
+each number linking to Google Maps.
+
+- County pages deliberately have none — a county isn't a walkable unit.
+- Subdivisions use explicit place names in `SUBDIVISION_WALK_PLACES` in
+  `build.py`, not their MLS `feed_params` subdivision strings (those are
+  truncated to match IRES's inconsistent naming and would misgeocode).
+  `west-loveland-riverfront-homes` is intentionally excluded: scattered river
+  frontage with no center to measure from.
+- This is **not** Walk Score® (Redfin's trademarked, licensed product). It's
+  our own estimate and the panel says so. Switching to the official score
+  would need a paid subscription plus their attribution and link-back.
+- The whole section ships hidden and reveals itself only when real data
+  arrives, so a missing key or failed lookup shows visitors nothing rather
+  than a broken heading.
+
 ## Blog migration & the last 7 nav pages
 
 Pulled directly from the live signaturepropertycollection.com via the same
@@ -417,8 +473,9 @@ jobs, and this project already uses two of them together:
   it doesn't serve the website to visitors. It's not an alternative to
   Netlify or Render — it's what feeds either of them.
 - **Netlify** is what this site is already built for. It's a static-site
-  host: push to GitHub, Netlify runs `python3 build/build.py` (per
-  `netlify.toml`) and publishes `site/`, free, with free SSL, a global
+  host: push to GitHub and Netlify publishes the committed `site/` folder
+  (it does *not* run `build.py` — you run that locally and commit the
+  output, see the warning at the top), free, with free SSL, a global
   CDN, and — importantly — **Netlify Forms already wired into every lead
   form on the site** (contact, guides, relocation, valuation, lifestyle
   search). This is the right home for signaturepropertycollection.com.
@@ -509,9 +566,14 @@ build-time-only (a static generator, no live CMS/database), which is a
    PR for you to approve first (recommended at the start, so you're
    reviewing AI-drafted copy before it goes live — you can always turn on
    auto-merge later once you trust the output).
-4. **Publish.** Netlify already auto-deploys on every push to `main` — no
-   new deploy step needed. A commit lands, the site rebuilds, the new post
-   is live, typically within a minute or two.
+4. **Publish.** Netlify auto-deploys on every push to `main`, but it does
+   **not** run `build.py` — so a job that only appends to
+   `build/data/blog.json` would change nothing visitors can see. Whatever
+   writes that file has to run `python3 build/build.py` and commit the
+   regenerated `site/` in the same push. (The alternative is adding a real
+   build command to `netlify.toml`; that trades "nothing can fail at deploy
+   time" for convenience, which is a deliberate call to make, not an
+   oversight to fix.)
 
 None of this needs a new hosting platform or a rewrite of this site — it's
 one new small service (on Render, or even a scheduled GitHub Action) that
@@ -636,10 +698,18 @@ call it done:
    detecting a form once it's been deployed and crawled once; submit a
    real test entry after the first deploy and confirm it shows up in
    Netlify's Forms dashboard.
-4. **Add `LOFTY_API_KEY` and `MLSGRID_API_TOKEN` in Netlify's environment
-   variables** (Site settings → Environment variables) so the leads
-   submission function actually pushes into Lofty, and `/search-homes.html`
-   goes live with real IRES listings — see "What's NOT done yet" #2 and #3.
+4. **Add `LOFTY_API_KEY`, `MLSGRID_API_TOKEN`, and `GOOGLE_MAPS_API_KEY` in
+   Netlify's environment variables** (Site settings → Environment variables)
+   so the leads submission function actually pushes into Lofty, and
+   `/search-homes.html` goes live with real IRES listings — see "What's NOT
+   done yet" #2 and #3.
+   - `GOOGLE_MAPS_API_KEY` gates **three** features that are all built and
+     currently invisible without it: the Sold Homes Map's pins, every
+     walkability panel, and the per-listing "Nearby & Distances" panel. It
+     needs the **Geocoding API and Places API** enabled on it, and should be
+     restricted to those two APIs (and ideally this site's domain) so a
+     leaked key can't be abused elsewhere. Nothing errors while it's absent —
+     each feature hides itself — so it's easy to forget it's missing.
    Also worth setting up Netlify's own form notifications (Site settings →
    Forms → Notifications) as a second, independent alert so you never miss
    a lead even if a Lofty push happens to fail.
