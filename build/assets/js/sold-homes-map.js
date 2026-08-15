@@ -70,6 +70,12 @@
     if (statusEl) { statusEl.textContent = ''; statusEl.style.display = 'none'; }
   }
 
+  // An empty dark rectangle reads as broken. If there will never be pins,
+  // drop the canvas entirely and let the status line stand on its own.
+  function hideMapCanvas() {
+    mapEl.style.display = 'none';
+  }
+
   var map = L.map(mapEl, { scrollWheelZoom: false }).setView([40.35, -104.9], 8);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -105,17 +111,35 @@
     fetch('/.netlify/functions/sold-homes-geocode')
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        // 2026-08-15: this used to tell the visitor the site "just needs a
+        // Google Maps API key added to this site's settings". True, but it is
+        // Christine's setup detail showing on a public page to buyers, and
+        // since the key genuinely isn't set yet it was the message EVERY
+        // visitor saw. Now the map hides itself and points at the pages that
+        // do work; the real reason goes to the console for whoever is
+        // debugging, not to the reader.
         if (data.error === 'not_configured') {
-          showStatus('The map is almost ready — it just needs a Google Maps API key added to this site’s settings before it can plot addresses.');
+          console.warn('sold-homes-map: GOOGLE_MAPS_API_KEY is not set on this site.');
+          hideMapCanvas();
+          showStatus('The map isn’t available right now — every home with a filmed tour is ' +
+            'on the Past Sales and Listing Video Portfolio pages linked below.');
           return;
         }
         if (data.error) {
-          if (!markers.length) showStatus('The map couldn’t load right now. Please try again shortly.');
+          if (!markers.length) {
+            hideMapCanvas();
+            showStatus('The map couldn’t load right now. Every home with a filmed tour is ' +
+              'on the Past Sales and Listing Video Portfolio pages linked below.');
+          }
           return;
         }
         var pins = data.pins || [];
         if (!pins.length && !markers.length) {
-          showStatus('No sold-home locations are available yet.');
+          if (!data.pending) {
+            hideMapCanvas();
+            showStatus('No mapped sold homes yet — every home with a filmed tour is on the ' +
+              'Past Sales and Listing Video Portfolio pages linked below.');
+          }
           return;
         }
 
@@ -135,7 +159,11 @@
         }
       })
       .catch(function () {
-        if (!markers.length) showStatus('The map couldn’t load right now. Please try again shortly.');
+        if (!markers.length) {
+          hideMapCanvas();
+          showStatus('The map couldn’t load right now. Every home with a filmed tour is on the ' +
+            'Past Sales and Listing Video Portfolio pages linked below.');
+        }
       });
   }
 

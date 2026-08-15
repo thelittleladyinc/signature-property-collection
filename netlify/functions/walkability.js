@@ -36,9 +36,8 @@ const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
 
 const WALK_STORE_NAME = "walkability-cache";
-// Shorter than sold-homes-geocode's forever cache: a street address's
-// coordinates are permanent, but coffee shops and pharmacies open and close.
-// Same 30 days nearby-places.js uses, for the same reason.
+// 30 days, matching nearby-places.js and (since 2026-08-15) sold-homes-geocode.js.
+// This is Google's ceiling, not a tuning choice -- see the note above.
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const PLACES_TIMEOUT_MS = 4000;
@@ -73,6 +72,11 @@ const CATEGORIES = [
   { key: "doctor",     type: "doctor",                 label: "Doctors",     weight: 7 },
 ];
 const EXAMPLES_PER_CATEGORY = 3;
+
+// Derived, not hardcoded to 100: `coverage` below is "what share of the
+// scoreable weight actually answered", and that stays correct if the weights
+// above are ever retuned and no longer happen to sum to 100.
+const TOTAL_WEIGHT = CATEGORIES.reduce((sum, c) => sum + c.weight, 0);
 
 // Distance decay, in miles, applied to the NEAREST place in each category.
 // Full credit inside a short walk, tapering to nothing by the point where
@@ -219,7 +223,7 @@ async function computeWalkability(place, near, apiKey) {
     score,
     band: score == null ? null : bandFor(score),
     categories,
-    coverage: Math.round((availableWeight / 100) * 100),
+    coverage: TOTAL_WEIGHT ? Math.round((availableWeight / TOTAL_WEIGHT) * 100) : 0,
     checkedAt: new Date().toISOString(),
     method: {
       fullCreditMiles: FULL_CREDIT_MILES,
