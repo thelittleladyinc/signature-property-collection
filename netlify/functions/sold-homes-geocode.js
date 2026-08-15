@@ -14,10 +14,21 @@
 // {"error":"not_configured"}, same pattern as every other optional
 // integration on this site.
 //
-// Unlike nearby-places.js's 30-day cache (grocery stores can open/close),
-// a street address's lat/lng never changes, so this caches each result
-// forever -- once geocoded, a sold address never re-spends Google API
-// quota again, even years later.
+// 2026-08-15 -- CACHE TTL CORRECTED. This used to cache each geocode forever,
+// on the reasoning that a street address's lat/lng never changes. That
+// reasoning is sound geographically and wrong contractually: Google's Maps
+// Platform Service Specific Terms permit caching lat/lng from the Geocoding
+// API for up to 30 consecutive calendar days and require deletion after that.
+// Place IDs are the only field exempt from the caching restrictions. So the
+// cache is now capped at 30 days like nearby-places.js, and entries written
+// under the old scheme (which carry no timestamp) are treated as expired and
+// re-fetched.
+//
+// Cost of the correction is small and bounded: one call per address per 30
+// days -- for 150 sold homes, about 150 calls a month, comfortably inside the
+// free tier. The progressive warming below already handles a partly cold
+// cache, so an expiry wave degrades to "fills in over the next couple of page
+// loads", not "map goes blank".
 //
 // 2026-08-14 -- TWO CHANGES, both prompted by Christine asking why only 12
 // of her 150+ sales were on the map:
@@ -49,6 +60,10 @@ const { getBlobStore } = require("./lib/_mls-shared");
 const SOLD_HOMES_DATA = require("./lib/_sold-homes-data.json");
 
 const GEOCODE_STORE_NAME = "sold-homes-geocode-cache";
+
+// Google's ceiling for cached Geocoding coordinates, not a tuning knob --
+// read the note above before raising it.
+const GEOCODE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Tuned for Netlify's 10s default function timeout. GEOCODE_TIME_BUDGET_MS
 // is when we stop STARTING lookups, not a hard abort -- in-flight requests
@@ -139,10 +154,17 @@ exports.handler = async () => {
     const cached = await mapWithConcurrency(
       SOLD_HOME_LOCATIONS,
       CACHE_READ_CONCURRENCY,
-      (loc) =>
-        store
+      async (loc) => {
+        const geo = await store
           .get(normalizeAddressKey(fullAddress(loc)), { type: "json" })
-          .catch(() => null)
+          .catch(() => null);
+        if (!geo) return null;
+        // No cachedAt = written under the old forever-cache scheme, so it is
+        // past the 30-day limit by definition. Expired either way: drop it
+        // and let pass 2 re-fetch.
+        if (!geo.cachedAt || Date.now() - geo.cachedAt >= GEOCODE_CACHE_TTL_MS) return null;
+        return geo;
+      }
     );
 
     const pins = [];
@@ -169,7 +191,7 @@ exports.handler = async () => {
         const address = fullAddress(loc);
         try {
           const geo = await geocodeAddress(address, apiKey);
-          await store.setJSON(normalizeAddressKey(address), geo);
+          await store.setJSON(normalizeAddressKey(address), { ...geo, cachedAt: Date.now() });
           return toPin(loc, geo);
         } catch (err) {
           console.error(`sold-homes-geocode: failed for "${address}":`, err.message);
@@ -186,7 +208,9 @@ exports.handler = async () => {
       headers: {
         "Content-Type": "application/json",
         // A sold address's location is permanent, so a fully-resolved
-        // response is safe to cache hard at the edge. A partial one is not:
+        // response is safe to cache hard at the edge -- this is the CDN's copy
+        // of OUR response, not our storage of Google's data, so the 30-day
+        // Geocoding cache limit above does not govern it. A partial one is not:
         // caching it would freeze the half-built map in place for a day and
         // stop the cache from warming, so those go uncached.
         "Cache-Control": pending

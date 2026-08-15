@@ -25,6 +25,13 @@
 // subdivision pages that is at most ~370 calls a month no matter how much
 // traffic the pages get, because the cache is keyed by town rather than by
 // visitor.
+//
+// 30 days is a CEILING set by Google, not a number picked for cost. The Maps
+// Platform Service Specific Terms allow lat/lng from the Geocoding API to be
+// cached for up to 30 consecutive calendar days and require deletion after
+// that; place IDs are the one field exempt from the caching restrictions and
+// may be stored indefinitely. Nothing here may cache longer than that, and
+// the TTL is checked on read so an entry can never be served stale past it.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
 
@@ -152,6 +159,11 @@ async function nearestInCategory(origin, cat, apiKey) {
     .filter((r) => r.geometry && r.geometry.location)
     .map((r) => ({
       name: r.name,
+      // Carried so the page can link the amenity straight to Google Maps --
+      // both a genuine convenience (it's what Zillow and Redfin do with
+      // nearby amenities) and the clearest way to satisfy Google's
+      // attribution requirement for Places content shown outside a map.
+      placeId: r.place_id || null,
       miles: Number(
         distanceMiles(origin.lat, origin.lng, r.geometry.location.lat, r.geometry.location.lng)
           .toFixed(2)
@@ -208,6 +220,7 @@ async function computeWalkability(place, near, apiKey) {
     band: score == null ? null : bandFor(score),
     categories,
     coverage: Math.round((availableWeight / 100) * 100),
+    checkedAt: new Date().toISOString(),
     method: {
       fullCreditMiles: FULL_CREDIT_MILES,
       noCreditMiles: NO_CREDIT_MILES,
@@ -251,6 +264,8 @@ exports.handler = async (event) => {
           "Content-Type": "application/json",
           "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
         },
+        // checkedAt deliberately survives -- it is when the data was actually
+        // fetched from Google, which is what the page reports to the reader.
         body: JSON.stringify({ ...cached, cachedAt: undefined, cached: true }),
       };
     }

@@ -46,6 +46,16 @@
     return m.toFixed(m < 10 ? 1 : 0) + ' mi';
   }
 
+  // Real estate sites date their neighborhood data, and it also makes the
+  // 30-day refresh visible instead of implied.
+  function checkedLine(data) {
+    if (!data.checkedAt) return ' ';
+    var d = new Date(data.checkedAt);
+    if (isNaN(d)) return ' ';
+    var when = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    return ' Checked ' + when + '. ';
+  }
+
   function catHtml(cat) {
     // Anything past the no-credit distance is greyed rather than hidden:
     // "nearest pharmacy is 6.2 mi" is genuinely useful for a rural town, and
@@ -53,7 +63,15 @@
     // the honest answer matters most.
     var far = cat.nearestMiles == null || cat.nearestMiles >= 1.5;
     var examples = (cat.examples || []).map(function (p) {
-      return '<li>' + esc(p.name) + ' &middot; ' + fmtMiles(p.miles) + '</li>';
+      // place_id is the one Places field Google lets us store, and linking
+      // through it is both useful and how the attribution requirement is
+      // properly met. Older cached entries predate placeId, so fall back to
+      // plain text rather than rendering a dead link.
+      var label = esc(p.name) + ' &middot; ' + fmtMiles(p.miles);
+      if (!p.placeId) return '<li>' + label + '</li>';
+      return '<li><a href="https://www.google.com/maps/place/?q=place_id:' +
+        encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' +
+        label + '</a></li>';
     }).join('');
     return '<li class="walk-cat">' +
       '<div class="walk-cat-top">' +
@@ -87,8 +105,9 @@
       'nothing by ' + (m.noCreditMiles || 1.5) + ' miles, then weighted by how much it ' +
       'matters day to day. Distances are straight-line from the center of ' +
       esc(data.place) + ', not routed walking directions, so treat them as close ' +
-      'estimates. Places data from Google. This is our own estimate, not an official ' +
-      'or licensed walkability rating.</p>';
+      'estimates. This is our own estimate, not an official or licensed walkability ' +
+      'rating.' + checkedLine(data) +
+      '<span class="walk-attrib">Places data from <strong>Google Maps</strong>.</span></p>';
     section.hidden = false;
   }
 

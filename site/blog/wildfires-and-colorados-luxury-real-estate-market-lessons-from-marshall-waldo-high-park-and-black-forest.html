@@ -265,10 +265,22 @@
         (NEARBY_CAT_LABELS[cat] || cat) + ' found.</p>';
       return;
     }
+    // 2026-08-15: names now link to Google Maps via place_id, and the panel
+    // carries a visible "Google Maps" attribution -- it had been rendering
+    // Google Places names with none, which Google's Places policy requires
+    // whenever Places content is displayed without a Google map. Entries
+    // cached before placeId existed fall back to plain text.
     resultsEl.innerHTML = '<ul class="nearby-list">' + items.map(function (p) {
-      return '<li><span class="nearby-name">' + esc(p.name) + '</span>' +
+      var name = esc(p.name);
+      var inner = p.placeId
+        ? '<a href="https://www.google.com/maps/place/?q=place_id:' +
+          encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
+        : name;
+      return '<li><span class="nearby-name">' + inner + '</span>' +
         '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
-    }).join('') + '</ul>';
+    }).join('') + '</ul>' +
+      '<p class="nearby-attrib">Straight-line distances. Places data from ' +
+      '<strong>Google Maps</strong>.</p>';
   }
 
   function fmtPrice(n) {

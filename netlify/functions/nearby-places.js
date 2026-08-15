@@ -89,6 +89,13 @@ async function nearbySearch(origin, placeType, apiKey) {
   const results = json.results || [];
   return results.slice(0, RESULTS_PER_CATEGORY).map((r) => ({
     name: r.name,
+    // 2026-08-15: added alongside the walkability panel. place_id is the one
+    // Places field Google exempts from its caching restrictions, and linking
+    // each result through it to Google Maps is how the attribution
+    // requirement for Places content shown outside a map is properly met --
+    // this panel had been displaying Google place names with no attribution
+    // at all since launch.
+    placeId: r.place_id || null,
     distanceMiles: Number(
       distanceMiles(origin.lat, origin.lng, r.geometry.location.lat, r.geometry.location.lng).toFixed(2)
     ),

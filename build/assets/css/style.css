@@ -619,6 +619,11 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .nearby-list li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #4a4a4c; }
 .nearby-name { flex: 1; }
 .nearby-distance { color: var(--dusty-rose); font-weight: 600; white-space: nowrap; }
+.nearby-name a { color: inherit; text-decoration: underline; text-decoration-color: var(--gray-light); }
+.nearby-name a:hover { color: var(--rose); text-decoration-color: var(--rose); }
+/* Kept clearly legible on purpose -- Places attribution must not be
+   obscured or faded into the background. */
+.nearby-attrib { font-size: 11px; color: #3a3a3c; margin: 10px 0 0; line-height: 1.6; }
 
 /* ---------- Walkability panel (city + subdivision pages) ----------
    2026-08-15 (Christine): "a much more detailed walkability score ... maybe
@@ -652,6 +657,12 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .walk-cat-examples { list-style: none; padding: 0; margin: 8px 0 0; }
 .walk-cat-examples li { font-size: 12px; color: #6a6a6c; line-height: 1.7; }
 .walk-method { font-size: 12px; color: #6a6a6c; line-height: 1.7; margin-top: 20px; }
+/* Google requires Places attribution to be clearly visible and not obscured,
+   so this is a touch darker than the surrounding fine print rather than
+   lighter. */
+.walk-attrib { color: #3a3a3c; }
+.walk-cat-examples a { color: inherit; text-decoration: underline; text-decoration-color: var(--gray-light); }
+.walk-cat-examples a:hover { color: var(--rose); text-decoration-color: var(--rose); }
 .walk-status { font-size: 14px; color: #6a6a6c; }
 @media (max-width: 520px) {
   .walk-headline { gap: 16px; }
