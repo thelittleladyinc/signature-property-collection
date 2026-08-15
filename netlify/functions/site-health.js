@@ -328,7 +328,8 @@ exports.handler = async (event) => {
       detail: (state && state.lastRunError) || "none",
     },
     {
-      name: "Initial catalog crawl",
+      optional: true,
+      name: "Initial catalog crawl (in progress is normal)",
       ok: !!(state && state.bootstrapped),
       detail: state
         ? `${state.bootstrapped ? "Complete" : "Still in progress"} — ${state.totalListingsStored ?? "?"} listing(s) stored so far this pass`
@@ -347,12 +348,22 @@ exports.handler = async (event) => {
         : "CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET — one or more isn't set",
     },
     {
-      name: "Christine's own photos permanently cached",
+      optional: true,
+      name: "Christine's own photos permanently cached (optional)",
       ok: mineCount > 0 && mineCloudinaryCount === mineCount,
-      detail: `${mineCloudinaryCount} of ${mineCount} listing(s) on a permanent Cloudinary photo — the rest are still on raw, expiring MLS Grid links`,
+      // Reworded 2026-08-15: "0 of 11 ... expiring MLS Grid links" was written when
+      // an expiring link meant a blank card. It doesn't anymore -- every listing
+      // photo is served through /listing-photo from this site's own domain, which
+      // resolves a fresh URL per request. A Cloudinary copy is now purely an
+      // optimization, so the row says that instead of implying the photos are down.
+      detail: `${mineCloudinaryCount} of ${mineCount} listing(s) have a permanent Cloudinary copy. ` +
+        `This is an optimization, not a fault: every listing photo is already served ` +
+        `from this site's own domain, so photos work either way. A Cloudinary copy just ` +
+        `saves an MLS Grid lookup per photo.`,
     },
     {
-      name: "No Cloudinary errors on last run",
+      optional: true,
+      name: "No Cloudinary errors on last run (optional)",
       ok: !state || !state.lastCloudinaryError,
       detail: (state && state.lastCloudinaryError) || "none",
     },
@@ -418,7 +429,8 @@ exports.handler = async (event) => {
         "(resolve the MLS media URLs, then actually fetch one) and see which step fails.",
   });
   checks.push({
-    name: "Cloudinary account healthy",
+    optional: true,
+    name: "Cloudinary account healthy (optional)",
     ok: !isCloudinaryConfigured() ? false : (!cloudCheck ? true : !!cloudCheck.ok),
     detail: !isCloudinaryConfigured()
       ? "Cloudinary env vars aren't all set."
@@ -482,7 +494,16 @@ exports.handler = async (event) => {
   }
   checks.push({ name: "Website leads reaching Lofty", ok: loftyOk, detail: loftyDetail });
 
-  const allOk = checks.every((c) => c.ok);
+  // 2026-08-15: some checks describe an OPTIONAL improvement rather than
+  // something broken. Cloudinary is the case that forced this: since the photo
+  // endpoint began serving every listing from this site's own domain, a
+  // Cloudinary copy is a nice-to-have (permanent URLs, fewer MLS Grid calls) and
+  // its absence breaks nothing a visitor can see. Leaving those rows as red X's
+  // told Christine the site was broken when it wasn't -- and a status page that
+  // cries wolf is worse than no status page, because the real red rows stop
+  // standing out.
+  const allOk = checks.every((c) => c.ok || c.optional);
+  const optionalIssues = checks.filter((c) => !c.ok && c.optional).length;
 
   if (wantsJson) {
     return {
@@ -494,7 +515,7 @@ exports.handler = async (event) => {
 
   const rows = checks.map((c) => `
     <tr>
-      <td style="padding:12px 16px;font-size:20px;text-align:center">${c.ok ? "✅" : "❌"}</td>
+      <td style="padding:12px 16px;font-size:20px;text-align:center">${c.ok ? "✅" : (c.optional ? "ℹ️" : "❌")}</td>
       <td style="padding:12px 16px;font-weight:600;white-space:nowrap">${esc(c.name)}</td>
       <td style="padding:12px 16px;color:#555">${esc(c.detail)}</td>
     </tr>`).join("");
@@ -516,7 +537,11 @@ exports.handler = async (event) => {
 </style>
 </head><body><div class="wrap">
 <h1>Signature Property Collection — Site Health</h1>
-<p class="status-line ${allOk ? "ok" : "bad"}">${allOk ? "✅ Everything looks clean." : "⚠️ Something needs attention — see below."}</p>
+<p class="status-line ${allOk ? "ok" : "bad"}">${allOk
+  ? (optionalIssues
+    ? `✅ Nothing is broken. ${optionalIssues} optional improvement(s) noted below (marked ℹ️) — the site works without them.`
+    : "✅ Everything looks clean.")
+  : "⚠️ Something needs attention — see below."}</p>
 <table>${rows}</table>
 <p class="refresh">Checked live just now — reload anytime. This page only reads stored status; it never calls MLS Grid or Cloudinary itself, so checking it is always free. Add <code>?probe=1</code> to live-test the Google APIs and the Lofty key (cached 10 minutes), or <code>?format=json</code> for raw data.</p>
 </div></body></html>`;
