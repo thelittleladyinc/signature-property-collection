@@ -3334,6 +3334,25 @@ def build_about():
 # confirmed -- better to under-link than to guess a URL that might 404 or
 # point at the wrong agent.
 def build_press():
+    # LICENCE COMPLIANCE NOTE (2026-08-14, per Christine)
+    #
+    # The licence sentence below used to read "...license in December 2020
+    # (Wyoming followed in 2021)". That parenthetical has been REMOVED and
+    # must not be reinstated: Christine is NO LONGER LICENSED IN WYOMING.
+    # Stating or implying licensure in a state where one is not licensed is a
+    # real-estate advertising compliance problem, not merely stale copy.
+    #
+    # The trap to watch for: this section is sourced from her NoCo Real
+    # Producers feature (noco_url below), which was accurate when published
+    # and is not accurate now. Anyone refreshing this copy from that article
+    # will be tempted to put it back. Don't.
+    #
+    # Colorado licence #100090441 remains correct and is displayed sitewide,
+    # and every areaServed entry in the schema is a Colorado county. Verified
+    # 2026-08-14: zero occurrences of "Wyoming", "Cheyenne" or a standalone
+    # "WY" anywhere in the built output. Kept as a Python comment rather than
+    # an HTML one so the word never ships into page source, where crawlers
+    # and AI extractors would still read it.
     noco_url = "https://www.realproducersmag.com/locations/noco-real-producers-6bda/articles/-d920f0/"
     bbb_url = "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390"
     body = f"""
@@ -3379,8 +3398,9 @@ def build_press():
       <p class="lede">Before real estate, {SITE['agent'].split()[0]} spent 23 years teaching
       English as a second language, then discovered a passion for sales and customer service
       while working at Thunder Mountain Harley-Davidson. She earned her Colorado real estate
-      license in December 2020 (Wyoming followed in 2021) &mdash; and the results came fast:
+      license in December 2020 &mdash; and the results came fast:
       12 homes her first year, 28 her second.</p>
+
       <p class="lede">&ldquo;From the moment I started, I knew I was home. It's my
       passion,&rdquo; she told NoCo Real Producers magazine.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
