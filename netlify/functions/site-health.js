@@ -494,6 +494,72 @@ exports.handler = async (event) => {
   }
   checks.push({ name: "Website leads reaching Lofty", ok: loftyOk, detail: loftyDetail });
 
+  // ---- Is Christine actually being TOLD about the lead? --------------------
+  // 2026-08-15: added because the answer turned out to be no, twice, while the
+  // row above said the push was fine. Reaching the CRM and reaching HER are two
+  // different things, and only one of them loses business when it breaks.
+  const emailKeySet = !!process.env.RESEND_API_KEY;
+  const lastEmail = loftyLast && loftyLast.emailResult;
+  let emailOk;
+  let emailDetail;
+  if (!emailKeySet) {
+    emailOk = false;
+    emailDetail = "RESEND_API_KEY isn't set, so no lead email is being sent. " +
+      "This is the notification that does not depend on Lofty automations working — " +
+      "add RESEND_API_KEY in Netlify → Site configuration → Environment variables " +
+      "(same key as sellerintelligence uses for the daily digest). Optional extras: " +
+      "LEAD_ALERT_TO to change or add recipients, LEAD_ALERT_FROM once your own domain is verified in Resend.";
+  } else if (!lastEmail || !lastEmail.attempted) {
+    emailOk = true;
+    emailDetail = "The key is set. No lead has come in since — submit any form once and this row " +
+      "will show whether the email actually left.";
+  } else if (lastEmail.ok) {
+    emailOk = true;
+    emailDetail = `Sent to you at ${loftyLast.at} for the lead from "${loftyLast.formName}". ` +
+      "If it isn't in your inbox, check spam — the default sender is Resend's shared " +
+      "onboarding@resend.dev address, which only delivers to the Resend account owner.";
+  } else {
+    emailOk = false;
+    emailDetail = `The lead email FAILED at ${loftyLast.at}: ` +
+      `${lastEmail.httpStatus ? `HTTP ${lastEmail.httpStatus} — ` : ""}` +
+      `${String(lastEmail.response || lastEmail.error || "(no detail)").slice(0, 240)}. ` +
+      "The lead itself is safe (Netlify Forms and Lofty both have it) — this is only the alert.";
+  }
+  checks.push({ name: "New-lead email reaching you", ok: emailOk, detail: emailDetail });
+
+  // The two calls that make a MERGED lead visible in Lofty: a note of its own,
+  // and a tag that genuinely counts as newly added so a Smart Plan re-triggers.
+  const note = loftyLast && loftyLast.noteResult;
+  const tag = loftyLast && loftyLast.tagResult;
+  const parts = [];
+  if (!note || !note.attempted) {
+    parts.push("Timeline note: not attempted yet.");
+  } else if (note.ok) {
+    parts.push("Timeline note: written to the lead ✓.");
+  } else {
+    parts.push(`Timeline note FAILED (${note.httpStatus || note.error || "unknown"}).`);
+  }
+  if (!tag || !tag.attempted) {
+    parts.push("Trigger tag: not attempted yet.");
+  } else if (tag.ok) {
+    parts.push(tag.step === "refired"
+      ? `Trigger tag: removed and re-added, so "Hot Lead - Website" counts as a NEW tag and your Smart Plan fires even for a repeat enquiry ✓.`
+      : `Trigger tag: added to the lead ✓.`);
+  } else if (tag.tagRestored === false) {
+    parts.push(`Trigger tag: the re-add FAILED (${tag.httpStatus || tag.error || "unknown"}) — ` +
+      `the lead is currently missing "Hot Lead - Website". Add it by hand on that lead in Lofty.`);
+  } else {
+    parts.push(`Trigger tag: unchanged, Lofty refused the edit (${tag.httpStatus || tag.error || "unknown"}). ` +
+      "The tag from the original push is still there; only the re-trigger didn't happen.");
+  }
+  checks.push({
+    name: "Lofty lead enriched (note + Smart Plan trigger)",
+    ok: (!note || !note.attempted) ? true : (!!note.ok && (!tag || !tag.attempted || tag.tagRestored !== false)),
+    detail: parts.join(" ") +
+      " These are what make a lead that MERGED into an existing contact still show up — " +
+      "the case that hid your own test submissions, because they used your account-owner email.",
+  });
+
   // 2026-08-15: some checks describe an OPTIONAL improvement rather than
   // something broken. Cloudinary is the case that forced this: since the photo
   // endpoint began serving every listing from this site's own domain, a

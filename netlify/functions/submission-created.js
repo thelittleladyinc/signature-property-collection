@@ -49,11 +49,28 @@
 //      and none named for this website -- so whatever is in LOFTY_API_KEY was
 //      borrowed from another app. site-health can now test the key directly
 //      against /v1.0/me, which is why that endpoint is worth knowing about.
+//
+// 2026-08-15, later that day. Christine built the Smart Plan by hand, tested it
+// twice, and got "didnt work" then "it didnt come through". Then she pointed at
+// the thing that actually settled it: "i have lofty sync with my repo called
+// seller intelligence i think - can you see if that repo has what you need?"
+//
+// That project has been driving this same Lofty account for months and it knew
+// three things this file was only guessing at -- the real notes endpoint, that
+// tags can be rewritten on an existing lead, and that she already has a Resend
+// account. So the notification no longer rests on a CRM automation firing
+// correctly: see lib/_notify.js, and the three calls after the push below.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
 const { postLead, recordPush } = require("./lib/_lofty");
+const { addLoftyNote, refireLoftyTag, sendLeadAlertEmail } = require("./lib/_notify");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
+
+// The tag her Smart Plan is triggered by. Kept in one place because two things
+// depend on it agreeing exactly: the tag written on the new lead, and the
+// remove-then-re-add that makes a repeat enquiry trigger the plan again.
+const TRIGGER_TAG = "Hot Lead - Website";
 
 // Human-friendly source label per form-name, so leads are easy to tell apart
 // inside Lofty. Falls back to the raw form name for anything not listed.
@@ -116,7 +133,7 @@ exports.handler = async (event) => {
     // distinct, sortable label rather than a note: a tag can be filtered, saved
     // as a smart list, and used as a Smart Plan trigger, so it can drive a real
     // notification instead of sitting in a timeline nobody opens.
-    body.tags = ["Hot Lead - Website", "Website Lead", formName];
+    body.tags = [TRIGGER_TAG, "Website Lead", formName];
     // Every note starts with this, so even a merged lead's activity timeline shows
     // at a glance that a NEW website enquiry came in and when.
     const stamp = new Date().toLocaleString("en-US", {
@@ -184,20 +201,57 @@ exports.handler = async (event) => {
     let store = null;
     try { store = getBlobStore(getStore, DIAG_STORE); } catch (e) { store = null; }
 
+    let json = {};
+    try { json = JSON.parse(result.responseBody || "{}"); } catch (e) { json = {}; }
+    // POST /leads returns the lead id whether it CREATED a contact or merged into
+    // an existing one -- Christine's 16:48 test proved that, coming back with
+    // 1147334685108095 for a contact that already existed. That is what makes the
+    // follow-up calls below possible without having to search Lofty by email
+    // (which its API offers no way to do -- sellerintelligence pages all ~20k
+    // leads to find one, far too slow for a form handler).
+    const leadId = json?.data?.leadId ?? json?.data?.id ?? json?.leadId ?? json?.id ?? null;
+
+    // ---- The notification, in the order that matters -------------------------
+    // The email goes out UNCONDITIONALLY -- before the note, before the tag, and
+    // whether or not the push above succeeded. It is the only step that still
+    // works when Lofty is down, when the lead merged into an existing contact,
+    // and when the Smart Plan is misconfigured, so nothing that can fail is
+    // allowed in front of it. This is the answer to "i want to be notified
+    // immediatly".
+    //
+    // It does sit after the create call, because that call is what yields the
+    // leadId for the "Open this lead in Lofty" link -- but a failed create
+    // doesn't stop it, which is the property that matters.
+    const stampedSource = SOURCE_LABELS[formName] || formName;
+    const emailResult = await sendLeadAlertEmail({
+      name: data.name, email: data.email, phone: data.phone,
+      source: stampedSource,
+      // The long labels all start with the site name; the subject line doesn't
+      // need it repeated.
+      sourceShort: stampedSource.replace("Signature Property Collection - ", ""),
+      noteText: body.notes, leadId, stamp: `${stamp} MT`,
+    });
+
     if (!result.ok) {
       console.error(`Lofty API ${result.httpStatus} (payload shape "${result.payloadShape}"): ${result.responseBody}`);
-      // The lead is queued for retry by the next sync run and is also sitting in
-      // Netlify Forms, so nothing is lost. Still returns 200: failing here would
-      // not help the visitor, whose submission already succeeded.
-      if (store) await recordPush(store, result, formName, body);
+      // The lead is queued for retry by the next sync run, is sitting in Netlify
+      // Forms, and -- new as of this change -- has already been emailed to her.
+      // Still returns 200: failing here would not help the visitor, whose
+      // submission already succeeded.
+      if (store) await recordPush(store, { ...result, emailResult }, formName, body);
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
-    let json = {};
-    try { json = JSON.parse(result.responseBody || "{}"); } catch (e) { json = {}; }
-    const leadId = json?.data?.leadId ?? json?.data?.id ?? json?.leadId ?? json?.id ?? null;
     console.log(`Pushed lead to Lofty${leadId ? ` (leadId ${leadId})` : ""} from form "${formName}" (${result.payloadShape} payload).`);
-    if (store) await recordPush(store, { ...result, leadId }, formName, body);
+
+    // The note as its own call, because a merge has no reason to overwrite an
+    // existing contact's fields -- which is why her repeat tests left no trace.
+    const noteResult = leadId ? await addLoftyNote(leadId, body.notes, apiKey) : { attempted: false };
+    // And make the trigger tag a real CHANGE, so the Smart Plan fires on a
+    // returning buyer's second enquiry and not only their first.
+    const tagResult = leadId ? await refireLoftyTag(leadId, TRIGGER_TAG, apiKey) : { attempted: false };
+
+    if (store) await recordPush(store, { ...result, leadId, emailResult, noteResult, tagResult }, formName, body);
     return { statusCode: 200, body: "ok" };
   } catch (err) {
     console.error("submission-created function error:", err);
