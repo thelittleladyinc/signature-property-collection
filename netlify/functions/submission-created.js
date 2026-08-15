@@ -11,8 +11,85 @@
 // If LOFTY_API_KEY isn't set, this function no-ops rather than failing --
 // the Netlify Forms submission itself (Christine's fallback inbox) always
 // succeeds independently of this function.
+//
+// 2026-08-15 (Christine: "i filled out a form earlier and nothing got pushed ot
+// lofty", with her Lofty dashboard showing 0 new leads). Checked her real site
+// through Netlify's API: the contact form has submission_count 1 with
+// last_submission_at 13:55 UTC that same day, so Netlify captured the lead
+// perfectly and the break was here, between Netlify and Lofty.
+//
+// The reason nobody could tell WHICH break it was: this function caught the
+// failure, logged it, and returned 200. Correct for the visitor -- their
+// submission is safely in Netlify Forms either way -- but it meant a broken
+// integration looked identical to a working one from the outside. Same class of
+// invisible failure as the stalled sync and the expired photo URLs. Three fixes:
+//
+//   1. The result of every push is written to Blobs and shown on /site-health,
+//      including Lofty's own HTTP status and the first part of its response
+//      body. That is what says whether this is a bad key, a rejected field, or
+//      an endpoint that moved.
+//   2. A failed push is QUEUED with the full lead payload (capped, newest kept)
+//      so a lead is never lost to an outage and can be replayed once the cause
+//      is fixed, instead of asking Christine to re-type it out of the Netlify
+//      dashboard.
+//   3. Lofty documents two auth styles -- an API key from Settings >
+//      Integrations > API, and OAuth 2.0 bearer tokens -- and its docs aren't
+//      reachable from this build environment to confirm which one an API key
+//      wants. So the request is tried as "token <key>" (the style inherited
+//      from Christine's sellerintelligence project) and, ONLY if that returns
+//      401/403, retried once as "Bearer <key>". Which style worked is recorded,
+//      so this can be pinned to the single correct one rather than left
+//      guessing forever. A 401 means the first attempt failed anyway, so the
+//      retry costs nothing and can't mask a working path.
+const { getStore } = require("@netlify/blobs");
+const { getBlobStore } = require("./lib/_mls-shared");
 
 const LOFTY_BASE_URL = "https://api.lofty.com/v1.0";
+const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
+const LAST_PUSH_KEY = "lofty-last-push.json";
+const FAILED_PUSH_KEY = "lofty-failed-pushes.json";
+const MAX_QUEUED_FAILURES = 25;
+
+// Posts the lead, trying the API-key header style first and the OAuth bearer
+// style only on an auth rejection. Returns everything the caller needs to record
+// what happened.
+async function postLead(body, apiKey) {
+  const styles = [
+    { style: "token", value: `token ${apiKey}` },
+    { style: "bearer", value: `Bearer ${apiKey}` },
+  ];
+  let last = null;
+  for (const attempt of styles) {
+    const res = await fetch(`${LOFTY_BASE_URL}/leads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": attempt.value },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text().catch(() => "");
+    last = { ok: res.ok, httpStatus: res.status, authStyle: attempt.style, responseBody: text.slice(0, 500) };
+    if (res.ok) return last;
+    // Anything other than an auth rejection is a real answer from Lofty (a
+    // rejected field, a moved endpoint) -- retrying with a different header
+    // would only obscure it.
+    if (res.status !== 401 && res.status !== 403) return last;
+  }
+  return last;
+}
+
+async function recordPush(result, formName) {
+  try {
+    const store = getBlobStore(getStore, DIAG_STORE);
+    await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, ...result });
+    if (!result.ok) {
+      const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
+      queue.unshift({ at: new Date().toISOString(), formName, ...result });
+      await store.setJSON(FAILED_PUSH_KEY, queue.slice(0, MAX_QUEUED_FAILURES));
+    }
+  } catch (err) {
+    // Diagnostics must never be the reason a lead push fails.
+    console.error("could not record Lofty push result:", err && err.message);
+  }
+}
 
 // Human-friendly source label per form-name, so leads are easy to tell apart
 // inside Lofty. Falls back to the raw form name for anything not listed.
@@ -112,26 +189,22 @@ exports.handler = async (event) => {
       body.tags.push("Neighborhood Quiz");
     }
 
-    const res = await fetch(`${LOFTY_BASE_URL}/leads`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `token ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const result = await postLead(body, apiKey);
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.error(`Lofty API ${res.status}: ${text.slice(0, 500)}`);
-      // Still return 200 — the Netlify Forms submission already succeeded
-      // and is sitting in the dashboard; don't make that fail on Lofty's account.
-      return { statusCode: 200, body: "ok (lofty push failed, see function logs)" };
+    if (!result.ok) {
+      console.error(`Lofty API ${result.httpStatus} (auth style "${result.authStyle}"): ${result.responseBody}`);
+      // The lead itself is queued by recordPush() and is also sitting in
+      // Netlify Forms, so nothing is lost. Still returns 200: failing here
+      // would not help the visitor, whose submission already succeeded.
+      await recordPush({ ...result, lead: body }, formName);
+      return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
-    const json = await res.json().catch(() => ({}));
+    let json = {};
+    try { json = JSON.parse(result.responseBody || "{}"); } catch (e) { json = {}; }
     const leadId = json?.data?.leadId ?? json?.data?.id ?? json?.leadId ?? json?.id ?? null;
-    console.log(`Pushed lead to Lofty${leadId ? ` (leadId ${leadId})` : ""} from form "${formName}".`);
+    console.log(`Pushed lead to Lofty${leadId ? ` (leadId ${leadId})` : ""} from form "${formName}" using the "${result.authStyle}" auth style.`);
+    await recordPush({ ...result, leadId }, formName);
     return { statusCode: 200, body: "ok" };
   } catch (err) {
     console.error("submission-created function error:", err);

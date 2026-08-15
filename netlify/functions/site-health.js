@@ -31,6 +31,11 @@ const { isCloudinaryConfigured } = require("./lib/_cloudinary");
 // stay read-only / dependency-light.
 const SUSPENSION_KEY = "mlsgrid-suspension.json";
 const GOOGLE_CHECK_KEY = "google-api-check.json";
+// Written by submission-created.js on every website-lead push. See that file's
+// 2026-08-15 note: a broken Lofty integration used to look exactly like a
+// working one from outside, which is how a real form submission went missing.
+const LOFTY_LAST_PUSH_KEY = "lofty-last-push.json";
+const LOFTY_FAILED_PUSH_KEY = "lofty-failed-pushes.json";
 const GOOGLE_CHECK_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_PROBE_TIMEOUT_MS = 6000;
 
@@ -91,11 +96,13 @@ exports.handler = async (event) => {
   const params = (event && event.queryStringParameters) || {};
   const wantsJson = params.format === "json";
 
-  const [state, mine, suspension, cachedGoogle] = await Promise.all([
+  const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed] = await Promise.all([
     store.get(SYNC_STATE_KEY, { type: "json" }),
     store.get(MINE_LISTINGS_KEY, { type: "json" }),
     store.get(SUSPENSION_KEY, { type: "json" }),
     store.get(GOOGLE_CHECK_KEY, { type: "json" }).catch(() => null),
+    store.get(LOFTY_LAST_PUSH_KEY, { type: "json" }).catch(() => null),
+    store.get(LOFTY_FAILED_PUSH_KEY, { type: "json" }).catch(() => null),
   ]);
 
   // ---- Google key check (opt-in, cached) ----
@@ -217,13 +224,39 @@ exports.handler = async (event) => {
         : ""),
   });
 
+  // ---- Website leads reaching Lofty ----
+  const loftyKeySet = !!process.env.LOFTY_API_KEY;
+  const failedCount = Array.isArray(loftyFailed) ? loftyFailed.length : 0;
+  let loftyDetail;
+  let loftyOk;
+  if (!loftyKeySet) {
+    loftyOk = false;
+    loftyDetail = "LOFTY_API_KEY isn't set — website leads stay in Netlify Forms only.";
+  } else if (!loftyLast) {
+    loftyOk = true;
+    loftyDetail = "No website lead has been submitted since this check was added " +
+      "(2026-08-15). Submit any form once and this row will show exactly what Lofty said.";
+  } else if (loftyLast.ok) {
+    loftyOk = failedCount === 0;
+    loftyDetail = `Last lead from "${loftyLast.formName}" reached Lofty at ${loftyLast.at}` +
+      `${loftyLast.leadId ? ` (lead ${loftyLast.leadId})` : ""}, using the "${loftyLast.authStyle}" auth style.` +
+      (failedCount ? ` ${failedCount} earlier push(es) failed and are queued.` : "");
+  } else {
+    loftyOk = false;
+    loftyDetail = `Last lead from "${loftyLast.formName}" FAILED at ${loftyLast.at}: ` +
+      `Lofty returned HTTP ${loftyLast.httpStatus} (tried the "${loftyLast.authStyle}" auth style). ` +
+      `Lofty said: ${String(loftyLast.responseBody || "(empty response)").slice(0, 240)}. ` +
+      `${failedCount} lead(s) queued and recoverable — nothing is lost, the submissions are also in Netlify Forms.`;
+  }
+  checks.push({ name: "Website leads reaching Lofty", ok: loftyOk, detail: loftyDetail });
+
   const allOk = checks.every((c) => c.ok);
 
   if (wantsJson) {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google } }, null, 2),
+      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed } }, null, 2),
     };
   }
 
