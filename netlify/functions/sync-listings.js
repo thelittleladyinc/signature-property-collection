@@ -407,7 +407,7 @@ async function refreshOneListing(listingId, listingsById, store, token, startedA
   const previouslyStored = listingsById[mapped.listingId];
   const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, photoDeadlineMs);
   mapped.photosRefreshedAt = new Date().toISOString();
-  listingsById[mapped.listingId] = mapped;
+  listingsById[mapped.listingId] = slimForStorage(mapped);
   return { refreshed: true, cached: photosCached > 0, photosCached };
 }
 
@@ -516,7 +516,7 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
           await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle);
         }
         mapped.photosRefreshedAt = new Date().toISOString();
-        listingsById[mapped.listingId] = mapped;
+        listingsById[mapped.listingId] = slimForStorage(mapped);
         if (isNew) found += 1;
       }
       url = json["@odata.nextLink"] || null;
@@ -525,6 +525,88 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
     console.warn(`sync-listings: office-wide discovery exception: ${err && err.message}`);
   }
   return { found };
+}
+
+// ---------------------------------------------------------------------------
+// 2026-08-15 -- WHY THE SYNC STOPPED COMPLETING AT ALL.
+//
+// Site health showed: last successful run frozen at 11:01Z, lastRunError null,
+// lastRunPagesFetched 1, and 18,925 listings stored. Those together point at
+// one thing: saveAll() loads the ENTIRE listing store into memory and writes
+// the whole object back on every single run. At ~19k records each carrying
+// PublicRemarks (often 1-2KB) plus a full photos[] array, that blob had grown
+// into the tens of megabytes. Parsing, mutating and re-serialising it stopped
+// fitting inside the function's wall clock -- and it dies BEFORE the line that
+// records lastRunAt/lastRunError, which is exactly why the failure was
+// invisible: the last numbers you can see are from the last run that survived.
+//
+// Two size reductions, both chosen so nothing a visitor can see changes:
+//
+//   1. `remarks` is dropped for listings that aren't Christine's. Verified
+//      unused in the UI -- nothing in build.py renders it. Its ONLY consumer is
+//      the waterfront keyword test in matchesQuery(), so that test is
+//      pre-computed into the boolean `waterfront` here and the raw text is
+//      discarded. Biggest single win: remarks are the largest field by far.
+//   2. `photos[]` is dropped for listings that aren't Christine's, keeping the
+//      cover `photo` and a `photoCount`. listings-search.js already sends only
+//      those two to the browser, never the array. And for other brokers'
+//      listings the array is dead weight regardless -- those are raw MLS Grid
+//      URLs, which are single-use, expire in an hour, and which MLS Grid's own
+//      docs forbid putting on a website. Only Christine's listings get
+//      Cloudinary-rehosted, so only hers need the array kept.
+//
+// Christine's own listings are never slimmed, so nothing about her own
+// inventory, photos or galleries is affected.
+function slimForStorage(mapped) {
+  if (isHerListing(mapped)) return mapped;
+
+  const remarks = (mapped.remarks || "").toLowerCase();
+  const waterfrontByKeyword = remarks.includes("riverfront") ||
+    remarks.includes("river frontage") || remarks.includes("waterfront");
+
+  const slim = { ...mapped };
+  slim.waterfront = mapped.waterfront === true || waterfrontByKeyword || null;
+  delete slim.remarks;
+
+  if (Array.isArray(slim.photos)) {
+    slim.photoCount = slim.photos.length;
+    slim.photo = slim.photo || slim.photos[0] || null;
+    delete slim.photos;
+  }
+  // Always null on this IRES feed (see SELECT_FIELDS' history in
+  // _mls-shared.js) -- storing 19k nulls costs bytes for nothing.
+  delete slim.officeName;
+  delete slim.agentPhone;
+  delete slim.agentEmail;
+  return slim;
+}
+
+// One-time (per run) cleanup of what's ALREADY stored, so the blob shrinks on
+// the first run that completes rather than only as the crawl happens to
+// re-reach each record -- which at 50 records per run would take months.
+// Applies the same slimming as above, and drops out-of-area listings when
+// OPERATING_COUNTIES is set (never Christine's own -- same rule as everywhere
+// else in this file).
+function pruneAndSlimStore(listingsById) {
+  let slimmed = 0;
+  let dropped = 0;
+  for (const id of Object.keys(listingsById)) {
+    const l = listingsById[id];
+    if (!l) { delete listingsById[id]; continue; }
+    if (OPERATING_COUNTIES.size > 0 && l.county && !OPERATING_COUNTIES.has(l.county) && !isHerListing(l)) {
+      delete listingsById[id];
+      dropped += 1;
+      continue;
+    }
+    if (!isHerListing(l) && (l.remarks || Array.isArray(l.photos))) {
+      listingsById[id] = slimForStorage(l);
+      slimmed += 1;
+    }
+  }
+  if (slimmed || dropped) {
+    console.log(`sync-listings: store cleanup — slimmed ${slimmed}, dropped ${dropped} out-of-area listing(s).`);
+  }
+  return { slimmed, dropped };
 }
 
 // 2026-08-15: caches cover photos for Christine's OWN listings ahead of
@@ -611,6 +693,9 @@ exports.handler = async () => {
   };
 
   let listingsById = (await store.get(LISTINGS_KEY, { type: "json" })) || {};
+  // Shrink what's already stored before doing anything else -- see
+  // pruneAndSlimStore's comment. Cheap (pure in-memory) and idempotent.
+  pruneAndSlimStore(listingsById);
 
   let lastRunError = null;
   let httpErrorOccurred = false;
@@ -782,7 +867,7 @@ exports.handler = async () => {
               coverPhotosCached += photosCached;
             }
             mapped.photosRefreshedAt = new Date().toISOString();
-            listingsById[mapped.listingId] = mapped;
+            listingsById[mapped.listingId] = slimForStorage(mapped);
           }
           if (mapped.modificationTimestamp &&
             (!maxModTimestampThisPass || mapped.modificationTimestamp > maxModTimestampThisPass)) {
