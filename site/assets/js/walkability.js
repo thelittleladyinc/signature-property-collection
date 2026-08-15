@@ -109,6 +109,12 @@
       'rating.' + checkedLine(data) +
       '<span class="walk-attrib">Places data from <strong>Google Maps</strong>.</span></p>';
     section.hidden = false;
+    // The sitewide scroll-reveal script tags every <section> with .reveal
+    // (opacity: 0) and only clears it when its own observer fires. This section
+    // ships [hidden], so that observer had nothing to observe while we were
+    // waiting on data -- rather than depend on it firing correctly afterwards,
+    // mark this section revealed ourselves. Harmless if the class isn't there.
+    section.classList.add('is-visible');
   }
 
   function load() {

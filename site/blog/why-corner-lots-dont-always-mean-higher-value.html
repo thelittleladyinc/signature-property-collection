@@ -79,9 +79,9 @@
   <div class="wrap">
     <a class="item" href="https://g.page/r/CZbs8kiTCII_EBM" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>158 Five-Star Google Reviews</a>
     <span class="divider">&middot;</span>
-    <span class="item">250+ Homes Sold</span>
+    <span class="item">250+ Homes Sold As A Team</span>
     <span class="divider">&middot;</span>
-    <span class="item">$200M+ In Sales Volume</span>
+    <span class="item">$200M+ Combined Volume</span>
     <span class="divider">&middot;</span>
     <span class="item">RealTrends Top 0.5% Nationwide</span>
   </div>
@@ -474,7 +474,16 @@ document.addEventListener('keydown', function (e) {
         io.unobserve(entry.target);
       }
     });
-  }, { threshold: .1, rootMargin: '0px 0px -80px 0px' });
+    // threshold 0, NOT .1 -- 2026-08-15 (Christine: "nothing in blog at all").
+    // A ratio threshold is a trap for tall sections: 10% of the blog index's
+    // single 8,190px section is 819px, so the reveal could only ever fire on a
+    // browser window taller than that. On any laptop viewport shorter than
+    // ~819px -- which is most of them once browser chrome is subtracted -- the
+    // entire 58-post archive stayed at opacity 0 forever, with no error and
+    // nothing in the console. It "worked" for anyone with a tall enough window,
+    // which is why it survived this long. threshold 0 fires on the first
+    // intersecting pixel and cannot be defeated by section height.
+  }, { threshold: 0, rootMargin: '0px 0px -80px 0px' });
   targets.forEach(function (el) { io.observe(el); });
 })();
 </script>

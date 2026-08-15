@@ -1712,7 +1712,8 @@ HOME_FAQ = [
     ("Who is the best luxury real estate agent in Loveland, Berthoud, and Masonville?",
      f"{SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a "
      f"luxury real estate agent based in Loveland, serving Berthoud, Masonville, and the "
-     f"rest of Larimer County with 200+ homes sold and expertise in luxury "
+     f"rest of Larimer County with 150+ homes sold personally (250+ as a duo with "
+     f"Kendra Bajcar) and expertise in luxury "
      f"marketing and negotiation."),
     ("What areas does Signature Property Collection serve?",
      f"{SITE['agent']} and {SITE['name']} serve Northern Colorado's Larimer, Weld, and "
@@ -1772,7 +1773,10 @@ def nav_html(active=None):
 # 2026-08-14 (later still, per Christine's official "Signature Listing
 # Strategy" brochure): reviews/homes/volume updated from Christine's solo
 # figures to her and Kendra Bajcar's combined-team numbers (158 reviews,
-# 250+ homes, $200M+ volume) -- Christine confirmed $200M+ is their real
+# 250+ homes, $200M+ volume) -- Christine confirmed 2026-08-15 that 250+ is
+# the COMBINED duo figure with Kendra Bajcar, and that she personally has sold
+# 150+. Both numbers are real; they are not interchangeable, and anything
+# stated about Christine alone uses 150+. Christine confirmed $200M+ is their real
 # joint total, not a solo figure (an earlier pass here had briefly used
 # the brochure's more conservative $100M+ before she corrected it).
 #
@@ -1793,9 +1797,9 @@ def _trust_ribbon_html():
   <div class="wrap">
     <a class="item" href="{GOOGLE_REVIEWS_URL}" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>158 Five-Star Google Reviews</a>
     <span class="divider">&middot;</span>
-    <span class="item">250+ Homes Sold</span>
+    <span class="item">250+ Homes Sold As A Team</span>
     <span class="divider">&middot;</span>
-    <span class="item">$200M+ In Sales Volume</span>
+    <span class="item">$200M+ Combined Volume</span>
     <span class="divider">&middot;</span>
     <span class="item">RealTrends Top 0.5% Nationwide</span>
   </div>
@@ -1826,7 +1830,16 @@ def _scroll_reveal_script():
         io.unobserve(entry.target);
       }
     });
-  }, { threshold: .1, rootMargin: '0px 0px -80px 0px' });
+    // threshold 0, NOT .1 -- 2026-08-15 (Christine: "nothing in blog at all").
+    // A ratio threshold is a trap for tall sections: 10% of the blog index's
+    // single 8,190px section is 819px, so the reveal could only ever fire on a
+    // browser window taller than that. On any laptop viewport shorter than
+    // ~819px -- which is most of them once browser chrome is subtracted -- the
+    // entire 58-post archive stayed at opacity 0 forever, with no error and
+    // nothing in the console. It "worked" for anyone with a tall enough window,
+    // which is why it survived this long. threshold 0 fires on the first
+    // intersecting pixel and cannot be defeated by section height.
+  }, { threshold: 0, rootMargin: '0px 0px -80px 0px' });
   targets.forEach(function (el) { io.observe(el); });
 })();
 </script>"""
@@ -2273,7 +2286,7 @@ def build_home():
 <section class="tight">
   <div class="wrap">
     <span class="eyebrow">{SITE['agent']}</span>
-    <h2 class="section-title">With 250+ homes sold and $200M+ in combined sales volume</h2>
+    <h2 class="section-title">With 250+ homes sold as a team and $200M+ in combined sales volume</h2>
     <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, {SITE['agent']} and
     Signature Property Collection represent Northern Colorado's luxury tier exclusively — the
     estate homes, acreage, and architecturally distinct properties that a generalist local search
@@ -2690,7 +2703,8 @@ def build_city_pages():
       <span class="eyebrow" style="color:var(--dusty-rose)">Meet {esc(SITE['agent'])}</span>
       <h2 class="section-title">Your {esc(city)} Luxury Real Estate Agent</h2>
       <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 250+
-      homes sold and $200M+ in combined sales volume across Northern Colorado's luxury tier. A
+      homes sold as a duo and $200M+ in combined sales volume across Northern Colorado's luxury
+      tier. A
       Certified Negotiation Specialist and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
       represents estate homes, acreage, and architecturally significant properties in and
       around {esc(city)}.</p>
@@ -2826,7 +2840,7 @@ def build_city_pages():
             faq_pairs = [
                 (f"Who is the best real estate agent in {city}, CO?",
                  f"{SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a luxury real "
-                 f"estate agent serving {city} and the rest of {c['name']} — with 200+ homes "
+                 f"estate agent serving {city} and the rest of {c['name']} — with 150+ homes "
                  f"sold across Northern Colorado's Larimer, Weld, and Boulder County "
                  f"Front Range."),
                 (f"Does {SITE['agent']} work with buyers and sellers in {city}?",
@@ -2914,7 +2928,7 @@ def build_about():
     <div class="card">
       <h3>By The Numbers</h3>
       <p>&#9733;&#9733;&#9733;&#9733;&#9733; 158 Five-Star Reviews on Google<br>
-      250+ Homes Sold &amp; $200M+ in Combined Sales Volume<br>
+      250+ Homes Sold &amp; $200M+ in Sales Volume &mdash; combined with Kendra Bajcar<br>
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
@@ -6135,7 +6149,8 @@ def build_nav_pages():
     <span class="eyebrow" style="color:var(--dusty-rose)">The Track Record</span>
     <h1>Past Sales In Northern Colorado</h1>
     <p class="lede">From luxury estates to acreage properties and everything in between,
-    {SITE['agent']} has sold 200+ homes across Northern Colorado — delivering
+    {SITE['agent']} has sold 150+ homes across Northern Colorado herself, 250+ as a
+    duo with Kendra Bajcar — delivering
     top-dollar results and seamless transactions for clients throughout the Front Range.</p>
     <p class="lede">Looking for current inventory? <a href="/search-homes.html"
     style="text-decoration:underline">Search live, active IRES MLS listings</a> across
@@ -6896,7 +6911,7 @@ def build_llms_txt(paths):
 
 > {SITE['agent']} is a luxury real estate agent with {SITE['brokerage']}, serving
 > Northern Colorado's Larimer, Weld, and Boulder County Front Range — with priority
-> focus on Loveland, Berthoud, Masonville, and Fort Collins. 250+ homes sold, $200M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
+> focus on Loveland, Berthoud, Masonville, and Fort Collins. 150+ homes sold personally and 250+ as a duo with Kendra Bajcar, $200M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
 > Phone: {SITE['phone']}. Email: {SITE['email']}.
 > Last updated: {BUILD_DATE}.
 
@@ -6930,7 +6945,7 @@ def build_llms_txt(paths):
 {tool_lines}
 
 ## Why choose Signature Property Collection
-- 250+ homes sold and $200M+ in combined sales volume across Northern Colorado
+- 150+ homes sold personally; 250+ and $200M+ in sales volume combined with Kendra Bajcar
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
 - Certified Negotiation Specialist and Luxury Home Marketing Expert
 - Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
