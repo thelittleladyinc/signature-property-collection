@@ -29,6 +29,10 @@ const SOURCE_LABELS = {
   // their own real lead-capture forms (previously they only linked out to
   // /contact.html) -- see build.py build_buyers()/build_sellers().
   "buyers-page-inquiry": "Signature Property Collection - Buyers Page Inquiry",
+  // 2026-08-15: the "Email Me New Matches" button on every search widget. See
+  // the alert_criteria block below -- this is the lead type that should get a
+  // Lofty Property Alert turned on.
+  "listing-alert-request": "Signature Property Collection - Listing Alert Request (saved search)",
   "sellers-page-inquiry": "Signature Property Collection - Sellers Page Inquiry (Home Valuation)",
 };
 
@@ -59,7 +63,29 @@ exports.handler = async (event) => {
     if (data.phone) body.phones = [data.phone];
     body.source = SOURCE_LABELS[formName] || `Signature Property Collection - ${formName}`;
     body.tags = ["Website Lead", formName];
-    if (data.listing_address) {
+    if (formName === "listing-alert-request") {
+      // 2026-08-15 (Christine: "we have the lofty api that connects to my
+      // emails - review it"). Reviewed: Lofty's own Property Alerts -- a Smart
+      // Plan carrying saved search criteria -- already send listing alerts from
+      // her CRM, branded, tracked against the lead, with unsubscribe handled.
+      // That's strictly better than adding a transactional email provider and
+      // rebuilding a worse version of it, so this pushes the buyer's actual
+      // search into Lofty as a lead instead.
+      //
+      // alert_criteria is the search in plain English (what she reads);
+      // alert_query is the exact query string, so the same search can be
+      // reproduced on the site or pasted into a Smart Plan's criteria.
+      //
+      // Deliberately does NOT try to create the Property Alert over the API:
+      // Lofty's API docs weren't reachable from the build environment, so the
+      // endpoint couldn't be verified, and a guessed endpoint would fail
+      // silently -- the worst outcome for a lead-capture path. The lead arrives
+      // tagged and ready; switching the alert on is one step in Lofty.
+      body.notes = `Wants email alerts for new listings matching: ${data.alert_criteria || "(no filters — all new listings)"}` +
+        (data.alert_query ? `\nReproduce this search: https://signaturepropertycollection.com/search-homes.html?${data.alert_query}` : "") +
+        (data.message ? `\nAlso said: "${data.message}"` : "");
+      body.tags.push("Property Alert Request", "Saved Search");
+    } else if (data.listing_address) {
       // From the Current Listings page's Ask A Question / Request A Tour
       // buttons (netlify/functions/listings-search.js + build_current_listings()).
       const kind = data.inquiry_type === "Tour" ? "Requested a tour" : "Asked a question";

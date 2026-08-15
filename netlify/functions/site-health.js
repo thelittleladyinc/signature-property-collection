@@ -1,10 +1,25 @@
 // Human-readable "is everything actually working" status page — one URL
 // Christine can bookmark and check herself instead of both of us running
 // ad-hoc ?debug=true fetches back and forth every time something seems
-// off. Read-only: this never talks to MLS Grid or Cloudinary itself, it
-// only reads what sync-listings.js already wrote to Blobs on its last
+// off. Read-only by default: it never talks to MLS Grid or Cloudinary itself,
+// it only reads what sync-listings.js already wrote to Blobs on its last
 // scheduled run — so loading this page is free and can never cost API
 // quota, trigger a request, or interfere with the suspension breaker.
+//
+// ONE EXCEPTION, added 2026-08-15 (Christine: "can you confirm that google maps
+// is correct api set correct for me?"). Nobody can answer that by reading code:
+// the key lives in Netlify's env vars and which APIs are enabled lives in her
+// Google Cloud project. So ?google=1 runs two real, tiny probes against her key
+// — one Geocoding request and one Places request — and reports Google's own
+// status and error_message verbatim, which is the part that actually says which
+// API to turn on ("This API project is not authorized to use this API",
+// "REQUEST_DENIED", "API key not valid", and so on).
+//
+// Kept honest about cost: opt-in only (the default page still makes zero
+// outbound calls), the result is cached in Blobs for GOOGLE_CHECK_TTL_MS so
+// refreshing the page doesn't re-spend quota, and two requests is far inside
+// the free tier either way. The key itself is never printed — only whether it
+// works.
 const { getStore } = require("@netlify/blobs");
 const {
   SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore,
@@ -15,6 +30,55 @@ const { isCloudinaryConfigured } = require("./lib/_cloudinary");
 // than exported since it's a single literal string and this file should
 // stay read-only / dependency-light.
 const SUSPENSION_KEY = "mlsgrid-suspension.json";
+const GOOGLE_CHECK_KEY = "google-api-check.json";
+const GOOGLE_CHECK_TTL_MS = 10 * 60 * 1000;
+const GOOGLE_PROBE_TIMEOUT_MS = 6000;
+
+// Christine's own business address (SITE['address'] in build.py) and a point in
+// Loveland — real inputs, so a success genuinely proves the API works rather
+// than proving a placeholder round-trips.
+const GEOCODE_PROBE_ADDRESS = "2411 Glade Rd, Loveland, CO";
+const PLACES_PROBE_LATLNG = "40.3978,-105.0748";
+
+// Probes the two Google APIs this site actually uses. Returns a plain,
+// printable result per API: ok, Google's status, and Google's own message.
+async function probeGoogle(apiKey) {
+  const out = { checkedAt: new Date().toISOString() };
+
+  async function call(label, url) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_PROBE_TIMEOUT_MS) });
+      if (!res.ok) return { ok: false, status: `HTTP ${res.status}`, message: "" };
+      const json = await res.json();
+      // Google returns 200 with a status field even when the key is wrong, which
+      // is exactly why checking the HTTP code alone tells you nothing.
+      const okStatuses = ["OK", "ZERO_RESULTS"];
+      return {
+        ok: okStatuses.includes(json.status),
+        status: json.status || "unknown",
+        message: json.error_message || "",
+      };
+    } catch (err) {
+      return { ok: false, status: "request failed", message: (err && err.message) || "" };
+    }
+  }
+
+  out.geocoding = await call(
+    "geocoding",
+    "https://maps.googleapis.com/maps/api/geocode/json?address=" +
+      encodeURIComponent(GEOCODE_PROBE_ADDRESS) + "&key=" + encodeURIComponent(apiKey),
+  );
+  // Same legacy Places endpoint nearby-places.js and walkability.js use, so this
+  // tests the API those features actually call -- not a different Places
+  // product that might be enabled while theirs isn't.
+  out.places = await call(
+    "places",
+    "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=" +
+      encodeURIComponent(PLACES_PROBE_LATLNG) + "&rankby=distance&type=cafe&key=" +
+      encodeURIComponent(apiKey),
+  );
+  return out;
+}
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
@@ -27,11 +91,23 @@ exports.handler = async (event) => {
   const params = (event && event.queryStringParameters) || {};
   const wantsJson = params.format === "json";
 
-  const [state, mine, suspension] = await Promise.all([
+  const [state, mine, suspension, cachedGoogle] = await Promise.all([
     store.get(SYNC_STATE_KEY, { type: "json" }),
     store.get(MINE_LISTINGS_KEY, { type: "json" }),
     store.get(SUSPENSION_KEY, { type: "json" }),
+    store.get(GOOGLE_CHECK_KEY, { type: "json" }).catch(() => null),
   ]);
+
+  // ---- Google key check (opt-in, cached) ----
+  const googleKey = process.env.GOOGLE_MAPS_API_KEY;
+  const wantsGoogle = params.google === "1" || params.google === "true";
+  let google = cachedGoogle;
+  const googleFresh = google && google.checkedAt &&
+    Date.now() - Date.parse(google.checkedAt) < GOOGLE_CHECK_TTL_MS;
+  if (wantsGoogle && googleKey && !googleFresh) {
+    google = await probeGoogle(googleKey);
+    await store.setJSON(GOOGLE_CHECK_KEY, google).catch(() => {});
+  }
 
   const now = Date.now();
   const lastRunAt = state && state.lastRunAt ? Date.parse(state.lastRunAt) : null;
@@ -104,13 +180,50 @@ exports.handler = async (event) => {
     },
   ];
 
+  // Google Maps: three separate rows, because "the key is set" and "the two
+  // APIs it needs are enabled" fail independently and have different fixes.
+  const googleDetail = (which) => {
+    if (!googleKey) return "GOOGLE_MAPS_API_KEY isn't set in Netlify.";
+    if (!google || !google[which]) {
+      return "Not tested yet — add ?google=1 to this page's URL to run a live check.";
+    }
+    const r = google[which];
+    const when = google.checkedAt ? ` (checked ${google.checkedAt})` : "";
+    if (r.ok) return `Working — Google returned ${r.status}${when}.`;
+    return `Google says ${r.status}${r.message ? `: ${r.message}` : ""}${when}`;
+  };
+  checks.push({
+    name: "Google Maps key set",
+    ok: !!googleKey,
+    detail: googleKey
+      ? "GOOGLE_MAPS_API_KEY is present. Note it shows several deploy-context values in Netlify — the Production one is the one this page reads."
+      : "Not set. Add GOOGLE_MAPS_API_KEY in Netlify → Site configuration → Environment variables.",
+  });
+  checks.push({
+    name: "Geocoding API enabled",
+    // An untested probe isn't a failure, so it doesn't turn the page red.
+    ok: !googleKey ? false : (!google || !google.geocoding ? true : google.geocoding.ok),
+    detail: googleDetail("geocoding") +
+      (google && google.geocoding && !google.geocoding.ok
+        ? " → enable it at console.cloud.google.com/apis/library/geocoding-backend.googleapis.com"
+        : ""),
+  });
+  checks.push({
+    name: "Places API enabled",
+    ok: !googleKey ? false : (!google || !google.places ? true : google.places.ok),
+    detail: googleDetail("places") +
+      (google && google.places && !google.places.ok
+        ? " → enable it at console.cloud.google.com/apis/library/places-backend.googleapis.com"
+        : ""),
+  });
+
   const allOk = checks.every((c) => c.ok);
 
   if (wantsJson) {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount } }, null, 2),
+      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google } }, null, 2),
     };
   }
 
@@ -140,7 +253,7 @@ exports.handler = async (event) => {
 <h1>Signature Property Collection — Site Health</h1>
 <p class="status-line ${allOk ? "ok" : "bad"}">${allOk ? "✅ Everything looks clean." : "⚠️ Something needs attention — see below."}</p>
 <table>${rows}</table>
-<p class="refresh">Checked live just now — reload anytime. This page only reads stored status; it never calls MLS Grid or Cloudinary itself, so checking it is always free. Add <code>?format=json</code> to the URL for raw data.</p>
+<p class="refresh">Checked live just now — reload anytime. This page only reads stored status; it never calls MLS Grid or Cloudinary itself, so checking it is always free. Add <code>?google=1</code> to run two real Google API probes (cached 10 minutes), or <code>?format=json</code> for raw data.</p>
 </div></body></html>`;
 
   return {

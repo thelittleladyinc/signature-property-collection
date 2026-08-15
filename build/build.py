@@ -1296,6 +1296,30 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
       <input type="hidden" name="inquiry_type" id="li-kind">
       <textarea name="message" placeholder="Your message (optional)" rows="3"></textarea>"""
 
+    # 2026-08-15 (Christine: "is there another way to get notified and send
+    # emails? we have the lofty api that connects to my emails - review it").
+    # Reviewed, and she's right -- Lofty is the better channel than adding a
+    # transactional email provider. Lofty's own Property Alerts (a Smart Plan
+    # with saved search criteria) already send listing alerts from her CRM,
+    # tracked against the lead, with her branding and unsubscribe handling. A
+    # homegrown emailer would be a worse copy of something she already pays for.
+    #
+    # So this form's job is to capture the search a buyer is actually running and
+    # hand it to Lofty as a lead with the criteria attached -- alert_criteria in
+    # plain English for her to read, alert_query as the exact query string so the
+    # same search can be reproduced or linked. submission-created.js tags it
+    # "Property Alert Request" so it's filterable in Lofty.
+    #
+    # What this does NOT do: create the Property Alert inside Lofty
+    # automatically. Lofty's API docs aren't reachable from this environment, so
+    # I could not verify an endpoint for that, and guessing at one would fail
+    # silently. Every alert request lands in Lofty tagged and ready; turning on
+    # the alert is one step in Lofty until that endpoint is confirmed.
+    alert_extra_fields = """
+      <input type="hidden" name="alert_criteria" id="al-criteria">
+      <input type="hidden" name="alert_query" id="al-query">
+      <textarea name="message" placeholder="Anything else you're looking for? (optional)" rows="3"></textarea>"""
+
     form_html = f"""<div class="fs-widget">
     <form id="{wid}-form">
       {geo_row_html}
@@ -1329,6 +1353,8 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
             <option value="sqft-desc">Largest first</option>
           </select>
         </label>
+        <button type="button" class="btn btn-outline" style="border-color:#141415;color:#141415"
+                id="{wid}-alert-btn" onclick="openListingAlert('{wid}')">&#9993; Email Me New Matches</button>
       </div>
     </form>
     <p class="search-status" id="{wid}-deep-link-note" style="display:none;font-weight:600"></p>
@@ -1359,8 +1385,18 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
       <p id="inquiry-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
       {_tool_lead_form("listing-inquiry", "Send My Message", extra_fields=inquiry_extra_fields)}
     </div>
+  </div>
+
+  <div class="lb-overlay" id="alert-overlay" role="dialog" aria-modal="true" aria-labelledby="alert-heading" onclick="if (event.target === this) closeListingAlert()">
+    <div class="lb-box">
+      <button type="button" class="lb-close" onclick="closeListingAlert()" aria-label="Close">&times;</button>
+      <h3 id="alert-heading">Email Me New Matches</h3>
+      <p id="alert-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
+      {_tool_lead_form("listing-alert-request", "Set Up My Alerts", extra_fields=alert_extra_fields)}
+    </div>
   </div>"""
 
+    agent_first_js = json.dumps(SITE["agent"].split()[0])
     fixed_city_js = json.dumps(fixed_city) if fixed_city else "null"
     deep_links_js = "true" if support_deep_links else "false"
     always_no_floor_js = "true" if always_no_floor else "false"
@@ -1764,6 +1800,55 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
         statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
       }});
   }}
+
+  // ---- "Email Me New Matches" ------------------------------------------
+  // Describes the CURRENT search in plain English so the buyer can see exactly
+  // what they're subscribing to, and stores the same search as a query string so
+  // it can be reproduced later. Both ride along on the form to Lofty.
+  function describeSearch(p) {{
+    var bits = [];
+    if (p.cities) bits.push(p.cities.split(',').join(', '));
+    else if (p.city) bits.push(p.city);
+    else bits.push('all areas');
+    var min = parseInt(p.minPrice, 10) || 0;
+    var max = parseInt(p.maxPrice, 10) || 0;
+    if (min && max && max < CEILING) bits.push('$' + min.toLocaleString() + '\u2013$' + max.toLocaleString());
+    else if (min) bits.push('$' + min.toLocaleString() + '+');
+    else if (max && max < CEILING) bits.push('up to $' + max.toLocaleString());
+    if (p.beds) bits.push(p.beds + '+ beds');
+    if (p.baths) bits.push(p.baths + '+ baths');
+    if (p.minSqft) bits.push(parseInt(p.minSqft, 10).toLocaleString() + '+ sq ft');
+    if (p.propertyCategory) bits.push(p.propertyCategory);
+    if (p.waterfront === 'true') bits.push('riverfront/waterfront');
+    if (p.equestrian === 'true') bits.push('horse property');
+    return bits.join(' \u00b7 ');
+  }}
+
+  window.openListingAlert = function (forWid) {{
+    if (forWid !== wid) return;
+    var p = paramsFromForm();
+    delete p.top; delete p.skip; delete p.sort;
+    var summary = describeSearch(p);
+    var criteriaEl = document.getElementById('al-criteria');
+    var queryEl = document.getElementById('al-query');
+    if (criteriaEl) criteriaEl.value = summary;
+    if (queryEl) queryEl.value = new URLSearchParams(p).toString();
+    var sub = document.getElementById('alert-subheading');
+    if (sub) {{
+      sub.textContent = summary
+        ? 'You\u2019ll hear from ' + {agent_first_js} + ' when a new listing matches: ' + summary
+        : 'You\u2019ll hear from ' + {agent_first_js} + ' when new listings come on the market.';
+    }}
+    var overlay = document.getElementById('alert-overlay');
+    if (!overlay) return;
+    overlay.classList.add('open');
+    var close = overlay.querySelector('.lb-close');
+    if (close) close.focus();
+  }};
+  window.closeListingAlert = function () {{
+    var overlay = document.getElementById('alert-overlay');
+    if (overlay) overlay.classList.remove('open');
+  }};
 
   form.addEventListener('submit', function (e) {{
     e.preventDefault();
@@ -6891,6 +6976,30 @@ def build_current_listings():
       <input type="hidden" name="listing_mls" id="li-mls">
       <input type="hidden" name="inquiry_type" id="li-kind">
       <textarea name="message" placeholder="Your message (optional)" rows="3"></textarea>"""
+
+    # 2026-08-15 (Christine: "is there another way to get notified and send
+    # emails? we have the lofty api that connects to my emails - review it").
+    # Reviewed, and she's right -- Lofty is the better channel than adding a
+    # transactional email provider. Lofty's own Property Alerts (a Smart Plan
+    # with saved search criteria) already send listing alerts from her CRM,
+    # tracked against the lead, with her branding and unsubscribe handling. A
+    # homegrown emailer would be a worse copy of something she already pays for.
+    #
+    # So this form's job is to capture the search a buyer is actually running and
+    # hand it to Lofty as a lead with the criteria attached -- alert_criteria in
+    # plain English for her to read, alert_query as the exact query string so the
+    # same search can be reproduced or linked. submission-created.js tags it
+    # "Property Alert Request" so it's filterable in Lofty.
+    #
+    # What this does NOT do: create the Property Alert inside Lofty
+    # automatically. Lofty's API docs aren't reachable from this environment, so
+    # I could not verify an endpoint for that, and guessing at one would fail
+    # silently. Every alert request lands in Lofty tagged and ready; turning on
+    # the alert is one step in Lofty until that endpoint is confirmed.
+    alert_extra_fields = """
+      <input type="hidden" name="alert_criteria" id="al-criteria">
+      <input type="hidden" name="alert_query" id="al-query">
+      <textarea name="message" placeholder="Anything else you're looking for? (optional)" rows="3"></textarea>"""
 
     js = """<script>
 (function () {

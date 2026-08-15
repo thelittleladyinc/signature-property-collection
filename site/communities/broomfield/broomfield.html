@@ -214,6 +214,8 @@
             <option value="sqft-desc">Largest first</option>
           </select>
         </label>
+        <button type="button" class="btn btn-outline" style="border-color:#141415;color:#141415"
+                id="fs-broomfield-city-alert-btn" onclick="openListingAlert('fs-broomfield-city')">&#9993; Email Me New Matches</button>
       </div>
     </form>
     <p class="search-status" id="fs-broomfield-city-deep-link-note" style="display:none;font-weight:600"></p>
@@ -269,6 +271,32 @@
         may apply. Reply STOP to unsubscribe.
       </label>
       <button class="btn btn-dark" type="submit">Send My Message</button>
+    </form>
+    </div>
+  </div>
+
+  <div class="lb-overlay" id="alert-overlay" role="dialog" aria-modal="true" aria-labelledby="alert-heading" onclick="if (event.target === this) closeListingAlert()">
+    <div class="lb-box">
+      <button type="button" class="lb-close" onclick="closeListingAlert()" aria-label="Close">&times;</button>
+      <h3 id="alert-heading">Email Me New Matches</h3>
+      <p id="alert-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
+      <form class="lead-form" name="listing-alert-request" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name" value="listing-alert-request">
+      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <input type="text" name="name" placeholder="Full Name" required>
+      <input type="email" name="email" placeholder="Email" required>
+      <input type="tel" name="phone" placeholder="Phone">
+      
+      <input type="hidden" name="alert_criteria" id="al-criteria">
+      <input type="hidden" name="alert_query" id="al-query">
+      <textarea name="message" placeholder="Anything else you're looking for? (optional)" rows="3"></textarea>
+      <label class="consent">
+        <input type="checkbox" required>
+        I agree to receive marketing communication via call, text, or similar automated
+        means from Signature Property Collection. Consent is not a condition of purchase. Msg/data rates
+        may apply. Reply STOP to unsubscribe.
+      </label>
+      <button class="btn btn-dark" type="submit">Set Up My Alerts</button>
     </form>
     </div>
   </div>
@@ -885,6 +913,55 @@
         statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
       });
   }
+
+  // ---- "Email Me New Matches" ------------------------------------------
+  // Describes the CURRENT search in plain English so the buyer can see exactly
+  // what they're subscribing to, and stores the same search as a query string so
+  // it can be reproduced later. Both ride along on the form to Lofty.
+  function describeSearch(p) {
+    var bits = [];
+    if (p.cities) bits.push(p.cities.split(',').join(', '));
+    else if (p.city) bits.push(p.city);
+    else bits.push('all areas');
+    var min = parseInt(p.minPrice, 10) || 0;
+    var max = parseInt(p.maxPrice, 10) || 0;
+    if (min && max && max < CEILING) bits.push('$' + min.toLocaleString() + '–$' + max.toLocaleString());
+    else if (min) bits.push('$' + min.toLocaleString() + '+');
+    else if (max && max < CEILING) bits.push('up to $' + max.toLocaleString());
+    if (p.beds) bits.push(p.beds + '+ beds');
+    if (p.baths) bits.push(p.baths + '+ baths');
+    if (p.minSqft) bits.push(parseInt(p.minSqft, 10).toLocaleString() + '+ sq ft');
+    if (p.propertyCategory) bits.push(p.propertyCategory);
+    if (p.waterfront === 'true') bits.push('riverfront/waterfront');
+    if (p.equestrian === 'true') bits.push('horse property');
+    return bits.join(' · ');
+  }
+
+  window.openListingAlert = function (forWid) {
+    if (forWid !== wid) return;
+    var p = paramsFromForm();
+    delete p.top; delete p.skip; delete p.sort;
+    var summary = describeSearch(p);
+    var criteriaEl = document.getElementById('al-criteria');
+    var queryEl = document.getElementById('al-query');
+    if (criteriaEl) criteriaEl.value = summary;
+    if (queryEl) queryEl.value = new URLSearchParams(p).toString();
+    var sub = document.getElementById('alert-subheading');
+    if (sub) {
+      sub.textContent = summary
+        ? 'You’ll hear from ' + "Christine" + ' when a new listing matches: ' + summary
+        : 'You’ll hear from ' + "Christine" + ' when new listings come on the market.';
+    }
+    var overlay = document.getElementById('alert-overlay');
+    if (!overlay) return;
+    overlay.classList.add('open');
+    var close = overlay.querySelector('.lb-close');
+    if (close) close.focus();
+  };
+  window.closeListingAlert = function () {
+    var overlay = document.getElementById('alert-overlay');
+    if (overlay) overlay.classList.remove('open');
+  };
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
