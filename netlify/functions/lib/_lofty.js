@@ -92,7 +92,14 @@ async function postLead(body, apiKey) {
 
 async function recordPush(store, result, formName, lead) {
   try {
-    await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, ...result });
+    // The lead's email is recorded because it identifies WHICH submission a
+    // result belongs to -- and because it matters here: Christine's two test
+    // submissions both used thelittleladyinc@gmail.com, which is the Lofty
+    // account owner's own address. A CRM refusing to create a lead that
+    // duplicates an existing contact (let alone the account owner) is ordinary
+    // behaviour, and would look exactly like "the push is broken".
+    const leadEmail = (lead && (lead.email || (Array.isArray(lead.emails) && lead.emails[0]))) || null;
+    await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, leadEmail, ...result });
     if (!result.ok) {
       const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
       queue.unshift({ at: new Date().toISOString(), formName, lead, ...result });
