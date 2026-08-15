@@ -47,6 +47,52 @@ const {
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, matchesQuery, getBlobStore,
 } = require("./lib/_mls-shared");
 
+// ---- Photo URLs the browser can actually load ----------------------------
+// 2026-08-15 (Christine: "still no photos", with a screenshot of a Search
+// Homes page where every card's image was broken). A stored MLS Grid media URL
+// is signed and expires in ~1-2 hours, so for any listing the sync hasn't
+// re-touched recently -- which, at 15,471 stored listings and a 5-per-run
+// refresh sweep, is nearly all of them -- the URL in storage is dead on
+// arrival. Never send one to a browser again.
+//
+// Cloudinary URLs are the exception and the preference: those are already
+// re-hosted permanently (Christine's own listings, see
+// cacheCoverPhotoIfHers() in sync-listings.js) and cost nothing to serve, so
+// they go straight through. Everything else is served by listing-photo.js from
+// this site's own domain.
+function isRehosted(url) {
+  return typeof url === "string" && url.indexOf("res.cloudinary.com") !== -1;
+}
+
+function photoUrlFor(listing, index) {
+  const i = index || 0;
+  const rehosted = Array.isArray(listing.cloudinaryPhotos) ? listing.cloudinaryPhotos[i] : null;
+  if (isRehosted(rehosted)) return rehosted;
+  if (i === 0 && isRehosted(listing.cloudinaryPhoto)) return listing.cloudinaryPhoto;
+  const stored = i === 0
+    ? listing.photo
+    : (Array.isArray(listing.photos) ? listing.photos[i] : null);
+  if (isRehosted(stored)) return stored;
+  if (!listing.listingId) return null;
+  // No photo at all? Don't send a URL that can only render a placeholder.
+  if (i === 0 && !listing.photo && !(Array.isArray(listing.photos) && listing.photos.length)) {
+    return null;
+  }
+  return `/.netlify/functions/listing-photo?id=${encodeURIComponent(listing.listingId)}&i=${i}`;
+}
+
+function galleryUrlsFor(listing) {
+  const count = Array.isArray(listing.photos) && listing.photos.length
+    ? listing.photos.length
+    : (typeof listing.photoCount === "number" ? listing.photoCount : (listing.photo ? 1 : 0));
+  const urls = [];
+  for (let i = 0; i < count; i += 1) {
+    const url = photoUrlFor(listing, i);
+    if (url) urls.push(url);
+  }
+  return urls;
+}
+
 exports.handler = async (event) => {
   const store = getBlobStore(getStore);
   const params = event.queryStringParameters || {};
@@ -120,7 +166,12 @@ exports.handler = async (event) => {
           "Content-Type": "application/json",
           "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
         },
-        body: JSON.stringify({ photos: listing.photos || [] }),
+        // 2026-08-15: the gallery used to hand the browser stored MLS Grid
+        // URLs, which are expired for anything the sync hasn't touched in the
+        // last hour or two. Now every photo goes through our own domain -- see
+        // photoUrlFor() and listing-photo.js. One MLS Grid call resolves the
+        // whole gallery, so a 30-photo lightbox is one request, not thirty.
+        body: JSON.stringify({ photos: galleryUrlsFor(listing) }),
       };
     }
 
@@ -152,9 +203,24 @@ exports.handler = async (event) => {
       // is trimmed to just the cover photo here — see the listingId block
       // above for how the full gallery is fetched, only when needed.
       const {
-        listingKey, modificationTimestamp, mlgCanView, photos, ...publicFields
+        listingKey, modificationTimestamp, mlgCanView, photos,
+        cloudinaryPhotos, cloudinaryPhoto, ...publicFields
       } = l;
-      return { ...publicFields, photoCount: Array.isArray(photos) ? photos.length : (l.photo ? 1 : 0) };
+      return {
+        ...publicFields,
+        // Always a URL this browser can load: a Cloudinary copy where one
+        // exists, otherwise our own /listing-photo endpoint. The raw signed
+        // MLS Grid URL never leaves the server now.
+        photo: photoUrlFor(l, 0),
+        // The stored photoCount has to win when photos[] is absent. It usually
+        // IS absent: slimForStorage() drops photos[] for every listing that
+        // isn't Christine's and records the count instead. Recomputing from
+        // l.photo alone reported "1 photo" for a listing with 40 -- which the
+        // gallery button reads, so it silently hid most photos on most cards.
+        photoCount: Array.isArray(photos)
+          ? photos.length
+          : (typeof l.photoCount === "number" ? l.photoCount : (l.photo ? 1 : 0)),
+      };
     });
 
     const response = {

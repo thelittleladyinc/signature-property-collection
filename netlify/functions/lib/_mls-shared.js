@@ -144,6 +144,35 @@ const CO_CITY_COUNTY = {
   "breckenridge": "summit", "frisco": "summit", "silverthorne": "summit",
   "vail": "eagle", "avon": "eagle", "edwards": "eagle", "eagle": "eagle",
   "aspen": "pitkin", "snowmass village": "pitkin", "steamboat springs": "routt",
+  // 2026-08-15: added because they were the actual symptom. With the operating
+  // filter now defaulted on, a listing is only droppable if its county can be
+  // inferred -- an unrecognized city keeps its listing, deliberately, so a
+  // real in-area sale in an unincorporated place (Bellvue, Livermore, Drake,
+  // Glen Haven) is never thrown away over a missing table entry. The cost of
+  // that caution is that a genuinely far-away town also stays until it's named
+  // here, which is how an $81.6M ranch in FRASER -- Grand County, a two-hour
+  // drive over Berthoud Pass -- ended up as the single most prominent result
+  // on the public search page, with Breckenridge right behind it. These are the
+  // mountain and plains towns most likely to turn up in an IRES/REcolorado
+  // reciprocal feed and least likely to be Christine's market.
+  "winter park": "grand", "fraser": "grand", "granby": "grand",
+  "grand lake": "grand", "tabernash": "grand", "kremmling": "grand",
+  "hot sulphur springs": "grand",
+  "dillon": "summit", "keystone": "summit", "blue river": "summit",
+  "copper mountain": "summit",
+  "leadville": "lake", "fairplay": "park", "alma": "park", "bailey": "park",
+  "buena vista": "chaffee", "salida": "chaffee",
+  // These four are the opposite case -- eastern-plains towns that ARE inside
+  // the service area (Adams and Arapahoe) and were being kept only because
+  // their county couldn't be inferred. Naming them makes their inclusion
+  // deliberate instead of accidental. Bennett prompted this: a $30M land
+  // listing there sat at #2 on the public search and looked out-of-area at a
+  // glance when it isn't.
+  "bennett": "adams", "strasburg": "adams", "watkins": "adams",
+  "byers": "arapahoe", "deer trail": "arapahoe",
+  "sterling": "logan", "limon": "lincoln", "burlington": "kit carson",
+  "akron": "washington", "holyoke": "phillips", "julesburg": "sedgwick",
+  "wray": "yuma", "yuma": "yuma",
 };
 
 function inferCountyFromCity(cityLower) {
@@ -180,8 +209,28 @@ function inferCountyFromCity(cityLower) {
 // own docs and Expired-Luxury's production history), so every record still
 // has to be paged through and inspected regardless; this just decides
 // what's worth keeping in Blobs afterward.
+// 2026-08-15: the default is no longer "no filtering at all". Christine asked
+// for the site's own counties twice ("i want all 8 counties", then "i need
+// morgan county too") and said plainly she wasn't going to set the env var
+// ("im not going to set it"), so the value she asked for belongs in code
+// rather than in a dashboard field nobody is going to fill in.
+//
+// This was not cosmetic. With no filter, the top of the public Search Homes
+// page was an $81.6M ranch in Fraser (Grand County), $30M of land in Bennett,
+// and a $25M house in Breckenridge -- sorted by price, so the three most
+// prominent results on a Northern Colorado site were three towns Christine
+// doesn't serve. Christine spotted it in a screenshot of her own live page.
+//
+// The env var still wins if it's ever set, so this is a default, not a
+// hardcode. Keep in sync with COUNTIES in build/build.py -- these are the nine
+// counties the site publishes pages for.
+const DEFAULT_OPERATING_COUNTIES = [
+  "larimer", "weld", "boulder", "broomfield",
+  "jefferson", "denver", "arapahoe", "adams", "morgan",
+];
+
 const OPERATING_COUNTIES = new Set(
-  (process.env.OPERATING_COUNTIES || "")
+  (process.env.OPERATING_COUNTIES || DEFAULT_OPERATING_COUNTIES.join(","))
     .split(",")
     .map((c) => c.toLowerCase().replace(/\s+county$/, "").trim())
     .filter(Boolean)

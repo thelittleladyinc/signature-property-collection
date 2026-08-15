@@ -1,0 +1,201 @@
+// Serves listing photos from THIS site's domain instead of linking straight
+// to MLS Grid's media URLs.
+//
+// 2026-08-15 (Christine, looking at a live Search Homes page: "still no
+// photos", with a screenshot showing every card's image broken). This is the
+// last piece of a problem the codebase already understood but had only half
+// solved. From sync-listings.js's own 2026-08-12 note:
+//
+//   "MLS Grid's Media URLs are signed with a short TTL (~1-2 hours, confirmed
+//   live) -- storing them here forever meant listing photos silently 400'd on
+//   the public site once that window passed"
+//
+// The fix at the time had two halves. Half one -- re-host Christine's OWN
+// listing photos on Cloudinary, permanently -- works. Half two, for everyone
+// else's listings, was a "small bounded refresh sweep" of 5 listings per
+// 15-minute run. That was the right call for a few hundred listings. The store
+// now holds 15,471, so the sweep re-touches roughly 0.03% of them per run and
+// the overwhelming majority of stored photo URLs are expired at any given
+// moment. Which is exactly what Christine's screenshot shows: a page of cards
+// with alt text where the photos should be.
+//
+// Cloudinary can't be the answer at that scale on a small plan, so this takes
+// the other route: the browser asks THIS function for a photo, and the
+// function resolves a fresh signed URL from MLS Grid, fetches the bytes with
+// the Bearer token (MLS Grid media requires one -- that's why Cloudinary's own
+// remote-fetch mode couldn't be used either, see _cloudinary.js), and returns
+// the image from our own domain with long cache headers.
+//
+// Why this is the compliant shape, not a workaround: MLS Grid's media URLs are
+// signed, short-lived, and not meant to be embedded in a public page -- which
+// is why re-hosting was always the plan for Christine's own listings. This is
+// the same re-hosting, with the CDN as the store instead of Cloudinary. Every
+// signed URL is used exactly once, by us, server-side.
+//
+// Cost control, in layers, because the MLS Grid account is shared with
+// Christine's two other apps (Listing-Engine and Expired-Luxury) and its rate
+// limits are per ACCOUNT:
+//   1. Cloudinary URLs never come here at all -- listings-search.js sends
+//      those to the browser directly (see photoUrlFor() there).
+//   2. One MLS Grid call resolves EVERY photo for a listing, and the resolved
+//      list is cached in Blobs for URL_CACHE_TTL_MS -- so opening a 30-photo
+//      gallery costs one request, not thirty.
+//   3. Successful responses are cached hard at the CDN, so a listing everyone
+//      is looking at costs MLS Grid nothing after the first viewer.
+//   4. The same suspension flag sync-listings.js sets on a 429 is honored
+//      here, so if the account is being rate limited this function stops
+//      calling MLS Grid entirely instead of adding to the problem.
+//   5. Any failure returns a neutral gray placeholder with a SHORT cache, so a
+//      broken photo self-heals on the next view instead of being frozen into
+//      the CDN for a day.
+const { getStore } = require("@netlify/blobs");
+const { getBlobStore, BASE_URL, SELECT_FIELDS } = require("./lib/_mls-shared");
+
+const BLOB_STORE_NAME = "mls-listings";
+const SUSPENSION_KEY = "mlsgrid-suspension.json";
+const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
+
+// Comfortably inside MLS Grid's ~1-2 hour signature life, so a cached URL is
+// still valid when we use it.
+const URL_CACHE_TTL_MS = 40 * 60 * 1000;
+
+const MLS_FETCH_TIMEOUT_MS = 6000;
+const IMAGE_FETCH_TIMEOUT_MS = 8000;
+
+// How long the CDN may serve our copy of a photo. Listing photos do change
+// (a re-shoot, a re-ordering), so this isn't immutable -- a day of hard
+// caching with a week of stale-while-revalidate keeps MLS Grid traffic near
+// zero while still picking changes up.
+const IMAGE_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800";
+const PLACEHOLDER_CACHE_CONTROL = "public, max-age=300";
+
+// Matches the onerror fallback the listing cards already use (#eee), so a
+// missing photo looks like a deliberate blank rather than a broken image.
+const PLACEHOLDER_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3" width="800" height="600">' +
+  '<rect width="4" height="3" fill="#eeeeee"/></svg>';
+
+function placeholder(reason) {
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": PLACEHOLDER_CACHE_CONTROL,
+      // Read this header in the browser's network tab to see why a photo is
+      // blank without needing the function logs.
+      "X-Photo-Fallback": reason,
+    },
+    body: PLACEHOLDER_SVG,
+  };
+}
+
+async function readSuspension(store) {
+  const state = await store.get(SUSPENSION_KEY, { type: "json" }).catch(() => null);
+  const until = state && state.suspendedUntil;
+  return typeof until === "number" && until > Date.now() ? until : null;
+}
+
+// Ordered media URLs for one listing, from the cache if it's fresh, otherwise
+// from MLS Grid. Returns null when MLS Grid can't be asked or has nothing.
+async function resolvePhotoUrls(listingId, store, token) {
+  const cacheKey = PHOTO_URL_CACHE_PREFIX + listingId + ".json";
+  const cached = await store.get(cacheKey, { type: "json" }).catch(() => null);
+  if (cached && Array.isArray(cached.urls) && typeof cached.cachedAt === "number" &&
+      Date.now() - cached.cachedAt < URL_CACHE_TTL_MS) {
+    return cached.urls;
+  }
+
+  const suspendedUntil = await readSuspension(store);
+  if (suspendedUntil) {
+    // Rate limited account-wide. A stale cached URL is worth trying anyway --
+    // it may still be inside its signature window, and it costs MLS Grid
+    // nothing to find out.
+    return (cached && Array.isArray(cached.urls)) ? cached.urls : null;
+  }
+
+  // Same request shape refreshOneListing() uses, including the MlgCanView
+  // guard and $top=1 -- and the same reason for not trusting the response
+  // blindly: this feed is documented to sometimes ignore a ListingId filter
+  // and return an unrelated record, so the returned ListingId is checked
+  // before its media is used.
+  const qs = new URLSearchParams({
+    "$filter": `ListingId eq '${listingId}' and MlgCanView eq true`,
+    "$select": SELECT_FIELDS,
+    "$expand": "Media",
+    "$top": "1",
+  });
+  const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
+  });
+  if (res.status === 429) {
+    await store.setJSON(SUSPENSION_KEY, { suspendedUntil: Date.now() + 5 * 60 * 1000 });
+    return (cached && Array.isArray(cached.urls)) ? cached.urls : null;
+  }
+  if (!res.ok) return (cached && Array.isArray(cached.urls)) ? cached.urls : null;
+
+  const json = await res.json();
+  const record = (json.value || [])[0];
+  if (!record || String(record.ListingId) !== String(listingId)) {
+    return (cached && Array.isArray(cached.urls)) ? cached.urls : null;
+  }
+
+  // Same ordering rule as mapListing()/sortMediaByOrder(): MLS Grid can't sort
+  // inside $expand, so Order decides, with array position as the tiebreak.
+  const media = (Array.isArray(record.Media) ? record.Media.slice() : [])
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => {
+      const ao = typeof a.m.Order === "number" ? a.m.Order : Number.MAX_SAFE_INTEGER;
+      const bo = typeof b.m.Order === "number" ? b.m.Order : Number.MAX_SAFE_INTEGER;
+      return ao !== bo ? ao - bo : a.i - b.i;
+    })
+    .map((x) => x.m && x.m.MediaURL)
+    .filter(Boolean);
+
+  if (!media.length) return null;
+  await store.setJSON(cacheKey, { urls: media, cachedAt: Date.now() }).catch(() => {});
+  return media;
+}
+
+exports.handler = async (event) => {
+  try {
+    const params = (event && event.queryStringParameters) || {};
+    const listingId = String(params.id || params.listingId || "").trim();
+    if (!listingId || !/^[A-Za-z0-9_-]{3,40}$/.test(listingId)) {
+      return placeholder("bad_id");
+    }
+    const index = Math.max(0, parseInt(params.i, 10) || 0);
+
+    const token = process.env.MLSGRID_API_TOKEN;
+    if (!token) return placeholder("not_configured");
+
+    const store = getBlobStore(getStore, BLOB_STORE_NAME);
+    const urls = await resolvePhotoUrls(listingId, store, token);
+    if (!urls || !urls.length) return placeholder("no_media");
+    if (index >= urls.length) return placeholder("index_out_of_range");
+
+    const imgRes = await fetch(urls[index], {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
+    });
+    if (!imgRes.ok) return placeholder("image_http_" + imgRes.status);
+
+    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+    if (!contentType.startsWith("image/")) return placeholder("not_an_image");
+
+    const buf = Buffer.from(await imgRes.arrayBuffer());
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": IMAGE_CACHE_CONTROL,
+        "Content-Length": String(buf.length),
+      },
+      body: buf.toString("base64"),
+      isBase64Encoded: true,
+    };
+  } catch (err) {
+    console.error("listing-photo error:", err && err.message);
+    return placeholder("exception");
+  }
+};
