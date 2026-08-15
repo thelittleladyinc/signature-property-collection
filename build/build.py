@@ -2861,7 +2861,7 @@ def build_communities_index():
         f'<a class="county-btn" data-slug="{c["slug"]}" href="/communities/{c["slug"]}.html">{c["name"]} <span>&rsaquo;</span></a>'
         for c in COUNTIES
     )
-    body = f"""
+    hero = f"""
 <section class="county-hero">
   <div class="wrap">
     <span class="eyebrow">Click To Explore</span>
@@ -2870,7 +2870,21 @@ def build_communities_index():
     county — {_county_name_list()}.</p>
   </div>
 </section>
-<section class="section-dark">
+"""
+    # 2026-08-15 (Christine: "move the quiz above the find your community").
+    # The quiz now sits between the hero band and the county map, so the first
+    # thing a visitor who doesn't yet know WHERE to look can do is answer four
+    # questions -- instead of being handed a nine-county map and left to guess.
+    # It stays collapsed, so it's an offer rather than a wall in front of the map.
+    #
+    # The <h1> stays above it: the quiz is the first thing you can DO on the page,
+    # but "Find Your Community" is still what the page IS, and burying the only h1
+    # below a collapsed widget would cost the page its heading for no visitor gain.
+    quiz = _quiz_disclosure(
+        f"Four quick questions, one real answer — matched against {len(QUIZ_CITIES)} real "
+        f"towns {esc(SITE['agent'])} shows clients every day. Click to expand."
+    )
+    county_map = f"""<section class="section-dark">
   <div class="wrap communities-layout">
     <div class="communities-panel">
       <div class="county-list">
@@ -2881,10 +2895,7 @@ def build_communities_index():
   </div>
 </section>
 """
-    body += _quiz_disclosure(
-        f"Four quick questions, one real answer — matched against {len(QUIZ_CITIES)} real "
-        f"towns {esc(SITE['agent'])} shows clients every day. Click to expand."
-    )
+    body = hero + quiz + county_map
     extra = _leaflet_lazy_loader_extra()
     page(
         "Explore Northern Colorado Communities | Signature Property Collection",
@@ -7444,6 +7455,14 @@ def build_redirects_and_meta():
     # function (200 = proxy/rewrite, not a redirect, so the address bar
     # stays "/status" instead of jumping to the raw .netlify/functions path).
     redirect_lines += ["/status  /.netlify/functions/site-health  200"]
+    # 2026-08-15 (Christine: "i popped in the url that you sjare but nothing",
+    # with a screenshot of the site's own Page Not Found). My fault: I sent her
+    # to /site-health, which never existed -- the route has always been /status.
+    # The function is NAMED site-health, so that is the name I kept typing, and
+    # she was diagnosing a Lofty problem against a 404 page. Both spellings now
+    # resolve, because the fix for "the human typed the other obvious name" is an
+    # alias, not a reminder to type it correctly.
+    redirect_lines += ["/site-health  /.netlify/functions/site-health  200"]
     redirect_lines += [f"{old}  {new}  301" for old, new in LEGACY_URL_REDIRECTS.items()]
     redirects = "\n".join(redirect_lines) + "\n"
     with open(os.path.join(OUT, "_redirects"), "w") as f:
