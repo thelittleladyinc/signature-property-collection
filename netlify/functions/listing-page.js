@@ -1,0 +1,411 @@
+// A real, shareable, indexable page for one listing: /listing/<MLS number>
+//
+// 2026-08-15 (Christine, on the biggest remaining gap: "is this something we
+// can do?" -- "No individual listing pages. Every listing lives in a card and a
+// modal, so there's no link a buyer can text a spouse, and Google can't index a
+// single address").
+//
+// Why a function instead of 15,000 static files: the inventory changes every 15
+// minutes and a listing that goes off-market has to stop being served. Static
+// pages would be stale within the hour and would leave sold homes published,
+// which is exactly the thing this site's MLS handling is careful about
+// everywhere else (see REPLICATED_STATUSES in _mls-shared.js).
+//
+// The page chrome is NOT written here. build.py generates
+// lib/_listing-page-shell.html from the same head()/header_html()/footer_html()
+// the other 141 pages use, and this function fills in the slots. A second
+// hand-written copy of the site design in a JS file would drift the first time
+// the header changed -- same reason the sold-homes pin data and the map's county
+// data are generated rather than duplicated.
+//
+// Routing: netlify.toml rewrites /listing/:id to this function, so the public
+// URL is clean (/listing/IRE1234567) and canonical.
+//
+// Compliance, deliberately conservative:
+//   - Only Active listings render. Anything under contract, pending, sold or
+//     missing returns 404 with a real "no longer available" page, so a texted
+//     link can never become a public record of a sold home.
+//   - The full IDX Rule 26 disclaimer, source attribution, and listing
+//     brokerage/agent line appear on every page, same text as the search pages.
+//   - Photos come through listing-photo.js, never as raw signed MLS Grid URLs.
+//   - mlgCanView is re-checked here, not assumed from storage.
+const { getStore } = require("@netlify/blobs");
+const fs = require("fs");
+const path = require("path");
+const {
+  LISTINGS_KEY, SYNC_STATE_KEY, getBlobStore, AGENT_SURNAME,
+} = require("./lib/_mls-shared");
+
+const SHELL_PATH = path.join(__dirname, "lib", "_listing-page-shell.html");
+const SITE_DOMAIN = "https://signaturepropertycollection.com";
+const AGENT_NAME = "Christine Gwinnup";
+const AGENT_PHONE = "303-709-4262";
+
+// Cached across warm invocations -- it's a static 12KB file.
+let _shell = null;
+function shell() {
+  if (_shell === null) _shell = fs.readFileSync(SHELL_PATH, "utf8");
+  return _shell;
+}
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function money(n) {
+  if (n == null) return "Price available on request";
+  return "$" + Number(n).toLocaleString("en-US");
+}
+
+function photoUrl(listing, i) {
+  const rehosted = Array.isArray(listing.cloudinaryPhotos) ? listing.cloudinaryPhotos[i] : null;
+  if (typeof rehosted === "string" && rehosted.indexOf("res.cloudinary.com") !== -1) return rehosted;
+  if (i === 0 && typeof listing.cloudinaryPhoto === "string" &&
+      listing.cloudinaryPhoto.indexOf("res.cloudinary.com") !== -1) {
+    return listing.cloudinaryPhoto;
+  }
+  return `/.netlify/functions/listing-photo?id=${encodeURIComponent(listing.listingId)}&i=${i}`;
+}
+
+function photoCount(listing) {
+  if (Array.isArray(listing.photos) && listing.photos.length) return listing.photos.length;
+  if (typeof listing.photoCount === "number") return listing.photoCount;
+  return listing.photo ? 1 : 0;
+}
+
+function isHers(listing) {
+  const a = (listing.agentName || "").toLowerCase();
+  const c = (listing.coAgentName || "").toLowerCase();
+  return a.includes(AGENT_SURNAME) || c.includes(AGENT_SURNAME);
+}
+
+function render(shellHtml, fields) {
+  let out = shellHtml;
+  for (const [key, value] of Object.entries(fields)) {
+    out = out.split(`{{${key}}}`).join(value);
+  }
+  return out;
+}
+
+// Rule 26 disclaimer -- same content as _mls_disclaimer_html() in build.py.
+// Duplicated in wording only because this page is assembled server-side; if the
+// legal text ever changes, change it in both places (build.py is the original).
+function disclaimerHtml(fetchedAt) {
+  return `<div class="mls-disclaimer">
+      <p><span class="mls-source-badge">Source: IRES MLS</span> &mdash; Listings courtesy of IRES MLS
+      as distributed by MLS Grid. Based on information submitted to MLS Grid as of
+      ${esc(fetchedAt || "page load")}. All data is obtained from various sources and may not have
+      been verified by broker or MLS Grid. Supplied open house information is subject to change
+      without notice. All information should be independently reviewed and verified for accuracy.
+      Properties may or may not be listed by the office/agent presenting the information. Some IDX
+      listings have been excluded from this website. Offer of compensation is made only to
+      participants of the MLS where the listing is filed.</p>
+    </div>`;
+}
+
+function notFoundBody(reason) {
+  return `<section class="hero" style="padding:90px 0 60px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Listing Unavailable</span>
+    <h1>This Listing Isn&rsquo;t Available</h1>
+    <p class="lede">${esc(reason)}</p>
+    <div class="btn-row">
+      <a class="btn btn-dark" href="/search-homes.html">Search Active Listings</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/contact.html">Ask ${esc(AGENT_NAME.split(" ")[0])} About It</a>
+    </div>
+  </div>
+</section>`;
+}
+
+function listingBody(l, fetchedAt) {
+  const count = photoCount(l);
+  const addressLine = [l.address, l.city, l.state, l.zip].filter(Boolean).join(", ");
+  const specs = [
+    l.beds ? `${l.beds} Bedrooms` : null,
+    l.baths ? `${l.baths} Bathrooms` : null,
+    l.sqft ? `${Number(l.sqft).toLocaleString()} Sq Ft` : null,
+    l.propertyType || null,
+    l.subdivision ? `${l.subdivision} neighborhood` : null,
+  ].filter(Boolean);
+
+  const gallery = count > 1
+    ? `<div class="listing-detail-thumbs">` +
+      Array.from({ length: Math.min(count, 12) }, (_, i) =>
+        `<img src="${esc(photoUrl(l, i))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}" loading="lazy">`
+      ).join("") +
+      (count > 12 ? `<p class="fs-advanced-note">Showing 12 of ${count} photos &mdash;
+       <a href="/contact.html" style="text-decoration:underline">ask for the full set</a>.</p>` : "") +
+      `</div>`
+    : "";
+
+  // Christine's own listings get her name and number on the page; everyone
+  // else's carry the listing agent's name, which is the attribution IDX
+  // requires -- her CTA is still there, phrased as representation rather than as
+  // if she listed it.
+  const hers = isHers(l);
+  const agentBlock = hers
+    ? `<div class="card">
+        <h3>Listed By ${esc(AGENT_NAME)}</h3>
+        <p>This is one of ${esc(AGENT_NAME)}&rsquo;s own listings. Call
+        <a href="tel:${esc(AGENT_PHONE.replace(/[^0-9]/g, ""))}" style="text-decoration:underline">${esc(AGENT_PHONE)}</a>
+        or send a message and you&rsquo;ll hear back from her directly.</p>
+        <a class="cta" href="/contact.html">Request A Private Showing &rarr;</a>
+      </div>`
+    : `<div class="card">
+        <h3>Want To See This Home?</h3>
+        <p>${esc(AGENT_NAME)} can show you this property and any other active listing in
+        Northern Colorado, and will tell you honestly how it compares to the rest of what&rsquo;s
+        available at this price.</p>
+        <a class="cta" href="/contact.html">Schedule A Showing &rarr;</a>
+      </div>`;
+
+  const listedBy = l.agentName
+    ? `<p class="fs-advanced-note">Listing courtesy of ${esc(l.agentName)}${l.officeName ? `, ${esc(l.officeName)}` : ""}. MLS# ${esc(l.listingId)}.</p>`
+    : `<p class="fs-advanced-note">MLS# ${esc(l.listingId)}.</p>`;
+
+  return `<section class="hero" style="padding:60px 0 30px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">${esc(l.city || "Northern Colorado")} &middot; ${esc(l.status || "Active")}</span>
+    <h1 style="margin-bottom:8px">${esc(l.address || "Listing")}</h1>
+    <p class="lede" style="margin-top:0">${esc(addressLine)}</p>
+  </div>
+</section>
+<section class="tight" style="padding-top:10px">
+  <div class="wrap grid-2">
+    <div>
+      ${count ? `<img src="${esc(photoUrl(l, 0))}" alt="${esc(addressLine)}"
+        style="width:100%;border-radius:4px;box-shadow:0 10px 30px rgba(20,20,21,.10)">` : ""}
+    </div>
+    <div>
+      <p class="listing-price" style="font-size:34px;margin:0 0 12px">${esc(money(l.price))}</p>
+      ${specs.length ? `<ul class="nearby-list">${specs.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
+      ${hers && l.remarks ? `<p class="lede">${esc(l.remarks)}</p>` : ""}
+      ${agentBlock}
+      ${listedBy}
+    </div>
+  </div>
+</section>
+${gallery ? `<section class="tight"><div class="wrap">
+  <h2 class="section-title">More Photos</h2>
+  ${gallery}
+</div></section>` : ""}
+<section class="tight">
+  <div class="wrap">
+    <div class="listing-nearby">
+      <button type="button" class="nearby-toggle" onclick="toggleNearby(this)" data-address="${esc(addressLine)}">
+      &#128205; What&rsquo;s Nearby: Coffee, Grocery, Schools &amp; Parks</button>
+      <div class="nearby-panel" style="display:none">
+        <div class="nearby-tabs">
+          <button type="button" class="nearby-tab active" data-cat="coffee" onclick="showNearbyCat(this)">Coffee</button>
+          <button type="button" class="nearby-tab" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>
+          <button type="button" class="nearby-tab" data-cat="dining" onclick="showNearbyCat(this)">Dining</button>
+          <button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>
+          <button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>
+        </div>
+        <div class="nearby-results"><p class="search-status" style="margin-top:0">Loading nearby places&hellip;</p></div>
+      </div>
+    </div>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:28px">
+      <a class="btn btn-dark" href="/contact.html">Ask About ${esc(l.address || "This Home")}</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/search-homes.html?cities=${encodeURIComponent(l.city || "")}">More Homes In ${esc(l.city || "This Area")}</a>
+    </div>
+    ${disclaimerHtml(fetchedAt)}
+  </div>
+</section>
+${nearbyScript()}`;
+}
+
+// The same on-demand distance panel the listing cards use. Inlined rather than
+// imported because build.py owns that JS as a Python string; kept minimal here
+// and pointed at the same nearby-places function and CSS classes.
+function nearbyScript() {
+  return `<script>
+(function () {
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  var LABELS = { grocery: 'grocery stores', coffee: 'coffee shops', dining: 'restaurants',
+    school: 'schools', park: 'parks' };
+  function renderCat(panel, cat) {
+    var data = panel._nearbyData;
+    var el = panel.querySelector('.nearby-results');
+    if (!data) return;
+    var items = (data.categories && data.categories[cat]) || [];
+    if (!items.length) {
+      el.innerHTML = '<p class="search-status" style="margin-top:0">No nearby ' +
+        (LABELS[cat] || cat) + ' found.</p>';
+      return;
+    }
+    el.innerHTML = '<ul class="nearby-list">' + items.map(function (p) {
+      var name = esc(p.name);
+      var inner = p.placeId
+        ? '<a href="https://www.google.com/maps/place/?q=place_id:' +
+          encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
+        : name;
+      return '<li><span class="nearby-name">' + inner + '</span><span class="nearby-dist">' +
+        esc(p.distanceMiles != null ? p.distanceMiles + ' mi' : '') + '</span></li>';
+    }).join('') + '</ul><p class="nearby-attrib">Places data &copy; Google Maps</p>';
+  }
+  window.showNearbyCat = function (tab) {
+    var tabs = tab.parentElement;
+    tabs.querySelectorAll('.nearby-tab').forEach(function (t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    renderCat(tabs.parentElement, tab.dataset.cat);
+  };
+  window.toggleNearby = function (btn) {
+    var panel = btn.nextElementSibling;
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    if (panel.dataset.loaded === 'true') return;
+    var el = panel.querySelector('.nearby-results');
+    fetch('/.netlify/functions/nearby-places?address=' + encodeURIComponent(btn.dataset.address))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) {
+          el.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\\u2019t look up nearby places right now.</p>';
+          return;
+        }
+        panel.dataset.loaded = 'true';
+        panel._nearbyData = data;
+        renderCat(panel, 'coffee');
+      })
+      .catch(function () {
+        el.innerHTML = '<p class="search-status" style="margin-top:0">Couldn\\u2019t look up nearby places right now.</p>';
+      });
+  };
+})();
+</script>`;
+}
+
+// schema.org for the listing. Deliberately RealEstateListing/Residence rather
+// than Product+Offer: a house is not a retail product, and Google's own
+// guidance for real estate is the RealEstateListing type.
+function listingSchema(l, canonical, image) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateListing",
+    "url": canonical,
+    "name": [l.address, l.city].filter(Boolean).join(", "),
+    "datePosted": l.modificationTimestamp || undefined,
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": l.address || undefined,
+      "addressLocality": l.city || undefined,
+      "addressRegion": l.state || "CO",
+      "postalCode": l.zip || undefined,
+      "addressCountry": "US",
+    },
+  };
+  if (image) schema.image = image;
+  if (l.price != null) {
+    schema.offers = {
+      "@type": "Offer",
+      "price": l.price,
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock",
+    };
+  }
+  const spec = {};
+  if (l.beds != null) spec.numberOfBedrooms = l.beds;
+  if (l.baths != null) spec.numberOfBathroomsTotal = l.baths;
+  if (l.sqft != null) {
+    spec.floorSize = { "@type": "QuantitativeValue", "value": l.sqft, "unitCode": "FTK" };
+  }
+  if (Object.keys(spec).length) {
+    schema.mainEntity = Object.assign({ "@type": "SingleFamilyResidence" }, spec);
+  }
+  return JSON.stringify(schema);
+}
+
+exports.handler = async (event) => {
+  const params = (event && event.queryStringParameters) || {};
+  // Accept either the rewrite's ?id= or a raw /listing/<id> path, so a direct
+  // function call behaves the same as the pretty URL.
+  let id = String(params.id || "").trim();
+  if (!id && event && event.path) {
+    const m = event.path.match(/\/listing\/([^/?#]+)/);
+    if (m) id = decodeURIComponent(m[1]);
+  }
+
+  const notFound = (reason, status) => ({
+    statusCode: status,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      // Short cache: a listing coming back on the market shouldn't be stuck
+      // behind a day of CDN caching of its own 404.
+      "Cache-Control": "public, max-age=120",
+      "X-Robots-Tag": "noindex",
+    },
+    body: render(shell(), {
+      TITLE: "Listing Unavailable | Signature Property Collection",
+      DESCRIPTION: "This listing is no longer available. Search current Northern Colorado listings instead.",
+      CANONICAL: `${SITE_DOMAIN}/search-homes.html`,
+      OG_IMAGE: `${SITE_DOMAIN}/assets/img/logo-full.png`,
+      SCHEMA: "",
+      BODY: notFoundBody(reason),
+    }),
+  });
+
+  try {
+    if (!id || !/^[A-Za-z0-9_-]{3,40}$/.test(id)) {
+      return notFound("That listing link doesn’t look right. Search below and you’ll find what you’re after.", 404);
+    }
+
+    const store = getBlobStore(getStore, "mls-listings");
+    const [listings, state] = await Promise.all([
+      store.get(LISTINGS_KEY, { type: "json" }),
+      store.get(SYNC_STATE_KEY, { type: "json" }),
+    ]);
+    const l = listings && listings[id];
+    if (!l) {
+      return notFound("This listing isn’t in our current feed — it may have sold or been withdrawn.", 404);
+    }
+    // Active only, and mlgCanView re-checked rather than trusted from storage.
+    if (String(l.status || "").toLowerCase() !== "active" || l.mlgCanView === false) {
+      return notFound("This home is no longer on the market as an active listing.", 404);
+    }
+
+    const canonical = `${SITE_DOMAIN}/listing/${encodeURIComponent(id)}`;
+    const addressLine = [l.address, l.city, l.state].filter(Boolean).join(", ");
+    const title = `${l.address || "Listing"}, ${l.city || "CO"} — ${money(l.price)} | Signature Property Collection`;
+    const bits = [
+      l.beds ? `${l.beds} bed` : null,
+      l.baths ? `${l.baths} bath` : null,
+      l.sqft ? `${Number(l.sqft).toLocaleString()} sq ft` : null,
+    ].filter(Boolean).join(", ");
+    const description = `${addressLine} — ${money(l.price)}${bits ? `, ${bits}` : ""}. Active IRES MLS listing. See photos, what's nearby, and schedule a showing with ${AGENT_NAME}.`;
+
+    // Absolute OG image so link previews work when the URL is texted or pasted
+    // into Facebook. A relative path silently renders no preview.
+    const cover = photoCount(l) ? photoUrl(l, 0) : null;
+    const ogImage = cover
+      ? (cover.startsWith("http") ? cover : SITE_DOMAIN + cover)
+      : `${SITE_DOMAIN}/assets/img/logo-full.png`;
+
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        // Long enough to absorb a burst from a shared link, short enough that a
+        // price change or status flip surfaces within the hour.
+        "Cache-Control": "public, max-age=600, stale-while-revalidate=3600",
+      },
+      body: render(shell(), {
+        TITLE: title,
+        DESCRIPTION: description,
+        CANONICAL: canonical,
+        OG_IMAGE: ogImage,
+        SCHEMA: `<script type="application/ld+json">${listingSchema(l, canonical, ogImage)}</script>`,
+        BODY: listingBody(l, state && state.lastRunAt),
+      }),
+    };
+  } catch (err) {
+    console.error("listing-page error:", err && err.message);
+    return notFound("Something went wrong loading this listing. Please try again.", 500);
+  }
+};

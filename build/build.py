@@ -880,17 +880,28 @@ def _listing_showcase_js_helpers():
         '" data-kind="Question">Ask A Question</button>' + tourBtn +
         '</div>';
     }} else {{
-      actions = '<p class="listing-address" style="margin-top:10px">' +
-        '<a href="/current-listings.html" style="text-decoration:underline">View Full Details &amp; Ask A Question &rarr;</a></p>';
+      actions = '';   // the detail link below covers this now
     }}
+    // 2026-08-15 (Christine: "there's no link a buyer can text a spouse").
+    // Every card's address is now a real link to that listing's own page
+    // (/listing/<MLS#>, rendered by netlify/functions/listing-page.js), which
+    // is also what makes a single address shareable and indexable at all.
+    var detailHref = l.listingId ? '/listing/' + encodeURIComponent(l.listingId) : null;
+    var addrHtml = detailHref
+      ? '<a href="' + detailHref + '">' + addr + '</a>'
+      : addr;
+    var detailLink = detailHref
+      ? '<p class="listing-address" style="margin-top:10px"><a href="' + detailHref +
+        '" style="text-decoration:underline">View This Listing &amp; Share It &rarr;</a></p>'
+      : '';
     return '<div class="listing-card">' + mediaHtml(l, full) +
       '<div class="listing-body">' +
       badgeHtml +
       '<p class="listing-price">' + esc(fmtPrice(l.price)) + '</p>' +
       '<p class="listing-meta">' + meta + '</p>' +
-      '<p class="listing-address">' + addr + '</p>' +
+      '<p class="listing-address">' + addrHtml + '</p>' +
       '<p class="listing-compliance">' + compliance + '</p>' +
-      actions +
+      actions + detailLink +
       nearbyToggleHtml(addr) +
       '</div></div>';
   }}
@@ -1309,6 +1320,15 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
       <input type="hidden" name="baths" id="{wid}-baths">
       <div class="fs-actions">
         <button class="btn btn-dark" type="submit">Search Homes</button>
+        <label class="fs-sort">
+          <span class="fs-label" style="margin:0">Sort</span>
+          <select id="{wid}-sort" name="sort" class="fs-select" style="width:auto">
+            <option value="price-desc">Price: high to low</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="recent">Recently updated</option>
+            <option value="sqft-desc">Largest first</option>
+          </select>
+        </label>
       </div>
     </form>
     <p class="search-status" id="{wid}-deep-link-note" style="display:none;font-weight:600"></p>
@@ -1665,7 +1685,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     // propertyCategory/minSqft/waterfront/equestrian come from the "More
     // filters" panel; unchecked checkboxes and empty selects simply aren't in
     // the FormData, so no special-casing is needed.
-    ['minPrice', 'maxPrice', 'beds', 'baths',
+    ['minPrice', 'maxPrice', 'beds', 'baths', 'sort',
      'propertyCategory', 'minSqft', 'waterfront', 'equestrian'].forEach(function (k) {{
       var v = data.get(k);
       if (v) p[k] = v;
@@ -1749,6 +1769,13 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     e.preventDefault();
     runSearch(true);
   }});
+  // Changing the sort re-runs immediately -- having to press Search again after
+  // picking an order is the kind of small friction that makes a search feel
+  // broken.
+  var sortSelect = document.getElementById(wid + '-sort');
+  if (sortSelect) {{
+    sortSelect.addEventListener('change', function () {{ runSearch(true); }});
+  }}
   loadMoreBtn.addEventListener('click', function () {{ runSearch(false); }});
 
   if (supportDeepLinks) {{
@@ -7453,6 +7480,68 @@ def copy_static_assets():
     shutil.copytree(src, dst)
 
 
+def write_listing_page_shell():
+    """Emit the page shell netlify/functions/listing-page.js renders each
+    individual listing into.
+
+    2026-08-15 (Christine, on the gaps list: "is this something we can do?" --
+    "No individual listing pages. Every listing lives in a card and a modal, so
+    there's no link a buyer can text a spouse, and Google can't index a single
+    address").
+
+    A listing page can't be a static file: the inventory is 15,000+ records that
+    change every 15 minutes, and a listing that goes off-market has to stop
+    being served. So it's rendered by a function at request time -- but the
+    site's chrome (head, header, trust ribbon, footer, fonts, CSS) is generated
+    HERE, at build time, from the same head()/header_html()/footer_html() the
+    other 141 pages use. That's the whole point: the function fills in a slot
+    rather than carrying a second, hand-written copy of the site design that
+    would drift the first time the header changed.
+
+    Placeholders, all replaced by the function:
+      {{TITLE}} {{DESCRIPTION}} {{CANONICAL}} {{OG_IMAGE}} {{SCHEMA}} {{BODY}}
+    """
+    out_dir = os.path.abspath(os.path.join(HERE, "..", "netlify", "functions", "lib"))
+    os.makedirs(out_dir, exist_ok=True)
+    # head() hardcodes its own canonical/og:image from the path, which is right
+    # for static pages and wrong here (one shell, many listings), so those two
+    # lines are re-opened as placeholders.
+    shell_head = head("{{TITLE}}", "{{DESCRIPTION}}", "/listing/", schema_extra="{{SCHEMA}}")
+    shell_head = shell_head.replace(
+        f'<link rel="canonical" href="{SITE["domain"]}/listing/">',
+        '<link rel="canonical" href="{{CANONICAL}}">',
+    ).replace(
+        f'<meta property="og:url" content="{SITE["domain"]}/listing/">',
+        '<meta property="og:url" content="{{CANONICAL}}">',
+    ).replace(
+        f'<meta property="og:image" content="{SITE["domain"]}/assets/img/logo-full.png">',
+        # The listing's own cover photo, so texting the link shows the house.
+        '<meta property="og:image" content="{{OG_IMAGE}}">\n'
+        '<meta name="twitter:image" content="{{OG_IMAGE}}">',
+    ).replace(
+        '<meta name="twitter:card" content="summary">',
+        '<meta name="twitter:card" content="summary_large_image">',
+    )
+    shell = f"""{shell_head}
+<body>
+{header_html("Current Listings")}
+{_trust_ribbon_html()}
+{{{{BODY}}}}
+{footer_html()}
+{_scroll_reveal_script()}
+</body>
+</html>"""
+    path = os.path.join(out_dir, "_listing-page-shell.html")
+    with open(path, "w") as f:
+        f.write(shell)
+    for token in ("{{TITLE}}", "{{DESCRIPTION}}", "{{CANONICAL}}", "{{OG_IMAGE}}",
+                  "{{SCHEMA}}", "{{BODY}}"):
+        if token not in shell:
+            raise SystemExit(f"listing page shell is missing {token} — check head()/page() "
+                             f"for a change that broke the placeholder substitution")
+    print(f"  listing page shell: {len(shell):,} bytes, all placeholders present")
+
+
 def write_map_county_data():
     """Emit the county -> {slug, cities, liveSearch} map that map.js reads.
 
@@ -7498,6 +7587,7 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     copy_static_assets()
     write_map_county_data()   # must follow copy_static_assets: writes into site/assets
+    write_listing_page_shell()
     write_neighborhood_quiz_script()
     build_home()
     build_communities_index()

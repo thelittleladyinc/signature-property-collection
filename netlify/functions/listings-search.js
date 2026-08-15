@@ -45,7 +45,9 @@
 const { getStore } = require("@netlify/blobs");
 const {
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, matchesQuery, getBlobStore,
+  BASE_URL, SELECT_FIELDS,
 } = require("./lib/_mls-shared");
+const { prewarmPhotoUrls } = require("./lib/_media");
 
 // ---- Photo URLs the browser can actually load ----------------------------
 // 2026-08-15 (Christine: "still no photos", with a screenshot of a Search
@@ -187,6 +189,26 @@ exports.handler = async (event) => {
       const s = String(l.status || "").toLowerCase();
       return s.indexOf("contract") !== -1 || s.indexOf("pending") !== -1;
     };
+    // 2026-08-15 (Christine: "No sort control. Results are always
+    // most-expensive-first"). That default is why an $81.6M ranch was the first
+    // thing on her public search page. Four orderings, and the labels in the UI
+    // say exactly what each one sorts by:
+    //
+    // "recent" uses modificationTimestamp, which is honestly labelled
+    // "Recently updated" rather than "Newest" -- it moves when a price changes
+    // or a status flips, not only when a listing first appears. A true
+    // on-market date would mean adding OnMarketDate/ListingContractDate to
+    // $select, and this feed has a documented history of 400ing standard RESO
+    // field names, which would break the whole crawl. Worth probing separately
+    // in an isolated try/catch; not worth risking the sync for a sort option.
+    const SORTS = {
+      "price-desc": (a, b) => (b.price || 0) - (a.price || 0),
+      "price-asc": (a, b) => (a.price || Infinity) - (b.price || Infinity),
+      "sqft-desc": (a, b) => (b.sqft || 0) - (a.sqft || 0),
+      "recent": (a, b) =>
+        String(b.modificationTimestamp || "").localeCompare(String(a.modificationTimestamp || "")),
+    };
+    const sortFn = SORTS[params.sort] || SORTS["price-desc"];
     const matched = Object.values(listingsById)
       .filter((l) => matchesQuery(l, params))
       .sort((a, b) => {
@@ -195,7 +217,7 @@ exports.handler = async (event) => {
           const bFirst = isUnderContractOrPending(b) ? 1 : 0;
           if (aFirst !== bFirst) return bFirst - aFirst;
         }
-        return (b.price || 0) - (a.price || 0);
+        return sortFn(a, b);
       });
 
     const page = matched.slice(skip, skip + top).map((l) => {
@@ -221,6 +243,22 @@ exports.handler = async (event) => {
           ? photos.length
           : (typeof l.photoCount === "number" ? l.photoCount : (l.photo ? 1 : 0)),
       };
+    });
+
+    // 2026-08-15 (Christine: "why some photos in and some are not?"). Resolve
+    // this page's photo URLs in ONE MLS Grid call before responding, so the 12
+    // image requests the browser is about to fire are cache hits instead of 12
+    // separate API calls racing each other into MLS Grid's rate limit. Awaited
+    // deliberately -- doing it after the response isn't reliable in a Netlify
+    // function -- but bounded, best-effort, and skipped entirely when the cache
+    // is already warm, so search results are never held up for long and a
+    // failure here costs a placeholder, not a broken page.
+    await prewarmPhotoUrls(page, {
+      store,
+      token: process.env.MLSGRID_API_TOKEN,
+      baseUrl: BASE_URL,
+      selectFields: SELECT_FIELDS,
+      timeoutMs: 3500,
     });
 
     const response = {

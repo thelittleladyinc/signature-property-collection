@@ -1,0 +1,182 @@
+// Shared photo-URL resolution for listing-photo.js (serves one image) and
+// listings-search.js (pre-warms a whole page of them).
+//
+// 2026-08-15, second pass. The first pass moved listing photos onto this site's
+// own domain, which fixed the "no photos at all" problem -- Christine's next
+// screenshot showed real photos loading. It also showed the next problem:
+// "why some photos in and some are not?" Some cards rendered, some stayed gray,
+// on the same page, with the gray ones still reporting "View All 25 Photos" --
+// so the data was there and the fetch was what failed.
+//
+// The cause is a burst. A search page shows 12 cards, the browser requests 12
+// images at once, and in the first pass EACH of those was its own function
+// invocation making its own MLS Grid API call. MLS Grid's documented limit is
+// about 2 requests per second, and that account is shared with Christine's two
+// other apps (Listing-Engine and Expired-Luxury), so 12 simultaneous calls
+// reliably 429s most of them. Each 429 became a gray placeholder.
+//
+// Two fixes, both here:
+//
+//   1. BATCH. listings-search.js resolves the media for every listing on the
+//      page in ONE MLS Grid call (OR-joined ListingId clauses -- `in` isn't
+//      reliably supported on this feed) and writes them all to the cache before
+//      the browser ever asks for an image. So a page costs 1 API call instead
+//      of 12, and the image requests are cache hits.
+//   2. DON'T POISON THE SYNC. The first pass had listing-photo.js call
+//      markSuspended() on a 429, which is the flag sync-listings.js uses to
+//      stop itself. A burst of photo requests could therefore pause the
+//      15-minute listing sync -- photo traffic taking down data replication.
+//      Photo requests now respect that flag but never set it; they set their
+//      own, shorter cooldown instead.
+const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
+
+// Comfortably inside MLS Grid's ~1-2 hour signature life.
+const URL_CACHE_TTL_MS = 40 * 60 * 1000;
+
+// The sync's flag: respected everywhere, set only by sync-listings.js.
+const SYNC_SUSPENSION_KEY = "mlsgrid-suspension.json";
+// Photo traffic's own flag, deliberately separate and much shorter.
+const PHOTO_COOLDOWN_KEY = "mlsgrid-photo-cooldown.json";
+const PHOTO_COOLDOWN_MS = 45 * 1000;
+
+const BATCH_TIMEOUT_MS = 5000;
+const SINGLE_TIMEOUT_MS = 6000;
+// One MLS Grid URL has to stay a sane length, and $top bounds the response.
+const MAX_IDS_PER_BATCH = 12;
+
+function cacheKey(listingId) {
+  return `${PHOTO_URL_CACHE_PREFIX}${listingId}.json`;
+}
+
+async function readCachedUrls(store, listingId) {
+  const cached = await store.get(cacheKey(listingId), { type: "json" }).catch(() => null);
+  if (!cached || !Array.isArray(cached.urls)) return null;
+  const fresh = typeof cached.cachedAt === "number" &&
+    Date.now() - cached.cachedAt < URL_CACHE_TTL_MS;
+  // Stale entries are still returned, flagged -- a signed URL a little past our
+  // conservative TTL is often still valid, and trying it costs MLS Grid nothing.
+  return { urls: cached.urls, fresh };
+}
+
+async function writeCachedUrls(store, listingId, urls) {
+  await store.setJSON(cacheKey(listingId), { urls, cachedAt: Date.now() }).catch(() => {});
+}
+
+async function isThrottled(store) {
+  const [sync, photo] = await Promise.all([
+    store.get(SYNC_SUSPENSION_KEY, { type: "json" }).catch(() => null),
+    store.get(PHOTO_COOLDOWN_KEY, { type: "json" }).catch(() => null),
+  ]);
+  const until = Math.max(
+    (sync && typeof sync.suspendedUntil === "number") ? sync.suspendedUntil : 0,
+    (photo && typeof photo.until === "number") ? photo.until : 0,
+  );
+  return until > Date.now() ? until : null;
+}
+
+async function setPhotoCooldown(store) {
+  await store.setJSON(PHOTO_COOLDOWN_KEY, { until: Date.now() + PHOTO_COOLDOWN_MS }).catch(() => {});
+}
+
+// MLS Grid can't sort inside $expand (its docs say so explicitly), so Order
+// decides and array position breaks ties -- same rule as mapListing().
+function mediaUrlsFrom(record) {
+  return (Array.isArray(record && record.Media) ? record.Media.slice() : [])
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => {
+      const ao = typeof a.m.Order === "number" ? a.m.Order : Number.MAX_SAFE_INTEGER;
+      const bo = typeof b.m.Order === "number" ? b.m.Order : Number.MAX_SAFE_INTEGER;
+      return ao !== bo ? ao - bo : a.i - b.i;
+    })
+    .map((x) => x.m && x.m.MediaURL)
+    .filter(Boolean);
+}
+
+// Resolves media for one or many listing ids in a single request. Returns a
+// {listingId: urls[]} map of whatever came back, and writes each to the cache.
+// Never throws: on any failure it resolves to whatever it managed to get.
+async function resolveMediaFor(ids, { store, token, baseUrl, selectFields, timeoutMs }) {
+  const wanted = ids.slice(0, MAX_IDS_PER_BATCH).filter(Boolean);
+  if (!wanted.length || !token) return {};
+  const idClause = wanted.map((id) => `ListingId eq '${id}'`).join(" or ");
+  const qs = new URLSearchParams({
+    "$filter": `(${idClause}) and MlgCanView eq true`,
+    "$select": selectFields,
+    "$expand": "Media",
+    "$top": String(wanted.length),
+  });
+  try {
+    const res = await fetch(`${baseUrl}?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(timeoutMs || BATCH_TIMEOUT_MS),
+    });
+    if (res.status === 429) {
+      // Our own cooldown, NOT the sync's suspension flag.
+      await setPhotoCooldown(store);
+      return {};
+    }
+    if (!res.ok) return {};
+    const json = await res.json();
+    const out = {};
+    // This feed is documented to sometimes ignore a ListingId filter and return
+    // an unrelated record, so only ids we actually asked for are accepted.
+    const asked = new Set(wanted.map(String));
+    for (const record of (json.value || [])) {
+      const id = String(record && record.ListingId);
+      if (!asked.has(id)) continue;
+      const urls = mediaUrlsFrom(record);
+      if (!urls.length) continue;
+      out[id] = urls;
+      await writeCachedUrls(store, id, urls);
+    }
+    return out;
+  } catch (err) {
+    console.error("resolveMediaFor failed:", err && err.message);
+    return {};
+  }
+}
+
+// Called by listings-search.js for the page it's about to return: fills the
+// cache for any listing that doesn't already have a fresh entry, so the
+// browser's image requests don't each trigger their own API call. Bounded and
+// best-effort -- a slow or throttled MLS Grid must never delay search results,
+// so a failure here just means those photos resolve individually (and may hit
+// the placeholder once) rather than a broken page.
+async function prewarmPhotoUrls(listings, { store, token, baseUrl, selectFields, timeoutMs }) {
+  if (!token || !Array.isArray(listings) || !listings.length) return 0;
+  const throttledUntil = await isThrottled(store);
+  if (throttledUntil) return 0;
+
+  const needed = [];
+  await Promise.all(listings.slice(0, MAX_IDS_PER_BATCH).map(async (l) => {
+    if (!l || !l.listingId) return;
+    // A listing whose cover is already re-hosted on Cloudinary never needs a
+    // signed URL at all.
+    const rehosted = (Array.isArray(l.cloudinaryPhotos) && l.cloudinaryPhotos[0]) || l.cloudinaryPhoto;
+    if (typeof rehosted === "string" && rehosted.indexOf("res.cloudinary.com") !== -1) return;
+    const cached = await readCachedUrls(store, l.listingId);
+    if (cached && cached.fresh) return;
+    needed.push(l.listingId);
+  }));
+
+  if (!needed.length) return 0;
+  const resolved = await resolveMediaFor(needed, {
+    store, token, baseUrl, selectFields, timeoutMs: timeoutMs || BATCH_TIMEOUT_MS,
+  });
+  return Object.keys(resolved).length;
+}
+
+module.exports = {
+  PHOTO_URL_CACHE_PREFIX,
+  URL_CACHE_TTL_MS,
+  PHOTO_COOLDOWN_MS,
+  SINGLE_TIMEOUT_MS,
+  cacheKey,
+  readCachedUrls,
+  writeCachedUrls,
+  isThrottled,
+  setPhotoCooldown,
+  mediaUrlsFrom,
+  resolveMediaFor,
+  prewarmPhotoUrls,
+};

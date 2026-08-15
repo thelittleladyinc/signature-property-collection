@@ -1027,3 +1027,23 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 }
 .poi-icon-marker svg { width: 60%; height: 60%; }
 .leaflet-marker-icon:hover .poi-icon-marker { transform: scale(1.12); }
+
+/* Sort control, sitting beside the Search button (2026-08-15). */
+.fs-sort { display: inline-flex; align-items: center; gap: 10px; }
+.fs-sort .fs-label { white-space: nowrap; }
+
+/* Individual listing page (/listing/<MLS#>, rendered by
+   netlify/functions/listing-page.js). 2026-08-15.
+   .listing-detail-thumbs was referenced by that function before this rule
+   existed, which stacked 12 photos in a single 100%-wide column -- caught in a
+   browser screenshot, not in review. */
+.listing-detail-thumbs {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 8px;
+}
+.listing-detail-thumbs img {
+  width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 3px;
+  background: #eee; box-shadow: 0 4px 14px rgba(20,20,21,.07);
+}
+.listing-detail-thumbs > p { grid-column: 1 / -1; margin: 4px 0 0; }
+@media (max-width: 860px) { .listing-detail-thumbs { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .listing-detail-thumbs { grid-template-columns: repeat(2, 1fr); } }

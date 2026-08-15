@@ -42,24 +42,27 @@
 //      gallery costs one request, not thirty.
 //   3. Successful responses are cached hard at the CDN, so a listing everyone
 //      is looking at costs MLS Grid nothing after the first viewer.
-//   4. The same suspension flag sync-listings.js sets on a 429 is honored
-//      here, so if the account is being rate limited this function stops
-//      calling MLS Grid entirely instead of adding to the problem.
-//   5. Any failure returns a neutral gray placeholder with a SHORT cache, so a
+//   4. listings-search.js pre-warms the whole page's photo URLs in ONE MLS Grid
+//      call before the browser asks for any of them (prewarmPhotoUrls in
+//      lib/_media.js), so a 12-card page costs 1 API call, not 12. Added
+//      2026-08-15 after Christine asked "why some photos in and some are not?"
+//      -- 12 simultaneous invocations each making their own call was tripping
+//      MLS Grid's ~2-requests-per-second limit and every 429 became a gray box.
+//   5. This function RESPECTS the suspension flag sync-listings.js sets on a
+//      429, but never sets it -- it sets a shorter photo-only cooldown instead.
+//      The first version set the shared flag, which meant a burst of photo
+//      requests could pause the 15-minute listing sync: photo traffic taking
+//      down data replication.
+//   6. Any failure returns a neutral gray placeholder with a SHORT cache, so a
 //      broken photo self-heals on the next view instead of being frozen into
 //      the CDN for a day.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore, BASE_URL, SELECT_FIELDS } = require("./lib/_mls-shared");
+const {
+  readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS,
+} = require("./lib/_media");
 
 const BLOB_STORE_NAME = "mls-listings";
-const SUSPENSION_KEY = "mlsgrid-suspension.json";
-const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
-
-// Comfortably inside MLS Grid's ~1-2 hour signature life, so a cached URL is
-// still valid when we use it.
-const URL_CACHE_TTL_MS = 40 * 60 * 1000;
-
-const MLS_FETCH_TIMEOUT_MS = 6000;
 const IMAGE_FETCH_TIMEOUT_MS = 8000;
 
 // How long the CDN may serve our copy of a photo. Listing photos do change
@@ -89,72 +92,24 @@ function placeholder(reason) {
   };
 }
 
-async function readSuspension(store) {
-  const state = await store.get(SUSPENSION_KEY, { type: "json" }).catch(() => null);
-  const until = state && state.suspendedUntil;
-  return typeof until === "number" && until > Date.now() ? until : null;
-}
-
-// Ordered media URLs for one listing, from the cache if it's fresh, otherwise
-// from MLS Grid. Returns null when MLS Grid can't be asked or has nothing.
+// One MLS Grid call per listing, cached for both this photo and the other 29 in
+// the same gallery. listings-search.js normally warms this ahead of the
+// browser's requests (see prewarmPhotoUrls in lib/_media.js) -- this path is the
+// fallback for a direct hit, a shared link, or a cache that expired mid-visit.
 async function resolvePhotoUrls(listingId, store, token) {
-  const cacheKey = PHOTO_URL_CACHE_PREFIX + listingId + ".json";
-  const cached = await store.get(cacheKey, { type: "json" }).catch(() => null);
-  if (cached && Array.isArray(cached.urls) && typeof cached.cachedAt === "number" &&
-      Date.now() - cached.cachedAt < URL_CACHE_TTL_MS) {
-    return cached.urls;
-  }
+  const cached = await readCachedUrls(store, listingId);
+  if (cached && cached.fresh) return cached.urls;
 
-  const suspendedUntil = await readSuspension(store);
-  if (suspendedUntil) {
-    // Rate limited account-wide. A stale cached URL is worth trying anyway --
-    // it may still be inside its signature window, and it costs MLS Grid
-    // nothing to find out.
-    return (cached && Array.isArray(cached.urls)) ? cached.urls : null;
-  }
+  // Respects the sync's suspension flag AND the photo-specific cooldown, and
+  // sets only the latter -- photo traffic must never pause listing replication.
+  const throttledUntil = await isThrottled(store);
+  if (throttledUntil) return cached ? cached.urls : null;
 
-  // Same request shape refreshOneListing() uses, including the MlgCanView
-  // guard and $top=1 -- and the same reason for not trusting the response
-  // blindly: this feed is documented to sometimes ignore a ListingId filter
-  // and return an unrelated record, so the returned ListingId is checked
-  // before its media is used.
-  const qs = new URLSearchParams({
-    "$filter": `ListingId eq '${listingId}' and MlgCanView eq true`,
-    "$select": SELECT_FIELDS,
-    "$expand": "Media",
-    "$top": "1",
+  const resolved = await resolveMediaFor([listingId], {
+    store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS,
+    timeoutMs: SINGLE_TIMEOUT_MS,
   });
-  const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
-  });
-  if (res.status === 429) {
-    await store.setJSON(SUSPENSION_KEY, { suspendedUntil: Date.now() + 5 * 60 * 1000 });
-    return (cached && Array.isArray(cached.urls)) ? cached.urls : null;
-  }
-  if (!res.ok) return (cached && Array.isArray(cached.urls)) ? cached.urls : null;
-
-  const json = await res.json();
-  const record = (json.value || [])[0];
-  if (!record || String(record.ListingId) !== String(listingId)) {
-    return (cached && Array.isArray(cached.urls)) ? cached.urls : null;
-  }
-
-  // Same ordering rule as mapListing()/sortMediaByOrder(): MLS Grid can't sort
-  // inside $expand, so Order decides, with array position as the tiebreak.
-  const media = (Array.isArray(record.Media) ? record.Media.slice() : [])
-    .map((m, i) => ({ m, i }))
-    .sort((a, b) => {
-      const ao = typeof a.m.Order === "number" ? a.m.Order : Number.MAX_SAFE_INTEGER;
-      const bo = typeof b.m.Order === "number" ? b.m.Order : Number.MAX_SAFE_INTEGER;
-      return ao !== bo ? ao - bo : a.i - b.i;
-    })
-    .map((x) => x.m && x.m.MediaURL)
-    .filter(Boolean);
-
-  if (!media.length) return null;
-  await store.setJSON(cacheKey, { urls: media, cachedAt: Date.now() }).catch(() => {});
-  return media;
+  return resolved[listingId] || (cached ? cached.urls : null);
 }
 
 exports.handler = async (event) => {

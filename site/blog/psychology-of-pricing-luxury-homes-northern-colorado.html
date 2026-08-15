@@ -325,17 +325,28 @@
         '" data-kind="Question">Ask A Question</button>' + tourBtn +
         '</div>';
     } else {
-      actions = '<p class="listing-address" style="margin-top:10px">' +
-        '<a href="/current-listings.html" style="text-decoration:underline">View Full Details &amp; Ask A Question &rarr;</a></p>';
+      actions = '';   // the detail link below covers this now
     }
+    // 2026-08-15 (Christine: "there's no link a buyer can text a spouse").
+    // Every card's address is now a real link to that listing's own page
+    // (/listing/<MLS#>, rendered by netlify/functions/listing-page.js), which
+    // is also what makes a single address shareable and indexable at all.
+    var detailHref = l.listingId ? '/listing/' + encodeURIComponent(l.listingId) : null;
+    var addrHtml = detailHref
+      ? '<a href="' + detailHref + '">' + addr + '</a>'
+      : addr;
+    var detailLink = detailHref
+      ? '<p class="listing-address" style="margin-top:10px"><a href="' + detailHref +
+        '" style="text-decoration:underline">View This Listing &amp; Share It &rarr;</a></p>'
+      : '';
     return '<div class="listing-card">' + mediaHtml(l, full) +
       '<div class="listing-body">' +
       badgeHtml +
       '<p class="listing-price">' + esc(fmtPrice(l.price)) + '</p>' +
       '<p class="listing-meta">' + meta + '</p>' +
-      '<p class="listing-address">' + addr + '</p>' +
+      '<p class="listing-address">' + addrHtml + '</p>' +
       '<p class="listing-compliance">' + compliance + '</p>' +
-      actions +
+      actions + detailLink +
       nearbyToggleHtml(addr) +
       '</div></div>';
   }

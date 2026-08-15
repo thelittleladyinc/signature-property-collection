@@ -27,3 +27,19 @@
 # Grid doesn't work and this replication step is required instead).
 [functions."sync-listings"]
   schedule = "*/15 * * * *"
+
+# Clean, shareable, indexable URL for one listing:
+#   /listing/IRE1234567  ->  netlify/functions/listing-page.js
+#
+# 2026-08-15 (Christine: "No individual listing pages... there's no link a buyer
+# can text a spouse, and Google can't index a single address"). A 200 rewrite
+# rather than a 301 so the pretty URL is the one that stays in the address bar,
+# gets shared, and is what the page's own canonical tag points at.
+#
+# force = false so a real file at that path would still win -- nothing is there
+# today, and this way adding one later doesn't require remembering this rule.
+[[redirects]]
+  from = "/listing/:id"
+  to = "/.netlify/functions/listing-page?id=:id"
+  status = 200
+  force = false
