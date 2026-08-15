@@ -117,7 +117,18 @@ const CO_CITY_COUNTY = {
   "hudson": "weld", "keenesburg": "weld", "fort lupton": "weld", "dacono": "weld",
   "firestone": "weld", "frederick": "weld", "erie": "weld", "lochbuie": "weld",
   "gill": "weld", "galeton": "weld", "briggsdale": "weld", "grover": "weld",
-  "roggen": "weld", "wiggins": "morgan",
+  "roggen": "weld",
+  // 2026-08-15: Carr added on Christine's correction -- it was missing from
+  // this table entirely, which showed up when checking her own sold homes
+  // against it (Carr was the one town of 21 it couldn't place). Missing towns
+  // are kept rather than dropped, so nothing was ever hidden, but the county
+  // was also never inferred for them.
+  "carr": "weld",
+  // Morgan County (2026-08-15, Christine: "i need morgan county too"). Only
+  // Wiggins was here before, so Fort Morgan and Brush -- the two biggest towns
+  // in the county -- couldn't be placed at all.
+  "wiggins": "morgan", "fort morgan": "morgan", "brush": "morgan",
+  "log lane village": "morgan",
   // Broader Front Range -- kept available for a future widen (same as
   // Expired-Luxury's table) but not applied unless OPERATING_COUNTIES below
   // is actually set to include them.

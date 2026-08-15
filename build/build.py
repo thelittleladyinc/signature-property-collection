@@ -268,6 +268,25 @@ COUNTIES = [
                  "Littleton.",
     },
     {
+        "slug": "morgan", "name": "Morgan County",
+        # 2026-08-15 (Christine: "i need morgan county too"). She works it, and
+        # the site had zero mentions of Morgan County, Fort Morgan, Brush or
+        # Wiggins anywhere -- no page, not in areaServed schema, not in the
+        # footer. Not flagged priority: this is a real service area, not one of
+        # the farm areas the luxury-tier search is tuned around.
+        #
+        # NOTE for whoever adds content here: the cities below deliberately have
+        # no city sub-pages yet. build_city_pages() only builds one where real
+        # captured content exists in city_content.json, so these list on the
+        # county page and in search without inventing local copy. That gate is
+        # the same reason the Ault data bug was caught -- don't work around it.
+        "priority": False,
+        "cities": ["Fort Morgan", "Brush", "Wiggins", "Log Lane Village"],
+        "blurb": "Morgan County sits east along I-76 and the South Platte, with "
+                 "Fort Morgan and Brush anchoring some of the most attainable "
+                 "acreage and small-town pricing in the region.",
+    },
+    {
         "slug": "adams", "name": "Adams County",
         # 2026-08-14: flipped True -- Christine confirmed IRES reciprocates
         # data with REcolorado (the Denver-metro MLS), and this is backed by
@@ -2344,6 +2363,18 @@ def build_home():
 
 
 # --------------------------------------------------------- COMMUNITIES ----
+def _county_name_list():
+    """Oxford-comma list of the counties actually in COUNTIES, short names.
+
+    2026-08-15: this used to be typed out by hand in two places, which both
+    silently went stale the moment Morgan County was added -- the page claimed
+    8 counties while the site served 9. Derived now so that can't recur."""
+    names = [c["name"].replace(" County", "") for c in COUNTIES]
+    if len(names) < 3:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + ", and " + names[-1]
+
+
 def build_communities_index():
     county_btns = "\n        ".join(
         f'<a class="county-btn" data-slug="{c["slug"]}" href="/communities/{c["slug"]}.html">{c["name"]} <span>&rsaquo;</span></a>'
@@ -2355,7 +2386,7 @@ def build_communities_index():
     <span class="eyebrow">Click To Explore</span>
     <h1 class="section-title" style="color:#fff">Find Your Community</h1>
     <p class="lede" style="color:rgba(255,255,255,.8)">Explore Northern Colorado county by
-    county — Larimer, Weld, Boulder, Broomfield, Jefferson, Denver, Arapahoe, and Adams.</p>
+    county — {_county_name_list()}.</p>
   </div>
 </section>
 <section class="section-dark">
@@ -2376,8 +2407,7 @@ def build_communities_index():
     extra = _leaflet_lazy_loader_extra()
     page(
         "Explore Northern Colorado Communities | Signature Property Collection",
-        "Click-to-explore county map of Northern Colorado — Larimer, Weld, Boulder, "
-        "Broomfield, Jefferson, Denver, Arapahoe, and Adams counties.",
+        f"Click-to-explore county map of Northern Colorado — {_county_name_list()} counties.",
         "/communities/index.html", "Communities", body, extra,
     )
 

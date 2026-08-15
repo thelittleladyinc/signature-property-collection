@@ -22,6 +22,7 @@
 - [Jefferson County](/communities/jefferson.html)
 - [Denver County](/communities/denver.html)
 - [Arapahoe County](/communities/arapahoe.html)
+- [Morgan County](/communities/morgan.html)
 - [Adams County](/communities/adams.html)
 
 ## Cities with dedicated local pages
