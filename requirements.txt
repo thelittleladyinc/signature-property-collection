@@ -1,5 +1,5 @@
-# Only needed to run `python3 build/build.py` locally (regenerates /site).
-# The live site is pre-built and committed -- Netlify just serves /site
-# directly (see netlify.toml) -- so this is a dev-time dependency only,
-# never something that needs to be installed anywhere else.
+# Needed to run `python3 build/build.py`, which happens in TWO places as of
+# 2026-08-15: locally, and on every Netlify deploy (scripts/netlify-build.sh
+# installs this file before building). It is no longer a dev-only dependency --
+# removing or breaking anything here will show up in the deploy log.
 qrcode>=8.0

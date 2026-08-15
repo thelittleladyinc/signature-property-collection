@@ -23,12 +23,22 @@ netlify.toml          — Netlify config: publish dir + function schedules
 netlify/functions/    — server-side bits (MLS sync, Google lookups, lead push)
 ```
 
-> **Netlify does not build this site.** `netlify.toml` sets `publish = "site"`
-> and nothing else, so Netlify serves the committed `site/` folder as-is. That
-> means **editing `build/build.py` alone changes nothing on the live site** —
-> you have to run `python3 build/build.py` yourself and commit the regenerated
-> `site/` along with it. Every content change is a two-part commit: the source
-> under `build/`, and the generated output under `site/`.
+> **Netlify rebuilds the site on every deploy** (as of 2026-08-15). Pushing a
+> change to `build/build.py` is enough — `scripts/netlify-build.sh` installs
+> `requirements.txt` and regenerates `site/` during the deploy. Before this,
+> Netlify published the committed `site/` as-is, so editing `build.py` and
+> pushing silently did nothing.
+>
+> Committing the regenerated `site/` anyway is still recommended: it is the
+> fallback if the build image can't run Python, and it keeps `git diff` honest
+> about what a content change actually produces. Run `python3 build/build.py`
+> before committing and you will see exactly what the deploy will publish.
+>
+> Failure behaviour is deliberate: a build-image problem (no `python3`, pip
+> failure) is non-fatal and publishes the committed `site/` exactly as the old
+> setup did, while an actual error in `build.py` fails the deploy so a
+> half-written `site/` is never published and the last good deploy keeps
+> serving.
 
 Don't hand-edit files in `site/` — they get overwritten every time
 `build.py` runs. Edit `build/build.py` (content/copy) or `build/assets/`
@@ -473,9 +483,9 @@ jobs, and this project already uses two of them together:
   it doesn't serve the website to visitors. It's not an alternative to
   Netlify or Render — it's what feeds either of them.
 - **Netlify** is what this site is already built for. It's a static-site
-  host: push to GitHub and Netlify publishes the committed `site/` folder
-  (it does *not* run `build.py` — you run that locally and commit the
-  output, see the warning at the top), free, with free SSL, a global
+  host: push to GitHub and Netlify runs `scripts/netlify-build.sh` (which
+  regenerates `site/` via `build.py`) and publishes `site/`, free, with
+  free SSL, a global
   CDN, and — importantly — **Netlify Forms already wired into every lead
   form on the site** (contact, guides, relocation, valuation, lifestyle
   search). This is the right home for signaturepropertycollection.com.
@@ -566,14 +576,12 @@ build-time-only (a static generator, no live CMS/database), which is a
    PR for you to approve first (recommended at the start, so you're
    reviewing AI-drafted copy before it goes live — you can always turn on
    auto-merge later once you trust the output).
-4. **Publish.** Netlify auto-deploys on every push to `main`, but it does
-   **not** run `build.py` — so a job that only appends to
-   `build/data/blog.json` would change nothing visitors can see. Whatever
-   writes that file has to run `python3 build/build.py` and commit the
-   regenerated `site/` in the same push. (The alternative is adding a real
-   build command to `netlify.toml`; that trades "nothing can fail at deploy
-   time" for convenience, which is a deliberate call to make, not an
-   oversight to fix.)
+4. **Publish.** Netlify auto-deploys on every push to `master` and now runs
+   `build.py` as part of that deploy, so a job that appends to
+   `build/data/blog.json` and pushes is genuinely enough — the new post
+   appears without anyone running the generator by hand. Committing the
+   regenerated `site/` alongside it is still good practice (see the note at
+   the top), just no longer required for the change to go live.
 
 None of this needs a new hosting platform or a rewrite of this site — it's
 one new small service (on Render, or even a scheduled GitHub Action) that

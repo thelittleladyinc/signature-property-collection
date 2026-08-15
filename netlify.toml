@@ -1,9 +1,21 @@
-# The finished site is pre-built and committed in /site, so Netlify just
-# serves it directly — no build step, nothing that can fail at deploy time.
-# To make content changes: edit build/build.py, run `python3 build/build.py`
-# locally to regenerate /site, then commit and push both.
+# 2026-08-15: Netlify now REGENERATES the site on every deploy, so editing
+# build/build.py and pushing is enough. It previously ran no build at all and
+# published the committed /site as-is, which meant a content change pushed
+# without a local rebuild silently did nothing — no error, no clue.
+#
+# The original reasoning ("nothing that can fail at deploy time") is preserved
+# rather than discarded: scripts/netlify-build.sh treats a build-image problem
+# (no python3, pip failure) as non-fatal and publishes the committed /site
+# exactly as before, and treats an actual generator error as fatal so a
+# half-written /site is never published and the last good deploy keeps serving.
+# See that script's header for the full reasoning; its failure paths are
+# covered by tests.
+#
+# Committing /site is still worth doing: it stays the fallback, and it keeps
+# `git diff` honest about what a content change actually produces.
 # (site/_redirects already handles "/" -> "/index.html".)
 [build]
+  command = "bash scripts/netlify-build.sh"
   publish = "site"
 
 [functions]
