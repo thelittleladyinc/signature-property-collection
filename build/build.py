@@ -102,6 +102,7 @@ LEGACY_URL_REDIRECTS = {
 # stay as plain pills on the county page.
 CITY_DATA_SLUG = {
     "Fort Collins": "fort-collins", "Loveland": "loveland", "Berthoud": "berthoud",
+    "Estes Park": "estes-park",
     "Masonville": "masonville", "Windsor": "windsor", "Timnath": "timnath",
     "Wellington": "wellington", "Red Feather Lakes": "red-feather-lakes",
     "Greeley": "greeley", "Severance": "severance", "Eaton": "eaton",

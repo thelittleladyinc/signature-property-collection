@@ -29,6 +29,7 @@
 ## Cities with dedicated local pages
 - [Fort Collins, Larimer County](/communities/larimer/fort-collins.html)
 - [Loveland, Larimer County](/communities/larimer/loveland.html)
+- [Estes Park, Larimer County](/communities/larimer/estes-park.html)
 - [Berthoud, Larimer County](/communities/larimer/berthoud.html)
 - [Masonville, Larimer County](/communities/larimer/masonville.html)
 - [Windsor, Larimer County](/communities/larimer/windsor.html)
