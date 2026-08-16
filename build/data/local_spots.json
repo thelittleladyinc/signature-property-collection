@@ -509,7 +509,10 @@
       "videoId": "K8sjM8_7o5I",
       "videoTitle": "Upgrade Your View: Luxurious Living in Windsor, Colorado",
       "views": 744,
-      "_why": "Named in the video: \"with Downtown Windsor being less than a mile away you'll be able to enjoy your evenings at the Windsor Mill Tavern\". Transcript read 2026-08-16; views from vidIQ the same day. Address 301 Main St Unit C per Yelp and the Windsor Chamber listing."
+      "_why": "Named in the video: \"with Downtown Windsor being less than a mile away you'll be able to enjoy your evenings at the Windsor Mill Tavern\". Transcript read 2026-08-16; views from vidIQ the same day. Address 301 Main St Unit C per Yelp and the Windsor Chamber listing. 2026-08-16: also shown on the Larimer Windsor page (Christine: \"same town\"). One record rather than a copy, so the county map still gets one pin and the view counts are not double-counted.",
+      "alsoOnCityHrefs": [
+        "/communities/larimer/windsor.html"
+      ]
     },
     {
       "name": "Windsor Lake & Boardwalk Park",
@@ -522,7 +525,10 @@
       "videoId": "SAZceZQJrAs",
       "videoTitle": "Is This the Cutest Home in Windsor, Colorado?",
       "views": 1096,
-      "_why": "Named in the video: \"community events at nearby Windsor Lake\". Transcript read 2026-08-16; views from vidIQ the same day. Address 100 N 5th St per the Town of Windsor / Boardwalk Park listings."
+      "_why": "Named in the video: \"community events at nearby Windsor Lake\". Transcript read 2026-08-16; views from vidIQ the same day. Address 100 N 5th St per the Town of Windsor / Boardwalk Park listings. 2026-08-16: also shown on the Larimer Windsor page (Christine: \"same town\"). One record rather than a copy, so the county map still gets one pin and the view counts are not double-counted.",
+      "alsoOnCityHrefs": [
+        "/communities/larimer/windsor.html"
+      ]
     }
   ],
   "_view_note": "She confirmed the steakhouse is The Loveland Chophouse, and naming Horsetooth Reservoir + the Denver park resolved two videos whose titles never said where they were."

@@ -28,6 +28,7 @@
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Who is the best real estate agent in Log Lane Village, CO?", "acceptedAnswer": {"@type": "Answer", "text": "Christine Gwinnup of Signature Property Collection (LPT Realty) is a luxury real estate agent serving Log Lane Village and the rest of Morgan County \u2014 with 150+ homes sold across Northern Colorado's Larimer, Weld, and Boulder County Front Range."}}, {"@type": "Question", "name": "Does Christine Gwinnup work with buyers and sellers in Log Lane Village?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Christine Gwinnup represents both buyers and sellers in Log Lane Village, across luxury, acreage, and relocation clients."}}, {"@type": "Question", "name": "What are the best hikes and trails near Log Lane Village, CO?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing in town, and nothing pretending otherwise. The closest real walking is Riverside Park's roughly six miles of South Platte trails in Fort Morgan, two miles away. Jackson Lake State Park is about a half-hour west, and the nearest mountain trailheads are a two-hour drive."}}, {"@type": "Question", "name": "What school district serves Log Lane Village, CO?", "acceptedAnswer": {"@type": "Answer", "text": "Log Lane Village is served by Morgan County School District Re-3 (Fort Morgan)."}}, {"@type": "Question", "name": "How far is Log Lane Village, CO from major job centers?", "acceptedAnswer": {"@type": "Answer", "text": "Two miles to Fort Morgan, about 83 miles and an hour and a half to Denver on I-76, and about 55 miles to Greeley \u2014 functionally the same commute as Fort Morgan's, with the interstate on-ramp right there at the Highway 144 interchange."}}]}</script>
 
 
+
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -1235,8 +1236,9 @@
       <div>
         <h2 class="footer-col-title">Connect</h2>
         <ul>
-          <li>303-709-4262</li>
-          <li>thelittleladyinc@gmail.com</li>
+          <li><a href="tel:3037094262" data-contact="call">303-709-4262</a></li>
+          <li><a href="sms:3037094262" data-contact="text">Text 303-709-4262</a></li>
+          <li><a href="mailto:thelittleladyinc@gmail.com" data-contact="email">thelittleladyinc@gmail.com</a></li>
           <li>2411 Glade Rd, Loveland, CO 80538</li>
           <li><a href="https://www.facebook.com/thelittleladysellshomes/" target="_blank" rel="noopener">Facebook</a></li>
         <li><a href="https://www.instagram.com/thelittleladysellshomes/" target="_blank" rel="noopener">Instagram</a></li>
@@ -1256,6 +1258,24 @@
     </div>
   </div>
 </footer>
+<nav class="contact-bar" aria-label="Contact Christine">
+  <a class="cbar-item" href="tel:3037094262" data-contact="call"><span class="cbar-ico" aria-hidden="true">&#9742;</span>Call</a><a class="cbar-item" href="sms:3037094262" data-contact="text"><span class="cbar-ico" aria-hidden="true">&#128172;</span>Text</a><a class="cbar-item" href="mailto:thelittleladyinc@gmail.com" data-contact="email"><span class="cbar-ico" aria-hidden="true">&#9993;</span>Email</a>
+</nav>
+<script>
+/* Reports which route people actually use, so "what is the best ROI" becomes a
+   number rather than an opinion. Guarded on gtag: analytics is optional here and
+   the links must work identically with it switched off. */
+(function () {
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest("[data-contact]");
+    if (!a || typeof window.gtag !== "function") return;
+    window.gtag("event", "contact_click", {
+      method: a.getAttribute("data-contact"),
+      page_path: window.location.pathname
+    });
+  }, { passive: true });
+})();
+</script>
 <div class="lb-overlay" id="qr-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-heading"
   onclick="if (event.target === this) this.classList.remove('open')">
   <div class="lb-box" style="text-align:center;max-width:340px">

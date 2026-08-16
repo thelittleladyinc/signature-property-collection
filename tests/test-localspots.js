@@ -111,6 +111,42 @@ const curatedSpots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).
   var b5 = JSON.parse(res.body);
   check("Blobs failure still yields every pin", b5.resolved === b5.total && b5.total > 0, JSON.stringify({ r: b5.resolved, t: b5.total }));
 
+  // --- one place, two town pages, still one pin ------------------------------
+  // 2026-08-16 (Christine: "move the same windsor pins to the larimer page as well
+  // as the weld site since it is the same town?"). Windsor straddles Larimer and
+  // Weld and has a page in each, so both should carry the Mill Tavern and Windsor
+  // Lake. The tempting fix -- duplicate the two records -- would put two pins on
+  // the county map for one restaurant and double every view count the site quotes,
+  // and neither would look like a bug from the outside. alsoOnCityHrefs is what
+  // keeps that honest, so both halves are pinned here.
+  const fsx = require("fs");
+  const spots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).spots;
+  const names = spots.map((s) => s.name);
+  check("no place appears twice in the pin data",
+    new Set(names).size === names.length,
+    names.filter((n, i) => names.indexOf(n) !== i).join(", "));
+
+  const dual = spots.filter((s) => (s.alsoOnCityHrefs || []).length);
+  check("the Windsor spots are marked for both county pages", dual.length === 2,
+    dual.map((s) => s.name).join(", "));
+
+  for (const page of ["weld/windsor", "larimer/windsor"]) {
+    const html = fsx.readFileSync(`${ROOT}/site/communities/${page}.html`, "utf8");
+    check(`${page} shows both Windsor spots`,
+      /Windsor Mill Tavern/.test(html) && /Windsor Lake/.test(html));
+  }
+
+  // A spot must never point at a town page that does not exist -- it would vanish
+  // from the site with nothing reporting it missing.
+  const badHref = [];
+  for (const s of spots) {
+    for (const href of [s.cityHref, ...(s.alsoOnCityHrefs || [])]) {
+      if (href && !fsx.existsSync(`${ROOT}/site${href}`)) badHref.push(`${s.name} -> ${href}`);
+    }
+  }
+  check("every cityHref points at a page that exists", badHref.length === 0,
+    badHref.slice(0, 3).join(" | "));
+
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.error("harness error:", e); process.exit(1); });

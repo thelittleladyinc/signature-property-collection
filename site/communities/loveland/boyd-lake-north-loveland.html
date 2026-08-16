@@ -28,6 +28,7 @@
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is Boyd Lake North actually on the water?", "acceptedAnswer": {"@type": "Answer", "text": "Yes \u2014 it's directly adjacent to Boyd Lake and Boyd Lake State Park, genuinely lake-adjacent, not just nearby in a general sense."}}, {"@type": "Question", "name": "What's the price range in Boyd Lake North?", "acceptedAnswer": {"@type": "Answer", "text": "Aggregated sales data shows a historical range of roughly $485,000 to $2.28 million, with a current median around $815,000 \u2014 a meaningful share of recent inventory reaches this site's $950K+ luxury range."}}]}</script>
 
 
+
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -410,8 +411,9 @@
       <div>
         <h2 class="footer-col-title">Connect</h2>
         <ul>
-          <li>303-709-4262</li>
-          <li>thelittleladyinc@gmail.com</li>
+          <li><a href="tel:3037094262" data-contact="call">303-709-4262</a></li>
+          <li><a href="sms:3037094262" data-contact="text">Text 303-709-4262</a></li>
+          <li><a href="mailto:thelittleladyinc@gmail.com" data-contact="email">thelittleladyinc@gmail.com</a></li>
           <li>2411 Glade Rd, Loveland, CO 80538</li>
           <li><a href="https://www.facebook.com/thelittleladysellshomes/" target="_blank" rel="noopener">Facebook</a></li>
         <li><a href="https://www.instagram.com/thelittleladysellshomes/" target="_blank" rel="noopener">Instagram</a></li>
@@ -431,6 +433,24 @@
     </div>
   </div>
 </footer>
+<nav class="contact-bar" aria-label="Contact Christine">
+  <a class="cbar-item" href="tel:3037094262" data-contact="call"><span class="cbar-ico" aria-hidden="true">&#9742;</span>Call</a><a class="cbar-item" href="sms:3037094262" data-contact="text"><span class="cbar-ico" aria-hidden="true">&#128172;</span>Text</a><a class="cbar-item" href="mailto:thelittleladyinc@gmail.com" data-contact="email"><span class="cbar-ico" aria-hidden="true">&#9993;</span>Email</a>
+</nav>
+<script>
+/* Reports which route people actually use, so "what is the best ROI" becomes a
+   number rather than an opinion. Guarded on gtag: analytics is optional here and
+   the links must work identically with it switched off. */
+(function () {
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest("[data-contact]");
+    if (!a || typeof window.gtag !== "function") return;
+    window.gtag("event", "contact_click", {
+      method: a.getAttribute("data-contact"),
+      page_path: window.location.pathname
+    });
+  }, { passive: true });
+})();
+</script>
 <div class="lb-overlay" id="qr-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-heading"
   onclick="if (event.target === this) this.classList.remove('open')">
   <div class="lb-box" style="text-align:center;max-width:340px">

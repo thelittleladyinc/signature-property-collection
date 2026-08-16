@@ -2813,6 +2813,7 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
 <link rel="stylesheet" href="/assets/css/style.css">
 <script type="application/ld+json">{_real_estate_agent_schema()}</script>
 {_schema_scripts(schema_extra)}
+{_gsc_verification_tag()}
 {_analytics_tag()}
 {canonical_extra}
 </head>"""
@@ -3046,8 +3047,9 @@ def footer_html():
       <div>
         <h2 class="footer-col-title">Connect</h2>
         <ul>
-          <li>{SITE['phone']}</li>
-          <li>{SITE['email']}</li>
+          <li><a href="tel:{esc(_phone_digits())}" data-contact="call">{SITE['phone']}</a></li>
+          <li><a href="sms:{esc(_phone_digits())}" data-contact="text">Text {esc(SITE['phone'])}</a></li>
+          <li><a href="mailto:{esc(SITE['email'])}" data-contact="email">{SITE['email']}</a></li>
           {f'<li>{esc(SITE["address"]["street"])}, {esc(SITE["address"]["city"])}, {esc(SITE["address"]["state"])} {esc(SITE["address"]["zip"])}</li>' if SITE.get('address') else ''}
           {social_links}
         </ul>
@@ -3103,6 +3105,130 @@ def _auto_breadcrumbs(title, path):
 GA_MEASUREMENT_ID = (os.environ.get("GA_MEASUREMENT_ID") or "").strip()
 
 
+# 2026-08-16 (Christine: "I would like to have mroe tapable links for my phone
+# number - whatever is the best roi - then we need a click to schedule with calendly
+# - make it easy to get ahold of me through email or phone or text").
+#
+# Her number was plain text on all 144 pages -- readable, never tappable, and not in
+# the header at all. On a phone that is a real loss: a visitor who wants to call has
+# to select the digits, copy them, switch apps and paste.
+#
+# Best ROI, in the order it was built:
+#   1. The FOOTER, because it is already on every page -- phone, text and email
+#      become links with no new interface at all.
+#   2. A sticky action bar on MOBILE only. This is the highest-converting pattern
+#      for a service business on a phone, and it is the one place a "call now" is
+#      always one thumb away regardless of how far down the page someone has read.
+#      Deliberately not shown on desktop, where clicking a tel: link mostly does
+#      nothing useful and the bar would just eat screen.
+#   3. Every action reports a GA event, which is what turns "whatever is the best
+#      ROI" from a guess into something she can read off a report in a fortnight.
+#
+# Scheduling is read from CALENDLY_URL (or SITE["schedule_url"]) and the button
+# simply does not render when neither is set -- a schedule button that 404s is worse
+# than no schedule button.
+SCHEDULE_URL = (os.environ.get("CALENDLY_URL") or SITE.get("schedule_url") or "").strip()
+
+
+def _phone_digits():
+    """Digits only, for tel:/sms: hrefs -- dialers handle punctuation inconsistently."""
+    return re.sub(r"[^\d+]", "", SITE.get("phone", ""))
+
+
+def _schedule_button_html(label=None):
+    """A booking button, or "" when no scheduling URL is configured.
+
+    Returns nothing rather than a disabled or placeholder button: a Schedule link
+    that 404s costs more trust than its absence, and this renders on the contact
+    page where a broken link is most damaging."""
+    if not SCHEDULE_URL:
+        return ""
+    first = esc(SITE["agent"].split()[0])
+    return (f'<a class="btn btn-primary" style="margin-top:20px" href="{esc(SCHEDULE_URL)}" '
+            f'target="_blank" rel="noopener" data-contact="schedule">'
+            f'{esc(label) if label else f"Book A Call With {first}"} &rarr;</a>')
+
+
+def _contact_bar():
+    """Sticky call/text/email/schedule bar, mobile only. Same on all 144 pages."""
+    digits = _phone_digits()
+    if not digits and not SITE.get("email"):
+        return ""
+    first = esc(SITE["agent"].split()[0])
+    items = []
+    if digits:
+        items.append(
+            f'<a class="cbar-item" href="tel:{esc(digits)}" data-contact="call">'
+            f'<span class="cbar-ico" aria-hidden="true">&#9742;</span>Call</a>')
+        items.append(
+            f'<a class="cbar-item" href="sms:{esc(digits)}" data-contact="text">'
+            f'<span class="cbar-ico" aria-hidden="true">&#128172;</span>Text</a>')
+    if SITE.get("email"):
+        items.append(
+            f'<a class="cbar-item" href="mailto:{esc(SITE["email"])}" data-contact="email">'
+            f'<span class="cbar-ico" aria-hidden="true">&#9993;</span>Email</a>')
+    if SCHEDULE_URL:
+        items.append(
+            f'<a class="cbar-item cbar-item-primary" href="{esc(SCHEDULE_URL)}" '
+            f'target="_blank" rel="noopener" data-contact="schedule">'
+            f'<span class="cbar-ico" aria-hidden="true">&#128197;</span>Schedule</a>')
+    return f"""<nav class="contact-bar" aria-label="Contact {first}">
+  {"".join(items)}
+</nav>
+<script>
+/* Reports which route people actually use, so "what is the best ROI" becomes a
+   number rather than an opinion. Guarded on gtag: analytics is optional here and
+   the links must work identically with it switched off. */
+(function () {{
+  document.addEventListener("click", function (e) {{
+    var a = e.target && e.target.closest && e.target.closest("[data-contact]");
+    if (!a || typeof window.gtag !== "function") return;
+    window.gtag("event", "contact_click", {{
+      method: a.getAttribute("data-contact"),
+      page_path: window.location.pathname
+    }});
+  }}, {{ passive: true }});
+}})();
+</script>"""
+
+
+# 2026-08-16. Her Search Console already lists signaturepropertycollection.com, but
+# under "Not verified" -- and as a DOMAIN property, which Google only verifies by DNS
+# TXT record. Her first Verify attempt failed for exactly that reason: no record had
+# been added yet.
+#
+# This is the way round it that needs no DNS access at all. A URL-prefix property
+# accepts an HTML-tag verification, and that tag is something this build can put on
+# every page. She pastes the token into Netlify; nobody has to touch a registrar.
+#
+# Stored as an env var like the measurement ID because it is per-property and would
+# be wrong on a fork, and because it lets her do it without waiting for me.
+GSC_VERIFICATION = (os.environ.get("GSC_VERIFICATION") or "").strip()
+
+
+def _gsc_verification_tag():
+    """Google's site-verification meta tag, or "" when no token is configured."""
+    if not GSC_VERIFICATION:
+        return ""
+    # Accepts either the bare token or the whole content="..." / full meta tag she
+    # might paste, because Search Console shows it as a complete <meta> element and
+    # copying the whole line is the obvious thing to do.
+    token = GSC_VERIFICATION
+    m = re.search(r'content=["\']([^"\']+)["\']', token)
+    if m:
+        token = m.group(1)
+    token = token.replace("google-site-verification=", "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,}", token):
+        raise SystemExit(
+            f"GSC_VERIFICATION={GSC_VERIFICATION!r} doesn't look like a Google "
+            "site-verification token.\nPaste either the token itself or the whole "
+            '<meta name="google-site-verification" content="..."> line from\n'
+            "Search Console -> your property -> Settings -> Ownership verification "
+            "-> HTML tag."
+        )
+    return f'<meta name="google-site-verification" content="{esc(token)}">'
+
+
 def _analytics_tag():
     """The gtag.js snippet, or "" when GA_MEASUREMENT_ID isn't set."""
     if not GA_MEASUREMENT_ID:
@@ -3150,6 +3276,7 @@ def page(title, description, path, active, body, extra_head="", schema_extra="",
 {body}
 </main>
 {footer_html()}
+{_contact_bar()}
 {_qr_share_modal(path)}
 {_scroll_reveal_script()}
 </body>
@@ -3680,13 +3807,22 @@ def _local_spots_by_city_href():
     that was set deliberately per spot -- Poudre Canyon sits in Bellvue but
     belongs on the Fort Collins page, and Gnome Road is filed under Red Feather
     Lakes. Matching on names would need a second mapping that could drift out of
-    step with the first."""
+    step with the first.
+
+    2026-08-16 (Christine: "move the same windsor pins to the larimer page as well
+    as the weld site since it is the same town?"). Right, and it needed a field
+    rather than a duplicated record. Windsor is ONE town with a page in each county,
+    so both pages should show the Mill Tavern and Windsor Lake -- but copying the
+    two spots would put TWO pins on the county map for one restaurant, and would
+    double every view count the site quotes. alsoOnCityHrefs keeps one record, one
+    pin, one set of numbers, appearing on as many town pages as it belongs to."""
     by_href = {}
     for spot in LOCAL_SPOTS_DATA.get("spots", []):
-        href = spot.get("cityHref")
-        if not href:
-            continue
-        by_href.setdefault(href, []).append(spot)
+        hrefs = [spot.get("cityHref")] + list(spot.get("alsoOnCityHrefs") or [])
+        for href in hrefs:
+            if not href:
+                continue
+            by_href.setdefault(href, []).append(spot)
     # Most-watched first, counting whichever platform the spot lives on, so the
     # strongest piece of local proof is the one a visitor sees first.
     for spots in by_href.values():
@@ -4865,11 +5001,14 @@ def build_contact():
     </form>
     <div class="card">
       <h2 class="article-subhead">Contact Information</h2>
-      <p>{SITE['phone']}<br>{SITE['email']}{f"<br>{esc(SITE['address']['street'])}, {esc(SITE['address']['city'])}, {esc(SITE['address']['state'])} {esc(SITE['address']['zip'])}" if SITE.get('address') else ''}</p>
+      <p><a href="tel:{esc(_phone_digits())}" data-contact="call">{SITE['phone']}</a><br>
+      <a href="sms:{esc(_phone_digits())}" data-contact="text">Text {esc(SITE['phone'])}</a><br>
+      <a href="mailto:{esc(SITE['email'])}" data-contact="email">{SITE['email']}</a>{f"<br>{esc(SITE['address']['street'])}, {esc(SITE['address']['city'])}, {esc(SITE['address']['state'])} {esc(SITE['address']['zip'])}" if SITE.get('address') else ''}</p>
+      {_schedule_button_html()}
       <h3 style="margin-top:24px">What Happens Next</h3>
       <p>Every message here comes straight to {esc(SITE['agent'].split()[0])} — expect a
       reply within one business day. For anything urgent, call or text
-      {SITE['phone']} directly.</p>
+      <a href="tel:{esc(_phone_digits())}" data-contact="call">{SITE['phone']}</a> directly.</p>
     </div>
   </div>
 </section>

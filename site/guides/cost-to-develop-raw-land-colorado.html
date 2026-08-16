@@ -28,6 +28,7 @@
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is it cheaper to buy raw land and build than to buy an existing home in Northern Colorado?", "acceptedAnswer": {"@type": "Answer", "text": "It depends entirely on the parcel. Land price plus realistic development costs (utilities, access, permitting, construction) can end up costing more than a comparable existing home \u2014 or less, if the parcel already has utilities at the property line and easy access. There's no universal answer; it has to be priced out parcel by parcel."}}, {"@type": "Question", "name": "Which Northern Colorado counties are easiest to build in?", "acceptedAnswer": {"@type": "Answer", "text": "This changes over time as county rules and processes evolve, so it's worth a direct conversation with the specific county planning office (Larimer, Weld, or Boulder) for the parcel you're considering, rather than relying on a general answer."}}]}</script>
 
 
+
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -172,8 +173,9 @@
       <div>
         <h2 class="footer-col-title">Connect</h2>
         <ul>
-          <li>303-709-4262</li>
-          <li>thelittleladyinc@gmail.com</li>
+          <li><a href="tel:3037094262" data-contact="call">303-709-4262</a></li>
+          <li><a href="sms:3037094262" data-contact="text">Text 303-709-4262</a></li>
+          <li><a href="mailto:thelittleladyinc@gmail.com" data-contact="email">thelittleladyinc@gmail.com</a></li>
           <li>2411 Glade Rd, Loveland, CO 80538</li>
           <li><a href="https://www.facebook.com/thelittleladysellshomes/" target="_blank" rel="noopener">Facebook</a></li>
         <li><a href="https://www.instagram.com/thelittleladysellshomes/" target="_blank" rel="noopener">Instagram</a></li>
@@ -193,6 +195,24 @@
     </div>
   </div>
 </footer>
+<nav class="contact-bar" aria-label="Contact Christine">
+  <a class="cbar-item" href="tel:3037094262" data-contact="call"><span class="cbar-ico" aria-hidden="true">&#9742;</span>Call</a><a class="cbar-item" href="sms:3037094262" data-contact="text"><span class="cbar-ico" aria-hidden="true">&#128172;</span>Text</a><a class="cbar-item" href="mailto:thelittleladyinc@gmail.com" data-contact="email"><span class="cbar-ico" aria-hidden="true">&#9993;</span>Email</a>
+</nav>
+<script>
+/* Reports which route people actually use, so "what is the best ROI" becomes a
+   number rather than an opinion. Guarded on gtag: analytics is optional here and
+   the links must work identically with it switched off. */
+(function () {
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest("[data-contact]");
+    if (!a || typeof window.gtag !== "function") return;
+    window.gtag("event", "contact_click", {
+      method: a.getAttribute("data-contact"),
+      page_path: window.location.pathname
+    });
+  }, { passive: true });
+})();
+</script>
 <div class="lb-overlay" id="qr-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-heading"
   onclick="if (event.target === this) this.classList.remove('open')">
   <div class="lb-box" style="text-align:center;max-width:340px">

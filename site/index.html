@@ -27,6 +27,7 @@
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Who is the best luxury real estate agent in Loveland, Berthoud, and Masonville?", "acceptedAnswer": {"@type": "Answer", "text": "Christine Gwinnup of Signature Property Collection (LPT Realty) is a luxury real estate agent based in Loveland, serving Berthoud, Masonville, and the rest of Larimer County with 150+ homes sold personally (250+ as a duo with Kendra Bajcar) and expertise in luxury marketing and negotiation."}}, {"@type": "Question", "name": "What areas does Signature Property Collection serve?", "acceptedAnswer": {"@type": "Answer", "text": "Christine Gwinnup and Signature Property Collection serve Northern Colorado's Larimer, Weld, and Boulder County Front Range \u2014 including Loveland, Berthoud, Masonville, Fort Collins, Windsor, Greeley, and Boulder \u2014 plus Broomfield, Jefferson, Denver, Arapahoe, and Adams Counties."}}, {"@type": "Question", "name": "Does Signature Property Collection work with both buyers and sellers?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Christine Gwinnup represents buyers, sellers, investors, and relocation clients across Northern Colorado."}}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "@id": "https://signaturepropertycollection.com/#signature-property-collection", "name": "Signature Property Collection", "url": "https://signaturepropertycollection.com/", "logo": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "thelittleladyinc@gmail.com", "founder": {"@id": "https://signaturepropertycollection.com/#christine-gwinnup"}, "employee": {"@id": "https://signaturepropertycollection.com/#christine-gwinnup"}, "parentOrganization": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Morgan County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady", "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390", "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2", "https://christinegwinnup.lpt.com/", "https://www.thelittleladysellshomes.com/"], "description": "Luxury real estate brokerage services from Christine Gwinnup (CO License #100090441, LPT Realty) across Northern Colorado's Larimer, Weld and Boulder County Front Range.", "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
 
+
 <script>
 (function () {
   function loadLeafletMap() {
@@ -371,8 +372,9 @@
       <div>
         <h2 class="footer-col-title">Connect</h2>
         <ul>
-          <li>303-709-4262</li>
-          <li>thelittleladyinc@gmail.com</li>
+          <li><a href="tel:3037094262" data-contact="call">303-709-4262</a></li>
+          <li><a href="sms:3037094262" data-contact="text">Text 303-709-4262</a></li>
+          <li><a href="mailto:thelittleladyinc@gmail.com" data-contact="email">thelittleladyinc@gmail.com</a></li>
           <li>2411 Glade Rd, Loveland, CO 80538</li>
           <li><a href="https://www.facebook.com/thelittleladysellshomes/" target="_blank" rel="noopener">Facebook</a></li>
         <li><a href="https://www.instagram.com/thelittleladysellshomes/" target="_blank" rel="noopener">Instagram</a></li>
@@ -392,6 +394,24 @@
     </div>
   </div>
 </footer>
+<nav class="contact-bar" aria-label="Contact Christine">
+  <a class="cbar-item" href="tel:3037094262" data-contact="call"><span class="cbar-ico" aria-hidden="true">&#9742;</span>Call</a><a class="cbar-item" href="sms:3037094262" data-contact="text"><span class="cbar-ico" aria-hidden="true">&#128172;</span>Text</a><a class="cbar-item" href="mailto:thelittleladyinc@gmail.com" data-contact="email"><span class="cbar-ico" aria-hidden="true">&#9993;</span>Email</a>
+</nav>
+<script>
+/* Reports which route people actually use, so "what is the best ROI" becomes a
+   number rather than an opinion. Guarded on gtag: analytics is optional here and
+   the links must work identically with it switched off. */
+(function () {
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest("[data-contact]");
+    if (!a || typeof window.gtag !== "function") return;
+    window.gtag("event", "contact_click", {
+      method: a.getAttribute("data-contact"),
+      page_path: window.location.pathname
+    });
+  }, { passive: true });
+})();
+</script>
 <div class="lb-overlay" id="qr-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-heading"
   onclick="if (event.target === this) this.classList.remove('open')">
   <div class="lb-box" style="text-align:center;max-width:340px">

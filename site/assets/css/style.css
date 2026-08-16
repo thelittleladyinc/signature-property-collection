@@ -1152,3 +1152,53 @@ h2.widget-title {
   margin: 0 0 10px;
   max-width: none;
 }
+
+/* ---- Sticky contact bar, phones only (2026-08-16) ----------------------------
+   Christine: "I would like to have mroe tapable links for my phone number -
+   whatever is the best roi ... make it easy to get ahold of me through email or
+   phone or text". Her number was plain text on all 144 pages, so on a phone the
+   only way to call was to select, copy, switch app, paste.
+
+   Mobile only, deliberately. On desktop a tel: link mostly does nothing useful and
+   a fixed bar would just eat screen height. env(safe-area-inset-bottom) keeps it
+   clear of the iPhone home indicator, and the matching body padding means the bar
+   never covers the last line of a page -- the bug this pattern usually ships with. */
+.contact-bar { display: none; }
+@media (max-width: 760px) {
+  .contact-bar {
+    display: flex;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 900;
+    background: rgba(255,255,255,.97);
+    backdrop-filter: saturate(160%) blur(8px);
+    border-top: 1px solid var(--hairline-strong, #e4e4d8);
+    box-shadow: 0 -6px 22px rgba(20,20,21,.10);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .contact-bar .cbar-item {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    /* 56px keeps every target above the 44px minimum for a comfortable thumb. */
+    min-height: 56px;
+    padding: 8px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--slate, #33414f);
+    border-left: 1px solid rgba(20,20,21,.07);
+  }
+  .contact-bar .cbar-item:first-child { border-left: 0; }
+  .contact-bar .cbar-ico { font-size: 17px; line-height: 1; }
+  .contact-bar .cbar-item-primary { background: var(--dusty-rose, #B86F7A); color: #fff; }
+  .contact-bar .cbar-item:active { background: rgba(184,111,122,.14); }
+  .contact-bar .cbar-item-primary:active { background: var(--deep-mauve, #8f5560); }
+  body { padding-bottom: 62px; }
+}

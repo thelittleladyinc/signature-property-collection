@@ -28,6 +28,7 @@
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Who is the best real estate agent in Louisville, CO?", "acceptedAnswer": {"@type": "Answer", "text": "Christine Gwinnup of Signature Property Collection (LPT Realty) is a luxury real estate agent serving Louisville and the rest of Boulder County \u2014 with 150+ homes sold across Northern Colorado's Larimer, Weld, and Boulder County Front Range."}}, {"@type": "Question", "name": "Does Christine Gwinnup work with buyers and sellers in Louisville?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Christine Gwinnup represents both buyers and sellers in Louisville, across luxury, acreage, and relocation clients."}}, {"@type": "Question", "name": "What are the best hikes and trails near Louisville, CO?", "acceptedAnswer": {"@type": "Answer", "text": "Davidson Mesa is the hometown favorite: a rolling, easy loop (roughly 3.2 miles) with sweeping views of the Front Range and Flatirons. The Coal Creek Trail runs through Louisville as a flat, paved path connecting to Lafayette and Superior."}}, {"@type": "Question", "name": "What school district serves Louisville, CO?", "acceptedAnswer": {"@type": "Answer", "text": "Louisville is served by Boulder Valley School District (BVSD, Re-2)."}}, {"@type": "Question", "name": "How far is Louisville, CO from major job centers?", "acceptedAnswer": {"@type": "Answer", "text": "About 32 miles / roughly 48 minutes to Loveland via US-287."}}]}</script>
 
 
+
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -1235,8 +1236,9 @@
       <div>
         <h2 class="footer-col-title">Connect</h2>
         <ul>
-          <li>303-709-4262</li>
-          <li>thelittleladyinc@gmail.com</li>
+          <li><a href="tel:3037094262" data-contact="call">303-709-4262</a></li>
+          <li><a href="sms:3037094262" data-contact="text">Text 303-709-4262</a></li>
+          <li><a href="mailto:thelittleladyinc@gmail.com" data-contact="email">thelittleladyinc@gmail.com</a></li>
           <li>2411 Glade Rd, Loveland, CO 80538</li>
           <li><a href="https://www.facebook.com/thelittleladysellshomes/" target="_blank" rel="noopener">Facebook</a></li>
         <li><a href="https://www.instagram.com/thelittleladysellshomes/" target="_blank" rel="noopener">Instagram</a></li>
@@ -1256,6 +1258,24 @@
     </div>
   </div>
 </footer>
+<nav class="contact-bar" aria-label="Contact Christine">
+  <a class="cbar-item" href="tel:3037094262" data-contact="call"><span class="cbar-ico" aria-hidden="true">&#9742;</span>Call</a><a class="cbar-item" href="sms:3037094262" data-contact="text"><span class="cbar-ico" aria-hidden="true">&#128172;</span>Text</a><a class="cbar-item" href="mailto:thelittleladyinc@gmail.com" data-contact="email"><span class="cbar-ico" aria-hidden="true">&#9993;</span>Email</a>
+</nav>
+<script>
+/* Reports which route people actually use, so "what is the best ROI" becomes a
+   number rather than an opinion. Guarded on gtag: analytics is optional here and
+   the links must work identically with it switched off. */
+(function () {
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest("[data-contact]");
+    if (!a || typeof window.gtag !== "function") return;
+    window.gtag("event", "contact_click", {
+      method: a.getAttribute("data-contact"),
+      page_path: window.location.pathname
+    });
+  }, { passive: true });
+})();
+</script>
 <div class="lb-overlay" id="qr-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-heading"
   onclick="if (event.target === this) this.classList.remove('open')">
   <div class="lb-box" style="text-align:center;max-width:340px">

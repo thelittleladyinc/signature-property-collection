@@ -720,11 +720,19 @@ exports.handler = async (event) => {
   // is a progress bar, not a to-do list.
   const spotCounts = new Map();
   for (const s of LOCAL_SPOTS.spots || []) {
-    if (!s.cityHref) continue;
-    const prev = spotCounts.get(s.cityHref) || { city: s.city, count: 0, views: 0 };
-    prev.count += 1;
-    prev.views += (s.views || 0) + (s.reviewViews || 0);
-    spotCounts.set(s.cityHref, prev);
+    // 2026-08-16: a spot can legitimately belong to more than one town PAGE without
+    // being more than one place. Windsor straddles Larimer and Weld and so has a
+    // page in each; alsoOnCityHrefs puts the Mill Tavern and Windsor Lake on both
+    // from a single record. Counting only cityHref would keep reporting the Larimer
+    // page as empty when it is not, which is exactly the wrong-in-a-reassuring-
+    // direction this row exists to prevent.
+    for (const href of [s.cityHref, ...(s.alsoOnCityHrefs || [])]) {
+      if (!href) continue;
+      const prev = spotCounts.get(href) || { city: s.city, count: 0, views: 0 };
+      prev.count += 1;
+      prev.views += (s.views || 0) + (s.reviewViews || 0);
+      spotCounts.set(href, prev);
+    }
   }
   const townPages = Array.isArray(LOCAL_SPOTS.townPages) ? LOCAL_SPOTS.townPages : [];
   // Label each row by the TOWN PAGE, not by the first spot that happened to land
@@ -733,22 +741,28 @@ exports.handler = async (event) => {
   // are on the Fort Collins page. Reading the label off the first spot printed
   // "Bellvue 2", which names a town that has no page at all.
   const pageCity = new Map(townPages.map((t) => [t.href, t.city]));
+  // 2026-08-16: her report listed "Windsor, Windsor". Windsor straddles Larimer and
+  // Weld, so it genuinely has two town pages, and printing the bare city name twice
+  // looks like a bug in the report rather than the fact it is. Qualified by county
+  // so the two are distinguishable.
+  //
+  // Later the same day, and the reason this is now a shared function: the
+  // qualification was written inline in the EMPTY list only. The moment Windsor got
+  // spots on both pages it moved to the COVERED list, which had no such handling,
+  // and the report would have read "Windsor 2 · Windsor 2" -- the identical
+  // confusion, reintroduced by fixing something else. One label, both lists.
+  const townLabel = (href, fallbackCity) => {
+    const city = pageCity.get(href) || fallbackCity;
+    const county = (String(href).match(/^\/communities\/([^/]+)\//) || [])[1];
+    const dupe = townPages.filter((o) => o.city === city).length > 1;
+    return dupe && county ? `${city} (${county.replace(/-/g, " ")})` : city;
+  };
   const covered = [...spotCounts.entries()]
-    .map(([href, v]) => ({ href, ...v, city: pageCity.get(href) || v.city }))
+    .map(([href, v]) => ({ href, ...v, city: townLabel(href, v.city) }))
     .sort((a, b) => (b.count - a.count) || (b.views - a.views));
-  // 2026-08-16: her report listed "Windsor, Windsor". Windsor straddles Larimer
-  // and Weld, so it genuinely has two town pages, and printing the bare city name
-  // twice looks like a bug in the report rather than the fact it is. Qualified by
-  // county so the two are distinguishable, and deduped as a backstop.
   const empty = [...new Set(townPages
     .filter((t) => !spotCounts.has(t.href))
-    .map((t) => {
-      const county = (String(t.href).match(/^\/communities\/([^/]+)\//) || [])[1];
-      const dupe = townPages.filter((o) => o.city === t.city).length > 1;
-      return dupe && county
-        ? `${t.city} (${county.replace(/-/g, " ")})`
-        : t.city;
-    }))];
+    .map((t) => townLabel(t.href, t.city)))];
   const ranked = covered
     .map((t) => `${t.city} ${t.count}` + (t.views ? ` (${t.views.toLocaleString()} views)` : ""))
     .join(" · ");
