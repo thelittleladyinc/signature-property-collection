@@ -3102,6 +3102,114 @@ def _city_meta_description(city, county_name, welcome_text, budget=158, disambig
     )
 
 
+def _local_spots_by_city_href():
+    """Group build/data/local_spots.json by the city page each spot points at.
+
+    2026-08-15 (Christine: "we can have a touring community link - so in each
+    town there are videos maybe to restaurants and thy are also on my mao
+    correct? is it smart?"). Yes, and it is the smarter half of the two. The
+    county map is ONE page, reached by someone already on this site. The town
+    pages are 141 pages that rank in Google, and "best restaurant in Berthoud"
+    lands on a town page, never on a county map. Same content, far more doors in.
+
+    Grouped by cityHref rather than by city name because the href is the field
+    that was set deliberately per spot -- Poudre Canyon sits in Bellvue but
+    belongs on the Fort Collins page, and Gnome Road is filed under Red Feather
+    Lakes. Matching on names would need a second mapping that could drift out of
+    step with the first."""
+    by_href = {}
+    for spot in LOCAL_SPOTS_DATA.get("spots", []):
+        href = spot.get("cityHref")
+        if not href:
+            continue
+        by_href.setdefault(href, []).append(spot)
+    # Most-watched first, counting whichever platform the spot lives on, so the
+    # strongest piece of local proof is the one a visitor sees first.
+    for spots in by_href.values():
+        spots.sort(key=lambda s: (s.get("views") or 0) + (s.get("reviewViews") or 0),
+                   reverse=True)
+    return by_href
+
+
+LOCAL_SPOTS_BY_CITY_HREF = None  # filled on first use by _tour_this_town_block
+
+
+# Human labels for the spot categories, used as a small kicker on each card.
+SPOT_CATEGORY_LABELS = {
+    "restaurant": "Where To Eat",
+    "winery": "Winery",
+    "golf": "Golf",
+    "trail": "Trail",
+    "lake": "On The Water",
+    "downtown": "Downtown",
+    "scenic": "Worth The Drive",
+}
+
+
+def _spot_card(spot):
+    """One local spot: her video (or her review) plus what it is."""
+    count = (spot.get("views") or 0) + (spot.get("reviewViews") or 0)
+    kicker = SPOT_CATEGORY_LABELS.get(spot.get("category"), "Local Spot")
+    if spot.get("videoId"):
+        media = _yt_embed(spot["videoId"], spot.get("videoTitle") or spot["name"],
+                          _fmt_views(count) if count else None)
+        proof = ""
+    else:
+        # A review-backed spot has nothing to embed, so her words ARE the media.
+        media = (f'<blockquote class="spot-quote">{esc(spot["reviewQuote"])}</blockquote>'
+                 if spot.get("reviewQuote") else "")
+        proof = (f'<p class="spot-proof">{_fmt_views(count)} on Google</p>'
+                 if count else "")
+    google = ""
+    if spot.get("googleReviewUrl"):
+        google = (f'<a class="media-link" href="{esc(spot["googleReviewUrl"])}" '
+                  f'target="_blank" rel="noopener">See It On Google &#8599;</a>')
+    return f"""<article class="spot-card">
+  <span class="eyebrow" style="color:var(--dusty-rose)">{esc(kicker)}</span>
+  <h3 class="spot-card-title">{esc(spot["name"])}</h3>
+  {media}
+  {proof}
+  <p class="spot-blurb">{esc(spot.get("blurb") or "")}</p>
+  {google}
+</article>"""
+
+
+def _tour_this_town_block(city_href, city_name):
+    """The "Tour <Town> With Me" section, or "" when there are no spots yet.
+
+    Every town page gets this from the same JSON the map reads, so adding one
+    spot updates the map AND its town page. The alternative -- a second hand-kept
+    list -- is the exact mistake write_sold_homes_function_data was written to
+    stop repeating."""
+    global LOCAL_SPOTS_BY_CITY_HREF
+    if LOCAL_SPOTS_BY_CITY_HREF is None:
+        LOCAL_SPOTS_BY_CITY_HREF = _local_spots_by_city_href()
+    spots = LOCAL_SPOTS_BY_CITY_HREF.get(city_href) or []
+    if not spots:
+        return ""
+    cards = "\n      ".join(_spot_card(s) for s in spots)
+    total = sum((s.get("views") or 0) + (s.get("reviewViews") or 0) for s in spots)
+    # Stated plainly rather than boasted about: the number IS the credential.
+    proof = (f" Between them they have been watched and read "
+             f"{total:,} times.") if total else ""
+    plural = "places" if len(spots) > 1 else "place"
+    return f"""<section class="tight" id="tour-{esc(city_href.rsplit('/', 1)[-1].replace('.html', ''))}">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Tour It With Me</span>
+    <h2 class="section-title">{esc(city_name)}, From Someone Who Actually Goes There</h2>
+    <p class="lede">{len(spots)} {plural} in and around {esc(city_name)} that
+    {esc(SITE['agent'])} has filmed or reviewed herself — not a stock list of amenities.{proof}</p>
+    <div class="spot-grid">
+      {cards}
+    </div>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415"
+         href="/communities/index.html">See Every Spot On The Map &rarr;</a>
+    </div>
+  </div>
+</section>"""
+
+
 def build_city_pages():
     """One page per city we have real captured content for (welcome blurb +
     things-to-do highlights, pulled from the live site's own city pages —
@@ -3201,6 +3309,12 @@ def build_city_pages():
     </div>
   </div>
 </section>"""
+
+            # "Tour It With Me" — this town's local spots, from the same JSON the
+            # county map reads. Empty string for towns with no spots yet, so no
+            # page ever shows a heading over nothing.
+            tour_block = _tour_this_town_block(
+                _city_url(c["slug"], city) or "", city)
 
             own_home_block = ""
             if data_slug == "erie":
@@ -3392,6 +3506,7 @@ def build_city_pages():
 {search_widget_block}
 {local_block}
 {video_block}
+{tour_block}
 {agent_proof_block}
 {own_home_block}
 {subdivisions_block}

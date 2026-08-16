@@ -1047,3 +1047,36 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .listing-detail-thumbs > p { grid-column: 1 / -1; margin: 4px 0 0; }
 @media (max-width: 860px) { .listing-detail-thumbs { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 560px) { .listing-detail-thumbs { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---- "Tour It With Me" local spots on a town page ----------------------
+   2026-08-15 (Christine: "we can have a touring community link - so in each
+   town there are videos maybe to restaurants and thy are also on my mao
+   correct?"). The same spots the county map pins, laid out on the town page
+   that Google actually sends people to. */
+.spot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 28px;
+  margin-top: 28px;
+}
+.spot-card { min-width: 0; }
+.spot-card-title { margin: 6px 0 12px; font-size: 21px; }
+.spot-card .video-embed { margin: 0; }
+.spot-blurb { margin: 10px 0 8px; font-size: 15px; }
+/* Her review, quoted. Matches the map modal's pull quote so the same content
+   reads the same way in both places. */
+.spot-quote {
+  margin: 0;
+  padding: 14px 18px;
+  border-left: 3px solid var(--dusty-rose);
+  background: rgba(184, 111, 122, .06);
+  font-style: italic;
+  font-size: 15px;
+}
+.spot-proof {
+  margin: 10px 0 0;
+  font-size: 13px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--deep-mauve);
+}
