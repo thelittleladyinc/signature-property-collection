@@ -425,11 +425,40 @@ exports.handler = async (event) => {
       return notFound("That listing link doesn’t look right. Search below and you’ll find what you’re after.", 404);
     }
 
-    const store = getBlobStore(getStore, "mls-listings");
-    const [listings, state] = await Promise.all([
-      store.get(LISTINGS_KEY, { type: "json" }),
-      store.get(SYNC_STATE_KEY, { type: "json" }),
-    ]);
+    // 2026-08-16. Her Search Console coverage export reported 12 pages under
+    // "Server error (5xx)", and this function was the only thing on the site that
+    // can produce one. Tracing it: everything below this read either succeeds or
+    // returns a 404, so a 5xx here means the BLOBS READ failed -- Netlify Blobs
+    // being briefly unavailable, or a token problem.
+    //
+    // 500 is the wrong answer to that, and not a cosmetic distinction. A 500 tells
+    // Google the page is broken; repeated 500s cost crawl rate across the whole site
+    // and can drop pages from the index. 503 with Retry-After tells it the truth --
+    // temporarily unavailable, come back -- which Google handles without penalty.
+    //
+    // Separated from the outer catch so a real bug in the rendering below still
+    // surfaces as a 500 rather than being disguised as an outage. Reporting every
+    // failure as transient would be its own lie.
+    let listings, state;
+    try {
+      const store = getBlobStore(getStore, "mls-listings");
+      [listings, state] = await Promise.all([
+        store.get(LISTINGS_KEY, { type: "json" }),
+        store.get(SYNC_STATE_KEY, { type: "json" }),
+      ]);
+    } catch (err) {
+      console.error("listing-page: listing store unavailable:", err && err.message);
+      return {
+        ...notFound("This listing is taking a moment to load. Please refresh, or search below.", 503),
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          // Don't let a CDN or a crawler cache an outage as the page's content.
+          "X-Robots-Tag": "noindex",
+          "Retry-After": "3600",
+        },
+      };
+    }
     const l = listings && listings[id];
     if (!l) {
       return notFound("This listing isn’t in our current feed — it may have sold or been withdrawn.", 404);
