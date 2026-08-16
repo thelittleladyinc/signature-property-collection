@@ -60,24 +60,25 @@ becomes unreadable afterwards. She has NOT confirmed doing this.
 
 ## 2. Known bugs, risks and rough edges in the code
 
-### 2.1 The sync time budget is the real structural problem — NOT FIXED
-```
-TIME_BUDGET_MS           = 8000
-LATE_WORK_TIME_MARGIN_MS = 6000   (sized for a slow photo upload)
-=> every time-gated loop, INCLUDING the bootstrap crawl, may only START
-   new work in the first 2000ms of a run
-REQUEST_DELAY_MS         = 1500   (one throttle wait)
-```
-So the whole function has a 2000ms window to begin anything, and one throttle plus
-one `$expand=Media` fetch nearly exhausts it. Mitigations added: the photo pass is
-capped at 40% of the window, and a Cloudinary *configuration* error skips the pass
-entirely. Those free the crawl but do not fix the shape.
+### 2.1 The sync time budget — FIXED 2026-08-16, with a caveat
+Was: `TIME_BUDGET_MS` 8000 with `LATE_WORK_TIME_MARGIN_MS` 6000, leaving a **2000ms
+window** in which any loop could start new work. One throttle wait (1500ms) plus one
+`$expand=Media` fetch nearly exhausted it, which is why the crawl reported
+`lastRunPagesFetched: 0` and sat at 18,226 of ~19,000 listings.
 
-**Raising `TIME_BUDGET_MS` is the real fix and was deliberately not attempted.**
-The 6000ms margin exists because observed HTTP 499s were killing whole runs and
-discarding all their work (see the comment above the constant). Doing this safely
-needs Netlify's actual scheduled-function timeout confirmed from documentation,
-not guessed. **Good first task for a fresh session.**
+**Now 11000.** Netlify's docs state a **30-second** limit for scheduled functions
+(synchronous: 10s, background: 15min). The old comment inferred "~15s" from an
+observed 499 and was never checked against the documentation. Start window is now
+5000ms — 2.5x the throughput — with a worst case near 13s, well under 30s.
+
+Deliberately NOT raised to the full 30s: the 499s were real, and there is no reason
+to spend the whole limit to fix a 2000ms window. `tests/test-budget.js` now asserts
+the worst case stays under 60% of the documented limit, so this cannot quietly creep.
+
+**Caveat worth verifying:** this has not been observed on a live run yet. Check
+`/status` after a deploy — `lastRunPagesFetched` should be greater than 0 and
+`totalListingsStored` should climb past 18,226. If 499s reappear, lower it rather
+than removing the guards.
 
 ### 2.2 Lofty tags cannot be read — settled, unfixable through the API
 `GET /leads/{id}` returns **no `tags` field** on this account. Proven live:
@@ -193,17 +194,18 @@ Jeff Kurtz, Miranda Cantin, Alissa Rhoades) — colleagues, not local spots.
   `scripts/netlify-build.sh`; the committed `site/` is the fallback.
 - **Tests: `bash tests/run-all.sh`** — 13 suites, all green. They were in a session
   scratchpad and would have vanished with it; moved into the repo at the end of
-  this session. Still **not wired to CI** — worth adding a GitHub Action so a
-  regression fails a push rather than waiting for someone to run them by hand.
+  this session. **Wired to CI** in `.github/workflows/tests.yml`: runs on every push
+  to master and claude/**, on PRs, and weekly. That workflow also fails if the
+  committed `site/` drifts from what `build.py` generates, since that directory is
+  the deploy fallback and going stale silently is this repo's signature failure.
 
 ---
 
 ## 7. Suggested opening prompt for the next session
 
-> Read `NEXT-SESSION.md`. Then: (1) research Netlify's real scheduled-function
-> timeout and, if it's safe, raise `TIME_BUDGET_MS` in `sync-listings.js` so the
-> catalog crawl isn't limited to a 2000ms start window — see §2.1. (2) Wire
-> `tests/run-all.sh` into a GitHub Action. (3) Then look at
+> Read `NEXT-SESSION.md`. Then: (1) check `/status?probe=1&format=json` and confirm
+> the raised time budget actually worked — `lastRunPagesFetched` > 0 and
+> `totalListingsStored` climbing past 18,226 (see §2.1's caveat). (2) Then look at
 > the `Listing-Engine` and `sellerintelligence` repos and tell me what's worth
 > pulling into this one.
 

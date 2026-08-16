@@ -104,7 +104,29 @@ let _lastCloudinaryError = null;
 // margin, but the durable fix is the incremental checkpoint saves added
 // below (after the priority pass and after each page) — those make a
 // timeout lose at most the current chunk of work instead of the whole run.
-const TIME_BUDGET_MS = 8000;
+// 2026-08-16, RAISED 8000 -> 11000 on documented evidence rather than a guess.
+//
+// Netlify's own docs state a 30-SECOND execution limit for scheduled functions
+// (docs.netlify.com/build/functions/scheduled-functions — synchronous functions
+// get 10s, background functions 15min, scheduled functions 30s). The comment above
+// inferred "~15s" from an observed 499, which is a reasonable read of a symptom but
+// was never checked against the documentation.
+//
+// Why this mattered enough to change: with LATE_WORK_TIME_MARGIN_MS at 6000, a
+// budget of 8000 left a 2000ms window in which ANY loop could start new work --
+// including the bootstrap crawl -- and one throttle wait (1500ms) plus one
+// $expand=Media fetch nearly exhausts it. That is why the catalog crawl reported
+// lastRunPagesFetched 0 and sat at 18,226 of ~19,000 listings.
+//
+// 11000 gives a 5000ms start window, 2.5x the throughput, and by this file's own
+// worst-case reasoning (work starts at budget - margin, then runs its full ~8s)
+// tops out near 13s -- comfortably under the documented 30s AND under the 15s the
+// observed 499 suggested. Deliberately NOT raised to the full 30s: the 499s were
+// real, the incremental checkpoint saves below bound the damage of a timeout to
+// the current chunk rather than the whole run, and there is no reason to spend the
+// entire limit to fix a 2000ms window. See tests/test-budget.js, which asserts the
+// worst case stays under a stated ceiling so this can't quietly creep.
+const TIME_BUDGET_MS = 11000;
 // The most any one sub-task may take of the run's budget. Exists so a failing
 // side-task can never starve the listing replication that is this function's
 // actual job -- see the 2026-08-16 note in the priority pass below, where a
@@ -865,13 +887,11 @@ exports.handler = async () => {
   //      fail identically every attempt, so hammering 11 listings every 15
   //      minutes is pure waste. Transient errors keep their normal retries.
   //
-  // STILL WORTH DOING, deliberately NOT done here: TIME_BUDGET_MS = 8000 is
-  // simply tight for the work this function now has, and a 6000ms margin leaves
-  // a 2000ms window for everything. Raising the budget is the structural fix,
-  // but the 6000 margin exists because real 499 timeouts were observed killing
-  // whole runs and losing all their work (see the comment above it). Changing it
-  // needs a careful look at Netlify's real limit for scheduled functions, not a
-  // guess at the end of a long session.
+  // DONE 2026-08-16: the structural fix this note used to defer. Netlify's docs
+  // state a 30s limit for scheduled functions, so TIME_BUDGET_MS went 8000 -> 11000
+  // (see its comment) and the start-work window went 2000ms -> 5000ms. Not raised
+  // to the full 30s on purpose -- the observed 499s were real and there is no need
+  // to spend the whole limit to fix a 2000ms window.
   const priorityCutoff = Math.floor((TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) * PRIORITY_PASS_BUDGET_FRACTION);
   const cloudConfigBroken = isCloudinaryConfigError(state && state.lastCloudinaryError);
   if (cloudConfigBroken && herPendingIds.length) {

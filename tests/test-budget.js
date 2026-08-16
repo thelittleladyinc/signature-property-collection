@@ -18,6 +18,25 @@ for (const m of ["Server returned unexpected status code - 500", "socket hang up
                  "Request Timeout", "rate limit exceeded", "", null, undefined]) {
   check(`${JSON.stringify(m)}`, fn(m) === false);
 }
+console.log("\nTime budget vs Netlify's documented 30s scheduled-function limit");
+const num = (name) => Number((src.match(new RegExp("const " + name + " = (\\d+)")) || [])[1]);
+const BUDGET = num("TIME_BUDGET_MS"), MARGIN = num("LATE_WORK_TIME_MARGIN_MS");
+const PHOTO_WORST = 8000;   // 4s download + 4s upload, per _cloudinary.js
+const NETLIFY_LIMIT = 30000;
+const startWindow = BUDGET - MARGIN;
+// This file's own worst-case reasoning: work may START at BUDGET - MARGIN and then
+// run its full duration.
+const worstCase = startWindow + PHOTO_WORST;
+console.log(`       budget ${BUDGET} · margin ${MARGIN} · start window ${startWindow}ms · worst case ~${worstCase}ms`);
+check("a start window big enough for a throttle (1500ms) AND a page fetch",
+  startWindow >= 3000, `${startWindow}ms`);
+check("worst case stays under Netlify's documented 30s limit",
+  worstCase < NETLIFY_LIMIT, `${worstCase}ms`);
+check("and keeps real headroom, not just squeaking under",
+  worstCase < NETLIFY_LIMIT * 0.6, `${worstCase}ms vs ${NETLIFY_LIMIT * 0.6}ms`);
+check("margin still covers a full worst-case photo attempt",
+  MARGIN >= 6000, `${MARGIN}ms`);
+
 console.log("\nBudget guard");
 check("a fraction constant exists", /PRIORITY_PASS_BUDGET_FRACTION = 0\.\d+/.test(src));
 check("it is less than the whole budget", /PRIORITY_PASS_BUDGET_FRACTION = 0\.[1-8]/.test(src));
