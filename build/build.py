@@ -95,6 +95,26 @@ LEGACY_URL_REDIRECTS = {
     # the community pages, so the old URL now lands on the communities index,
     # which carries the quiz and is the right entry point for "which town?".
     "/neighborhood-quiz.html": "/communities/index.html",
+    # 2026-08-16, found by reading Christine's actual YouTube Studio list rather than
+    # theorising about it. Two of her published video descriptions link to
+    # signaturepropertycollection.com URLs that DO NOT EXIST on this site:
+    #
+    #   /johnstown-luxury-real-estate   -- "Inside a $1.35M Luxury Home in Small-Town
+    #                                       Colorado" (521 views)
+    #   /windsor-co-lifestyle-guide     -- "Is This the Cutest Home in Windsor, Colorado?"
+    #                                       (1,096 views), and the $1.35M video too
+    #
+    # So roughly 1,600 views' worth of people have been clicking a link she wrote, on a
+    # video she made, and landing on her own 404. That is worse than having no link: it
+    # reads as a broken business.
+    #
+    # Pointed at the town pages rather than a generic luxury page, because that is what a
+    # viewer of a Johnstown or Windsor tour is actually looking for -- and both town pages
+    # carry a live IRES feed, so the click lands on current listings for that town.
+    "/johnstown-luxury-real-estate": "/communities/weld/johnstown.html",
+    "/johnstown-luxury-real-estate/": "/communities/weld/johnstown.html",
+    "/windsor-co-lifestyle-guide": "/communities/weld/windsor.html",
+    "/windsor-co-lifestyle-guide/": "/communities/weld/windsor.html",
 }
 
 # Display name (as used in COUNTIES[]["cities"]) -> CITY_CONTENT data key.
