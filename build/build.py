@@ -3744,11 +3744,15 @@ def _county_town_comparison(county):
         spots = [sp for sp in LOCAL_SPOTS_DATA.get("spots", [])
                  if sp.get("cityHref") == url]
         views = sum((sp.get("views") or 0) + (sp.get("reviewViews") or 0) for sp in spots)
+        # Best-known first, so the two names shown are the two worth recognising.
+        spots.sort(key=lambda sp: -((sp.get("views") or 0) + (sp.get("reviewViews") or 0)))
+        names = [sp["name"] for sp in spots]
+        places = ", ".join(names[:2]) + (f" +{len(names) - 2} more" if len(names) > 2 else "")
         rows.append({
             "city": city, "url": url,
             "commute": _commute_short(data.get("commute")),
             "district": _district_short(data.get("school_district")),
-            "spots": len(spots), "views": views,
+            "spots": len(spots), "views": views, "places": places,
         })
     if not rows:
         return ""
@@ -3758,16 +3762,15 @@ def _county_town_comparison(county):
         <th scope="row"><a href="{r['url']}">{esc(r['city'])}</a></th>
         <td>{esc(r['commute']) or "&mdash;"}</td>
         <td>{esc(r['district']) or "&mdash;"}</td>
-        <td>{(f"{r['spots']} spot{'s' if r['spots'] != 1 else ''} &middot; {r['views']:,} views"
-              if r['spots'] else "&mdash;")}</td>
+        <td>{esc(r['places']) or "&mdash;"}</td>
       </tr>""" for r in rows)
     covered = [r for r in rows if r["spots"]]
+    first = esc(SITE["agent"].split()[0])
     lede = (f"Drive times and school districts for every {esc(county['name'])} town "
-            f"{esc(SITE['agent'].split()[0])} works in, side by side.")
+            f"{first} works in, side by side.")
     if covered:
-        lede += (f" The last column is where she has actually been with a camera &mdash; "
-                 f"{sum(r['spots'] for r in covered)} places, watched and read "
-                 f"{sum(r['views'] for r in covered):,} times.")
+        lede += (f" The last column is the places {first} has actually been to with a "
+                 f"camera &mdash; tap a town to watch them.")
     return f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Compare Before You Commit</span>
@@ -3777,7 +3780,7 @@ def _county_town_comparison(county):
       <table class="town-table">
         <thead>
           <tr><th scope="col">Town</th><th scope="col">Nearest City</th>
-          <th scope="col">School District</th><th scope="col">Filmed Locally</th></tr>
+          <th scope="col">School District</th><th scope="col">Places She&rsquo;s Filmed</th></tr>
         </thead>
         <tbody>
       {body}
