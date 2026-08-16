@@ -75,10 +75,17 @@ Deliberately NOT raised to the full 30s: the 499s were real, and there is no rea
 to spend the whole limit to fix a 2000ms window. `tests/test-budget.js` now asserts
 the worst case stays under 60% of the documented limit, so this cannot quietly creep.
 
-**Caveat worth verifying:** this has not been observed on a live run yet. Check
-`/status` after a deploy — `lastRunPagesFetched` should be greater than 0 and
-`totalListingsStored` should climb past 18,226. If 499s reappear, lower it rather
-than removing the guards.
+**VERIFIED LIVE 2026-08-16T01:45:51Z.** `lastRunPagesFetched: 1`,
+`lastRunRecordsSeen: 50`, cursor advanced `$skip=12400` → `12500`. It was 0 and 0 on
+every run before this. No 499s. The crawl is moving again.
+
+(`totalListingsStored` reads 18,216 rather than climbing — that is `pruneAndSlimStore`
+dropping listings that left the replicated statuses, which is correct behaviour, not
+a regression.)
+
+**New consequence to watch:** more crawl throughput means more MLS Grid requests per
+run, on an account shared with Listing-Engine and Expired-Luxury. A 429 appeared on
+the photo probe shortly after. See §2.6.
 
 ### 2.2 Lofty tags cannot be read — settled, unfixable through the API
 `GET /leads/{id}` returns **no `tags` field** on this account. Proven live:
@@ -114,6 +121,25 @@ caught `/seller-local-proof.html` before it shipped. When adding a page, add it 
 - Several assertions hardcoded facts that then changed (which spot has the most
   views, how many spots exist). Assertions now derive expected values from the
   data. Keep doing that.
+
+### 2.6 MLS Grid 429s — rate limiting, and partly self-inflicted
+2026-08-16: `/status?probe=1` reported a 429 on the photo fetch right after several
+refreshes. The pipeline was intact — the URLs resolved fine. Two contributing causes:
+
+1. The raised time budget (§2.1) means the crawl now actually fetches pages, each
+   with `$expand=Media`. Real extra load on an account shared with two other apps.
+2. **The probe itself.** Each `?probe=1` costs a media-resolve plus a real image
+   fetch. Refreshing it repeatedly caused some of the 429 it then reported.
+
+Fixed both reporting problems: a 429 now reads "Rate limited, not broken" and
+explains the shared-account limit, and the probe **refuses to run at all while a
+cool-off is active** rather than adding to it. A diagnostic that changes what it
+measures is worse than no diagnostic.
+
+**If 429s persist beyond bursts**, the lever is `REQUEST_DELAY_MS` (1500ms) or
+lowering `TIME_BUDGET_MS` back toward 9000 — not removing the guards. Photos degrade
+to a grey placeholder that retries on the next view, so it is visible but not
+destructive.
 
 ---
 

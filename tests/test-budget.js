@@ -1,8 +1,12 @@
 // The audit's finding: a broken Cloudinary account was consuming 100% of every
 // sync run's time budget, so the catalog crawl fetched 0 pages. These are the
 // two properties that stop that recurring.
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
 const fs = require("fs");
-const src = fs.readFileSync("/home/user/signature-property-collection/netlify/functions/sync-listings.js", "utf8");
+const src = fs.readFileSync(`${ROOT}/netlify/functions/sync-listings.js`, "utf8");
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
 

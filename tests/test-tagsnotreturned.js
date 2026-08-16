@@ -1,7 +1,11 @@
 // Lofty's GET /leads/{id} returns NO tags field on this account (proven by her
 // live probe). The site must say so as a settled fact and stop asking her to
 // report it — and must still never write tags it couldn't read.
-const FN_DIR = "/home/user/signature-property-collection/netlify/functions";
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
+const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };

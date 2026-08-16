@@ -2,15 +2,19 @@
 // Christine's review of one Berthoud restaurant has 10k+ views on its own —
 // more than this whole map's YouTube footage combined — so the review path is
 // not a fallback, it's the highest-value case.
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
 const fs = require("fs");
 const path = require("path");
-const FN_DIR = "/home/user/signature-property-collection/netlify/functions";
+const FN_DIR = `${ROOT}/netlify/functions`;
 const LIB = path.join(FN_DIR, "lib/_local-spots.json");
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
 
-const SRC = "/home/user/signature-property-collection/build/data/local_spots.json";
+const SRC = `${ROOT}/build/data/local_spots.json`;
 const original = fs.readFileSync(LIB, "utf8");
 const originalSrc = fs.readFileSync(SRC, "utf8");
 const data = JSON.parse(original);
@@ -49,7 +53,7 @@ fs.writeFileSync(LIB, JSON.stringify(data, null, 2));
       pin.reviewViews === 10400 && pin.views === undefined, JSON.stringify({ r: pin.reviewViews, v: pin.views }));
 
     // The map's own logic, exercised directly rather than described.
-    const mapJs = fs.readFileSync("/home/user/signature-property-collection/site/assets/js/map.js", "utf8");
+    const mapJs = fs.readFileSync(`${ROOT}/site/assets/js/map.js`, "utf8");
     check("tooltip switches to Read for a review pin", /'★ Read: '/.test(mapJs));
     check("no iframe is built without a videoId", /if \(poi\.videoId\) \{[\s\S]{0,400}youtube-nocookie/.test(mapJs));
     check("media panel is hidden rather than left black", /wrap\.style\.display = 'none'/.test(mapJs));
@@ -60,12 +64,12 @@ fs.writeFileSync(LIB, JSON.stringify(data, null, 2));
 
     // And the build guard: neither source at all must still be rejected.
     data.spots = [{ name: "No Source", category: "restaurant", address: "x", city: "Loveland" }];
-    fs.writeFileSync("/home/user/signature-property-collection/build/data/local_spots.json",
+    fs.writeFileSync(`${ROOT}/build/data/local_spots.json`,
       JSON.stringify(data, null, 2));
     const { execFileSync } = require("child_process");
     let rejected = false;
     try {
-      execFileSync("python3", ["build/build.py"], { cwd: "/home/user/signature-property-collection", stdio: "pipe" });
+      execFileSync("python3", ["build/build.py"], { cwd: `${ROOT}`, stdio: "pipe" });
     } catch (e) {
       rejected = /carry nothing of Christine/.test(String(e.stdout) + String(e.stderr));
     }
@@ -77,7 +81,7 @@ fs.writeFileSync(LIB, JSON.stringify(data, null, 2));
     fs.writeFileSync(LIB, original);
     fs.writeFileSync(SRC, originalSrc);
     require("child_process").execFileSync("python3", ["build/build.py"],
-      { cwd: "/home/user/signature-property-collection", stdio: "pipe" });
+      { cwd: `${ROOT}`, stdio: "pipe" });
   }
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
   process.exit(failures ? 1 : 0);

@@ -1,8 +1,12 @@
 // Every category the data actually uses must have its own glyph, and a local
 // spot must not fall through to the golf flag — the bug this test exists for.
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
 const fs = require("fs");
-const mapJs = fs.readFileSync("/home/user/signature-property-collection/site/assets/js/map.js", "utf8");
-const spots = require("/home/user/signature-property-collection/netlify/functions/lib/_local-spots.json").spots;
+const mapJs = fs.readFileSync(`${ROOT}/site/assets/js/map.js`, "utf8");
+const spots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).spots;
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
 

@@ -1,7 +1,11 @@
 // A listing page must carry Christine's own local spots for its town — the thing
 // no portal listing page can have — and must degrade to nothing for a town where
 // she has no spots yet.
-const FN_DIR = "/home/user/signature-property-collection/netlify/functions";
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
+const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
@@ -37,7 +41,7 @@ function load(city) {
   check("exactly three spots", titles.length === 3, String(titles.length));
   // Derived, not hardcoded: the leader changes as reviews and videos are added.
   // Sweet Heart Winery leads today only because it carries BOTH (1,188 + 1,000).
-  const all = require("/home/user/signature-property-collection/netlify/functions/lib/_local-spots.json").spots;
+  const all = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).spots;
   const total = (s) => (s.views || 0) + (s.reviewViews || 0);
   const expected = all.filter(s => s.city === "Loveland").sort((a, b) => total(b) - total(a))[0];
   check("most-watched first, counting both platforms", titles[0] === expected.name,

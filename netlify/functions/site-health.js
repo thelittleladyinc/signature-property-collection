@@ -25,7 +25,7 @@ const {
   SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS,
 } = require("./lib/_mls-shared");
 const { isCloudinaryConfigured } = require("./lib/_cloudinary");
-const { resolveMediaFor, fetchMediaResponse, looksPresigned } = require("./lib/_media");
+const { resolveMediaFor, fetchMediaResponse, looksPresigned, isThrottled } = require("./lib/_media");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 // Read for the Tour It With Me coverage row below — same file the map reads.
 const LOCAL_SPOTS = require("./lib/_local-spots.json");
@@ -85,6 +85,21 @@ async function probePhotoPipeline(mineListings, token) {
   }
   try {
     const store = getBlobStore(getStore);
+    // 2026-08-16: don't pile on. If MLS Grid has already rate-limited us, this
+    // probe's own resolve + image fetch make it worse, and it would report a 429
+    // it helped cause. A diagnostic that changes what it measures is worse than
+    // no diagnostic. Respects both the sync's suspension flag and the photo
+    // cooldown, and says plainly that it declined rather than pretending to pass.
+    const throttledUntil = await isThrottled(store);
+    if (throttledUntil) {
+      const waitSec = Math.max(1, Math.ceil((throttledUntil - Date.now()) / 1000));
+      out.ok = true;
+      out.skipped = true;
+      out.detail = `Not tested just now: MLS Grid requests are in a ${waitSec}s cool-off, ` +
+        `so running this probe would add to the rate limiting rather than measure it. ` +
+        `The cool-off is normal after a burst — it clears itself. Re-run ?probe=1 after that.`;
+      return out;
+    }
     const resolved = await resolveMediaFor([first.listingId], {
       store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS, timeoutMs: 6000,
     });
@@ -110,10 +125,26 @@ async function probePhotoPipeline(mineListings, token) {
     out.contentType = attempt.res.headers.get("content-type") || null;
     if (!attempt.res.ok) {
       out.ok = false;
-      out.detail = `Resolved ${urls.length} URL(s) from ${out.mediaHost} ` +
-        `(pre-signed: ${out.presigned ? "yes" : "no"}), but fetching photo 0 returned ` +
-        `HTTP ${attempt.res.status} using the "${attempt.mode}" auth mode. ` +
-        `That is the exact step breaking the photos.`;
+      // 2026-08-16: a 429 is NOT the same finding as a 403 or a 404, and this row
+      // used to call every failure "the exact step breaking the photos". Christine
+      // hit a 429 right after several ?probe=1 refreshes, and that wording reads as
+      // "your photos are broken" when the truth is "you are being rate limited,
+      // partly by this very page". MLS Grid's limit is per ACCOUNT and shared with
+      // Listing-Engine and Expired-Luxury, so total volume is what matters — and
+      // each probe run costs a media-resolve plus a real image fetch.
+      out.rateLimited = attempt.res.status === 429;
+      out.detail = out.rateLimited
+        ? `Rate limited, not broken. MLS Grid returned HTTP 429 for photo 0 of ` +
+          `${out.listingId}. The URLs resolved fine (${urls.length} of them), so the ` +
+          `pipeline is intact — MLS Grid is just refusing requests right now. That limit ` +
+          `is per ACCOUNT and shared with Listing-Engine and Expired-Luxury, and each ` +
+          `?probe=1 run costs a resolve plus a real image fetch, so refreshing this page ` +
+          `repeatedly contributes to it. Visitors see a grey placeholder that re-tries ` +
+          `itself on the next view. Re-check in a few minutes before treating it as a fault.`
+        : `Resolved ${urls.length} URL(s) from ${out.mediaHost} ` +
+          `(pre-signed: ${out.presigned ? "yes" : "no"}), but fetching photo 0 returned ` +
+          `HTTP ${attempt.res.status} using the "${attempt.mode}" auth mode. ` +
+          `That is the exact step breaking the photos.`;
       return out;
     }
     const buf = Buffer.from(await attempt.res.arrayBuffer());

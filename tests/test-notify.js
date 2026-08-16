@@ -1,7 +1,11 @@
 // Exercises submission-created.js end to end with fetch and Blobs stubbed, so
 // the three new notification steps are proven before Christine tests a form.
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
 const path = require("path");
-const FN_DIR = "/home/user/signature-property-collection/netlify/functions";
+const FN_DIR = `${ROOT}/netlify/functions`;
 
 // --- stub @netlify/blobs -----------------------------------------------------
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });

@@ -1,7 +1,11 @@
 // The tag reader must never overwrite a lead's tags with a list it built from a
 // response shape it didn't understand. That would delete real tags off a real
 // client's record.
-const { tagsFromLead, describeTagShape, refireLoftyTag } = require("/home/user/signature-property-collection/netlify/functions/lib/_notify.js");
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
+const { tagsFromLead, describeTagShape, refireLoftyTag } = require(`${ROOT}/netlify/functions/lib/_notify.js`);
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
 

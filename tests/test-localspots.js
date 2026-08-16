@@ -1,7 +1,11 @@
 // The local-spots endpoint must geocode once, cache, and never return a pin it
 // couldn't place — a wrong pin puts Christine's recommendation on the wrong
 // business, so "fewer pins" has to be the failure mode.
-const FN_DIR = "/home/user/signature-property-collection/netlify/functions";
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
+const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
@@ -20,7 +24,7 @@ function memStore() {
 }
 
 process.env.GOOGLE_MAPS_API_KEY = "gkey";
-const curatedSpots = require("/home/user/signature-property-collection/netlify/functions/lib/_local-spots.json").spots;
+const curatedSpots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).spots;
 
 (async () => {
   console.log("\n1. All spots geocode cleanly");
@@ -56,7 +60,7 @@ const curatedSpots = require("/home/user/signature-property-collection/netlify/f
     body.spots.filter(s => s.views || s.reviewViews).length >= body.spots.length - 2);
   // Derived from the data file rather than hardcoded: the top pin changes as
   // she adds videos, and a test that names one becomes a lie the day it does.
-  const curated = require("/home/user/signature-property-collection/netlify/functions/lib/_local-spots.json").spots;
+  const curated = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).spots;
   const expectedTop = curated.slice().sort((a, b) => (b.views || 0) - (a.views || 0))[0].name;
   check("the top-viewed pin matches the curated data", 
     body.spots.slice().sort((a, b) => b.views - a.views)[0].name === expectedTop, expectedTop);

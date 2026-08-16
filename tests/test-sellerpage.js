@@ -1,7 +1,10 @@
 // The seller page is the listing-appointment pitch: real numbers per town, and a
 // form that reaches Lofty tagged as a SELLER lead rather than another browse.
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
 const fs = require("fs");
-const ROOT = "/home/user/signature-property-collection";
 const html = fs.readFileSync(`${ROOT}/site/seller-local-proof.html`, "utf8");
 const spots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).spots;
 let failures = 0;

@@ -1,7 +1,11 @@
 // With no Resend key, the backup-email row must read as OPTIONAL (ℹ️) and must
 // NOT drag the page's overall verdict to red -- the crying-wolf mistake the
 // Cloudinary row already taught us.
-const FN_DIR = "/home/user/signature-property-collection/netlify/functions";
+// Repo root derived from this file's own location, never hardcoded: these suites
+// run both locally and in GitHub Actions, where the checkout is at
+// /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+const ROOT = require("path").resolve(__dirname, "..");
+const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
 const record = {
   at: "2026-08-15T19:40:00.000Z", formName: "contact", leadEmail: "buyer@example.com",
