@@ -677,11 +677,11 @@ _LISTING_VIDEO_ENTRIES = [
      "N57_J3llZCQ", "45 Acres + Heated Shop — Custom Colorado Ranch, No HOA | 16225 County Road 98", "live"),
     (["929 independent ave", "929 w independent ave", "929 west independent ave",
       "929 independent avenue", "929 w independent avenue"],
-     "TpjE36J71zc", "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado", "unconfirmed"),
+     "TpjE36J71zc", "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado", "not-sold"),
     (["294 gila trail", "294 gila trl"],
-     "JvtRGf01JXU", "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail", "unconfirmed"),
+     "JvtRGf01JXU", "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail", "sold"),
     (["39243 boulevard e", "39243 blvd e"],
-     "L-uEVzq1bv4", "Eaton, CO Home Under $400K — 39243 Boulevard E", "unconfirmed"),
+     "L-uEVzq1bv4", "Eaton, CO Home Under $400K — 39243 Boulevard E", "sold"),
     (["1110 quitman st", "1110 s quitman st", "1110 south quitman st",
       "1110 quitman street", "1110 s quitman street"],
      # 2026-08-16: confirmed SOLD, and by a document rather than an inference. Her
@@ -692,11 +692,11 @@ _LISTING_VIDEO_ENTRIES = [
      # reason the other five stay unconfirmed rather than being waved through.
      "e7kMY1yV7GI", "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St", "sold"),
     (["45615 county rd 27", "45615 county road 27"],
-     "dVonJhu_zCo", "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO", "unconfirmed"),
+     "dVonJhu_zCo", "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO", "sold"),
     (["504 graefe ave", "504 graefe avenue"],
      "eiFurERq_As", "Charming Home for Sale at 504 Graefe Ave, Ault CO", "sold"),
     (["1316 cimarron cir", "1316 cimarron circle"],
-     "xWcrj6foJ-Q", "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir", "unconfirmed"),
+     "xWcrj6foJ-Q", "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir", "not-sold"),
     # 2026-08-15: the MLS record for this sale is 4869 Stuart St, not 4986 --
     # the video title has the digits transposed (there IS a real 4986 W 5th St
     # in Greeley, which is likely where the mix-up came from). Both forms kept
@@ -3565,23 +3565,19 @@ def build_home():
     services_html = "\n      ".join(
         f'<div class="card"><h2 class="card-title">{t}</h2><p>{d}</p></div>' for t, d in services
     )
+    # 2026-08-16, on the H1. It read "Turning Dreams Into Addresses" -- a nice line that
+    # nobody types into anything. A homepage H1 is among the strongest signals a page has,
+    # for Google and for an answer engine deciding what this site IS, and it was spending
+    # that signal on a slogan, so the page named its own market nowhere in its largest
+    # text. Now it carries the terms people actually search and the coverage stated the way
+    # Christine states it herself: Denver north. The slogan keeps the eyebrow, where it
+    # costs nothing.
+    #
+    # Kept as a Python comment, not an HTML one: HTML comments ship, and build notes
+    # quoting Christine's own words do not belong in a page a client can View Source on.
     body = f"""
 <section class="hero">
   <div class="wrap">
-    <!-- 2026-08-16 (Christine: "are these words that people search for? and ask ai
-         answers about? we need to mention northern colorado - and say across - I
-         represent Denver north").
-
-         The H1 was "Turning Dreams Into Addresses". It is a nice line and nobody
-         types it into anything. A homepage H1 is one of the strongest signals a page
-         has, for Google and for an answer engine deciding what this site IS, and it
-         was spending that signal on a slogan -- so the page named its own market
-         nowhere in its largest text.
-
-         Now it says the thing people search ("luxury real estate", "Northern
-         Colorado") and the thing they ask an AI ("who covers my area"), with her
-         coverage stated the way she states it herself: Denver north. The slogan is
-         kept as the eyebrow, where it costs nothing. -->
     <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Turning Dreams Into Addresses</span>
     <h1>Luxury Real Estate Across Northern Colorado</h1>
     <p class="lede">{SITE['agent']} represents estate homes, acreage, and architecturally
@@ -8857,17 +8853,25 @@ def build_nav_pages():
         {rows}
       </ul>
     </div>""")
+    # 2026-08-16: "ive sold over 100 homes - there should not be anything saying less."
+    # The first draft of this section broke that twice over -- a heading reading "EVERY
+    # Home Christine Has Sold" above a list of 43, and a lede opening on the number 43.
+    # Together they read as a career total, which is about a third of the truth.
+    #
+    # This list is a RECORD, not a tally: it holds the closings with a street address on
+    # file, and the older years are not in Drive at all. So her real total leads, the list
+    # is described as what it is, and no number smaller than it appears near it. The counts
+    # inside each town heading stay -- nothing about "Loveland, 18 homes" reads as a career
+    # figure.
     all_sold_section = f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">The Full List</span>
-    <h2 class="section-title">Every Home {esc(SITE['agent'].split()[0])} Has Sold, By Town</h2>
-    <!-- The count and the "150+ homes" figure in the hero are both true and a reader
-         WILL notice the gap, so it is explained rather than left to look like a
-         contradiction. Only addresses Christine has published herself appear here. -->
-    <p class="lede">{len(SOLD_HOME_PINS)} closed sales, grouped by town so you can find
-    yours. {esc(SITE['agent'].split()[0])} has sold 150+ homes over her career; these are
-    the ones on record here by address, and the list keeps growing as older files go in.
-    Every one is a real closing, not a shortlist of the good ones.</p>
+    <h2 class="section-title">Homes {esc(SITE['agent'].split()[0])} Has Sold, By Town</h2>
+    <p class="lede">150+ homes sold across Northern Colorado, 250+ as a duo with Kendra
+    Bajcar. Below are the closings with a street address on file, grouped by town so you
+    can find yours &mdash; the record goes back further than the paperwork does, and this
+    list keeps growing as older files go in. Every one is a real closing, not a shortlist
+    of the good ones.</p>
     {"".join(year_blocks)}
     <div class="btn-row" style="margin-top:32px">
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/sold-homes-map.html">See Them On A Map &rarr;</a>

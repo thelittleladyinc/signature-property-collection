@@ -49,8 +49,17 @@ console.log("\n1. The status table parses, and the four values are all in use");
 check(`parsed ${entries.length} listing-video entries`, entries.length >= 15, String(entries.length));
 const byStatus = {};
 for (const e of entries) (byStatus[e.status] ||= []).push(e);
-check("statuses found: " + Object.keys(byStatus).sort().join(", "),
-  ["sold", "live", "not-sold", "unconfirmed"].every((s) => byStatus[s]),
+// Every status in use must be one of the four, and the three that make a claim must all
+// be represented. "unconfirmed" deliberately is NOT required: it is a holding pen, and
+// emptying it is the goal -- Christine cleared the last of it on 2026-08-16 ("i sold 294
+// gila, bold 3 rounty rd 27 not indpendevent or cimaron"). Requiring it made an
+// improvement fail the build, which is the same mistake five earlier tests here made:
+// encoding a moment instead of a rule.
+const VALID = ["sold", "live", "not-sold", "unconfirmed"];
+const unknown = Object.keys(byStatus).filter((k) => !VALID.includes(k));
+check("no status outside the four documented values", unknown.length === 0, unknown.join(", "));
+check("statuses in use: " + Object.keys(byStatus).sort().join(", "),
+  ["sold", "live", "not-sold"].every((s) => byStatus[s]),
   JSON.stringify(Object.fromEntries(Object.entries(byStatus).map(([k, v]) => [k, v.length]))));
 
 console.log("\n2. Every 'sold' entry has evidence behind it");

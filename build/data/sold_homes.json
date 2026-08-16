@@ -64,7 +64,8 @@
     "Both keep their video tours. If either correction is wrong, the video title is",
     "the thing to re-check, not the MLS.",
     "2026-08-16: eight pins removed. They came from the sold-status inference in _LISTING_VIDEO_ENTRIES (build.py) -- 'absent from her live-listings sheet, so presumably closed' -- not from Christine's records. She confirmed 32 Victoria Dr and 475 Homestead Ln did NOT sell, which invalidated the other six by the same reasoning. A pin belongs here only when Christine's own records back it, which in practice means it carries a year. Removed: 1110 S Quitman St, 1316 Cimarron Cir, 294 Gila Trail, 32 Victoria Dr, 39243 Boulevard E, 45615 County Rd 27, 475 Homestead Ln, 929 W Independent Ave.",
-    "2026-08-16, same day: 1110 S Quitman St went back in. It was one of the eight removed above, and then her own 'Bold Collective — Updated Deal Tracker' in Drive turned out to record it CLOSED on 06/05/2026 at $405,000, co-listed with Kendra. That is a document, which is the standard -- one of the six unconfirmed addresses cleared it and five did not."
+    "2026-08-16, same day: 1110 S Quitman St went back in. It was one of the eight removed above, and then her own 'Bold Collective — Updated Deal Tracker' in Drive turned out to record it CLOSED on 06/05/2026 at $405,000, co-listed with Kendra. That is a document, which is the standard -- one of the six unconfirmed addresses cleared it and five did not.",
+    "2026-08-16, third correction of the day and the one that came straight from Christine: \"i sold 294 gila, bold 3 rounty rd 27 not indpendevent or cimaron\". So 294 Gila Trail (Ault), 39243 Boulevard E (Eaton) and 45615 County Rd 27 (Pierce) go back in, and 929 W Independent Ave and 1316 Cimarron Cir are recorded not-sold. No year on these three -- she has confirmed the sale, which is the standard here; the year is not required for a pin and is not shown when absent."
   ],
   "homes": [
     {
@@ -328,6 +329,24 @@
       "year": 2026,
       "videoId": "e7kMY1yV7GI",
       "title": "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St"
+    },
+    {
+      "address": "294 Gila Trail",
+      "city": "Ault",
+      "videoId": "JvtRGf01JXU",
+      "title": "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail"
+    },
+    {
+      "address": "39243 Boulevard E",
+      "city": "Eaton",
+      "videoId": "L-uEVzq1bv4",
+      "title": "Eaton, CO Home Under $400K — 39243 Boulevard E"
+    },
+    {
+      "address": "45615 County Rd 27",
+      "city": "Pierce",
+      "videoId": "dVonJhu_zCo",
+      "title": "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO"
     }
   ]
 }
