@@ -4019,7 +4019,7 @@ ACREAGE_TOWN_TITLES = {
 }
 
 
-def _town_title(city, data_slug, county_name):
+def _town_title(city, data_slug, county_name, disambiguate=False):
     """The <title> for a town page — relocation intent first, money term second.
 
     2026-08-16 (competitive audit against potterealty.com — Michael Potter of
@@ -4044,6 +4044,22 @@ def _town_title(city, data_slug, county_name):
     """
     full = ACREAGE_TOWN_TITLES.get(data_slug or "") or "Luxury Homes For Sale"
     short = full[: -len(" For Sale")] if full.endswith(" For Sale") else full
+    # 2026-08-16 (caught by a sitewide duplicate-title audit right after the change
+    # above shipped): dropping the county was free for 35 towns and not free for
+    # Windsor, the one town with a page under two counties. The county name was the
+    # only thing telling those two titles apart, so removing it made them byte-
+    # identical -- a duplicate title on exactly the page pair this repo already went
+    # to the trouble of canonicalising. The canonical still consolidates them, but
+    # two identical titles in a crawl is a signal worth not sending. Only the towns
+    # that actually straddle a county line pay the character cost.
+    if disambiguate:
+        for candidate in (
+            f"Living In {city}, CO | {county_name} | {short}",
+            f"Living In {city}, CO | {county_name}",
+        ):
+            if len(candidate) <= TITLE_BUDGET:
+                return candidate
+        return f"Living In {city}, CO | {county_name}"
     for candidate in (
         f"Living In {city}, CO | Moving Guide & {short}",
         f"Living In {city}, CO | {full}",
@@ -4875,6 +4891,14 @@ def _moving_to_block(city, county_name, school_district, commute, relocate_extra
       <p>{esc(d)}</p>
     </div>""" for t, d in cards
     )
+    # .grid-2col, NOT .grid-3 with an inline two-column override. The inline form
+    # out-specifies the max-width:900px rule that collapses grids on phones, so it
+    # never reflows and the page overflows -- diagnosed on 2026-08-13 with a 390px
+    # Playwright check (see the comment above .grid-2col in style.css) and fixed
+    # once already. It came back here on 2026-08-16 by copying the block below,
+    # which had the same bug. Both are on the class now. Relocation search skews
+    # heavily mobile, so of all the pages to force a desktop layout onto a phone,
+    # these were the worst possible choice.
     return f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Thinking About Moving Here</span>
@@ -4882,7 +4906,7 @@ def _moving_to_block(city, county_name, school_district, commute, relocate_extra
     <p class="lede">The questions people actually ask {esc(SITE['agent'].split()[0])} before
     they ask about houses — schools, the drive, and what's being built — answered for
     {esc(city)} specifically rather than for {esc(county_name)} in general.</p>
-    <div class="grid-3" style="grid-template-columns:repeat(2,1fr);margin-top:24px">
+    <div class="grid-2col" style="margin-top:24px">
       {cards_html}
     </div>
     <div class="btn-row" style="justify-content:flex-start;margin-top:32px">
@@ -4976,7 +5000,7 @@ def build_city_pages():
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Life In {esc(city)}</span>
     <h2 class="section-title">What It's Like To Live In {esc(city)}</h2>
-    <div class="grid-3" style="grid-template-columns:repeat(2,1fr)">
+    <div class="grid-2col">
       {local_cards}
     </div>
   </div>
@@ -5324,7 +5348,8 @@ def build_city_pages():
                 # anywhere on the site, despite "luxury" appearing 264 times.
                 # The site was semantically adjacent to its money terms
                 # everywhere and exactly on them nowhere.
-                _town_title(city, data_slug, c["name"]),
+                _town_title(city, data_slug, c["name"],
+                            disambiguate=city_county_counts[city] > 1),
                 meta,
                 f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html", "Communities", body,
                 schema_extra=[breadcrumbs, faq_schema]
