@@ -7013,6 +7013,120 @@ SUBDIVISION_PAGES = [
 ]
 
 
+# --------------------------------------------------- LOCATION PHOTOS ----
+# 2026-08-16 (Christine: "you have full access to my drive to search for exactly what
+# subject or location you want - lets do great photos that are geotagged and captioned
+# and any other finability and go bonkers!").
+#
+# Photos of real places, each carrying the four things that make an image findable rather
+# than merely decorative:
+#
+#   caption   Shown under the photo AND used as the sitemap caption. A caption is the one
+#             thing Google Images has repeatedly said it reads; alt text alone is thin.
+#   alt       For screen readers, describing the image rather than repeating the caption.
+#   lat/lng   Real coordinates, emitted as ImageObject.contentLocation with a GeoCoordinates
+#             block. This is what lets an image be associated with a PLACE rather than just
+#             a page, which is the whole point for a local search business.
+#   credit    Who took it. Kept because it is true and because attribution is cheap.
+#
+# Coordinates are the real published location of the subject, never a guess. Anything
+# without a verified coordinate simply omits lat/lng and still gets a caption -- the same
+# rule the sold-homes map and the local-spots pins follow.
+#
+# NOTHING here is decorative stock. Every entry is a photo of a specific place in her
+# market, from her own Drive.
+# path -> photo slug, so the sitemap knows which page shows which photo. Filled after
+# SUBDIVISION_PAGES is defined (see below) rather than hand-maintained, because a
+# hand-maintained second list is exactly what drifted on the main sitemap already.
+LOCATION_PHOTO_BY_PATH = {}
+
+LOCATION_PHOTOS = {
+    "downtown-loveland": {
+        "caption": "Historic 4th Street in downtown Loveland, Colorado — the brick "
+                   "storefronts between Lincoln and Cleveland, with one of the city's "
+                   "bronze sculptures on the sidewalk.",
+        "alt": "Two-storey historic brick commercial buildings along 4th Street in "
+               "downtown Loveland, with parked cars and a bronze sculpture of a "
+               "cameraman on the sidewalk",
+        # 4th St & Lincoln Ave, Loveland -- the same point local_spots.json uses for
+        # the Downtown Loveland pin.
+        "lat": 40.3977, "lng": -105.0758,
+        "place": "Downtown Loveland",
+        "credit": "Christine Gwinnup",
+    },
+}
+
+
+def _location_photo_figure(slug, *, class_extra=""):
+    """A captioned, geotagged photo as a <figure>, or "" if the slug is unknown.
+
+    Returns markup only. The matching ImageObject schema comes from
+    _image_object_schema(slug) so a page can put the JSON-LD in its head where it
+    belongs, rather than inline next to the picture.
+    """
+    ph = LOCATION_PHOTOS.get(slug or "")
+    if not ph:
+        return ""
+    cls = ("loc-photo " + class_extra).strip()
+    return f"""<figure class="{cls}">
+  <picture>
+    <source srcset="/assets/img/communities/{slug}.webp" type="image/webp">
+    <img src="/assets/img/communities/{slug}.jpg" alt="{esc(ph['alt'])}"
+      loading="lazy" decoding="async" width="1600" height="900">
+  </picture>
+  <figcaption>{esc(ph['caption'])}{f" <span>Photo: {esc(ph['credit'])}</span>" if ph.get('credit') else ""}</figcaption>
+</figure>"""
+
+
+def _image_object_schema(slug):
+    """ImageObject JSON-LD for a location photo, with contentLocation when we have
+    real coordinates. Returns None for an unknown slug so callers can filter."""
+    ph = LOCATION_PHOTOS.get(slug or "")
+    if not ph:
+        return None
+    data = {
+        "@context": "https://schema.org",
+        "@type": "ImageObject",
+        "contentUrl": f"{SITE['domain']}/assets/img/communities/{slug}.jpg",
+        "caption": ph["caption"],
+        "description": ph["alt"],
+        "width": 1600,
+        "height": 900,
+        "representativeOfPage": True,
+    }
+    if ph.get("credit"):
+        data["creditText"] = ph["credit"]
+        data["copyrightNotice"] = ph["credit"]
+        data["creator"] = {"@type": "Person", "name": ph["credit"]}
+    if ph.get("place") and ph.get("lat") is not None:
+        data["contentLocation"] = {
+            "@type": "Place",
+            "name": ph["place"],
+            "geo": {"@type": "GeoCoordinates",
+                    "latitude": ph["lat"], "longitude": ph["lng"]},
+        }
+    return json.dumps(data, indent=None)
+
+
+def _sitemap_location_image(path):
+    """<image:image> with caption and title for a page carrying a location photo."""
+    slug = LOCATION_PHOTO_BY_PATH.get(path)
+    if not slug:
+        return ""
+    ph = LOCATION_PHOTOS[slug]
+    return (f'<image:image>'
+            f'<image:loc>{SITE["domain"]}/assets/img/communities/{slug}.jpg</image:loc>'
+            f'<image:title>{esc(ph.get("place") or ph["caption"][:60])}</image:title>'
+            f'<image:caption>{esc(ph["caption"])}</image:caption>'
+            f'</image:image>')
+
+
+LOCATION_PHOTO_BY_PATH.update({
+    f"/communities/loveland/{s['slug']}.html": s["photo"]
+    for s in SUBDIVISION_PAGES if s.get("photo") in LOCATION_PHOTOS
+})
+
+
 def _subdivision_photo(sub):
     """Optional hero photo for a subdivision page.
 
@@ -7024,6 +7138,15 @@ def _subdivision_photo(sub):
     slug = sub.get("photo")
     if not slug:
         return ""
+    # A captioned, geotagged figure where the photo is in LOCATION_PHOTOS; a plain
+    # image otherwise, so a photo can be added before its caption is written.
+    fig = _location_photo_figure(slug)
+    if fig:
+        return f"""<section class="tight" style="padding-top:0">
+  <div class="wrap">
+    {fig}
+  </div>
+</section>"""
     alt = sub.get("photo_alt") or sub["title"]
     return f"""<section class="tight" style="padding-top:0">
   <div class="wrap">
@@ -7127,7 +7250,11 @@ def build_subdivision_pages():
             f"{sub['title']} | Signature Property Collection",
             sub["meta"],
             f"/communities/loveland/{sub['slug']}.html", None, body,
-            schema_extra=[breadcrumbs, faq_schema],
+            # ImageObject with real coordinates where the page carries a location photo.
+            # Without this the caption and the geotag exist in the markup and nowhere a
+            # crawler is guaranteed to read them.
+            schema_extra=[breadcrumbs, faq_schema]
+            + [x for x in [_image_object_schema(sub.get("photo"))] if x],
         )
 
 
@@ -9853,6 +9980,10 @@ def build_redirects_and_meta():
         # as the wrong URL. Now emits whichever file the page really uses.
         + (f'<image:image><image:loc>{SITE["domain"]}/assets/img/communities/{city_photo_by_path[p]}{_hero_ext(city_photo_by_path[p])}</image:loc></image:image>'
            if p in city_photo_by_path else "")
+        # 2026-08-16: location photos carry a caption and a title into the image
+        # sitemap. An <image:loc> on its own tells Google the file exists; the caption
+        # is the part it can actually read, and it is the same text shown on the page.
+        + _sitemap_location_image(p)
         + "</url>"
         for p in paths if p not in NOINDEX_PATHS
     )

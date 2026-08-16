@@ -1327,3 +1327,18 @@ h2.widget-title {
 .town-table tbody th a { font-weight: 600; }
 .town-table tbody tr:last-child th, .town-table tbody tr:last-child td { border-bottom: 0; }
 .town-table tbody tr:hover td, .town-table tbody tr:hover th { background: rgba(184,111,122,.04); }
+
+
+/* ---------- Captioned, geotagged location photos ----------
+   2026-08-16 (Christine: "lets do great photos that are geotagged and captioned and any
+   other finability"). The caption is not decoration: it is the text Google Images reads,
+   and it is what the image sitemap carries. So it gets real type rather than being
+   shrunk to a legal line, and the credit sits inside it in a lighter weight. */
+.loc-photo { margin: 0; }
+.loc-photo img,
+.loc-photo picture { display: block; width: 100%; height: auto; border-radius: 4px; }
+.loc-photo figcaption {
+  margin-top: 12px; font-size: 14px; line-height: 1.65; color: var(--slate-soft);
+  max-width: 70ch;
+}
+.loc-photo figcaption span { color: var(--slate); font-style: italic; }
