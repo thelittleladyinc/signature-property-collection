@@ -3254,8 +3254,8 @@ def footer_html():
         <h2 class="footer-col-title">{SITE['name']}</h2>
         <p style="max-width:340px;color:rgba(255,255,255,.7);line-height:1.6">
           {SITE['agent']} &middot; {SITE['brokerage']}<br>
-          Luxury real estate across Loveland, Berthoud, Masonville, and the
-          Larimer, Weld &amp; Boulder County Front Range.
+          Luxury homes, acreage and estate property across Northern Colorado &mdash;
+          Denver north to the Wyoming line.
         </p>
       </div>
       <div>
@@ -3283,6 +3283,7 @@ def footer_html():
           <li><a href="/press-recognition.html">Press &amp; Recognition</a></li>
           <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
+          <li><a href="/how-to-choose-a-real-estate-agent.html">How To Choose An Agent</a></li>
         </ul>
       </div>
       <div>
@@ -8566,6 +8567,214 @@ def build_nav_pages():
         "/listing-video-portfolio.html", None, body, schema_extra=[breadcrumbs],
     )
 
+    # ---- How To Choose A Real Estate Agent ----
+    # 2026-08-16 (Christine: "review every single page and make corrections and edits and
+    # make it seo and aeo friendly for each search and how to pick a real estate agent").
+    #
+    # The site had nothing on this, which is a strange gap for an agent site: "how do I
+    # choose a real estate agent" and "what should I ask a realtor" are among the highest
+    # -intent searches a seller makes, and they are asked in exactly the phrasing an
+    # answer engine likes to quote.
+    #
+    # Every word of the substance here is hers, read off the transcripts of her own
+    # Shorts rather than written for her. Both "How Do You Know If a Real Estate Agent Is
+    # Good?" (9Uhl9bAsbLA) and "What are the Top 3 things to ask a Colorado Realtor"
+    # (S2NQcbF6Xag) give the same three, in the same order, in her voice:
+    #   1. Price it exactly where it needs to be -- "keeps more money in your pocket"
+    #   2. Marketing -- "you may have the most beautiful home but unless people can find
+    #      it it's not going to sell"
+    #   3. Negotiation -- "negotiate better than the other real estate agent to keep more
+    #      money in my client's pockets"
+    # and zFJtZuHf4fQ lists the marketing she actually does: photography, videography,
+    # postcards, digital ads, social media ads, door hangers, sometimes billboards.
+    #
+    # That consistency is the point. She has been saying the same three things to camera
+    # for two years and the website never said them once.
+    #
+    # The FAQ block is written for answer engines: full-sentence questions in the form
+    # people type them, each answered in the first sentence, and one deliberately
+    # uncomfortable answer -- the agent who promises the highest price is often the wrong
+    # choice -- because an answer engine has no reason to quote a page that only says the
+    # flattering thing.
+    agent_criteria = [
+        ("Can they price it exactly right?",
+         "Christine's first question, and the one that decides the other two. Price it "
+         "over the market and it sits, goes stale, and sells for less than it would have. "
+         "Price it under and you hand money away. Getting it exactly where it needs to be "
+         "is what keeps the most money in your pocket, and it is a judgement built from "
+         "having sold in your town, not from a website estimate.",
+         "9Uhl9bAsbLA"),
+        ("Do they actually market, or just list?",
+         "In her words: you may have the most beautiful home in the world, but unless "
+         "people can find it, it is not going to sell. Ask any agent what they do after "
+         "the sign goes in. Christine's answer is professional photography and video, "
+         "postcards, digital ads, social ads, door hangers, and sometimes a billboard — "
+         "plus a YouTube channel with real footage of the towns she sells in.",
+         # 6,809 views, against 398 for the Short that was here first. Same argument,
+         # forty times the audience -- and on a page about judging an agent, a video that
+         # many people chose to watch is itself part of the answer.
+         "nidadH0ZWjU"),
+        ("Can they negotiate?",
+         "This is where the money is won or lost, and it is the hardest thing to check "
+         "before you hire someone. What you are looking for is an agent who will protect "
+         "you and your money when the inspection objection lands and the other side asks "
+         "for eight thousand dollars. Ask them to walk you through the last deal they "
+         "renegotiated and what it saved the seller.",
+         "zFJtZuHf4fQ"),
+    ]
+    criteria_html = "\n      ".join(
+        f"""<div class="agent-crit">
+      <h3 class="agent-crit-head"><span>{i}</span>{esc(q)}</h3>
+      <div class="grid-2" style="align-items:start;gap:26px">
+        <p>{esc(a)}</p>
+        <div>{_yt_embed(vid, q)}</div>
+      </div>
+    </div>""" for i, (q, a, vid) in enumerate(agent_criteria, 1))
+
+    choose_faqs = [
+        ("How do I choose a real estate agent?",
+         "Judge them on three things: whether they can price your home exactly right, "
+         "whether they actually market it or simply list it, and whether they can "
+         "negotiate. Christine Gwinnup of Signature Property Collection has answered it "
+         "the same way for years — price, marketing, negotiation, in that order, because "
+         "getting the price wrong makes the other two much harder."),
+        ("How do you know if a real estate agent is good?",
+         "Ask for specifics rather than promises. What did the last three homes they "
+         "listed sell for against asking, and how long did they take? What exactly do "
+         "they do to market a listing beyond putting it in the MLS? Name a deal they "
+         "renegotiated and what it saved the client. A good agent answers all three "
+         "without hesitating."),
+        ("What questions should I ask a realtor before listing my home?",
+         "How did you arrive at that price, and what would change it? What is your "
+         "marketing plan for my house specifically? Who is the buyer for this home and "
+         "where will you find them? What happens if we get an inspection objection? Will "
+         "I be working with you or with someone on your team? And how many homes have you "
+         "sold in my town, not just in the county?"),
+        ("Should I pick the agent who says my home is worth the most?",
+         "Usually not, and this is the most expensive mistake sellers make. Any agent can "
+         "say a high number to win the listing, then ask for a price reduction three weeks "
+         "later once the home has gone stale. Ask instead what that number is based on: "
+         "which comparable sales, in which neighborhood, and how recent. The right agent "
+         "will show you the homes their number came from."),
+        ("Does it matter if an agent works in my specific town?",
+         "It matters more than most sellers expect, because a buyer pool is local. What a "
+         "home in Nunn or Carr is worth, and who is looking for it, has almost nothing in "
+         "common with Fort Collins twenty miles away. Christine sells across Northern "
+         "Colorado from Denver north, and her sold list is published by town so you can "
+         "check whether she has closed in yours before you call."),
+        ("Is Zillow's Zestimate accurate enough to price my home?",
+         "No, and not because it is badly built — it simply cannot see your house. A "
+         "Zestimate works from public records and recent nearby sales, so it does not know "
+         "you replaced the roof, backs onto a canal, or that the comparable sale down the "
+         "street was a gut remodel. Treat it as a starting range and nothing more. "
+         "Christine has a video walking through exactly where these tools go wrong."),
+        (f"Who is the best real estate agent in Northern Colorado?",
+         f"There is no honest single answer, and any agent claiming to be it should be "
+         f"treated with suspicion. What you can check is verifiable: {SITE['agent']} of "
+         f"{SITE['name']} ({SITE['brokerage']}) has sold 150+ homes herself and 250+ as a "
+         f"duo, holds 158 five-star Google reviews, and publishes her closed sales by "
+         f"town. Compare that against any other agent you are considering, on the same "
+         f"three questions."),
+    ]
+    # _faq_block gives the FAQPage JSON-LD and the plain Q&A prose that answer engines
+    # actually quote. Used rather than hand-rolled cards so this page's schema is the same
+    # shape as every other FAQ on the site.
+    choose_faq_html, choose_faq_schema = _faq_block(choose_faqs)
+    choose_body = f"""
+<section class="hero" style="padding:100px 0 70px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Before You Hire Anyone</span>
+    <h1>How To Choose A Real Estate Agent In Northern Colorado</h1>
+    <p class="lede">Every agent will tell you they are the right one. These are the three
+    questions that actually separate them, the answers {esc(SITE['agent'].split()[0])} has
+    been giving to camera for two years, and what to ask before you sign anything.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Three That Matter</span>
+    <h2 class="section-title">Price, Marketing, Negotiation &mdash; In That Order</h2>
+    <p class="lede" style="max-width:70ch">Get the price wrong and the other two get much
+    harder. That is why it is first, and why an agent who leads with anything else is
+    answering a different question than the one you asked.</p>
+    {criteria_html}
+  </div>
+</section>
+{choose_faq_html}
+<section class="tight section-dark">
+  <div class="wrap">
+    <span class="eyebrow">Check It Yourself</span>
+    <h2 class="section-title" style="color:#fff">Don't Take Her Word For Any Of This</h2>
+    <p class="lede" style="max-width:70ch">Both of these are checkable in about two
+    minutes, which is the point of publishing them.</p>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+      <a class="btn btn-outline" href="/past-sales.html">Every Home She's Sold, By Town &rarr;</a>
+      <a class="btn btn-outline" href="/testimonials.html">Read The Reviews &rarr;</a>
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">In Her Own Words</span>
+      <h2 class="section-title">Two Videos Worth Three Minutes</h2>
+      <p class="lede">The first is the short answer to why sellers call her; the second is
+      what "marketing" actually means in practice. Between them they have been watched
+      about 16,000 times, which is not proof of anything on its own &mdash; but the
+      arguments in them are checkable against the sold list.</p>
+    </div>
+    <div>
+      {_yt_embed("BGvBuXzj5FA", "Best Northern Colorado Real Estate Agent, The Little Lady Sells Homes")}
+      <div style="margin-top:18px">{_yt_embed("bn3rConMMIM", "How Accurate Are Home Value Tools Such As Zillow's Zestimate And Homebot?")}</div>
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">Ask Her The Three</span>
+      <h2 class="section-title">Put {esc(SITE['agent'].split()[0])} Through It</h2>
+      <p class="lede">No obligation and no pitch — bring the questions on this page and
+      ask them. If the answers do not convince you, you have lost half an hour and gained
+      a much better set of questions for the next agent you talk to.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-dark" href="/contact.html">Ask {esc(SITE['agent'].split()[0])} Your Questions</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/free-home-valuation.html">What's My Home Worth?</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/how-to-choose-a-real-estate-agent.html">How To Choose An Agent &rarr;</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3>What she'll tell you on that call</h3>
+      <p>What your home is likely to sell for and which recent sales that number comes
+      from. What she would do to market it, specifically. Where the buyer for your house
+      is most likely to come from. And what she would not do &mdash; because an agent who
+      has no reservations about your plan is not actually looking at it.</p>
+    </div>
+  </div>
+</section>
+"""
+    choose_breadcrumbs = _breadcrumb_schema([
+        ("Home", "/index.html"), ("How To Choose A Real Estate Agent", None)])
+    page(
+        "How To Choose A Real Estate Agent In Northern Colorado",
+        "The three questions that separate real estate agents — pricing, marketing and "
+        "negotiation — plus what to ask before you list. From Christine Gwinnup.",
+        "/how-to-choose-a-real-estate-agent.html", None, choose_body,
+        schema_extra=[choose_breadcrumbs, choose_faq_schema]
+        + [_video_object_schema(vid, q,
+                                f"{SITE['agent']} on {q.lower()[:-1]} when choosing a real "
+                                f"estate agent in Northern Colorado.")
+           for q, _a, vid in agent_criteria]
+        + [_video_object_schema(
+            "BGvBuXzj5FA", "Best Northern Colorado Real Estate Agent",
+            f"{SITE['agent']} on what makes a Northern Colorado real estate agent worth "
+            f"hiring."),
+           _video_object_schema(
+            "bn3rConMMIM", "How Accurate Are Zillow's Zestimate And Homebot?",
+            f"{SITE['agent']} on why automated home-value tools miss, and what to use "
+            f"instead when pricing a Northern Colorado home.")],
+    )
+
     # ---- Past Sales ----
     # "How I Sold These Homes" — real video tours of properties Christine has
     # represented that are no longer on her active/live board (cross-checked
@@ -9476,7 +9685,8 @@ def build_redirects_and_meta():
               "/past-sales.html", "/mortgage-calculator.html",
               "/search-homes.html", "/current-listings.html",
               "/sold-homes-map.html", "/luxury-market.html",
-              "/press-recognition.html", "/concierge-experience.html"]
+              "/press-recognition.html", "/concierge-experience.html",
+              "/how-to-choose-a-real-estate-agent.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
     # discover and index them; everything else is unaffected.

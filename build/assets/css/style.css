@@ -715,6 +715,27 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
    obscured or faded into the background. */
 .nearby-attrib { font-size: 11px; color: var(--slate); margin: 10px 0 0; line-height: 1.6; }
 
+/* ---------- The three criteria (how-to-choose-a-real-estate-agent.html) ----------
+   2026-08-16. The number is a real part of the argument here -- price is first because
+   getting it wrong makes the other two harder -- so it gets to look deliberate rather
+   than rendering as "1Can they price it exactly right?", which is what an unstyled
+   <span> gave on the first build. */
+.agent-crit { margin-top: 42px; padding-top: 34px; border-top: 1px solid var(--hairline); }
+.agent-crit:first-of-type { border-top: 0; padding-top: 8px; }
+.agent-crit-head {
+  display: flex; align-items: baseline; gap: 14px;
+  font-family: var(--font-display); font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1.25; margin: 0 0 16px; color: var(--charcoal); font-weight: 400;
+}
+.agent-crit-head span {
+  flex: 0 0 auto;
+  font-family: var(--font-sans); font-size: 13px; font-weight: 600; letter-spacing: .1em;
+  color: var(--white); background: var(--deep-mauve);
+  width: 30px; height: 30px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transform: translateY(-2px);
+}
+
 /* ---------- Every sold home, by year (past-sales.html) ----------
    2026-08-16 (Christine: "maybe a page with all sold listings not just hte ones with
    videos"). A plain list, on purpose. Forty-two rows as cards would be a wall of
