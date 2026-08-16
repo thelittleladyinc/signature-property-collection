@@ -188,11 +188,12 @@ her 30 vetted spots. The most impressive and the most work; blocked by §2.3.
 and which filters they used, so her first call opens with
 *"I saw you were looking at Devil's Backbone"* instead of a cold hello.
 
-**Point her audience at the site.** Not code — the highest-leverage marketing
-action available. She has 20,815 video views and 15,550 Google review views. Most
-video descriptions still link `thelittleladysellshomes.com` (the old site). One
-line — `signaturepropertycollection.com/communities` — converts existing reach
-into traffic she owns.
+**Point her audience at the site — NOW WRITTEN, awaiting her.** See
+`docs/YOUTUBE-DESCRIPTION-LINES.md`: the exact line to paste into each of her 22
+local videos, with the right town-page URL and real view count, most-watched first.
+Regenerate with `python3 build/tools/description_lines.py` after adding spots, and
+`tests/test-desclines.js` verifies every URL in it resolves to a page that exists.
+This is the highest-leverage action left and it costs her an evening, not a budget.
 
 **Netlify Forms email notification** as a zero-signup backup:
 Site configuration → Notifications → form submission email.
