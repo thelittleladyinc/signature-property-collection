@@ -3621,6 +3621,29 @@ def build_home():
   </div>
 </section>
 
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">Moving Here From Out Of State</span>
+      <h2 class="section-title">Relocating To Northern Colorado</h2>
+      <p class="lede">Roughly the hardest part of moving here isn't finding a house — it's
+      working out which of thirty-odd towns you want to wake up in, from a thousand miles
+      away, on the strength of a weekend visit. Every town page on this site answers the
+      same four questions for that town: the schools, the drive, what's being built, and
+      what homes actually cost. The free guide puts them side by side.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:20px">
+        <a class="btn btn-primary" href="{RELOCATION_GUIDE_PATH}">Get The Free Relocation Guide</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/relocation.html">How Relocation Works &rarr;</a>
+      </div>
+    </div>
+    <div>
+      {_yt_embed("2jNGXw5lzAM", "I Moved Away from Loveland, CO... And Here's Why I'm Back")}
+      <p style="margin-top:12px;font-size:14px;color:#6b6b70">{SITE['agent'].split()[0]} left Loveland,
+      then chose to come back — the honest version of the case for moving here.</p>
+    </div>
+  </div>
+</section>
+
 <section>
   <div class="wrap">
     <span class="eyebrow">158 Five-Star Google Reviews</span>
@@ -3997,9 +4020,39 @@ ACREAGE_TOWN_TITLES = {
 
 
 def _town_title(city, data_slug, county_name):
-    """The <title> for a town page — luxury framing only where it is true."""
-    phrase = ACREAGE_TOWN_TITLES.get(data_slug or "") or "Luxury Homes For Sale"
-    return f"{city} {phrase} | {county_name}, CO"
+    """The <title> for a town page — relocation intent first, money term second.
+
+    2026-08-16 (competitive audit against potterealty.com — Michael Potter of
+    LPT Realty, who farms these same towns): his town pages are titled "Living
+    in Severance, Colorado". Ours were "{City} Luxury Homes For Sale |
+    {County}, CO". Both are defensible titles; they just chase different
+    searches, and the gap between them was not a decision anyone made — it is
+    the 2026-08-14 money-term fix applied without the relocation query in view.
+
+    "moving to loveland colorado" and "living in windsor co" are what an
+    out-of-state buyer types months BEFORE they know what they can afford or
+    what "luxury" means here. That makes them the earlier, cheaper and far less
+    contested half of the same funnel, and we were conceding all of it.
+
+    The county name is what gets dropped to pay for the new words, because it
+    earned nothing — per this repo's own README note on the town-comparison
+    block, nobody searches by county. The luxury/acreage money term stays: this
+    is a title that now carries both queries, not a swap of one for the other.
+    Candidates are tried longest-first and the first one inside TITLE_BUDGET
+    wins, so long names (Red Feather Lakes, Fort Morgan) degrade to a shorter
+    real title instead of being truncated mid-phrase by _fit_title.
+    """
+    full = ACREAGE_TOWN_TITLES.get(data_slug or "") or "Luxury Homes For Sale"
+    short = full[: -len(" For Sale")] if full.endswith(" For Sale") else full
+    for candidate in (
+        f"Living In {city}, CO | Moving Guide & {short}",
+        f"Living In {city}, CO | {full}",
+        f"Living In {city}, CO | Moving Guide",
+        f"Living In {city}, CO",
+    ):
+        if len(candidate) <= TITLE_BUDGET:
+            return candidate
+    return f"Living In {city}, CO"
 
 
 def _county_town_comparison(county):
@@ -4316,10 +4369,16 @@ def _city_meta_description(city, county_name, welcome_text, budget=158, disambig
     # identical (confirmed duplicate, flagged in the SEO audit). Folding the
     # county into the suffix for cities that appear under more than one
     # county disambiguates them with zero new content needed.
+    # 2026-08-16: the suffix used to spend its whole width on the brand name
+    # ("...with Signature Property Collection"), which no one searches and which
+    # Google prints last anyway. Replaced with the three things a person weighing
+    # a move actually wants to see in the snippet before they click — schools,
+    # commute, and what homes cost — matching the relocation intent the title and
+    # H1 now carry. The county still disambiguates the dual-county towns.
     suffix = (
-        f" See homes for sale in {city}, {county_name} with Signature Property Collection."
+        f" What it's like to live in {city}, {county_name} — schools, commute, homes for sale."
         if disambiguate else
-        f" See homes for sale in {city} with Signature Property Collection."
+        f" What it's like to live in {city} — schools, commute, and homes for sale."
     )
     hook = ""
     if welcome_text:
@@ -4333,8 +4392,8 @@ def _city_meta_description(city, county_name, welcome_text, budget=158, disambig
             trimmed = hook[:available].rsplit(" ", 1)[0].rstrip(",.")
             return f"{trimmed}…{suffix}"
     return (
-        f"{city} real estate with Signature Property Collection — homes, local market "
-        f"insight, and neighborhood guidance in {city}, {county_name}."
+        f"Thinking about moving to {city}, CO? Schools, commute times, what it's like to "
+        f"live here, and homes for sale in {city}, {county_name}."
     )
 
 
@@ -4704,6 +4763,77 @@ def _tour_this_town_block(city_href, city_name):
 </section>"""
 
 
+# The single relocation lead magnet. Declared once, here, because it is linked
+# from every town page, the relocation page and the homepage — three places that
+# would otherwise drift apart the first time the filename changed.
+RELOCATION_GUIDE_PATH = "/guides/northern-colorado-relocation-guide.html"
+
+
+def _moving_to_block(city, county_name, school_district, commute, relocate_extra):
+    """The "Moving To {City}" section — the relocation half of a town page.
+
+    2026-08-16 (competitive audit against potterealty.com). Every fact in this
+    block was ALREADY on the page before today: school district, commute times
+    and a real "what's changing here" note sit in city_content.json for all 36
+    towns and have since the content was captured. They were rendered as one
+    card, titled "Schools & Commute From {City}", sixth in a six-card grid,
+    below the fold, under a heading about restaurants and dog parks.
+
+    So this is not new content — it is the same content stopped from being
+    buried. A relocating buyer's two questions are "where would my kids go to
+    school" and "how long is the drive", and the page answered both in a corner.
+    The competing site builds a whole page per town around exactly those two
+    questions. Ours now leads with them, one section below the welcome, with the
+    live MLS feed immediately after so the answer to "what does that cost"
+    is the next thing on screen rather than a different page.
+
+    The card removed from the grid below is this same data — it is promoted,
+    not duplicated. Saying it twice on one page would read as padding.
+    """
+    cards = []
+    if school_district:
+        cards.append((
+            f"Schools In {city}",
+            f"{city} is served by {school_district}. Attendance boundaries decide which "
+            f"school a specific address feeds into, and they don't follow town lines — "
+            f"if a school is driving the move, send the shortlist over and we'll check "
+            f"the boundary on each address before you tour it.",
+        ))
+    if commute:
+        cards.append((f"The Commute From {city}", commute))
+    if relocate_extra:
+        cards.append((f"What's Changing In {city}", relocate_extra))
+    cards.append((
+        f"What Homes Cost In {city}",
+        f"Deliberately not a number typed into a page — an average printed today is wrong "
+        f"by spring. The live IRES MLS feed further down this page shows every active "
+        f"{city} listing at its real asking price, updated every 15 minutes, and the "
+        f"monthly Northern Colorado market report tracks where the numbers are heading.",
+    ))
+    cards_html = "\n      ".join(
+        f"""<div class="card">
+      <h3>{esc(t)}</h3>
+      <p>{esc(d)}</p>
+    </div>""" for t, d in cards
+    )
+    return f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Thinking About Moving Here</span>
+    <h2 class="section-title">Moving To {esc(city)}: What You'll Want To Know First</h2>
+    <p class="lede">The questions people actually ask {esc(SITE['agent'].split()[0])} before
+    they ask about houses — schools, the drive, and what's being built — answered for
+    {esc(city)} specifically rather than for {esc(county_name)} in general.</p>
+    <div class="grid-3" style="grid-template-columns:repeat(2,1fr);margin-top:24px">
+      {cards_html}
+    </div>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:32px">
+      <a class="btn btn-primary" href="{RELOCATION_GUIDE_PATH}">Get The Free Northern Colorado Relocation Guide</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/northern-colorado-market-report.html">This Month's Market Report &rarr;</a>
+    </div>
+  </div>
+</section>"""
+
+
 def build_city_pages():
     """One page per city we have real captured content for (welcome blurb +
     things-to-do highlights, pulled from the live site's own city pages —
@@ -4760,14 +4890,11 @@ def build_city_pages():
       <p>{esc(text)}</p>
     </div>"""
 
-            relocate_bits = []
-            if school_district:
-                relocate_bits.append(f"Schools: {school_district}.")
-            if commute:
-                relocate_bits.append(f"Commute: {commute}")
-            if relocate_extra:
-                relocate_bits.append(relocate_extra)
-            relocate_text = " ".join(relocate_bits)
+            # 2026-08-16: the "Schools: … Commute: …" string that used to be
+            # assembled here fed a single card at the bottom of the local grid.
+            # That data now leads the page through _moving_to_block(), so the
+            # concatenation is gone rather than left computing a value nothing
+            # reads — the three fields are passed through as themselves.
 
             restaurants_card = ""
             if restaurants:
@@ -4784,7 +4911,6 @@ def build_city_pages():
                 _local_card("Dog Parks & Pet-Friendly Spots", dog_parks),
                 _local_card(f"{city} Recreation Center", rec_center),
                 _local_card(f"Best Hikes & Trails Near {city}", hikes),
-                _local_card(f"Schools & Commute From {city}", relocate_text),
             ]))
             local_block = (
                 f"""<section class="tight">
@@ -4834,6 +4960,12 @@ def build_city_pages():
             # "what it's like to live here" -- because that section describes the
             # appeal of a small town and this one answers the question it raises.
             distance_block = _town_distance_block(city, c["name"])
+
+            # The relocation half of the page — schools, commute, growth — promoted
+            # out of the bottom of the local grid and given the slot directly under
+            # the welcome. See _moving_to_block() for why.
+            moving_block = _moving_to_block(
+                city, c["name"], school_district, commute, relocate_extra)
 
             # Her "why I moved back" film, above the local spots: the personal
             # reason first, then the proof of how well she knows the place.
@@ -4997,7 +5129,7 @@ def build_city_pages():
 <section class="county-hero" style="{hero_style}">
   <div class="wrap">
     <span class="eyebrow"><a href="/communities/{c['slug']}.html" style="color:var(--dusty-rose)">&larr; {esc(c['name'])}</a></span>
-    <h1 class="section-title" style="color:#fff">{esc(city)}</h1>
+    <h1 class="section-title" style="color:#fff">Living In {esc(city)}, Colorado</h1>
   </div>
 </section>
 <section>
@@ -5019,6 +5151,7 @@ def build_city_pages():
     </div>
   </div>
 </section>
+{moving_block}
 {search_widget_block}
 {local_block}
 {distance_block}
@@ -5030,7 +5163,36 @@ def build_city_pages():
 {subdivisions_block}
 {nearby_block}
 """
-            faq_pairs = [
+            # 2026-08-16: "is <town> co a good place to live" is the highest-volume
+            # question asked about a small town and it was answered nowhere on this
+            # site — it is the query the competing NoCo site's town pages are built
+            # around. Answered first, from the same captured facts the page body
+            # already states, and answered honestly: the town is described, not
+            # sold, and the answer says out loud that another town may fit better.
+            # An FAQ that only ever says yes is worth nothing to the person reading
+            # it and, increasingly, nothing to the engine quoting it.
+            faq_pairs = []
+            welcome_first = welcome.split(". ")[0].strip().rstrip(".") if welcome else ""
+            if welcome_first:
+                good_place = [f"That depends on what you're weighing. {welcome_first}."]
+                if school_district:
+                    good_place.append(f"It's served by {school_district}.")
+                if commute:
+                    good_place.append(commute if commute.endswith(".") else f"{commute}.")
+                good_place.append(
+                    f"If you want the honest version for your own situation, "
+                    f"{SITE['agent'].split()[0]} will talk it through — including the case "
+                    f"for a different Northern Colorado town when that's the better fit."
+                )
+                faq_pairs.append((f"Is {city}, CO a good place to live?", " ".join(good_place)))
+                faq_pairs.append((
+                    f"What is it like living in {city}, CO?",
+                    f"{welcome_first}. "
+                    + (f"{relocate_extra} " if relocate_extra else "")
+                    + f"The {city} page covers schools, commute times, restaurants, trails "
+                      f"and dog parks, with live IRES MLS listings for the town.",
+                ))
+            faq_pairs += [
                 (f"Who is the best real estate agent in {city}, CO?",
                  f"{SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a luxury real "
                  f"estate agent serving {city} and the rest of {c['name']} — with 150+ homes "
@@ -5825,7 +5987,8 @@ def build_guides():
 
     # Lead-capture landing pages (mirror the live site's PDF-download offers,
     # wired to the same Netlify Forms pattern as /contact.html for now).
-    def _lead_guide(path, title, description, kicker, headline, bullets, form_name=None):
+    def _lead_guide(path, title, description, kicker, headline, bullets, form_name=None,
+                    lede=None):
         # 2026-08-13 fix: this used to derive the form name from the path
         # via `path.strip('/').replace('/', '-')`, which for
         # "/guides/buyers-guide.html" produces "guides-buyers-guide.html"
@@ -5842,8 +6005,9 @@ def build_guides():
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">{esc(kicker)}</span>
     <h1>{esc(headline)}</h1>
-    <p class="lede">Learn the top strategies to prepare, move fast, and get the best
-    outcome — straight from {esc(SITE['agent'])} and Signature Property Collection.</p>
+    <p class="lede">{esc(lede) if lede else
+      f"Learn the top strategies to prepare, move fast, and get the best outcome — "
+      f"straight from {SITE['agent']} and Signature Property Collection."}</p>
   </div>
 </section>
 <section>
@@ -5895,6 +6059,44 @@ def build_guides():
          "Understand pricing strategies that work",
          "Attract the right buyers quickly"],
         form_name="sellers-guide",
+    )
+    # 2026-08-16 (competitive audit, potterealty.com): the one thing the competing
+    # NoCo site does that this one did not. His entire homepage funnels to a single
+    # named offer — a free Relocation Guide — and roughly half his stated business
+    # is out-of-state relocation. This site had ten guides and a relocation page
+    # with a contact form, which is a better library and a weaker funnel: nothing
+    # was THE ask, and the relocation audience had nothing to take away.
+    #
+    # Deliberately not a tenth general guide. The bullets below describe things
+    # this site can actually do that a PDF from a national brand cannot — real
+    # drive times measured between real addresses, the school district per town,
+    # the town-by-town comparison, the live IRES feed — so the offer is specific
+    # enough to be worth an email address and honest enough to survive delivery.
+    _lead_guide(
+        RELOCATION_GUIDE_PATH,
+        "Free Northern Colorado Relocation Guide | Signature Property Collection",
+        "A free relocation guide to Northern Colorado — how the towns from Denver north "
+        "to the Wyoming line actually differ on schools, commute, price and pace.",
+        "Moving To Northern Colorado",
+        "The Northern Colorado Relocation Guide",
+        ["How the towns actually differ — Loveland, Fort Collins, Berthoud, Windsor, "
+         "Timnath, Severance, Wellington and the rest, compared on the things that "
+         "decide it rather than on scenery",
+         "Real drive times, measured between real addresses — to Denver, DIA, Boulder, "
+         "and the Fort Collins and Greeley job centers",
+         "Which school district serves which town, and why the boundary matters more "
+         "than the town line when you're choosing an address",
+         "What the buying process looks like from out of state — touring on one trip, "
+         "writing an offer you haven't stood in, and what to inspect for at altitude",
+         "Water, wells, septic, HOAs and metro districts — the Colorado-specific line "
+         "items that surprise people moving in from other states",
+         "A month-by-month read on the market, so you arrive knowing whether you're "
+         "early, late, or right on time"],
+        form_name="relocation-guide",
+        lede=f"Most relocation guides are a brochure for the state. This one is about the "
+             f"twenty minutes between one Northern Colorado town and the next — which is "
+             f"where the decision actually gets made. Written by {SITE['agent']}, who left "
+             f"Loveland and moved back.",
     )
 
 
@@ -8474,6 +8676,7 @@ def build_nav_pages():
       {steps_html}
     </div>
     <div class="btn-row" style="justify-content:flex-start;margin-top:40px">
+      <a class="btn btn-primary" href="{RELOCATION_GUIDE_PATH}">Get The Free Relocation Guide</a>
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/communities/index.html">Explore Communities</a>
     </div>
   </div>
@@ -10298,7 +10501,8 @@ def build_redirects_and_meta():
     paths = ["/index.html", "/communities/index.html", "/about.html", "/buyers.html",
              "/sellers.html", "/seller-local-proof.html", "/testimonials.html", "/contact.html",
              "/privacy-policy.html", "/accessibility.html", "/thank-you.html",
-             "/guides/buyers-guide.html", "/guides/sellers-guide.html"]
+             "/guides/buyers-guide.html", "/guides/sellers-guide.html",
+             RELOCATION_GUIDE_PATH]
     paths += [f"/communities/{c['slug']}.html" for c in COUNTIES]
     city_paths = [(f"/communities/{c['slug']}/{_city_url_slug(CITY_DATA_SLUG[city])}.html", CITY_DATA_SLUG.get(city))
                   for c in COUNTIES for city in c["cities"]

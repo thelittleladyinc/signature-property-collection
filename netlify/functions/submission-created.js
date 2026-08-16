@@ -79,6 +79,12 @@ const SOURCE_LABELS = {
   "buyers-guide": "Signature Property Collection - Buyer's Guide Download",
   "sellers-guide": "Signature Property Collection - Seller's Guide Download",
   "relocation": "Signature Property Collection - Relocation Page",
+  // 2026-08-16: the site's single named lead magnet, linked from every town page,
+  // the relocation page and the homepage. Worth its own label rather than sharing
+  // "relocation" with the relocation page's form: this lead has read a town page
+  // and asked for the guide, which is a different (earlier, out-of-state) moment
+  // than someone who filled in the "start your relocation" form.
+  "relocation-guide": "Signature Property Collection - Relocation Guide Download",
   "free-home-valuation": "Signature Property Collection - Free Home Valuation",
   "lifestyle-search": "Signature Property Collection - Lifestyle Search",
   "listing-inquiry": "Signature Property Collection - Listing Inquiry (Current Listings page)",

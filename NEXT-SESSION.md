@@ -46,7 +46,27 @@ Order matters: rotate at each provider → save new values in a password manager
 THEN tick "Contains secret value" in Netlify. Marking secret is one-way; the value
 becomes unreadable afterwards. She has NOT confirmed doing this.
 
-### 1.4 Small, cheap, still open
+### 1.4 The Relocation Guide itself — the one thing she has to write
+
+`/guides/northern-colorado-relocation-guide.html` went live 2026-08-16 as the site's
+single named lead magnet, linked from all 37 town pages, the homepage and
+`/relocation.html`. It is built on the exact pattern the Buyer's and Seller's Guide
+landers already use: **no PDF is attached, on any of the three.** The form captures the
+lead, it lands in Lofty tagged "Relocation Guide Download", and `/thank-you.html`
+promises Christine reads it personally and replies the same day. That is how the other
+two have always worked, so this is not a new gap — but it is now a gap on the page the
+whole relocation funnel points at.
+
+The lander's "What's Inside" list is six specific promises (town-by-town comparison,
+measured drive times, school districts, the out-of-state buying process, water/wells/
+septic/metro districts, month-by-month market read). Every one is deliverable from
+material already on this site — the drive times, school districts and town comparisons
+are live data, not something to research. Someone needs to assemble it into a document
+and either attach it or have Christine send it on reply. **Until then the promise is
+only as good as her follow-up**, and the follow-up currently depends on §1.2
+(`RESEND_API_KEY`) actually alerting her that the lead arrived.
+
+### 1.5 Small, cheap, still open
 - **"Driven Steakhouse"** — real Loveland restaurant, she says she has a Facebook
   post about it. No YouTube video and no Gmail review notification mentions it, so
   it can't be pinned yet. NB: the Google AI Overview claiming she and the
