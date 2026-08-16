@@ -53,6 +53,7 @@
 - [Lafayette, Boulder County](/communities/boulder/lafayette.html)
 - [Louisville, Boulder County](/communities/boulder/louisville.html)
 - [Nederland, Boulder County](/communities/boulder/nederland.html)
+- [Lyons, Boulder County](/communities/boulder/lyons.html)
 - [Broomfield, Broomfield County](/communities/broomfield/broomfield.html)
 - [Denver, Denver County](/communities/denver/denver.html)
 - [Fort Morgan, Morgan County](/communities/morgan/fort-morgan.html)
