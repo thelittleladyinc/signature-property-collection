@@ -86,13 +86,41 @@ check(`touch targets clear the 44px minimum (found ${minH || "none"}px)`,
 const withSchedule = pages.filter((f) =>
   /data-contact="schedule"/.test(fs.readFileSync(f, "utf8")));
 const buildPy = fs.readFileSync(path.join(ROOT, "build/build.py"), "utf8");
-check("the schedule URL is configuration, not hardcoded",
+check("the schedule URL is read from config, with an env override",
   /SCHEDULE_URL = \(os\.environ\.get\("CALENDLY_URL"\)/.test(buildPy));
-check("no committed page carries a booking link while none is configured",
-  withSchedule.length === 0,
-  `${withSchedule.length} pages, e.g. ${withSchedule.slice(0, 2).map(rel).join(", ")}`);
 check("the button is omitted rather than rendered dead",
   /if not SCHEDULE_URL:\s*\n\s*return ""/.test(buildPy));
+
+// 2026-08-16, second pass. This first read "no page carries a booking link while
+// none is configured" -- true right up until Christine supplied her Calendly URL an
+// hour later, at which point a correct build failed the suite.
+//
+// The invariant is not "absent"; it is "absent OR everywhere, matching the config".
+// Asserted against what SITE actually holds so the test follows the site instead of
+// a moment in its history -- the same mistake the Windsor-has-no-spots test made.
+const configured = (buildPy.match(/"schedule_url":\s*"([^"]*)"/) || [])[1] || "";
+if (configured) {
+  check(`a booking link is configured, so every page carries it (${pages.length} pages)`,
+    withSchedule.length === pages.length,
+    `${withSchedule.length} of ${pages.length}`);
+  // A booking URL that points at the wrong host is the failure a lead discovers,
+  // not one a build does.
+  const wrongHref = pages.filter((f) => {
+    const html = fs.readFileSync(f, "utf8");
+    return /data-contact="schedule"/.test(html) && !html.includes(`href="${configured}"`);
+  });
+  check("every booking link points at the configured URL", wrongHref.length === 0,
+    wrongHref.slice(0, 2).map(rel).join(", "));
+  check("it is an https link, not a bare domain",
+    /^https:\/\//.test(configured), configured);
+  check("the highest-intent pages offer it explicitly, not just in the mobile bar",
+    /Book A Call With/.test(fs.readFileSync(path.join(ROOT, "site/contact.html"), "utf8"))
+    && /Pick A Time That Suits You/.test(fs.readFileSync(path.join(ROOT, "site/thank-you.html"), "utf8")));
+} else {
+  check("no committed page carries a booking link while none is configured",
+    withSchedule.length === 0,
+    `${withSchedule.length} pages, e.g. ${withSchedule.slice(0, 2).map(rel).join(", ")}`);
+}
 
 // --- measurement, so "best ROI" becomes a number -----------------------------
 check("contact clicks report which method was used",

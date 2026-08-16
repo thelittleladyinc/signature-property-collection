@@ -147,6 +147,12 @@ SITE = {
     "phone": "303-709-4262",
     "email": "thelittleladyinc@gmail.com",
     "domain": "https://signaturepropertycollection.com",
+    # Her real booking link, given 2026-08-16. Committed here rather than left in the
+    # CALENDLY_URL environment variable it was built against: this is public content,
+    # not a credential, and content belongs in the repo where it is reviewable and
+    # cannot vanish with a Netlify setting. The env var still overrides, which is
+    # what makes it safe to test a different link on a branch deploy.
+    "schedule_url": "https://calendly.com/thelittleladysellshomes/30min",
     # Business address, confirmed by Christine 2026-08-11 (cross-checked
     # against her public Yelp business listing, which lists this same
     # address for "Christine Gwinnup - The Little Lady Sells Homes") — used
@@ -8480,6 +8486,9 @@ def build_legal():
   <p class="lede" style="margin-top:18px">If it&rsquo;s urgent, call or text
   <a href="tel:{esc(phone_digits)}">{esc(SITE.get('phone', ''))}</a>
   and you&rsquo;ll reach {esc(first)} directly.</p>
+  {f'''<p class="lede" style="margin-top:18px">Or skip the back-and-forth and put
+  a time on the calendar now &mdash; 30 minutes, no obligation.</p>
+  {_schedule_button_html("Pick A Time That Suits You")}''' if SCHEDULE_URL else ""}
 </div></section>
 
 <section class="tight"><div class="wrap">
