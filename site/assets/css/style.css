@@ -715,6 +715,32 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
    obscured or faded into the background. */
 .nearby-attrib { font-size: 11px; color: var(--slate); margin: 10px 0 0; line-height: 1.6; }
 
+/* ---------- "How far is everything" on a town page ----------
+   2026-08-16 (Christine: "maybe do a miles minutes to the closest restaurant and
+   gas station"). Same markup as the listing panel, which is the point -- but that
+   panel is a 13px detail inside a card the reader already chose to open, and this
+   is a section heading's worth of answer on its own. Two lines, so they get room
+   to be read rather than scanned past. */
+.town-far {
+  margin-top: 24px; padding: 22px 24px;
+  border: 1px solid var(--hairline); border-radius: 4px; background: var(--white);
+  max-width: 620px;
+}
+.town-far .nearby-list { gap: 14px; }
+.town-far .nearby-list li {
+  font-size: 16px; color: var(--charcoal); align-items: baseline;
+  padding-bottom: 14px; border-bottom: 1px solid var(--hairline);
+}
+.town-far .nearby-list li:last-child { padding-bottom: 0; border-bottom: 0; }
+.town-far .nearby-distance { font-size: 16px; }
+.town-far .nearby-attrib { margin-top: 18px; }
+@media (max-width: 520px) {
+  /* The name and the drive time both matter, and side by side they collide on a
+     phone once a business name runs past a few words. */
+  .town-far { padding: 18px; }
+  .town-far .nearby-list li { flex-direction: column; gap: 4px; }
+}
+
 /* ---------- Buyer/seller profile rows (Homes Over $1M) ----------
    2026-08-15: deliberately NOT cards. A stack of boxed cards is the busiest
    possible way to present five paragraphs; a single hairline between rows says

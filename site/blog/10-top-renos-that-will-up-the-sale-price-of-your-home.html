@@ -194,6 +194,7 @@
       '<button type="button" class="nearby-tab active" data-cat="coffee" onclick="showNearbyCat(this)">Coffee</button>' +
       '<button type="button" class="nearby-tab" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
       '<button type="button" class="nearby-tab" data-cat="dining" onclick="showNearbyCat(this)">Dining</button>' +
+      '<button type="button" class="nearby-tab" data-cat="gas" onclick="showNearbyCat(this)">Gas</button>' +
       '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
       '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
       '</div>' +
@@ -239,7 +240,18 @@
   };
 
   var NEARBY_CAT_LABELS = { grocery: 'grocery stores', coffee: 'coffee shops',
-    dining: 'restaurants', school: 'schools', park: 'parks' };
+    dining: 'restaurants', gas: 'gas stations', school: 'schools', park: 'parks' };
+
+  // "4 min drive · 2.8 mi" where Google gave us a route, plain straight-line miles
+  // where it didn't. Never both kinds of mile in one string: out here they differ by
+  // a factor of three and showing them together looks like a mistake.
+  window.nearbyDistanceLabel = function (p) {
+    if (p.drivingMinutes) {
+      return p.drivingMinutes + ' min drive' +
+        (p.drivingMiles ? ' \u00b7 ' + p.drivingMiles.toFixed(1) + ' mi' : '');
+    }
+    return Number(p.distanceMiles).toFixed(1) + ' mi';
+  };
 
   function renderNearbyCat(panel, cat) {
     var data = panel._nearbyData;
@@ -263,10 +275,10 @@
           encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
         : name;
       return '<li><span class="nearby-name">' + inner + '</span>' +
-        '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
+        '<span class="nearby-distance">' + nearbyDistanceLabel(p) + '</span></li>';
     }).join('') + '</ul>' +
-      '<p class="nearby-attrib">Straight-line distances. Places data from ' +
-      '<strong>Google Maps</strong>.</p>';
+      '<p class="nearby-attrib">Drive times where available, otherwise straight-line ' +
+      'distance. Places data from <strong>Google Maps</strong>.</p>';
   }
 
   function fmtPrice(n) {

@@ -359,6 +359,7 @@
       '<button type="button" class="nearby-tab active" data-cat="coffee" onclick="showNearbyCat(this)">Coffee</button>' +
       '<button type="button" class="nearby-tab" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
       '<button type="button" class="nearby-tab" data-cat="dining" onclick="showNearbyCat(this)">Dining</button>' +
+      '<button type="button" class="nearby-tab" data-cat="gas" onclick="showNearbyCat(this)">Gas</button>' +
       '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
       '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
       '</div>' +
@@ -404,7 +405,18 @@
   };
 
   var NEARBY_CAT_LABELS = { grocery: 'grocery stores', coffee: 'coffee shops',
-    dining: 'restaurants', school: 'schools', park: 'parks' };
+    dining: 'restaurants', gas: 'gas stations', school: 'schools', park: 'parks' };
+
+  // "4 min drive · 2.8 mi" where Google gave us a route, plain straight-line miles
+  // where it didn't. Never both kinds of mile in one string: out here they differ by
+  // a factor of three and showing them together looks like a mistake.
+  window.nearbyDistanceLabel = function (p) {
+    if (p.drivingMinutes) {
+      return p.drivingMinutes + ' min drive' +
+        (p.drivingMiles ? ' \u00b7 ' + p.drivingMiles.toFixed(1) + ' mi' : '');
+    }
+    return Number(p.distanceMiles).toFixed(1) + ' mi';
+  };
 
   function renderNearbyCat(panel, cat) {
     var data = panel._nearbyData;
@@ -428,10 +440,10 @@
           encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
         : name;
       return '<li><span class="nearby-name">' + inner + '</span>' +
-        '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
+        '<span class="nearby-distance">' + nearbyDistanceLabel(p) + '</span></li>';
     }).join('') + '</ul>' +
-      '<p class="nearby-attrib">Straight-line distances. Places data from ' +
-      '<strong>Google Maps</strong>.</p>';
+      '<p class="nearby-attrib">Drive times where available, otherwise straight-line ' +
+      'distance. Places data from <strong>Google Maps</strong>.</p>';
   }
 
   function fmtPrice(n) {
@@ -1072,11 +1084,11 @@
     <div class="grid-3" style="grid-template-columns:repeat(2,1fr)">
       <div class="card">
       <h3>Things To Do In Nunn</h3>
-      <p>Nunn is small and unpretentious — a handful of local businesses along US-85 and the highway itself, which is the main street. What people come here for is outside: wide-open shortgrass prairie, uninterrupted views west to the Front Range, and enough sky that you can watch weather arrive an hour before it does. Greeley is twenty-one miles south for anything the town does not have, and Fort Collins is twenty-five miles southwest.</p>
+      <p>Nunn is small and unpretentious — a handful of local businesses along US-85 and the highway itself, which is the main street. What people come here for is outside: wide-open shortgrass prairie, uninterrupted views west to the Front Range, and enough sky that you can watch weather arrive an hour before it does. The one destination that draws people from all over the Front Range is Great Guns Sporting at 16126 County Road 96 — a public outdoor range open seven days a week with 42 rifle positions from 25 to 300 yards, 36 pistol positions, three action bays, a 15-station sporting clays course, five trap fields, two skeet fields and a five-stand. It has been open to the public since 1996 and is a real reason some buyers choose this side of Weld County. Greeley is twenty-one miles south for anything the town does not have, and Fort Collins is twenty-five miles southwest.</p>
     </div>
       <div class="card">
       <h3>Restaurants &amp; Dining</h3>
-      <p>Being straight about it: Nunn is a town of roughly 550 people and does not have a dining scene. There are a couple of local spots on the highway. Most Nunn residents shop and eat in Ault, twelve miles south, or in Greeley. If that sounds like a drawback, Nunn is probably not your town; if it sounds like the point, it probably is.</p>
+      <p>Being straight about it: Nunn is a town of roughly 550 people and does not have a dining scene. Soaring V Fuels on County Road 100 is the fuel and convenience stop in town. Beyond that, most Nunn residents shop and eat in Ault, twelve miles south, or in Greeley. Rather than name a restaurant here that may have changed hands or closed since this page was written, the nearest-restaurant and nearest-gas panel above reads live from Google, so it is current. If a twelve-mile drive for dinner sounds like a drawback, Nunn is probably not your town; if it sounds like the point, it probably is.</p>
       <a class="cta" href="https://www.google.com/maps/search/restaurants%20near%20Nunn%2C%20CO" target="_blank" rel="noopener">See More On Google Maps &rarr;</a>
     </div>
       <div class="card">
@@ -1089,11 +1101,68 @@
     </div>
       <div class="card">
       <h3>Schools &amp; Commute From Nunn</h3>
-      <p>Schools: Weld RE-9 School District (Highland — serving Ault, Pierce, Nunn and Carr). Commute: About 21 miles to Greeley via US-85 and CR 29, and about 25 miles to Fort Collins. Both are real commutes rather than errands, and the school district — Weld RE-9, known locally as Highland — runs bus routes across 539 square miles, which tells you something honest about the distances out here. If you are buying land in Nunn, this is the part that matters more than the house. A property here is not a subdivision lot: there are wells and well permits, septic systems and their condition, water rights, survey lines, easements and legal access, utility distances, county zoning, and rules on how many animals you may keep and where. Every one of those can change what a parcel is worth or whether you can do the thing you bought it for. Many Nunn properties are also USDA-eligible, which can mean no down payment — genuinely useful, and it comes with its own conditions. Christine has listed and sold acreage in and around Nunn repeatedly and will walk the property with you asking these questions before you write an offer, not after.</p>
+      <p>Schools: Weld RE-9 School District (Highland — serving Ault, Pierce, Nunn and Carr). Commute: About 21 miles to Greeley via US-85 and CR 29, and about 25 miles to Fort Collins. Both are real commutes rather than errands, and the school district — Weld RE-9, known locally as Highland — runs bus routes across 539 square miles, which tells you something honest about the distances out here. If you are buying land in Nunn, this is the part that matters more than the house. A property here is not a subdivision lot: there are wells and well permits, septic systems and their condition, water rights, survey lines, easements and legal access, utility distances, county zoning, and rules on how many animals you may keep and where. Every one of those can change what a parcel is worth or whether you can do the thing you bought it for. If shooting is part of why you are looking out here, note that Great Guns Sporting sits on County Road 96, which is a genuine amenity to some buyers and something to know about in advance for others — it is an outdoor range, and sound carries a long way across open prairie. Many Nunn properties are also USDA-eligible, which can mean no down payment — genuinely useful, and it comes with its own conditions. Christine has listed and sold acreage in and around Nunn repeatedly and will walk the property with you asking these questions before you write an offer, not after.</p>
     </div>
     </div>
   </div>
 </section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">How Far Is Everything</span>
+    <h2 class="section-title">Nearest Restaurant And Gas Station To Nunn</h2>
+    <p class="lede" style="max-width:70ch">Small-town Colorado is wonderful right up until
+    you need dinner and a tank of gas. Here is the real answer for Nunn — drive
+    time, not straight-line distance, because out here those are not the same number.</p>
+    <div class="town-far" data-town="Nunn, Weld County, CO">
+      <p class="search-status" style="margin:0">Checking drive times&hellip;</p>
+    </div>
+  </div>
+</section>
+<script>
+(function () {
+  var box = document.querySelector('.town-far');
+  if (!box) return;
+  var LABELS = { dining: 'Nearest restaurant', gas: 'Nearest gas station' };
+  function fail(msg) {
+    box.innerHTML = '<p class="search-status" style="margin:0">' + msg + '</p>';
+  }
+  // Escaped, not stripped. Deleting the characters instead silently renamed real
+  // businesses: "Ault Corner Bar & Grill" rendered as "Ault Corner Bar Grill".
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  fetch('/.netlify/functions/nearby-places?only=dining,gas&address=' +
+        encodeURIComponent(box.dataset.town))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.error === 'not_configured') return fail('Drive times aren\u2019t connected yet.');
+      if (data.error) return fail('Couldn\u2019t look these up right now.');
+      var rows = [];
+      ['dining', 'gas'].forEach(function (cat) {
+        var p = ((data.categories || {})[cat] || [])[0];
+        if (!p) return;
+        var name = esc(p.name);
+        var link = p.placeId
+          ? '<a href="https://www.google.com/maps/place/?q=place_id:' +
+            encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
+          : name;
+        rows.push('<li><span class="nearby-name"><strong>' + LABELS[cat] + ':</strong> ' +
+          link + '</span><span class="nearby-distance">' +
+          (window.nearbyDistanceLabel ? window.nearbyDistanceLabel(p)
+            : Number(p.distanceMiles).toFixed(1) + ' mi') + '</span></li>');
+      });
+      // Nothing found is a real answer for a town this small, and saying so is more
+      // use than an empty box -- but it must not be mistaken for a failed lookup.
+      if (!rows.length) return fail('Google lists nothing within about five miles \u2014 ' +
+        'worth a conversation before you buy out here.');
+      box.innerHTML = '<ul class="nearby-list">' + rows.join('') + '</ul>' +
+        '<p class="nearby-attrib">Live from <strong>Google Maps</strong>, measured from the ' +
+        'center of town.</p>';
+    })
+    .catch(function () { fail('Couldn\u2019t look these up right now.'); });
+}());
+</script>
 
 
 

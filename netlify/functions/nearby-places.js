@@ -19,12 +19,19 @@
 // Design notes:
 // - Straight-line ("as the crow flies") distance, computed ourselves via
 //   the haversine formula from the geocoded origin to each place's
-//   lat/lng -- not real walking/driving distance from Google's Distance
-//   Matrix API. This keeps the integration to two Google APIs instead of
-//   three and meaningfully cheaper, at the cost of slight
-//   under/over-statement versus an actual route. Good enough for "is the
-//   grocery store 1 mile away or 8" -- if Christine wants true route
-//   distance later, Distance Matrix is a straightforward addition here.
+//   lat/lng. Kept as the floor that is always present, because it needs no
+//   third Google API and therefore cannot fail.
+// - 2026-08-16 (Christine: "maybe do a miles minutes to the closest
+//   restaurant and gas station"): real DRIVING miles and minutes now come
+//   from the Distance Matrix API on top of that, for the nearest result in
+//   each category. This is the number people actually asked for -- out here
+//   straight-line distance and drive time come apart badly, because a place
+//   two miles away across a section of dryland wheat is an eight-mile drive
+//   around it. Nunn is the case that makes it matter.
+//   Distance Matrix has to be enabled on her Google Cloud key. If it is
+//   not, the call returns REQUEST_DENIED, that is logged loudly, and the
+//   response still carries straight-line miles -- fewer numbers, never
+//   wrong ones.
 // - Results are cached in Netlify Blobs, keyed by the normalized address,
 //   for 30 days. Grocery stores/schools/parks don't relocate often, and
 //   this means the same listing being viewed by 50 different buyers costs
@@ -43,15 +50,26 @@ const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 // for 30 days. Filtering all 15,000+ stored listings this way is not
 // affordable, which is why matchesQuery() has no distance filter -- see the
 // note there.
+//
+// 2026-08-16: gas added. On an acreage listing outside Nunn or Carr it is a more
+// pressing question than the coffee shop, and it was the one category a rural buyer
+// asks about that this panel could not answer.
 const CATEGORY_TYPES = {
   grocery: "grocery_or_supermarket",
   coffee: "cafe",
   dining: "restaurant",
+  gas: "gas_station",
   school: "school",
   park: "park",
 };
 const RESULTS_PER_CATEGORY = 3;
 const SEARCH_RADIUS_METERS = 8000; // ~5 miles, generous for rural Weld/Larimer parcels
+
+// Bumped whenever the shape of a cached entry changes, so a 30-day-old entry from
+// before that change is treated as a miss instead of being served forever with
+// fields the caller now expects. Without this, adding `gas` and driving times would
+// have taken a month to appear on any address already in the cache.
+const CACHE_SHAPE_VERSION = 2;
 
 function normalizeAddressKey(address) {
   return address.trim().toLowerCase().replace(/\s+/g, " ");
@@ -98,6 +116,10 @@ async function nearbySearch(origin, placeType, apiKey) {
   const results = json.results || [];
   return results.slice(0, RESULTS_PER_CATEGORY).map((r) => ({
     name: r.name,
+    // Kept so Distance Matrix can be asked for a route to this exact place rather
+    // than to a name Google would have to re-resolve.
+    lat: r.geometry.location.lat,
+    lng: r.geometry.location.lng,
     // 2026-08-15: added alongside the walkability panel. place_id is the one
     // Places field Google exempts from its caching restrictions, and linking
     // each result through it to Google Maps is how the attribution
@@ -109,6 +131,51 @@ async function nearbySearch(origin, placeType, apiKey) {
       distanceMiles(origin.lat, origin.lng, r.geometry.location.lat, r.geometry.location.lng).toFixed(2)
     ),
   }));
+}
+
+// Real driving distance and time from the origin to each place, in ONE Distance
+// Matrix call for all of them (it takes up to 25 destinations per request, and we
+// send at most one per category).
+//
+// Mutates the place objects in place, adding drivingMiles/drivingMinutes only where
+// Google actually returned a route. Anything it cannot answer is simply left with
+// its straight-line mileage: the caller's contract is "distanceMiles is always
+// there, driving figures are a bonus", so a disabled API, a rate limit or an
+// unroutable destination degrades the panel instead of breaking it.
+async function addDrivingTimes(origin, places, apiKey) {
+  if (!places.length) return { ok: true, skipped: true };
+  const dests = places.map((p) => `${p.lat},${p.lng}`).join("|");
+  const url = "https://maps.googleapis.com/maps/api/distancematrix/json?" +
+    `origins=${origin.lat},${origin.lng}&destinations=${encodeURIComponent(dests)}` +
+    `&mode=driving&units=imperial&key=${apiKey}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`Distance Matrix HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.status !== "OK") {
+      // Named loudly and specifically: REQUEST_DENIED here almost always means the
+      // Distance Matrix API is not enabled on the key, which is a one-click fix in
+      // the Google Cloud console and is otherwise completely invisible -- the panel
+      // just quietly never shows a drive time.
+      throw new Error(`Distance Matrix status ${json.status}: ${json.error_message || ""}`);
+    }
+    const elements = (json.rows && json.rows[0] && json.rows[0].elements) || [];
+    elements.forEach((el, i) => {
+      if (!el || el.status !== "OK" || !places[i]) return;
+      if (el.duration && typeof el.duration.value === "number") {
+        places[i].drivingMinutes = Math.max(1, Math.round(el.duration.value / 60));
+      }
+      if (el.distance && typeof el.distance.value === "number") {
+        places[i].drivingMiles = Number((el.distance.value / 1609.344).toFixed(1));
+      }
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error(`nearby-places: no driving times (${err && err.message}) — ` +
+      "straight-line miles only. If this says REQUEST_DENIED, enable the " +
+      "Distance Matrix API on GOOGLE_MAPS_API_KEY in Google Cloud.");
+    return { ok: false, reason: err && err.message };
+  }
 }
 
 exports.handler = async (event) => {
@@ -131,33 +198,76 @@ exports.handler = async (event) => {
       };
     }
 
+    // 2026-08-16: `only` lets a caller ask for a subset. The town pages want the
+    // nearest restaurant and gas station and nothing else, and there are 35 of them
+    // -- asking for all six categories on each would have been six Places calls per
+    // town for four answers nobody on that page requested.
+    const only = ((event.queryStringParameters || {}).only || "")
+      .split(",").map((s) => s.trim()).filter((s) => s in CATEGORY_TYPES);
+    const wanted = only.length ? only : Object.keys(CATEGORY_TYPES);
+
     const cacheKey = normalizeAddressKey(address);
     const store = getBlobStore(getStore, NEARBY_STORE_NAME);
 
     const cached = await store.get(cacheKey, { type: "json" }).catch(() => null);
-    if (cached && cached.cachedAt && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    const usable = cached && cached.v === CACHE_SHAPE_VERSION;
+    const now = Date.now();
+    // Cached by category rather than all-or-nothing. The listing panel asks for six
+    // and the town panel for two against the SAME address key, so an all-or-nothing
+    // cache would have had each of them re-fetching everything the other stored.
+    //
+    // Each category carries its OWN timestamp. Sharing one would mean a partial
+    // refetch renewed the whole entry, and a restaurant that closed two years ago
+    // would still be named as the nearest one -- an entry topped up every few weeks
+    // by some other category would never expire at all.
+    const at = (usable && cached.at) || {};
+    const have = {};
+    if (usable && cached.categories) {
+      for (const [k, v] of Object.entries(cached.categories)) {
+        if (at[k] && now - at[k] < CACHE_TTL_MS) have[k] = v;
+      }
+    }
+    const missing = wanted.filter((k) => !have[k]);
+
+    if (!missing.length) {
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ origin: cached.origin, categories: cached.categories, cached: true }),
+        body: JSON.stringify({
+          origin: cached.origin,
+          categories: Object.fromEntries(wanted.map((k) => [k, have[k]])),
+          cached: true,
+        }),
       };
     }
 
-    const origin = await geocodeAddress(address, apiKey);
-    const categoryEntries = await Promise.all(
-      Object.entries(CATEGORY_TYPES).map(async ([key, placeType]) => {
-        const results = await nearbySearch(origin, placeType, apiKey);
-        return [key, results];
-      })
-    );
-    const categories = Object.fromEntries(categoryEntries);
+    const origin = (usable && cached.origin) || await geocodeAddress(address, apiKey);
+    const fetched = Object.fromEntries(await Promise.all(
+      missing.map(async (key) => [key, await nearbySearch(origin, CATEGORY_TYPES[key], apiKey)])
+    ));
 
-    await store.setJSON(cacheKey, { origin, categories, cachedAt: Date.now() });
+    // One Distance Matrix call covering the nearest result of each category just
+    // fetched -- the only ones a caller shows a drive time against.
+    await addDrivingTimes(origin, Object.values(fetched).map((v) => v[0]).filter(Boolean), apiKey);
+
+    // Written back whole, including any still-valid category this request did not
+    // ask for, so the next caller for this address finds everything either request
+    // has already paid Google for.
+    const categories = { ...(usable ? cached.categories : {}), ...fetched };
+    const stamps = { ...at };
+    for (const k of missing) stamps[k] = now;
+    await store.setJSON(cacheKey, {
+      origin, categories, at: stamps, cachedAt: now, v: CACHE_SHAPE_VERSION,
+    }).catch(() => {});
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ origin, categories, cached: false }),
+      body: JSON.stringify({
+        origin,
+        categories: Object.fromEntries(wanted.map((k) => [k, categories[k] || []])),
+        cached: false,
+      }),
     };
   } catch (err) {
     console.error("nearby-places function error:", err);

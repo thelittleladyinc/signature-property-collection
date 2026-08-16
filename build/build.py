@@ -976,6 +976,7 @@ def _nearby_places_js_helpers():
       '<button type="button" class="nearby-tab active" data-cat="coffee" onclick="showNearbyCat(this)">Coffee</button>' +
       '<button type="button" class="nearby-tab" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
       '<button type="button" class="nearby-tab" data-cat="dining" onclick="showNearbyCat(this)">Dining</button>' +
+      '<button type="button" class="nearby-tab" data-cat="gas" onclick="showNearbyCat(this)">Gas</button>' +
       '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
       '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
       '</div>' +
@@ -1021,7 +1022,18 @@ def _nearby_places_js_helpers():
   };
 
   var NEARBY_CAT_LABELS = { grocery: 'grocery stores', coffee: 'coffee shops',
-    dining: 'restaurants', school: 'schools', park: 'parks' };
+    dining: 'restaurants', gas: 'gas stations', school: 'schools', park: 'parks' };
+
+  // "4 min drive · 2.8 mi" where Google gave us a route, plain straight-line miles
+  // where it didn't. Never both kinds of mile in one string: out here they differ by
+  // a factor of three and showing them together looks like a mistake.
+  window.nearbyDistanceLabel = function (p) {
+    if (p.drivingMinutes) {
+      return p.drivingMinutes + ' min drive' +
+        (p.drivingMiles ? ' \\u00b7 ' + p.drivingMiles.toFixed(1) + ' mi' : '');
+    }
+    return Number(p.distanceMiles).toFixed(1) + ' mi';
+  };
 
   function renderNearbyCat(panel, cat) {
     var data = panel._nearbyData;
@@ -1045,10 +1057,10 @@ def _nearby_places_js_helpers():
           encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
         : name;
       return '<li><span class="nearby-name">' + inner + '</span>' +
-        '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
+        '<span class="nearby-distance">' + nearbyDistanceLabel(p) + '</span></li>';
     }).join('') + '</ul>' +
-      '<p class="nearby-attrib">Straight-line distances. Places data from ' +
-      '<strong>Google Maps</strong>.</p>';
+      '<p class="nearby-attrib">Drive times where available, otherwise straight-line ' +
+      'distance. Places data from <strong>Google Maps</strong>.</p>';
   }
 """
 
@@ -4205,8 +4217,10 @@ def _local_spots_by_city_href():
     town there are videos maybe to restaurants and thy are also on my mao
     correct? is it smart?"). Yes, and it is the smarter half of the two. The
     county map is ONE page, reached by someone already on this site. The town
-    pages are 141 pages that rank in Google, and "best restaurant in Berthoud"
+    pages are 35 pages that rank in Google, and "best restaurant in Berthoud"
     lands on a town page, never on a county map. Same content, far more doors in.
+    (This said 141 until 2026-08-16. That is the whole site's page count, not the
+    town pages', and it got copied into two later comments before anyone counted.)
 
     Grouped by cityHref rather than by city name because the href is the field
     that was set deliberately per spot -- Poudre Canyon sits in Bellvue but
@@ -4412,6 +4426,87 @@ def _town_listing_videos_block(data_slug, city_name, county_name, exclude_ids=()
 </section>""", schema
 
 
+def _town_distance_block(city_name, county_name):
+    """"How far is the nearest restaurant and gas station" for this town.
+
+    2026-08-16 (Christine: "maybe do a miles minutes to the closest restaurant and
+    gas station"). It is the first question a buyer asks about a small town and the
+    one the site could not answer -- the county comparison table gives drive time to
+    Denver and Fort Collins, which is the question people ask about a COMMUTE, not
+    about a Tuesday evening.
+
+    Filled in the browser from nearby-places.js rather than written into the page,
+    and that is a deliberate trade with a real cost. Google's Places data is current
+    and mine is not: I checked Nunn while building this and found its cafe listed
+    both as open and as permanently closed, at the same address, by two sources on
+    the same day. Numbers typed into a town page go stale silently and are then
+    quoted back to a buyer by an agent who trusted them. The cost is that Google
+    cannot index an answer that arrives by fetch, so this does not win the search
+    for "nearest gas station to Nunn" -- if that trade should go the other way for a
+    town, the fix is real verified prose in city_content.json, which is where Great
+    Guns Sporting went for exactly that reason.
+
+    Asks for two categories, not six -- see the `only` parameter in the function.
+    """
+    return f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">How Far Is Everything</span>
+    <h2 class="section-title">Nearest Restaurant And Gas Station To {esc(city_name)}</h2>
+    <p class="lede" style="max-width:70ch">Small-town Colorado is wonderful right up until
+    you need dinner and a tank of gas. Here is the real answer for {esc(city_name)} — drive
+    time, not straight-line distance, because out here those are not the same number.</p>
+    <div class="town-far" data-town="{esc(city_name)}, {esc(county_name)}, CO">
+      <p class="search-status" style="margin:0">Checking drive times&hellip;</p>
+    </div>
+  </div>
+</section>
+<script>
+(function () {{
+  var box = document.querySelector('.town-far');
+  if (!box) return;
+  var LABELS = {{ dining: 'Nearest restaurant', gas: 'Nearest gas station' }};
+  function fail(msg) {{
+    box.innerHTML = '<p class="search-status" style="margin:0">' + msg + '</p>';
+  }}
+  // Escaped, not stripped. Deleting the characters instead silently renamed real
+  // businesses: "Ault Corner Bar & Grill" rendered as "Ault Corner Bar Grill".
+  function esc(s) {{
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }}
+  fetch('/.netlify/functions/nearby-places?only=dining,gas&address=' +
+        encodeURIComponent(box.dataset.town))
+    .then(function (r) {{ return r.json(); }})
+    .then(function (data) {{
+      if (data.error === 'not_configured') return fail('Drive times aren\\u2019t connected yet.');
+      if (data.error) return fail('Couldn\\u2019t look these up right now.');
+      var rows = [];
+      ['dining', 'gas'].forEach(function (cat) {{
+        var p = ((data.categories || {{}})[cat] || [])[0];
+        if (!p) return;
+        var name = esc(p.name);
+        var link = p.placeId
+          ? '<a href="https://www.google.com/maps/place/?q=place_id:' +
+            encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
+          : name;
+        rows.push('<li><span class="nearby-name"><strong>' + LABELS[cat] + ':</strong> ' +
+          link + '</span><span class="nearby-distance">' +
+          (window.nearbyDistanceLabel ? window.nearbyDistanceLabel(p)
+            : Number(p.distanceMiles).toFixed(1) + ' mi') + '</span></li>');
+      }});
+      // Nothing found is a real answer for a town this small, and saying so is more
+      // use than an empty box -- but it must not be mistaken for a failed lookup.
+      if (!rows.length) return fail('Google lists nothing within about five miles \\u2014 ' +
+        'worth a conversation before you buy out here.');
+      box.innerHTML = '<ul class="nearby-list">' + rows.join('') + '</ul>' +
+        '<p class="nearby-attrib">Live from <strong>Google Maps</strong>, measured from the ' +
+        'center of town.</p>';
+    }})
+    .catch(function () {{ fail('Couldn\\u2019t look these up right now.'); }});
+}}());
+</script>"""
+
+
 def _spot_video_ids(city_href):
     """Video ids this town page's local-spots block will already embed.
 
@@ -4591,6 +4686,11 @@ def build_city_pages():
             # page ever shows a heading over nothing.
             town_href = _city_url(c["slug"], city) or ""
             tour_block = _tour_this_town_block(town_href, city)
+
+            # Drive time to the nearest restaurant and gas station, straight after
+            # "what it's like to live here" -- because that section describes the
+            # appeal of a small town and this one answers the question it raises.
+            distance_block = _town_distance_block(city, c["name"])
 
             # Her "why I moved back" film, above the local spots: the personal
             # reason first, then the proof of how well she knows the place.
@@ -4778,6 +4878,7 @@ def build_city_pages():
 </section>
 {search_widget_block}
 {local_block}
+{distance_block}
 {video_block}
 {relocation_block}
 {tour_block}
