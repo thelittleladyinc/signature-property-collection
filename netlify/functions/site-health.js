@@ -779,15 +779,46 @@ exports.handler = async (event) => {
   // and a tag that genuinely counts as newly added so a Smart Plan re-triggers.
   const note = loftyLast && loftyLast.noteResult;
   const tag = loftyLast && loftyLast.tagResult;
+  // 2026-08-16, SETTLED WITH EVIDENCE, and it is the merge case rather than a
+  // fault. Christine submitted a real listing-inquiry at 13:50; the push
+  // succeeded and returned leadId 1147334685108095, and POST /notes for that very
+  // id came back 404 "Lead not exist" -- while an unrelated lead read back 200.
+  //
+  // Lofty hands back the id of the record it ABSORBED on a merge, never the
+  // survivor's, and offers no lookup-by-email to find the survivor. So this
+  // cannot be fixed from here -- but it also only happens when the submitter is
+  // already in her CRM, which so far has only ever been Christine testing with
+  // her own account-owner address. A stranger creates a new contact, the id
+  // resolves, and note and tag both land.
+  //
+  // Rendered as informational for that reason. A red X here told her the lead
+  // pipeline was broken when the only thing that had happened was Lofty
+  // deduplicating her own email -- and a status page that overstates is one she
+  // stops trusting for the rows that do matter.
+  const leadMerged = !!(note && note.leadMissing);
   const parts = [];
   if (!note || !note.attempted) {
     parts.push("Timeline note: not attempted yet.");
   } else if (note.ok) {
     parts.push("Timeline note: written to the lead ✓.");
+  } else if (leadMerged) {
+    parts.push("This lead MERGED into a contact Lofty already had, and Lofty returns the " +
+      "id of the record it absorbed rather than the surviving contact's — so the timeline " +
+      "note had no id to attach to (404 \"Lead not exist\"). Its API offers no way to look a " +
+      "contact up by email, so nothing more can be done from here. Two things to know: the " +
+      "tag from the original push IS on the surviving contact (Lofty appends tags on a " +
+      "merge), and this only happens for someone already in your CRM — which so far has only " +
+      "been you, testing with your own address. A new enquirer creates a new contact, the id " +
+      "works, and both the note and the tag land normally.");
   } else {
     parts.push(`Timeline note FAILED (${note.httpStatus || note.error || "unknown"}).`);
   }
-  if (!tag || !tag.attempted) {
+  if (leadMerged) {
+    // The tag call reads the same unresolvable id, so submission-created no
+    // longer spends a request on it. Saying so beats an unexplained gap.
+    parts.push("Trigger tag: not attempted, because it reads the same id and would fail " +
+      "the same way.");
+  } else if (!tag || !tag.attempted) {
     parts.push("Trigger tag: not attempted yet.");
   } else if (tag.ok) {
     parts.push(tag.step === "refired"
@@ -814,12 +845,16 @@ exports.handler = async (event) => {
   checks.push({
     // Named for what she cares about, not for the mechanism: this row is the
     // primary notification path now that the tag genuinely changes.
-    name: "Your Lofty notification will fire",
-    ok: (!note || !note.attempted) ? true
+    optional: leadMerged,
+    name: leadMerged
+      ? "Lofty note on your last lead (it merged — expected)"
+      : "Your Lofty notification will fire",
+    ok: leadMerged ? false
+      : (!note || !note.attempted) ? true
       : (!!note.ok && (!tag || !tag.attempted || (tag.ok && tag.tagRestored !== false))),
-    detail: parts.join(" ") +
+    detail: parts.join(" ") + (leadMerged ? "" :
       " These are what make a lead that MERGED into an existing contact still show up — " +
-      "the case that hid your own test submissions, because they used your account-owner email.",
+      "the case that hid your own test submissions, because they used your account-owner email."),
   });
 
   // 2026-08-15: some checks describe an OPTIONAL improvement rather than

@@ -84,6 +84,15 @@ async function loftyRequest(method, path, apiKey, body) {
   return { ok: res.ok, httpStatus: res.status, text: text.slice(0, 300), json };
 }
 
+// Lofty's own way of saying "the id you were just handed doesn't resolve".
+// Matched on the error CODE as well as the message so a reworded message doesn't
+// silently turn this back into an unexplained 404.
+function isLeadMissing(res) {
+  if (!res || res.httpStatus !== 404) return false;
+  const body = `${res.text || ""} ${JSON.stringify(res.json || {})}`;
+  return /errorCode=20006|Lead not exist/i.test(body);
+}
+
 // POST /notes — NOT /leads/{id}/notes, which 404s. See the header comment.
 async function addLoftyNote(leadId, content, apiKey) {
   if (!leadId || !content || !apiKey) return { attempted: false };
@@ -95,8 +104,34 @@ async function addLoftyNote(leadId, content, apiKey) {
     const res = await loftyRequest("POST", "/notes", apiKey, {
       leadId: numericId, content,
     });
-    if (!res.ok) console.error(`Lofty note failed: HTTP ${res.httpStatus} ${res.text}`);
-    return { attempted: true, ok: res.ok, httpStatus: res.httpStatus, response: res.text };
+    // 2026-08-16, from Christine's live /status after a real submission. POST
+    // /leads returned leadId 1147334685108095 and reported success -- then
+    // POST /notes for that same id came back
+    //   404 {"message":"...errorCode=20006,errorMsg=Lead not exist"}
+    // while a DIFFERENT lead (1147802441137106) read back fine with HTTP 200.
+    //
+    // So the id Lofty returns when a submission MERGES into an existing contact
+    // is the absorbed record, not the surviving one, and the survivor's id is
+    // never disclosed. That is the whole explanation for why her repeat tests
+    // left no timeline entry: the note had nowhere to go.
+    //
+    // Not fixable from here. Lofty's API offers no lookup-by-email (which is why
+    // sellerintelligence resorts to paging all ~20k leads -- far too slow inside
+    // a form handler), so there is no way to find the survivor. What IS worth
+    // doing is naming the case precisely instead of reporting a bare 404: this
+    // only happens on a merge, it never happens for a genuinely new contact, and
+    // a new contact is every lead that matters commercially.
+    const leadMissing = isLeadMissing(res);
+    if (leadMissing) {
+      console.warn(`Lofty note skipped: lead ${numericId} does not resolve (merged into an ` +
+        `existing contact; Lofty does not return the surviving lead's id).`);
+    } else if (!res.ok) {
+      console.error(`Lofty note failed: HTTP ${res.httpStatus} ${res.text}`);
+    }
+    return {
+      attempted: true, ok: res.ok, httpStatus: res.httpStatus, response: res.text,
+      ...(leadMissing ? { leadMissing: true } : {}),
+    };
   } catch (err) {
     console.error("Lofty note error:", err && err.message);
     return { attempted: true, ok: false, error: String(err && err.message) };
@@ -153,6 +188,15 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
   try {
     const current = await loftyRequest("GET", `/leads/${leadId}`, apiKey);
     if (!current.ok) {
+      // Same ghost-id case as in addLoftyNote, reported under its own step so
+      // /status can explain a merge rather than showing two identical 404s and
+      // implying two separate faults.
+      if (isLeadMissing(current)) {
+        return {
+          attempted: true, ok: false, step: "lead-missing", tagRestored: true,
+          httpStatus: current.httpStatus, response: current.text,
+        };
+      }
       return { attempted: true, ok: false, step: "read", httpStatus: current.httpStatus, response: current.text };
     }
     const tags = tagsFromLead(current.json);
@@ -292,6 +336,7 @@ module.exports = {
   DEFAULT_TO,
   addLoftyNote,
   refireLoftyTag,
+  isLeadMissing,
   tagsFromLead,
   describeTagShape,
   alertEmailHtml,

@@ -258,7 +258,17 @@ exports.handler = async (event) => {
     const noteResult = leadId ? await addLoftyNote(leadId, body.notes, apiKey) : { attempted: false };
     // And make the trigger tag a real CHANGE, so the Smart Plan fires on a
     // returning buyer's second enquiry and not only their first.
-    const tagResult = leadId ? await refireLoftyTag(leadId, TRIGGER_TAG, apiKey) : { attempted: false };
+    //
+    // 2026-08-16: skipped entirely when the note already proved the returned
+    // leadId doesn't resolve (a merge — see addLoftyNote). The tag call reads the
+    // same id and would 404 identically, so attempting it only spends a Lofty
+    // call and puts a second, redundant failure on /status that reads like a
+    // separate fault. tagRestored stays true because the tag written by the
+    // create call is still on the surviving contact; Lofty appends tags on merge.
+    const tagResult = !leadId ? { attempted: false }
+      : noteResult.leadMissing
+        ? { attempted: false, skipped: "lead-missing", tagRestored: true }
+        : await refireLoftyTag(leadId, TRIGGER_TAG, apiKey);
 
     if (store) await recordPush(store, { ...result, leadId, emailResult, noteResult, tagResult }, formName, body);
     return { statusCode: 200, body: "ok" };
