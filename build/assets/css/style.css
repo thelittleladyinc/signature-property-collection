@@ -715,6 +715,36 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
    obscured or faded into the background. */
 .nearby-attrib { font-size: 11px; color: var(--slate); margin: 10px 0 0; line-height: 1.6; }
 
+/* ---------- Every sold home, by year (past-sales.html) ----------
+   2026-08-16 (Christine: "maybe a page with all sold listings not just hte ones with
+   videos"). A plain list, on purpose. Forty-two rows as cards would be a wall of
+   boxes; what a seller does here is scan for a street they recognise, so the address
+   is the strongest thing on each row and everything else gets out of its way. */
+.sold-year { margin-top: 30px; }
+.sold-year-head {
+  font-family: var(--font-sans); font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--deep-mauve); margin: 0 0 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--hairline); display: flex; justify-content: space-between; gap: 12px;
+}
+.sold-year-head span { color: var(--slate); letter-spacing: .04em; font-weight: 400; }
+.sold-list { list-style: none; padding: 0; margin: 0; }
+.sold-list li {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto;
+  gap: 14px; align-items: baseline;
+  padding: 11px 0; border-bottom: 1px solid var(--hairline);
+}
+.sold-list li:last-child { border-bottom: 0; }
+.sold-addr { font-size: 16px; color: var(--charcoal); }
+.sold-town { font-size: 14px; color: var(--slate-soft); }
+.sold-tour { font-size: 13px; color: var(--deep-mauve); white-space: nowrap; }
+.sold-tour:hover { color: var(--rose); }
+@media (max-width: 560px) {
+  /* Three columns cannot hold an address, a town and a link on a phone without the
+     address wrapping to two lines and colliding with the town. */
+  .sold-list li { grid-template-columns: 1fr; gap: 2px; padding: 12px 0; }
+  .sold-town { font-size: 13px; }
+}
+
 /* ---------- "How far is everything" on a town page ----------
    2026-08-16 (Christine: "maybe do a miles minutes to the closest restaurant and
    gas station"). Same markup as the listing panel, which is the point -- but that

@@ -62,57 +62,16 @@
     "                                             separate sale, which is probably",
     "                                             where the wrong number came from)",
     "Both keep their video tours. If either correction is wrong, the video title is",
-    "the thing to re-check, not the MLS."
+    "the thing to re-check, not the MLS.",
+    "2026-08-16: eight pins removed. They came from the sold-status inference in _LISTING_VIDEO_ENTRIES (build.py) -- 'absent from her live-listings sheet, so presumably closed' -- not from Christine's records. She confirmed 32 Victoria Dr and 475 Homestead Ln did NOT sell, which invalidated the other six by the same reasoning. A pin belongs here only when Christine's own records back it, which in practice means it carries a year. Removed: 1110 S Quitman St, 1316 Cimarron Cir, 294 Gila Trail, 32 Victoria Dr, 39243 Boulevard E, 45615 County Rd 27, 475 Homestead Ln, 929 W Independent Ave."
   ],
   "homes": [
-    {
-      "address": "32 Victoria Dr",
-      "city": "Johnstown",
-      "videoId": "9aIGz-SvCtI",
-      "title": "Affordable Luxury at 32 Victoria Dr — Johnstown Home Tour"
-    },
-    {
-      "address": "929 W Independent Ave",
-      "city": "LaSalle",
-      "videoId": "TpjE36J71zc",
-      "title": "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado"
-    },
-    {
-      "address": "294 Gila Trail",
-      "city": "Ault",
-      "videoId": "JvtRGf01JXU",
-      "title": "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail"
-    },
-    {
-      "address": "39243 Boulevard E",
-      "city": "Eaton",
-      "videoId": "L-uEVzq1bv4",
-      "title": "Eaton, CO Home Under $400K — 39243 Boulevard E"
-    },
-    {
-      "address": "1110 S Quitman St",
-      "city": "Denver",
-      "videoId": "e7kMY1yV7GI",
-      "title": "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St"
-    },
-    {
-      "address": "45615 County Rd 27",
-      "city": "Pierce",
-      "videoId": "dVonJhu_zCo",
-      "title": "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO"
-    },
     {
       "address": "504 Graefe Ave",
       "city": "Ault",
       "videoId": "eiFurERq_As",
       "title": "Charming Home for Sale at 504 Graefe Ave, Ault CO",
       "year": "2024"
-    },
-    {
-      "address": "1316 Cimarron Cir",
-      "city": "Eaton",
-      "videoId": "xWcrj6foJ-Q",
-      "title": "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir"
     },
     {
       "address": "4869 Stuart St",
@@ -127,12 +86,6 @@
       "videoId": "MDfyzESb1Yk",
       "title": "Why Is Loveland, CO Called the \"Sweetheart City\"? — 5705 Snow Mesa Dr",
       "year": "2024"
-    },
-    {
-      "address": "475 Homestead Ln",
-      "city": "Johnstown",
-      "videoId": "6Hrdv6LZIDM",
-      "title": "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)"
     },
     {
       "address": "913 Green Mountain Dr",

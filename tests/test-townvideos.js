@@ -57,13 +57,10 @@ const TOWN_VIDEOS = {};   // slug -> [{id, title, views, prop}]
 }
 const OFF_BRAND = new Set(
   [...block("OFF_BRAND_LISTING_VIDEOS").matchAll(/^\s+"([\w-]+)":/gm)].map((m) => m[1]));
-// _LISTING_VIDEO_ENTRIES is a list of tuples whose last element is the status.
-const SOLD = new Set(
-  [...BUILD.matchAll(/\n\s+"([\w-]+)", "[^"]*", "(sold|live)"\),/g)]
-    .filter((m) => m[2] === "sold").map((m) => m[1]));
-const LIVE = new Set(
-  [...BUILD.matchAll(/\n\s+"([\w-]+)", "[^"]*", "(sold|live)"\),/g)]
-    .filter((m) => m[2] === "live").map((m) => m[1]));
+// Sold/live statuses used to be read here to verify the "Sold" captions. Christine
+// removed those captions on 2026-08-16, and the block now forbids any status wording
+// outright -- see the label check below. tests/test-soldclaims.js is what guards the
+// status table itself.
 
 console.log("\n1. The data itself");
 const towns = Object.keys(TOWN_VIDEOS);
@@ -72,8 +69,6 @@ check(`parsed ${towns.length} towns and ` +
   towns.length >= 10 && Object.values(TOWN_VIDEOS).flat().length >= 30,
   JSON.stringify(towns));
 check(`${OFF_BRAND.size} videos held back, and the parse found them`, OFF_BRAND.size >= 5);
-check("cross-checked sold/live statuses were found too", SOLD.size >= 10 && LIVE.size >= 1,
-  `${SOLD.size} sold / ${LIVE.size} live`);
 
 const allIds = Object.values(TOWN_VIDEOS).flat().map((v) => v.id);
 check("every id looks like a YouTube id", allIds.every((i) => /^[\w-]{11}$/.test(i)),

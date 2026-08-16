@@ -619,38 +619,69 @@ BRAND_VIDEOS = [
 # auto-attached once that address hits the live MLS feed — video ID + title
 # from YouTube, address variants lowercase.
 #
-# `status` is cross-checked against Christine's own "Each Listing SOP" Google
-# Sheet (shared with Kendra + Savanna — the real-time source of truth for
-# what's actually live right now), checked 2026-08-11: "live" = address
-# appears there with Stage = Live; "sold" = it doesn't, meaning as far as we
-# can tell that listing has closed or moved on. "sold" entries are what
-# populate the "How I Sold These Homes" showcase on /past-sales.html (see
-# build_nav_pages()) — "live" ones are excluded from that showcase (showing
-# an active seller's home in a "sold" section would be both wrong and
-# awkward for that client). Status is a label for OUR display logic only —
-# it never affects live MLS matching itself, which always checks the real
-# feed regardless of what's recorded here.
+# `status` drives whether the site claims a home was SOLD, so it is now the most
+# load-bearing field in this file. Four values:
+#
+#   "sold"         Christine's own records say it closed. This is the ONLY value that
+#                  puts a home on the sold-homes map or in the "How I Sold These
+#                  Homes" showcase on /past-sales.html.
+#   "live"         Currently listed. Excluded from any sold framing -- showing an
+#                  active seller's home in a "sold" section is both wrong and awkward
+#                  for that client.
+#   "not-sold"     Listed and did not sell. Excluded from everything sold-related.
+#   "unconfirmed"  We do not actually know. Treated exactly like "not-sold" until
+#                  Christine says otherwise.
+#
+# 2026-08-16, and this is the important part. Until today "sold" meant something much
+# weaker: on 2026-08-11 these were cross-checked against her "Each Listing SOP" sheet
+# and anything NOT appearing there as Stage = Live was recorded as sold -- "it doesn't
+# appear, meaning as far as we can tell that listing has closed or moved on".
+#
+# That inference is unsound, and "moved on" is doing the lying. A listing absent from
+# a live-listings sheet may have closed, expired, been withdrawn, or never gone live.
+# Christine read the site today and said: "32 victoria was not sold either was
+# homestead". Both were marked sold by that inference, and both were therefore being
+# published as her past sales -- pins on the sold-homes map and tiles in the showcase.
+# Two wrong out of the twelve she could check.
+#
+# So the eight entries whose only evidence was that inference are no longer claimed.
+# Four remain "sold", each with real evidence:
+#   504 Graefe Ave, 4869 Stuart St, 5705 Snow Mesa Ct -- listed with a sale year on
+#     Christine's own sold-listings page (see sold_homes.json, added 2026-08-15).
+#   913 Green Mountain Dr -- confirmed directly with her on 2026-08-11.
+#
+# The rule going forward: "sold" requires evidence from Christine, not an absence of
+# evidence to the contrary. tests/test-soldclaims.js enforces it -- every "sold" entry
+# must have a matching sold_homes.json pin, and no other status may appear in any sold
+# framing anywhere on the site.
+#
+# Status is a label for OUR display logic only — it never affects live MLS matching
+# itself, which always checks the real feed regardless of what's recorded here.
 _LISTING_VIDEO_ENTRIES = [
+    # 2026-08-16 (Christine: "32 victoria was not sold either was homestead"). Was
+    # marked sold, which put it on the sold-homes map and in the "How I Sold These
+    # Homes" showcase. It did not sell. See the note above _LISTING_VIDEO_ENTRIES's
+    # status field -- the inference that produced this was unsound.
     (["32 victoria dr", "32 victoria drive"],
-     "9aIGz-SvCtI", "Affordable Luxury at 32 Victoria Dr — Johnstown Home Tour", "sold"),
+     "9aIGz-SvCtI", "Affordable Luxury at 32 Victoria Dr — Johnstown Home Tour", "not-sold"),
     (["16225 county road 98", "16225 county rd 98"],
      "N57_J3llZCQ", "45 Acres + Heated Shop — Custom Colorado Ranch, No HOA | 16225 County Road 98", "live"),
     (["929 independent ave", "929 w independent ave", "929 west independent ave",
       "929 independent avenue", "929 w independent avenue"],
-     "TpjE36J71zc", "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado", "sold"),
+     "TpjE36J71zc", "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado", "unconfirmed"),
     (["294 gila trail", "294 gila trl"],
-     "JvtRGf01JXU", "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail", "sold"),
+     "JvtRGf01JXU", "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail", "unconfirmed"),
     (["39243 boulevard e", "39243 blvd e"],
-     "L-uEVzq1bv4", "Eaton, CO Home Under $400K — 39243 Boulevard E", "sold"),
+     "L-uEVzq1bv4", "Eaton, CO Home Under $400K — 39243 Boulevard E", "unconfirmed"),
     (["1110 quitman st", "1110 s quitman st", "1110 south quitman st",
       "1110 quitman street", "1110 s quitman street"],
-     "e7kMY1yV7GI", "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St", "sold"),
+     "e7kMY1yV7GI", "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St", "unconfirmed"),
     (["45615 county rd 27", "45615 county road 27"],
-     "dVonJhu_zCo", "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO", "sold"),
+     "dVonJhu_zCo", "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO", "unconfirmed"),
     (["504 graefe ave", "504 graefe avenue"],
      "eiFurERq_As", "Charming Home for Sale at 504 Graefe Ave, Ault CO", "sold"),
     (["1316 cimarron cir", "1316 cimarron circle"],
-     "xWcrj6foJ-Q", "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir", "sold"),
+     "xWcrj6foJ-Q", "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir", "unconfirmed"),
     # 2026-08-15: the MLS record for this sale is 4869 Stuart St, not 4986 --
     # the video title has the digits transposed (there IS a real 4986 W 5th St
     # in Greeley, which is likely where the mix-up came from). Both forms kept
@@ -671,8 +702,10 @@ _LISTING_VIDEO_ENTRIES = [
     # Maplebrook...".
     (["945 maplebrook dr", "945 maplebrook drive"],
      "SAZceZQJrAs", "Is This the Cutest Home in Windsor, Colorado? — 945 Maplebrook Dr Tour", "live"),
+    # 2026-08-16: same correction as 32 Victoria Dr above -- Christine confirmed this
+    # one did not sell either.
     (["475 homestead ln", "475 homestead lane"],
-     "6Hrdv6LZIDM", "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)", "sold"),
+     "6Hrdv6LZIDM", "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)", "not-sold"),
     # Confirmed 2026-08-11 (after an earlier back-and-forth): 913 Green
     # Mountain Dr, Erie was a real past CLIENT sale (Christine represented
     # the seller), not her own home — 2411 Glade Rd, Loveland is her
@@ -3508,10 +3541,26 @@ def build_home():
     body = f"""
 <section class="hero">
   <div class="wrap">
-    <h1>Turning Dreams<br>Into Addresses</h1>
-    <p class="lede">Northern Colorado's luxury real estate collection — representing estate homes,
-    acreage, and architecturally significant properties across Loveland, Berthoud, Masonville, and
-    the Larimer, Weld &amp; Boulder County Front Range.</p>
+    <!-- 2026-08-16 (Christine: "are these words that people search for? and ask ai
+         answers about? we need to mention northern colorado - and say across - I
+         represent Denver north").
+
+         The H1 was "Turning Dreams Into Addresses". It is a nice line and nobody
+         types it into anything. A homepage H1 is one of the strongest signals a page
+         has, for Google and for an answer engine deciding what this site IS, and it
+         was spending that signal on a slogan -- so the page named its own market
+         nowhere in its largest text.
+
+         Now it says the thing people search ("luxury real estate", "Northern
+         Colorado") and the thing they ask an AI ("who covers my area"), with her
+         coverage stated the way she states it herself: Denver north. The slogan is
+         kept as the eyebrow, where it costs nothing. -->
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Turning Dreams Into Addresses</span>
+    <h1>Luxury Real Estate Across Northern Colorado</h1>
+    <p class="lede">{SITE['agent']} represents estate homes, acreage, and architecturally
+    significant properties across Northern Colorado — Denver north to the Wyoming line.
+    Loveland, Fort Collins, Berthoud, Windsor, Greeley, Boulder County and every town
+    in between.</p>
     <div class="btn-row">
       <a class="btn btn-primary" href="/buyers.html">Find Your Home</a>
       <a class="btn btn-outline" href="/sellers.html">List With Us</a>
@@ -3565,9 +3614,16 @@ def build_home():
     body += faq_html
     extra = _leaflet_lazy_loader_extra()
     page(
-        "Luxury Real Estate Loveland & Northern Colorado | Signature Property Collection",
-        "Christine Gwinnup and Signature Property Collection — luxury real estate across Loveland, "
-        "Berthoud, Masonville, and the Larimer, Weld & Boulder County Front Range.",
+        "Northern Colorado Luxury Real Estate Agent | Christine Gwinnup",
+        # 2026-08-16: this named Loveland, Berthoud and Masonville -- one real town and
+        # two of the smallest in the county -- and then three counties out of nine.
+        # The description is the line Google prints, and it was describing a fraction
+        # of the business. Now: what she does, where, and the phrase she uses herself.
+        # Written to fit DESC_BUDGET (160) on purpose: the first draft ran to 217 and
+        # _fit_description trimmed off "Denver north to the Wyoming line", which was
+        # the whole point of rewriting it.
+        "Christine Gwinnup sells luxury homes and acreage across Northern Colorado, "
+        "Denver north to the Wyoming line. 250+ homes sold, 158 five-star Google reviews.",
         "/index.html", None, body, extra,
         schema_extra=[faq_schema, _organization_schema()],
     )
@@ -8481,12 +8537,67 @@ def build_nav_pages():
       <button type="button" class="btn btn-outline" style="border-color:#141415;color:#141415;cursor:pointer"
       onclick="document.getElementById('more-sold-tours').style.display='block';this.style.display='none'">View More Videos</button>
     </div>""" if hidden_sold_cards else ""
+    # 2026-08-16 (Christine: "maybe a page with all sold listings not just hte ones
+    # with videos"). Right, and the gap was bigger than it looked: the showcase above
+    # only ever renders sales she happened to FILM, so a page headed "Past Sales" was
+    # showing four homes out of forty-two. The film crew is not the qualification.
+    #
+    # Grouped newest first, because "what have you sold lately" is the actual question
+    # and a 2019 sale answers it differently from a 2025 one. Homes whose year is not
+    # recorded sit in their own group at the end rather than being guessed into one.
+    #
+    # Deliberately address + town + year and nothing else. Price, beds and square
+    # footage for these come out of the IRES IDX feed, whose terms limit that data to
+    # consumers' personal, non-commercial use -- her transaction history is hers to
+    # publish, the MLS's listing content is not. Same rule as sold_homes.json.
+    by_year = {}
+    for pin in SOLD_HOME_PINS:
+        by_year.setdefault(pin.get("year") or "", []).append(pin)
+    year_blocks = []
+    # Newest year first, with the undated group forced to the END. `(y == "", y)`
+    # under reverse=True did the opposite -- True sorts above every year string, so
+    # the one home with no recorded year led the list.
+    for year in sorted(by_year, key=lambda y: (y != "", y), reverse=True):
+        homes = sorted(by_year[year], key=lambda p: p["address"])
+        rows = "\n        ".join(
+            f"""<li><span class="sold-addr">{esc(p['address'])}</span>"""
+            f"""<span class="sold-town">{esc(p['city']) or '&mdash;'}</span>"""
+            + (f"""<a class="sold-tour" href="https://www.youtube.com/watch?v={esc(p['videoId'])}" """
+               f"""target="_blank" rel="noopener">Watch the tour &#8599;</a>"""
+               if p.get("videoId") else '<span class="sold-tour"></span>')
+            + "</li>" for p in homes)
+        label = year if year else "Year not recorded"
+        year_blocks.append(f"""<div class="sold-year">
+      <h3 class="sold-year-head">{esc(label)} <span>{len(homes)} home{'s' if len(homes) != 1 else ''}</span></h3>
+      <ul class="sold-list">
+        {rows}
+      </ul>
+    </div>""")
+    all_sold_section = f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Full List</span>
+    <h2 class="section-title">Every Home {esc(SITE['agent'].split()[0])} Has Sold, By Year</h2>
+    <!-- The count and the "150+ homes" figure in the hero are both true and a reader
+         WILL notice the gap, so it is explained rather than left to look like a
+         contradiction. Only addresses Christine has published herself appear here. -->
+    <p class="lede">{len(SOLD_HOME_PINS)} closed sales with the address on record, newest
+    first. {esc(SITE['agent'].split()[0])} has sold 150+ homes herself over her career;
+    these are the ones documented here by address, and the list grows as older files
+    are added. Every one is a real closing, not a selection of the good ones.</p>
+    {"".join(year_blocks)}
+    <div class="btn-row" style="margin-top:32px">
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/sold-homes-map.html">See Them On A Map &rarr;</a>
+      <a class="btn btn-dark" href="/free-home-valuation.html">What Would Mine Sell For?</a>
+    </div>
+  </div>
+</section>""" if SOLD_HOME_PINS else ""
+
     sold_homes_section = f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">How I Sold These Homes</span>
     <h2 class="section-title">Real Tours From Homes {esc(SITE['agent'].split()[0])} Has Represented</h2>
-    <p class="lede">A look at the actual marketing video for each property, filmed and
-    posted by {esc(SITE['agent'])} herself — real homes, real results, no stock photos.</p>
+    <p class="lede">The ones she filmed. Every video below is her own marketing for that
+    specific house — what a listing with {esc(SITE['agent'].split()[0])} actually looks like.</p>
     <div class="video-grid">
       {visible_sold_cards}
     </div>
@@ -8506,19 +8617,19 @@ def build_nav_pages():
     {SITE['agent']} has sold 150+ homes across Northern Colorado herself, 250+ as a
     duo with Kendra Bajcar — delivering
     top-dollar results and seamless transactions for clients throughout the Front Range.</p>
-    <p class="lede">Looking for current inventory? <a href="/search-homes.html"
-    style="text-decoration:underline">Search live, active IRES MLS listings</a> across
-    Larimer, Weld, and Boulder County, or see <a href="/current-listings.html"
-    style="text-decoration:underline">{esc(SITE['agent'].split()[0])}'s own Current Listings</a>.
-    In the meantime, read real client experiences on the
-    <a href="/testimonials.html" style="text-decoration:underline">Testimonials page</a>,
-    or reach out directly for recent comparable sales in your area.</p>
+    <p class="lede">Buying instead? <a href="/search-homes.html"
+    style="text-decoration:underline">Search every home for sale</a> across Northern
+    Colorado, or see <a href="/current-listings.html"
+    style="text-decoration:underline">{esc(SITE['agent'].split()[0])}'s own listings</a>.
+    For what her clients say about the experience, read the
+    <a href="/testimonials.html" style="text-decoration:underline">testimonials</a>.</p>
     <div class="btn-row">
-      <a class="btn btn-primary" href="/search-homes.html">Search Active Listings</a>
+      <a class="btn btn-primary" href="/free-home-valuation.html">What's My Home Worth?</a>
       <a class="btn btn-outline" href="/testimonials.html">Read Testimonials</a>
     </div>
   </div>
 </section>
+{all_sold_section}
 {sold_homes_section}
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Past Sales", None)])
