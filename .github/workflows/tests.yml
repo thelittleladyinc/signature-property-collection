@@ -1,0 +1,57 @@
+# 2026-08-16: the thirteen suites in tests/ spent their whole life in a session
+# scratchpad, where they would have been lost. Now they run on every push, because
+# tests nobody runs are tests that don't exist — and this repo's whole hard-won
+# lesson is that a silent failure is the expensive kind.
+#
+# Deliberately minimal: no npm install of dev tooling, no matrix. The suites use
+# only Node's built-ins plus the two runtime deps already in package.json, and
+# build.py uses only the standard library. Anything heavier would be a second thing
+# to keep working.
+name: tests
+
+on:
+  push:
+    branches: ["master", "claude/**"]
+  pull_request:
+  # So a dependency or platform change that breaks the build is caught even in a
+  # week with no commits.
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # @netlify/blobs is stubbed by the suites but must resolve, and cloudinary is
+      # required by _cloudinary.js at load time.
+      - name: Install function dependencies
+        run: npm install --no-audit --no-fund
+
+      # Runs build.py first, so a generator error or a page missing from the
+      # sitemap fails here rather than on Netlify.
+      - name: Build and run all suites
+        run: bash tests/run-all.sh
+
+      # The committed site/ is the deploy fallback (see netlify.toml). If a commit
+      # changes build.py without rebuilding, that fallback silently goes stale —
+      # exactly the failure this repo keeps relearning. Catch it.
+      - name: Check committed site/ matches the generator
+        run: |
+          if [ -n "$(git status --porcelain site/)" ]; then
+            echo "::error::site/ is out of date with build/build.py."
+            echo "Run 'python3 build/build.py' and commit the result."
+            git status --short site/ | head -20
+            exit 1
+          fi
+          echo "site/ matches the generator."
