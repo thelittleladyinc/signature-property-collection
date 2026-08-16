@@ -6429,6 +6429,100 @@ def build_market_topic_pages():
 # to Christine's general-market site, thelittleladysellshomes.com, alongside
 # the live feed here.
 SUBDIVISION_PAGES = [
+    # 2026-08-16 (Christine: "we need a downtown loveland subdivision as well as West
+    # Loveland, Marianne Butte, buckhorn, all subdievsions by lakes and rivers"). West
+    # Loveland, Mariana Butte, Buckhorn, Lakes at Centerra, Boyd Lake North, The
+    # Waterfront at Boyd Lake and the Big Thompson riverfront pages all already existed --
+    # downtown was the one genuinely missing, and it is the one people search by name.
+    #
+    # Carries the first photo on any of these pages: 4th Street, out of her own
+    # "Community Photos and Videos" folder in Drive.
+    {
+        "slug": "downtown-loveland-real-estate",
+        "eyebrow": "Downtown & Historic Core",
+        "photo": "downtown-loveland",
+        "photo_alt": "Historic brick storefronts on 4th Street in downtown Loveland, Colorado",
+        "title": "Downtown Loveland: Lofts, Historic Homes & The 4th Street Core",
+        "meta": "Buying in downtown Loveland — live/work lofts, historic bungalows and "
+                "the walkable 4th Street core, plus what to know about older housing "
+                "stock and a live feed of what is on the market.",
+        "intro": "Downtown Loveland is the one part of town people choose by name. It is "
+                  "also the one where the housing bears the least resemblance to the rest "
+                  "of the city: live/work lofts, century-old brick and bungalows on the "
+                  "surrounding blocks, and a walkable core that has been genuinely rebuilt "
+                  "over the last fifteen years rather than merely talked about.",
+        "paragraphs": [
+            "What You Are Actually Buying Downtown",
+            "There is very little new detached housing in the core, so downtown buyers "
+            "usually land in one of three places: a loft or condo built out of a "
+            "redeveloped building, an apartment in one of the newer infill blocks, or an "
+            "older single-family home on the streets immediately around 4th. Each comes "
+            "with a different set of questions, and they are not the questions you ask "
+            "about a 2015 subdivision house.",
+            "The Live/Work Lofts",
+            "Artspace Loveland Lofts on West 3rd Street holds 30 live/work units in one, "
+            "two and three-bedroom layouts, and the restored Feed & Grain building next "
+            "to it adds nine more alongside about 4,000 square feet of commercial space. "
+            "These were built for working artists and they are the reason the arts "
+            "district is a real thing rather than a slogan. The Gallery Flats added a "
+            "five-storey, 66-unit building right in the core.",
+            "The Older Homes Around The Core",
+            "The blocks around 4th Street are where downtown gets genuinely interesting "
+            "for buyers who want a house rather than a unit. It is also where the "
+            "inspection matters most: knob-and-tube wiring, galvanised or cast-iron "
+            "supply lines, unpermitted basement finishes, foundations that predate any "
+            "modern soils report, and sewer laterals of unknown age running under mature "
+            "trees. None of that is a reason not to buy. All of it is a reason to have "
+            "the sewer scoped before you remove your inspection objection.",
+            "Why People Pay For It",
+            "The Rialto Theater at 228 E 4th Street has been on that block since 1919 and "
+            "came through a four-million-dollar expansion that added a restaurant and a "
+            "larger lobby. Benson Sculpture Garden and Chapungu Sculpture Park are both "
+            "minutes away, Lake Loveland sits just north, and the summer events calendar "
+            "genuinely fills these streets. If you want to know whether Loveland has a "
+            "downtown worth living in, come on a Friday night in July and decide for "
+            "yourself.",
+            "The Honest Trade",
+            "Downtown means noise, event traffic and parking you share with everyone else "
+            "who wanted to be walkable. Garages are often detached, sometimes off an "
+            "alley, and occasionally absent. Buyers who love it love it precisely because "
+            "they can walk to dinner; buyers who want a three-car garage and a quiet "
+            "cul-de-sac are better served in west or east Loveland, and it is cheaper to "
+            "work that out now than after closing.",
+        ],
+        "feed_heading": "Current Listings In And Around Downtown Loveland",
+        "feed_params": {"city": "Loveland"},
+        "feed_empty_note": "The downtown core is small and turns over slowly, so quiet "
+                            "stretches are normal. Ask and I will tell you what is coming "
+                            "before it is listed.",
+        "faq": [
+            ("Can you buy a loft or condo in downtown Loveland?",
+             "Yes. Most of the attached housing in the core came out of redevelopment — "
+             "Artspace Loveland Lofts on West 3rd Street holds 30 live/work units, the "
+             "restored Feed & Grain adds nine more, and The Gallery Flats is a five-storey, "
+             "66-unit building in the core. Inventory is thin because the total number of "
+             "units is small, not because nothing sells."),
+            ("What should I check before buying an older home near downtown Loveland?",
+             "Have the sewer lateral scoped, and have the electrical and supply plumbing "
+             "looked at specifically rather than generally. Homes on the blocks around 4th "
+             "Street can carry knob-and-tube wiring, galvanised or cast-iron supply lines, "
+             "unpermitted basement finishes and a sewer line of unknown age under mature "
+             "trees. These are normal for the age and all of them are cheaper to find "
+             "before closing."),
+            ("Is downtown Loveland walkable?",
+             "Genuinely, yes — which is unusual for a Northern Colorado city of this size. "
+             "The 4th Street core has restaurants, the Rialto Theater, galleries and "
+             "shops within a few blocks, and Lake Loveland and Benson Sculpture Garden are "
+             "close by. The trade is event traffic, shared parking, and garages that are "
+             "often detached or off an alley."),
+            ("Is downtown Loveland a good investment?",
+             "It behaves differently from the rest of the city, which is the point: a "
+             "limited number of units in a walkable core does not get built again, so "
+             "supply stays tight. That cuts both ways — it supports value and it means you "
+             "may wait for the right one. Anyone quoting you a confident appreciation "
+             "figure for a market this small is guessing."),
+        ],
+    },
     {
         "slug": "buckhorn-subdivisions-loveland",
         "eyebrow": "West Loveland Foothills",
@@ -6919,6 +7013,30 @@ SUBDIVISION_PAGES = [
 ]
 
 
+def _subdivision_photo(sub):
+    """Optional hero photo for a subdivision page.
+
+    2026-08-16 (Christine: "you have access to my photos and locations you could use 100%
+    more photos in my website for the locations"). These ten pages had none at all. Ships
+    .webp with a .jpg fallback, the same pair the town heroes use, and returns "" for a
+    page with no photo rather than reserving empty space.
+    """
+    slug = sub.get("photo")
+    if not slug:
+        return ""
+    alt = sub.get("photo_alt") or sub["title"]
+    return f"""<section class="tight" style="padding-top:0">
+  <div class="wrap">
+    <picture>
+      <source srcset="/assets/img/communities/{slug}.webp" type="image/webp">
+      <img src="/assets/img/communities/{slug}.jpg" alt="{esc(alt)}"
+        loading="lazy" decoding="async" width="1600" height="900"
+        style="width:100%;height:auto;display:block;border-radius:4px">
+    </picture>
+  </div>
+</section>"""
+
+
 def build_subdivision_pages():
     """One page per Loveland subdivision/area guide — see SUBDIVISION_PAGES
     above for the sourcing note. Modeled on build_market_topic_pages()'s
@@ -6946,6 +7064,7 @@ def build_subdivision_pages():
     <p class="lede">{esc(sub['intro'])}</p>
   </div>
 </section>
+{_subdivision_photo(sub)}
 <section>
   <div class="wrap" style="max-width:780px">
     {body_html}
