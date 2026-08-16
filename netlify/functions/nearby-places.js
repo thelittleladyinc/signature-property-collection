@@ -69,7 +69,13 @@ const SEARCH_RADIUS_METERS = 8000; // ~5 miles, generous for rural Weld/Larimer 
 // before that change is treated as a miss instead of being served forever with
 // fields the caller now expects. Without this, adding `gas` and driving times would
 // have taken a month to appear on any address already in the cache.
-const CACHE_SHAPE_VERSION = 2;
+// 3 (2026-08-16, hours after 2): Christine enabled the Distance Matrix API on her Google
+// Cloud key. Any address looked up in the window before that was cached WITHOUT
+// drivingMinutes -- a valid version-2 entry that would have served miles-only for the
+// next 30 days, on exactly the pages the drive times were built for. The shape is
+// unchanged, so nothing but the version number can invalidate those. Bumping it costs one
+// re-fetch per address and is the whole reason this field exists.
+const CACHE_SHAPE_VERSION = 3;
 
 function normalizeAddressKey(address) {
   return address.trim().toLowerCase().replace(/\s+/g, " ");
