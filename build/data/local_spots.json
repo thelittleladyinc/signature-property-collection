@@ -44,7 +44,19 @@
     "more word from her: 'sage in loveland' (restaurant?), 'driven' (no matching video found), the",
     "cherry place in west Loveland (her Cherry Treats video, business name unknown), Taste of Loveland",
     "(an annual event whose venue moves, so it is covered by the Downtown Loveland pin rather than",
-    "given a fixed one), and the Big Thompson River (a line on the map, not a pin -- see RIVERS)."
+    "given a fixed one), and the Big Thompson River (a line on the map, not a pin -- see RIVERS).",
+    "",
+    "2026-08-15: the Berthoud restaurant is COCINA & CANTINA, confirmed from her own Google Maps",
+    "notification -- 10,000 review views, five stars, posted 7/15/25. Her review text is carried",
+    "here verbatim rather than only linked, because Google gives no permalink to a single review: a",
+    "link can only open the business's listing and leave a visitor hunting for her among everyone",
+    "else's. googleReviewUrl is therefore the PLACE, and the button says 'See It On Google'.",
+    "",
+    "This one entry outweighs every video here: 10,000 views against 14,671 across eighteen videos.",
+    "Any future sweep of her local content must include Google reviews, not just YouTube.",
+    "",
+    "Checked and deliberately NOT pinned because both are permanently closed: Grubby'z (Pierce and",
+    "Severance), found via a 'replied to your review' email, and The River Forks Inn in Drake."
   ],
   "_views_as_of": "2026-08-15",
   "spots": [
@@ -280,6 +292,20 @@
       "videoId": "K2XYDr2cgYU",
       "videoTitle": "What Makes a Home Luxurious? | Colliers Hill Erie CO Luxury Home",
       "views": 21,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Cocina & Cantina",
+      "category": "restaurant",
+      "address": "Cocina & Cantina",
+      "city": "Berthoud",
+      "cityHref": "/communities/larimer/berthoud.html",
+      "searchCity": "Berthoud",
+      "blurb": "Berthoud's Mexican place, and the single most-read thing Christine has written about anywhere in Northern Colorado — her Google review of it has been seen 10,000 times.",
+      "reviewQuote": "Berthoud's Gem for Mexican Food! Cocina & Cantina in Berthoud totally surprised me—in the best way. The food is beautifully presented, the ingredients are fresh, and the flavors were spot on.",
+      "reviewDate": "2025-07-15",
+      "reviewViews": 10000,
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Cocina%20%26%20Cantina%20Berthoud%20CO",
       "googlePostUrl": ""
     }
   ],
