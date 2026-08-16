@@ -207,6 +207,7 @@ ${gallery ? `<section class="tight"><div class="wrap">
         <div class="nearby-results"><p class="search-status" style="margin-top:0">Loading nearby places&hellip;</p></div>
       </div>
     </div>
+    ${localSpotsBlock(l)}
     <div class="btn-row" style="justify-content:flex-start;margin-top:28px">
       <a class="btn btn-dark" href="/contact.html">Ask About ${esc(l.address || "This Home")}</a>
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/search-homes.html?cities=${encodeURIComponent(l.city || "")}">More Homes In ${esc(l.city || "This Area")}</a>
@@ -215,6 +216,74 @@ ${gallery ? `<section class="tight"><div class="wrap">
   </div>
 </section>
 ${nearbyScript()}`;
+}
+
+// ---- "Around <town>, from Christine" -------------------------------------
+// 2026-08-16 (Christine: "build the most detailed most complex but perfect idea
+// to integrate buyers and sellers with this knowledge", then "fix all you can").
+//
+// The idea in one line: the panel above this one lists nearby coffee and grocery
+// from Google, which every portal has. This one lists places CHRISTINE has
+// personally filmed or reviewed, with her own view counts. Google can tell a
+// buyer there is a taqueria 4 minutes away. Only this page can tell them the
+// agent has eaten there and 1,635 people watched her do it.
+//
+// SCOPED DELIBERATELY TO THE TOWN, not to a radius. The honest reason: listings
+// from MLS Grid carry no latitude or longitude in this feed, so true distance
+// ranking would mean geocoding all 15,000 of them — real money and a lot of
+// moving parts for a panel that is already convincing at town level. A buyer
+// looking at a Loveland house wants to know what Loveland is like. If listing
+// coordinates ever arrive, this function is the only place that changes.
+//
+// Reads the same build/data/local_spots.json the map and the town pages read, so
+// adding one spot updates all three.
+const LOCAL_SPOTS = require("./lib/_local-spots.json");
+const MAX_SPOTS_ON_LISTING = 3;
+
+function spotsForCity(city) {
+  if (!city) return [];
+  const want = String(city).trim().toLowerCase();
+  return (LOCAL_SPOTS.spots || [])
+    .filter((s) => String(s.city || "").trim().toLowerCase() === want)
+    // Most-watched first, counting whichever platform the spot lives on, so the
+    // strongest piece of local proof is the one a buyer sees.
+    .sort((a, b) => ((b.views || 0) + (b.reviewViews || 0)) - ((a.views || 0) + (a.reviewViews || 0)))
+    .slice(0, MAX_SPOTS_ON_LISTING);
+}
+
+function spotCard(s) {
+  const count = (s.views || 0) + (s.reviewViews || 0);
+  const proof = count
+    ? `<p class="spot-proof">${count.toLocaleString()} views on ${s.videoId ? "YouTube" : "Google"}</p>`
+    : "";
+  // A video embeds; a review-backed spot shows her words instead. Same rule as
+  // the map modal and the town pages.
+  const media = s.videoId
+    ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(s.videoId)}"
+        title="${esc(s.videoTitle || s.name)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen></iframe></div>`
+    : (s.reviewQuote ? `<blockquote class="spot-quote">${esc(s.reviewQuote)}</blockquote>` : "");
+  return `<article class="spot-card">
+    <h3 class="spot-card-title">${esc(s.name)}</h3>
+    ${media}
+    ${proof}
+    <p class="spot-blurb">${esc(s.blurb || "")}</p>
+  </article>`;
+}
+
+function localSpotsBlock(l) {
+  const spots = spotsForCity(l && l.city);
+  if (!spots.length) return "";
+  const town = esc(l.city);
+  return `<div class="spot-section" style="margin-top:36px">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Around ${town}, From Christine</span>
+    <h2 class="section-title" style="margin:6px 0 10px">Not just what's nearby — what's actually worth your time</h2>
+    <p class="lede">Places ${town} locals go, filmed or reviewed by ${esc(AGENT_NAME)} herself.</p>
+    <div class="spot-grid">
+      ${spots.map(spotCard).join("\n      ")}
+    </div>
+  </div>`;
 }
 
 // The same on-demand distance panel the listing cards use. Inlined rather than
