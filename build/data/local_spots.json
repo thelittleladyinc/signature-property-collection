@@ -42,7 +42,6 @@
     "mr chens, erie colorado' -- plus 'yes - loveland chophouse'. That named Horsetooth Reservoir and",
     "the Denver park, which closed two of the open questions above. Still unresolved and needing one",
     "more word from her: 'sage in loveland' (restaurant?), 'driven' (no matching video found), the",
-    "cherry place in west Loveland (her Cherry Treats video, business name unknown), Taste of Loveland",
     "(an annual event whose venue moves, so it is covered by the Downtown Loveland pin rather than",
     "given a fixed one), and the Big Thompson River (a line on the map, not a pin -- see RIVERS).",
     "",
@@ -62,7 +61,12 @@
     "loveland event!'). Bobcat Ridge has no video or review text here yet -- it is pinned on her word",
     "that she contributed there, linking to the place, and the quote + view count can be filled in once",
     "she has the numbers. Taste of Loveland uses the dedicated 'Taste of Loveland 2026' film rather than",
-    "the higher-viewed 'All in a day' clip, which is really about three places at once."
+    "the higher-viewed 'All in a day' clip, which is really about three places at once.",
+    "",
+    "2026-08-16: the 'cherry place in west Loveland' is THE COLORADO CHERRY COMPANY -- found the same",
+    "way as the others, by reading the video's own description rather than guessing from its title.",
+    "That method has now named every spot on this map whose title was coy. Beaver Meadows Resort added",
+    "from the same Shorts sweep."
   ],
   "_views_as_of": "2026-08-15",
   "spots": [
@@ -336,6 +340,32 @@
       "videoId": "wMtJCTePofE",
       "videoTitle": "Taste of Loveland 2026",
       "views": 156,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "The Colorado Cherry Company",
+      "category": "restaurant",
+      "address": "Colorado Cherry Company",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "Pies, cider and jam just west of Loveland, going for generations — from back when Loveland was Colorado's cherry capital. The kind of place West Loveland is full of and no listing portal knows about.",
+      "videoId": "Irv3SlJK9KY",
+      "videoTitle": "What Makes Loveland's Cherry Treats So Special?",
+      "views": 1439,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Beaver Meadows Resort",
+      "category": "lake",
+      "address": "Beaver Meadows Resort Ranch",
+      "city": "Red Feather Lakes",
+      "cityHref": "/communities/larimer/red-feather-lakes.html",
+      "searchCity": "Red Feather Lakes",
+      "blurb": "Lodging, trails and winter activities up at Red Feather — the practical answer to 'what would we actually do up there year round'.",
+      "videoId": "NoKEJ3uQQ0Q",
+      "videoTitle": "Discover Beaver Meadows: Winter Magic with Elves and Fun Activities!",
+      "views": 78,
       "googlePostUrl": ""
     }
   ],

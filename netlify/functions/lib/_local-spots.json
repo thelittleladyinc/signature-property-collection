@@ -273,6 +273,32 @@
       "videoTitle": "Taste of Loveland 2026",
       "views": 156,
       "googlePostUrl": ""
+    },
+    {
+      "name": "The Colorado Cherry Company",
+      "category": "restaurant",
+      "address": "Colorado Cherry Company",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "Pies, cider and jam just west of Loveland, going for generations — from back when Loveland was Colorado's cherry capital. The kind of place West Loveland is full of and no listing portal knows about.",
+      "videoId": "Irv3SlJK9KY",
+      "videoTitle": "What Makes Loveland's Cherry Treats So Special?",
+      "views": 1439,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Beaver Meadows Resort",
+      "category": "lake",
+      "address": "Beaver Meadows Resort Ranch",
+      "city": "Red Feather Lakes",
+      "cityHref": "/communities/larimer/red-feather-lakes.html",
+      "searchCity": "Red Feather Lakes",
+      "blurb": "Lodging, trails and winter activities up at Red Feather — the practical answer to 'what would we actually do up there year round'.",
+      "videoId": "NoKEJ3uQQ0Q",
+      "videoTitle": "Discover Beaver Meadows: Winter Magic with Elves and Fun Activities!",
+      "views": 78,
+      "googlePostUrl": ""
     }
   ],
   "townPages": [
