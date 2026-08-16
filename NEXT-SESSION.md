@@ -66,7 +66,45 @@ and either attach it or have Christine send it on reply. **Until then the promis
 only as good as her follow-up**, and the follow-up currently depends on §1.2
 (`RESEND_API_KEY`) actually alerting her that the lead arrived.
 
-### 1.5 Small, cheap, still open
+### 1.5 Two GitHub secrets — the town-page prices are off until these are set
+
+Added 2026-08-16 after searching the queries the town pages were re-aimed at. Every
+page outranking this site leads with numbers — "median list price $672,792 … 92 days
+on market … median home value $485,976" — and ours led with a paragraph explaining
+why we wouldn't print one. That argument was right about *their* method (hand-typed
+into a blog post, then left to rot) and wrong as a conclusion, because this site is
+the only one in that search result with a raw MLS feed in its own code rather than a
+vendor IDX widget it cannot read from. Their numbers are stuck in a widget Google
+doesn't index; ours can be baked into the HTML and into FAQPage schema, which is the
+form an AI answer engine actually quotes.
+
+So the town pages now say "there are 214 active listings in Loveland, at a median
+asking price of $689,000", computed from the live IRES inventory
+`sync-listings.js` already replicates into Netlify Blobs. Nothing is typed by hand,
+and `tests/test-townmarket.js` fails the build if a figure on a page ever disagrees
+with its source.
+
+**What's needed:** add these two repo secrets (Settings → Secrets and variables →
+Actions). They are the same values the Netlify functions already use — Netlify →
+Site settings → Environment variables:
+
+    BLOBS_SITE_ID
+    BLOBS_TOKEN
+
+Then `.github/workflows/town-market.yml` refreshes the figures Mondays and Thursdays
+and commits them, which triggers the normal Netlify rebuild.
+
+**Until they are set, no prices appear.** That is deliberate and safe — `build.py`
+suppresses every figure once the data is missing or more than 21 days old, and the
+pages fall back to their qualitative copy. Nothing breaks; the site just doesn't get
+the win. The scheduled job skips itself with a notice rather than failing red every
+week, and `python3 build/build.py` prints a one-line reminder every time it runs.
+
+To generate the file once by hand from a machine with the credentials:
+
+    BLOBS_SITE_ID=... BLOBS_TOKEN=... node build/tools/town-market-stats.js
+
+### 1.6 Small, cheap, still open
 - **"Driven Steakhouse"** — real Loveland restaurant, she says she has a Facebook
   post about it. No YouTube video and no Gmail review notification mentions it, so
   it can't be pinned yet. NB: the Google AI Overview claiming she and the
