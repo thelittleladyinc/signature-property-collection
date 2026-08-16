@@ -49,6 +49,7 @@
 - [Fort Lupton, Weld County](/communities/weld/fort-lupton.html)
 - [Mead, Weld County](/communities/weld/mead.html)
 - [Erie, Weld County](/communities/weld/erie.html)
+- [Nunn, Weld County](/communities/weld/nunn.html)
 - [Boulder, Boulder County](/communities/boulder/boulder.html)
 - [Longmont, Boulder County](/communities/boulder/longmont.html)
 - [Lafayette, Boulder County](/communities/boulder/lafayette.html)

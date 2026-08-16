@@ -125,6 +125,7 @@ CITY_DATA_SLUG = {
     "Estes Park": "estes-park",
     "Lyons": "lyons",
     "Longmont": "longmont",
+    "Nunn": "nunn",
     "Masonville": "masonville", "Windsor": "windsor", "Timnath": "timnath",
     "Wellington": "wellington", "Red Feather Lakes": "red-feather-lakes",
     "Greeley": "greeley", "Severance": "severance", "Eaton": "eaton",
