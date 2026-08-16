@@ -248,7 +248,21 @@
     buildPoiModal();
     var overlay = document.getElementById('map-poi-modal');
     overlay.querySelector('#poi-title').textContent = poi.name;
-    overlay.querySelector('#poi-blurb').textContent = poi.blurb || '';
+    var blurbEl = overlay.querySelector('#poi-blurb');
+    blurbEl.textContent = poi.blurb || '';
+    // A review-backed pin shows her actual words as a pull quote underneath the
+    // blurb. Built with textContent on a child node rather than innerHTML so a
+    // quote can contain anything without becoming markup.
+    var oldQuote = overlay.querySelector('#poi-review-quote');
+    if (oldQuote) oldQuote.remove();
+    if (poi.reviewQuote) {
+      var q = document.createElement('blockquote');
+      q.id = 'poi-review-quote';
+      q.style.cssText = 'margin:0 0 12px;padding:10px 14px;border-left:3px solid #B86F7A;' +
+        'color:rgba(255,255,255,.9);font-size:14px;font-style:italic';
+      q.textContent = '“' + poi.reviewQuote + '”';
+      blurbEl.parentNode.insertBefore(q, blurbEl.nextSibling);
+    }
     // Two kinds of pin, credited honestly: the two municipal golf-course videos
     // are the City of Loveland's, everything else is Christine's own footage --
     // and saying so is the whole point of the layer.
@@ -307,7 +321,11 @@
       gLink.href = googleUrl;
       gLink.target = '_blank';
       gLink.rel = 'noopener';
-      gLink.textContent = poi.googleReviewUrl ? 'Read My Review On Google' : 'See This On Google';
+      // Worded for what the link actually does. Google has no per-review
+      // permalink, so this opens the business's listing -- promising "read my
+      // review" and landing someone on a wall of other people's would be a
+      // small lie, and the quote above already shows them hers.
+      gLink.textContent = poi.googleReviewUrl ? 'See It On Google' : 'See This On Google';
       actionsEl.appendChild(gLink);
     }
     if (poi.cityHref) {

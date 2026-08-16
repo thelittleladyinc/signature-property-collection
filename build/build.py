@@ -5812,12 +5812,12 @@ def write_local_spots_function_data():
     # always should have been -- a pin must carry HER work, in whichever form
     # that work exists.
     unsourced = [s["name"] for s in spots
-                 if not s.get("videoId") and not s.get("googleReviewUrl")]
+                 if not s.get("videoId") and not s.get("reviewQuote")
+                 and not s.get("googleReviewUrl")]
     if unsourced:
         raise SystemExit(
-            "local_spots.json: these spots have neither a videoId nor a "
-            "googleReviewUrl, so there is nothing of Christine's behind them: "
-            + ", ".join(unsourced)
+            "local_spots.json: these spots carry nothing of Christine's — no "
+            "videoId, no reviewQuote, no googleReviewUrl: " + ", ".join(unsourced)
         )
     payload = {
         "_generated": "Written by build/build.py from build/data/local_spots.json. "
@@ -5829,9 +5829,16 @@ def write_local_spots_function_data():
         json.dump(payload, f, indent=2, ensure_ascii=False)
         f.write("\n")
     towns = sorted({s.get("city") for s in spots if s.get("city")})
-    total_views = sum(s.get("views") or 0 for s in spots)
-    print(f"  local spots: {len(spots)} pins across {len(towns)} places, "
-          f"{total_views:,} video views behind them")
+    video_views = sum(s.get("views") or 0 for s in spots)
+    # 2026-08-15: review views are counted separately and BOTH are printed. The
+    # first version reported only video views, which quietly understated the
+    # layer by the single biggest number in it -- her Cocina & Cantina review
+    # alone is 10,000 of them.
+    review_views = sum(s.get("reviewViews") or 0 for s in spots)
+    reviews = sum(1 for s in spots if s.get("reviewQuote") or s.get("googleReviewUrl"))
+    print(f"  local spots: {len(spots)} pins across {len(towns)} places — "
+          f"{video_views:,} video views + {review_views:,} Google review views "
+          f"({reviews} review-backed)")
 
 
 def write_sold_homes_function_data():

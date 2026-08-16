@@ -117,6 +117,12 @@ function toPin(spot, geo) {
   if (typeof spot.reviewViews === "number" && spot.reviewViews > 0) {
     pin.reviewViews = spot.reviewViews;
   }
+  // Her words, shown on the map itself. Carrying the quote rather than only a
+  // link matters: Google gives no permalink to an individual review, so a link
+  // can only ever open the business's listing and leave the visitor hunting for
+  // her among the others. The quote puts her actual review in front of them.
+  if (spot.reviewQuote) pin.reviewQuote = spot.reviewQuote;
+  if (spot.reviewDate) pin.reviewDate = spot.reviewDate;
   return pin;
 }
 
