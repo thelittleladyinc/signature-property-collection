@@ -299,6 +299,58 @@
       "videoTitle": "Discover Beaver Meadows: Winter Magic with Elves and Fun Activities!",
       "views": 78,
       "googlePostUrl": ""
+    },
+    {
+      "name": "Sage",
+      "category": "restaurant",
+      "address": "Sage",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "The downtown Loveland spot behind the bar footage in her Sweetheart City video — the one that shows downtown actually alive on a night out.",
+      "videoId": "OGoRYV2bGA8",
+      "videoTitle": "Downtown Loveland — Sweetheart City's Best Events!",
+      "views": 996,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "24 Carrot Bistro",
+      "category": "restaurant",
+      "address": "578 Briggs St",
+      "city": "Erie",
+      "cityHref": "/communities/weld/erie.html",
+      "searchCity": "Erie",
+      "blurb": "Farm-to-table in historic downtown Erie, and the first place Christine names when someone asks what there is to eat here.",
+      "videoId": "JFfx8G9OxP0",
+      "videoTitle": "Why Everyone Loves Living in Erie Colorado!",
+      "views": 1820,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Birdhouse",
+      "category": "restaurant",
+      "address": "Birdhouse",
+      "city": "Erie",
+      "cityHref": "/communities/weld/erie.html",
+      "searchCity": "Erie",
+      "blurb": "The other half of Erie's food scene, alongside 24 Carrot — the pair that surprises buyers who assumed a small town meant no dinner options.",
+      "videoId": "xJvhWG2E9qw",
+      "videoTitle": "Why Erie, Colorado Feels Like Home | Scenic, Social, & So Worth It",
+      "views": 551,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Colorado National Golf Club",
+      "category": "golf",
+      "address": "Colorado National Golf Club",
+      "city": "Erie",
+      "cityHref": "/communities/weld/erie.html",
+      "searchCity": "Erie",
+      "blurb": "Erie's championship course with Front Range views — the golf half of why buyers pick Erie over the towns either side of it.",
+      "videoId": "xJvhWG2E9qw",
+      "videoTitle": "Why Erie, Colorado Feels Like Home | Scenic, Social, & So Worth It",
+      "views": 551,
+      "googlePostUrl": ""
     }
   ],
   "townPages": [
