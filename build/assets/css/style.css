@@ -1066,10 +1066,28 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
   gap: 28px;
   margin-top: 28px;
 }
-.spot-card { min-width: 0; }
-.spot-card-title { margin: 6px 0 12px; font-size: 21px; }
+/* 2026-08-16 (Christine, looking at the Loveland page: "i want the videos to all
+   be level, balanced - easier to see"). She was right, and the cause was not the
+   embeds -- .video-embed has always been a locked 16:9 box. It was the TITLES.
+   "Sage" fits on one line and "Mr. Chen Sushi & Hibachi Steak House" takes two,
+   so every thumbnail in the row started at a different height and a grid of
+   identical boxes read as ragged.
+   Reserving two lines of title space lines every video up on one baseline, and
+   letting the blurb absorb the slack puts every card's footer on one baseline
+   too. Both are floors, not fixed heights: a title that needs three lines still
+   gets them, it just doesn't happen at these sizes. */
+.spot-card { min-width: 0; display: flex; flex-direction: column; }
+.spot-card-title { margin: 6px 0 12px; font-size: 21px; line-height: 1.3; }
 .spot-card .video-embed { margin: 0; }
 .spot-blurb { margin: 10px 0 8px; font-size: 15px; }
+@media (min-width: 600px) {
+  /* Only worth doing once the grid is more than one column wide -- stacked on a
+     phone there is no neighbour to line up with, and the reserved space would
+     just be a gap under every heading. */
+  .spot-card-title { min-height: 2.6em; }   /* exactly two lines at 1.3 */
+  .spot-blurb { flex: 1 1 auto; }
+  .spot-card .media-link { margin-top: auto; align-self: start; }
+}
 /* Her review, quoted. Matches the map modal's pull quote so the same content
    reads the same way in both places. */
 .spot-quote {

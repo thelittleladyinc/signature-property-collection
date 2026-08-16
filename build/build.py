@@ -3699,6 +3699,53 @@ def _spot_card(spot):
 </article>"""
 
 
+# 2026-08-16 (Christine: "I have a relocation video that would be good to add to
+# the loveland page for buyers if we dont alrady have it"). It existed, but only on
+# /relocation -- and someone searching "moving to Loveland" almost never lands
+# there, because Google sends that search to the TOWN page. Same film, put where
+# the audience actually arrives.
+#
+# Held as data rather than written inline like Erie's sold-home section below, so
+# the second town is one entry instead of another hand-built block to keep in sync.
+TOWN_RELOCATION_VIDEOS = {
+    "loveland": {
+        "videoId": "2jNGXw5lzAM",
+        "title": "I Moved Away from Loveland, CO... And Here's Why I'm Back",
+        "views": 1181,  # vidIQ, checked 2026-08-16
+        "heading": "Why I Moved Back To Loveland",
+        "lede": "Before I sold homes here, I left Loveland — and then I chose to come back. "
+                "If you're weighing that same move, hear the honest version from someone "
+                "who's actually made it, not another list of amenities.",
+    },
+}
+
+
+def _relocation_video_block(data_slug, city_name):
+    """Her own 'why I moved here' film, on the town page a relocating buyer lands on.
+
+    Returns "" for towns with no such video, so no page ever shows a heading over
+    nothing -- the same rule _tour_this_town_block follows."""
+    v = TOWN_RELOCATION_VIDEOS.get(data_slug)
+    if not v:
+        return ""
+    first = SITE["agent"].split()[0]
+    return f"""<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">From {esc(first)}, Personally</span>
+      <h2 class="section-title" style="margin-top:6px">{esc(v['heading'])}</h2>
+      <p class="lede">{esc(v['lede'])}</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-outline" href="/relocation.html">Plan Your Move To {esc(city_name)} &rarr;</a>
+      </div>
+    </div>
+    <div>
+      {_yt_embed(v["videoId"], v["title"], _fmt_views(v["views"]) if v.get("views") else None)}
+    </div>
+  </div>
+</section>"""
+
+
 def _tour_this_town_block(city_href, city_name):
     """The "Tour <Town> With Me" section, or "" when there are no spots yet.
 
@@ -3859,6 +3906,10 @@ def build_city_pages():
             # page ever shows a heading over nothing.
             tour_block = _tour_this_town_block(
                 _city_url(c["slug"], city) or "", city)
+
+            # Her "why I moved back" film, above the local spots: the personal
+            # reason first, then the proof of how well she knows the place.
+            relocation_block = _relocation_video_block(data_slug, city)
 
             own_home_block = ""
             if data_slug == "erie":
@@ -4050,6 +4101,7 @@ def build_city_pages():
 {search_widget_block}
 {local_block}
 {video_block}
+{relocation_block}
 {tour_block}
 {agent_proof_block}
 {own_home_block}
