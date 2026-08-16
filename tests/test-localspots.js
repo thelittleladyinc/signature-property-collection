@@ -44,9 +44,16 @@ const curatedSpots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).
   // Two spots can legitimately share an address (Downtown Loveland and Taste of
   // Loveland are the same street), and the cache dedupes them within one run —
   // so calls <= spots, never more. Asserting equality punished correct dedup.
-  const addrs = new Set(curatedSpots.map(s => [s.address, s.city, "CO"].filter(Boolean).join(", ").toLowerCase()));
-  check("no address is geocoded more than once", calls.length === addrs.size,
-    `${calls.length} calls for ${addrs.size} distinct addresses`);
+  // 2026-08-16: a spot carrying Google's own lat/lng (taken from the Maps link for that
+  // place) is NOT geocoded at all -- there is nothing to look up. So the expected call
+  // count is the distinct addresses of the spots that still NEED a lookup, not of every
+  // spot. Comparing against all of them made a real improvement look like a regression.
+  const needsLookup = curatedSpots.filter(s => typeof s.lat !== "number" || typeof s.lng !== "number");
+  const addrs = new Set(needsLookup.map(s => [s.address, s.city, "CO"].filter(Boolean).join(", ").toLowerCase()));
+  const preLocated = curatedSpots.length - needsLookup.length;
+  check(`only un-located spots are geocoded, once each (${calls.length} calls, ` +
+        `${addrs.size} addresses, ${preLocated} pre-located)`,
+    calls.length === addrs.size, `${calls.length} calls for ${addrs.size} distinct addresses`);
   check("address includes city AND state", /Loveland%2C%20CO|Loveland,%20CO/.test(calls.join("|")) || calls.some(c => /Loveland/.test(c) && /CO/.test(c)));
   check("every pin has coordinates", body.spots.every(s => typeof s.lat === "number" && typeof s.lng === "number"));
   check("every pin carries something of HERS (video or review)",
@@ -107,7 +114,24 @@ const curatedSpots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).
   global.fetch = async () => ({ ok: true, status: 200, json: async () => ({ status: "REQUEST_DENIED", error_message: "key not authorized" }) });
   res = await load(memStore())({});
   body = JSON.parse(res.body);
-  check("no pins invented", body.spots.length === 0, JSON.stringify(body.spots));
+  // This used to assert ZERO pins, which was right when every pin needed Google. Spots
+  // carrying their own coordinates now survive a dead geocoder -- that is the point of
+  // storing them, and it is the difference between a smaller map and no map.
+  //
+  // The rule being protected is unchanged: nothing may be INVENTED. So the survivors must
+  // be exactly the pre-located spots, at exactly the coordinates in the data file.
+  const survivors = body.spots.map(s => s.name).sort();
+  const expectedSurvivors = curatedSpots
+    .filter(s => typeof s.lat === "number" && typeof s.lng === "number")
+    .map(s => s.name).sort();
+  check(`only pre-located spots survive a dead geocoder (${survivors.length})`,
+    JSON.stringify(survivors) === JSON.stringify(expectedSurvivors),
+    JSON.stringify({ got: survivors, want: expectedSurvivors }));
+  check("their coordinates come from the data, not from guesswork",
+    body.spots.every(p => {
+      const src = curatedSpots.find(s => s.name === p.name);
+      return src && p.lat === src.lat && p.lng === src.lng;
+    }));
   check("still HTTP 200 so the map draws", res.statusCode === 200);
 
   console.log("\n5. No key, and no Blobs, must both degrade quietly");

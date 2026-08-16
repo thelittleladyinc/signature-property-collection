@@ -298,7 +298,7 @@
       "googlePostUrl": ""
     },
     {
-      "name": "Beaver Meadows Resort",
+      "name": "Beaver Meadows Resort Ranch",
       "category": "lake",
       "address": "Beaver Meadows Resort Ranch",
       "city": "Red Feather Lakes",
@@ -308,7 +308,11 @@
       "videoId": "NoKEJ3uQQ0Q",
       "videoTitle": "Discover Beaver Meadows: Winter Magic with Elves and Fun Activities!",
       "views": 78,
-      "googlePostUrl": ""
+      "googlePostUrl": "",
+      "lat": 40.842073,
+      "lng": -105.6521353,
+      "googleReviewUrl": "https://maps.google.com/?cid=15846497758055752850",
+      "_why": " 2026-08-16: exact coordinates and the Google CID taken from the Maps link Christine sent, so this pin no longer depends on geocoding a street address. The tracking parameters (g_ep, skid, the photo blob) were discarded -- they rot; the CID does not."
     },
     {
       "name": "Sage",
@@ -334,7 +338,11 @@
       "videoId": "JFfx8G9OxP0",
       "videoTitle": "Why Everyone Loves Living in Erie Colorado!",
       "views": 1820,
-      "googlePostUrl": ""
+      "googlePostUrl": "",
+      "lat": 40.0499209,
+      "lng": -105.0478222,
+      "googleReviewUrl": "https://maps.google.com/?cid=15012359042481323730",
+      "_why": " 2026-08-16: exact coordinates and the Google CID taken from the Maps link Christine sent, so this pin no longer depends on geocoding a street address. The tracking parameters (g_ep, skid, the photo blob) were discarded -- they rot; the CID does not."
     },
     {
       "name": "Birdhouse",
@@ -443,8 +451,10 @@
       "cityHref": "/communities/larimer/loveland.html",
       "searchCity": "Loveland",
       "blurb": "Street tacos and premium tequila at The Foundry, right in downtown Loveland — the kind of place that tells you what a downtown is actually like on a Friday night, which no listing photo will.",
-      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Vatos%20Tacos%20and%20Tequila%20Loveland%20CO",
-      "_why": "2026-08-16, from Christine's own Google review list. Address 270 N Cleveland Ave verified via Yelp and Visit Loveland; it sits in The Foundry development downtown. No review view count given yet."
+      "googleReviewUrl": "https://maps.google.com/?cid=2905957499092980905",
+      "_why": "2026-08-16, from Christine's own Google review list. Address 270 N Cleveland Ave verified via Yelp and Visit Loveland; it sits in The Foundry development downtown. No review view count given yet. 2026-08-16: exact coordinates and the Google CID taken from the Maps link Christine sent, so this pin no longer depends on geocoding a street address. The tracking parameters (g_ep, skid, the photo blob) were discarded -- they rot; the CID does not.",
+      "lat": 40.3942284,
+      "lng": -105.0741366
     },
     {
       "name": "The Pizza Palace",

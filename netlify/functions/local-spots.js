@@ -142,6 +142,19 @@ exports.handler = async () => {
 
     const startedAt = Date.now();
     const resolved = await mapWithConcurrency(SPOTS, GEOCODE_CONCURRENCY, async (spot) => {
+      // 2026-08-16. A spot may carry Google's own coordinates, taken from the Maps link for
+      // that place. When it does, there is nothing to look up: skip the cache, skip the
+      // API call, and pin it exactly.
+      //
+      // Three things improve at once. The pin is Google's real point for the business
+      // rather than a geocoder's interpretation of a street address. It costs no API quota.
+      // And it can never be dropped from the map, which was the one failure mode this
+      // function was written to make loud -- an unreachable geocoder used to mean a
+      // silently smaller map.
+      if (typeof spot.lat === "number" && typeof spot.lng === "number") {
+        return toPin(spot, { lat: spot.lat, lng: spot.lng });
+      }
+
       const address = fullAddress(spot);
       const key = cacheKey(address);
 
