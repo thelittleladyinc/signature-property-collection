@@ -1202,3 +1202,26 @@ h2.widget-title {
   .contact-bar .cbar-item-primary:active { background: var(--deep-mauve, #8f5560); }
   body { padding-bottom: 62px; }
 }
+
+/* ---- Town directory on the communities hub (2026-08-16) ----------------------
+   The hub linked 20 county pages and none of the 31 town pages, so every town page
+   had exactly one inbound internal link and Google was declining to index them. This
+   is the crawlable, readable index of the same thing the map shows. */
+.town-dir {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 28px 36px;
+  margin-top: 28px;
+}
+.town-dir-col { min-width: 0; }
+.town-dir-county {
+  font-family: var(--font-serif); font-weight: 400; font-size: 18px;
+  margin: 0 0 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--hairline-strong, #e4e4d8);
+}
+.town-dir-county a { text-decoration: none; color: var(--deep-mauve, #8f5560); }
+.town-dir-list { list-style: none; margin: 0; padding: 0; }
+.town-dir-list li { margin: 0 0 7px; font-size: 15px; line-height: 1.5; }
+.town-dir-list a { font-weight: 500; }
+/* The "why click" half is deliberately quieter than the link itself. */
+.town-dir-note { color: var(--slate-mist, #8a8a8f); font-size: 13.5px; font-weight: 300; }

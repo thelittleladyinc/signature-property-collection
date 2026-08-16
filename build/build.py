@@ -2783,6 +2783,18 @@ def _fit_description(desc):
     return cut.rstrip()
 
 
+# 2026-08-16. Pages that must never be submitted for indexing, declared once so the
+# meta tag and the sitemap cannot disagree. They did disagree: /thank-you.html was given
+# a noindex tag this morning and left in `paths`, so the sitemap was actively submitting
+# a page that tells Google not to index it. Search Console reports that as an error
+# rather than shrugging, and it would have appeared in her next coverage export as a new
+# problem caused by a fix.
+#
+# 404.html is handled separately -- it is excluded from `paths` by the drift guard,
+# which is where a page that must never be listed at all belongs.
+NOINDEX_PATHS = {"/thank-you.html"}
+
+
 def head(title, description, path="/", canonical_extra="", schema_extra="",
          canonical_path=None):
     title = _fit_title(title)
@@ -2817,6 +2829,7 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#141415">
 <link rel="stylesheet" href="/assets/css/style.css">
+{'<meta name="robots" content="noindex, follow">' if path in NOINDEX_PATHS else ''}
 <script type="application/ld+json">{_real_estate_agent_schema()}</script>
 {_schema_scripts(schema_extra)}
 {_gsc_verification_tag()}
@@ -3593,7 +3606,12 @@ def build_communities_index():
   </div>
 </section>
 """
-    body = hero + quiz + county_map
+    # The town directory goes AFTER the map, not before it. The map is what the page
+    # is for and what Christine asked to lead with; the directory is the crawlable,
+    # skimmable version of the same thing for anyone who would rather read a list than
+    # click a county — and the only route by which the hub's authority reaches the 31
+    # town pages at all.
+    body = hero + quiz + county_map + _town_directory_block()
     extra = _leaflet_lazy_loader_extra()
     page(
         "Explore Northern Colorado Communities | Signature Property Collection",
@@ -3616,6 +3634,166 @@ def _city_url(county_slug, city_name):
     if data_slug and data_slug in CITY_CONTENT:
         return f"/communities/{county_slug}/{_city_url_slug(data_slug)}.html"
     return None
+
+
+# ---- Internal linking (2026-08-16) ---------------------------------------------
+#
+# Christine: "can you review the ones the did index conmpared to the ones they didnt
+# and then make the rest much better?"
+#
+# Measured rather than guessed. An audit of all 144 built pages against her Search
+# Console coverage export (39 indexed, 62 "Crawled - currently not indexed") found
+# the cause is structural, not editorial:
+#
+#   * 31 town pages each had exactly ONE inbound internal link -- their county page.
+#     They are NOT thin: 650-940 unique non-template words each, well above the
+#     median. Google had read them and declined to index them, which is what it does
+#     with pages nothing on the site treats as important.
+#   * /communities/index.html -- the hub, with 144 inbound links of its own -- linked
+#     the 20 COUNTY pages and not one of the 31 town pages. All that authority stopped
+#     one level short of the pages that actually target searches like "homes for sale
+#     in Timnath".
+#   * The same for the 10 Loveland subdivision pages: 1 inbound link each.
+#
+# So the fix is links, not words. Two blocks below: the hub now lists every town, and
+# every town links its siblings. That takes each town page from 1 inbound link to
+# roughly 6-11 and puts all of them two clicks from the homepage instead of three.
+#
+# Both are generated from _all_town_pages(), which reads the same COUNTIES/_city_url
+# pair the pages themselves are built from -- so a town cannot appear in a directory
+# without having a page, or have a page without appearing.
+def _all_town_pages():
+    """[(county, city_name, url)] for every city that actually has a page."""
+    out = []
+    for c in COUNTIES:
+        for city in c["cities"]:
+            u = _city_url(c["slug"], city)
+            if u:
+                out.append((c, city, u))
+    return out
+
+
+def _spot_note_for(url):
+    """A specific reason to click, or "" -- her own coverage of that town.
+
+    A bare list of 31 town names is link plumbing. Naming the place she filmed makes
+    the same link worth following, which is the difference between a directory that
+    helps a reader and one that only talks to a crawler."""
+    global LOCAL_SPOTS_BY_CITY_HREF
+    if LOCAL_SPOTS_BY_CITY_HREF is None:
+        LOCAL_SPOTS_BY_CITY_HREF = _local_spots_by_city_href()
+    spots = LOCAL_SPOTS_BY_CITY_HREF.get(url) or []
+    if not spots:
+        return ""
+    top = spots[0]["name"]
+    return (f" &middot; {len(spots)} local spots incl. {esc(top)}" if len(spots) > 1
+            else f" &middot; {esc(top)}")
+
+
+def _county_coverage_block(county):
+    """What Christine actually covers in this county, in numbers.
+
+    Every figure is derived, never typed: the town count comes from the same
+    _city_url() the pages are built from, and the spots and view counts from
+    local_spots.json. So this can't drift into a claim that stopped being true."""
+    global LOCAL_SPOTS_BY_CITY_HREF
+    if LOCAL_SPOTS_BY_CITY_HREF is None:
+        LOCAL_SPOTS_BY_CITY_HREF = _local_spots_by_city_href()
+    towns = [(city, url) for c, city, url in _all_town_pages() if c["slug"] == county["slug"]]
+    if not towns:
+        return ""
+    prefix = f"/communities/{county['slug']}/"
+    spots, views = [], 0
+    for href, ss in LOCAL_SPOTS_BY_CITY_HREF.items():
+        if href.startswith(prefix):
+            for s in ss:
+                if s not in spots:      # alsoOnCityHrefs can list one spot twice
+                    spots.append(s)
+                    views += (s.get("views") or 0) + (s.get("reviewViews") or 0)
+    first = esc(SITE["agent"].split()[0])
+    if spots:
+        named = ", ".join(esc(s["name"]) for s in spots[:4])
+        proof = (
+            f"<p class=\"lede\">{first} has filmed or reviewed {len(spots)} "
+            f"{'place' if len(spots) == 1 else 'places'} in {esc(county['name'])} County"
+            + (f" &mdash; {named}" if named else "")
+            + (f" &mdash; and that coverage has been watched or read "
+               f"<strong>{views:,} times</strong>." if views else ".")
+            + " Every one of them is pinned on the map and on the town page it belongs to.</p>"
+        )
+    else:
+        # Said plainly rather than dressed up. An empty county is an honest gap, and
+        # claiming coverage that doesn't exist is the one thing that would make every
+        # other number here worthless.
+        proof = (
+            f'<p class="lede">{first} hasn\'t filmed in {esc(county["name"])} County yet '
+            f"&mdash; so these pages give you the market and the listings rather than a "
+            f"tour. If there's somewhere here you think is worth covering, tell her.</p>"
+        )
+    return f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Our Coverage Here</span>
+    <h2 class="section-title">{esc(county['name'])} County, In Numbers</h2>
+    <p class="lede">{len(towns)} {'town' if len(towns) == 1 else 'towns'} in
+    {esc(county['name'])} County {'has' if len(towns) == 1 else 'have'} a page of their own
+    here &mdash; live listings, what the area is actually like, and what it costs.</p>
+    {proof}
+  </div>
+</section>"""
+
+
+def _town_directory_block():
+    """Every town, grouped by county, on the communities hub page."""
+    by_county = {}
+    for c, city, url in _all_town_pages():
+        by_county.setdefault((c["name"], c["slug"]), []).append((city, url))
+    if not by_county:
+        return ""
+    cols = []
+    for (name, slug), towns in by_county.items():
+        links = "\n          ".join(
+            f'<li><a href="{url}">{esc(city)}</a><span class="town-dir-note">{_spot_note_for(url)}</span></li>'
+            for city, url in sorted(towns))
+        cols.append(f"""<div class="town-dir-col">
+        <h3 class="town-dir-county"><a href="/communities/{slug}.html">{esc(name)} County</a></h3>
+        <ul class="town-dir-list">
+          {links}
+        </ul>
+      </div>""")
+    total = sum(len(v) for v in by_county.values())
+    return f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Every Town, One Page</span>
+    <h2 class="section-title">All {total} Towns We Cover</h2>
+    <p class="lede">Each one has its own page with live listings, what the area is
+    actually like, and — where {esc(SITE['agent'].split()[0])} has filmed there — the
+    local spots worth knowing about.</p>
+    <div class="town-dir">
+      {"".join(cols)}
+    </div>
+  </div>
+</section>"""
+
+
+def _nearby_towns_block(county, current_city):
+    """Sibling towns in the same county, from a town page."""
+    sibs = [(city, url) for c, city, url in _all_town_pages()
+            if c["slug"] == county["slug"] and city != current_city]
+    if not sibs:
+        return ""
+    links = "\n      ".join(
+        f'<a class="city-pill" href="{url}">{esc(city)}</a>' for city, url in sorted(sibs))
+    return f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Still Deciding?</span>
+    <h2 class="section-title">Other {esc(county['name'])} County Towns</h2>
+    <p class="lede">Most people looking at {esc(current_city)} are weighing it against
+    a neighbour or two. Here is the rest of the county, each with its own page.</p>
+    <div class="city-pills" style="margin-top:20px">
+      {links}
+    </div>
+  </div>
+</section>"""
 
 
 def _live_search(c):
@@ -3706,6 +3884,21 @@ def build_county_pages():
   </div>
 </section>
 """
+        # 2026-08-16. The audit found the county pages were the site's remaining
+        # near-duplicate cluster -- /communities/denver.html and
+        # /communities/broomfield.html scored 0.908 similarity, and eleven other pairs
+        # were above 0.65. Understandably: each was a hero, a list of town pills, the
+        # same two paragraphs with the county name swapped in, and 117-133 unique
+        # words. Near-identical AND thin is precisely the combination that produces
+        # "Crawled - currently not indexed".
+        #
+        # Differentiated with real numbers rather than more adjectives, because
+        # rewriting the prose nine ways would produce nine paragraphs that still say
+        # the same thing. This states how many towns here have their own page, and how
+        # much of Christine's own filmed and reviewed coverage sits in this county --
+        # which is genuinely different per county (Larimer carries thousands of views,
+        # Arapahoe none) and is the one claim no other agent's county page can copy.
+        body += _county_coverage_block(c)
         body += _quiz_disclosure(
             f"Not sure which {esc(c['name'])} town fits? Four quick questions, matched "
             f"against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients "
@@ -3961,6 +4154,10 @@ def _tour_this_town_block(city_href, city_name):
       <a class="btn btn-outline" style="border-color:#141415;color:#141415"
          href="/communities/index.html">See Every Spot On The Map &rarr;</a>
     </div>
+    {f'''<p style="margin-top:22px;font-size:15px;color:var(--slate-soft)">
+      <strong>Thinking of selling in {esc(city_name)}?</strong> That
+      {total:,}-view audience is the one your listing would be marketed to.
+      <a href="/seller-local-proof.html">See the numbers for your town &rarr;</a></p>''' if total else ""}
   </div>
 </section>"""
 
@@ -4093,6 +4290,11 @@ def build_city_pages():
             # Her "why I moved back" film, above the local spots: the personal
             # reason first, then the proof of how well she knows the place.
             relocation_block = _relocation_video_block(data_slug, city)
+
+            # Sibling towns in the same county. Last on the page on purpose: it is
+            # the "not this one?" exit, and it should sit after everything that argues
+            # for the town the reader is actually on.
+            nearby_block = _nearby_towns_block(c, city)
 
             own_home_block = ""
             if data_slug == "erie":
@@ -4289,6 +4491,7 @@ def build_city_pages():
 {agent_proof_block}
 {own_home_block}
 {subdivisions_block}
+{nearby_block}
 """
             faq_pairs = [
                 (f"Who is the best real estate agent in {city}, CO?",
@@ -6232,6 +6435,31 @@ def build_subdivision_pages():
             # somewhere else is rejected rather than scored -- see
             # MAX_PLACE_DRIFT_MILES in netlify/functions/walkability.js.
             body += _walkability_block(_walk["label"], _walk["query"], "Loveland, CO")
+        # 2026-08-16: same finding as the town pages. Each of these 10 had exactly one
+        # inbound internal link -- the card grid on Loveland's own page -- despite
+        # carrying 291-531 unique words. Someone weighing Mariana Butte against
+        # Kinston has no route between them, and Google reads a page nothing links to
+        # as one nobody needs. Siblings listed here takes each from 1 inbound link to
+        # 10.
+        sibs = [s for s in SUBDIVISION_PAGES if s["slug"] != sub["slug"]]
+        if sibs:
+            sib_links = "\n      ".join(
+                f'<a class="city-pill" href="/communities/loveland/{s["slug"]}.html">'
+                f'{esc(s["eyebrow"])}</a>' for s in sibs)
+            body += f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Compare Loveland Areas</span>
+    <h2 class="section-title">Other Loveland Neighborhoods</h2>
+    <p class="lede">Nobody picks a Loveland neighborhood in isolation. Here are the
+    others, each with its own live feed and honest write-up.</p>
+    <div class="city-pills" style="margin-top:20px">
+      {sib_links}
+    </div>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+      <a class="btn btn-outline" href="{loveland_url}">All Of Loveland &rarr;</a>
+    </div>
+  </div>
+</section>"""
         body += _quiz_disclosure(
             f"Still comparing neighborhoods? Four quick questions, matched against "
             f"{len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients every day. "
@@ -8559,10 +8787,10 @@ def build_legal():
     page("Thank You | Signature Property Collection",
          "Thanks for reaching out to Signature Property Collection — "
          f"{SITE['agent']} will be in touch the same day.",
-         "/thank-you.html", None, thank_you_body,
-         # Kept out of the index: a thank-you page ranking for anything is a
-         # visitor landing on a confirmation for something they never submitted.
-         extra_head='<meta name="robots" content="noindex, follow">')
+         # noindex comes from NOINDEX_PATHS, which the sitemap reads too -- a
+         # thank-you page ranking would mean someone landing on a confirmation for
+         # something they never submitted.
+         "/thank-you.html", None, thank_you_body)
 
 
 def _truncate_words(text, max_len):
@@ -8693,7 +8921,7 @@ def build_redirects_and_meta():
         + (f'<image:image><image:loc>{SITE["domain"]}/assets/img/communities/{city_photo_by_path[p]}{_hero_ext(city_photo_by_path[p])}</image:loc></image:image>'
            if p in city_photo_by_path else "")
         + "</url>"
-        for p in paths
+        for p in paths if p not in NOINDEX_PATHS
     )
     sitemap = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -8716,7 +8944,7 @@ def build_redirects_and_meta():
         for f in _glob.glob(os.path.join(OUT, "**", "*.html"), recursive=True)
     }
     listed = set(paths)
-    unlisted = sorted(on_disk - listed - {"/404.html"})
+    unlisted = sorted(on_disk - listed - {"/404.html"} - NOINDEX_PATHS)
     stale = sorted(listed - on_disk)
     if unlisted:
         print(f"  ! sitemap: {len(unlisted)} built page(s) NOT in the sitemap "
