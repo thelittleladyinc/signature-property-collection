@@ -104,6 +104,7 @@ CITY_DATA_SLUG = {
     "Fort Collins": "fort-collins", "Loveland": "loveland", "Berthoud": "berthoud",
     "Estes Park": "estes-park",
     "Lyons": "lyons",
+    "Longmont": "longmont",
     "Masonville": "masonville", "Windsor": "windsor", "Timnath": "timnath",
     "Wellington": "wellington", "Red Feather Lakes": "red-feather-lakes",
     "Greeley": "greeley", "Severance": "severance", "Eaton": "eaton",

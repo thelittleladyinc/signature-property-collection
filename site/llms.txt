@@ -50,6 +50,7 @@
 - [Mead, Weld County](/communities/weld/mead.html)
 - [Erie, Weld County](/communities/weld/erie.html)
 - [Boulder, Boulder County](/communities/boulder/boulder.html)
+- [Longmont, Boulder County](/communities/boulder/longmont.html)
 - [Lafayette, Boulder County](/communities/boulder/lafayette.html)
 - [Louisville, Boulder County](/communities/boulder/louisville.html)
 - [Nederland, Boulder County](/communities/boulder/nederland.html)
