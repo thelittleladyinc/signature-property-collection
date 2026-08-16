@@ -4397,15 +4397,15 @@ def _spot_card(spot):
     count = (spot.get("views") or 0) + (spot.get("reviewViews") or 0)
     kicker = SPOT_CATEGORY_LABELS.get(spot.get("category"), "Local Spot")
     if spot.get("videoId"):
-        media = _yt_embed(spot["videoId"], spot.get("videoTitle") or spot["name"],
-                          _fmt_views(count) if count else None)
+        # No view count under the embed either, same reason as the lede above. A number
+        # about her channel tells a buyer nothing about the place.
+        media = _yt_embed(spot["videoId"], spot.get("videoTitle") or spot["name"])
         proof = ""
     else:
         # A review-backed spot has nothing to embed, so her words ARE the media.
         media = (f'<blockquote class="spot-quote">{esc(spot["reviewQuote"])}</blockquote>'
                  if spot.get("reviewQuote") else "")
-        proof = (f'<p class="spot-proof">{_fmt_views(count)} on Google</p>'
-                 if count else "")
+        proof = ""
     google = ""
     if spot.get("googleReviewUrl"):
         google = (f'<a class="media-link" href="{esc(spot["googleReviewUrl"])}" '
@@ -4666,16 +4666,26 @@ def _tour_this_town_block(city_href, city_name):
         return ""
     cards = "\n      ".join(_spot_card(s) for s in spots)
     total = sum((s.get("views") or 0) + (s.get("reviewViews") or 0) for s in spots)
-    # Stated plainly rather than boasted about: the number IS the credential.
-    proof = (f" Between them they have been watched and read "
-             f"{total:,} times.") if total else ""
+    # 2026-08-16 (Christine: "such canned writing"). The lede used to run "N places in and
+    # around <Town> that Christine Gwinnup has filmed or reviewed herself -- not a stock
+    # list of amenities. Between them they have been watched and read N times."
+    #
+    # Three faults in two sentences. Third person, on a section headed "Tour It With Me".
+    # A defensive clause about what the list ISN'T, answering an accusation no visitor
+    # made. And a view total, which she had already dismissed earlier the same day --
+    # "why would anyone care about how many views?" -- and which is a fact about her
+    # channel, not about whether the tacos are good.
+    #
+    # The audience number is still the argument on /seller-local-proof.html, where the
+    # reader is a seller and the size of the audience IS the point. It has no business on
+    # a card a buyer is reading to decide where to eat.
     plural = "places" if len(spots) > 1 else "place"
     return f"""<section class="tight" id="tour-{esc(city_href.rsplit('/', 1)[-1].replace('.html', ''))}">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Tour It With Me</span>
     <h2 class="section-title">{esc(city_name)}, From Someone Who Actually Goes There</h2>
-    <p class="lede">{len(spots)} {plural} in and around {esc(city_name)} that
-    {esc(SITE['agent'])} has filmed or reviewed herself — not a stock list of amenities.{proof}</p>
+    <p class="lede">{len(spots)} {plural} in and around {esc(city_name)} I actually go to.
+    Where I eat, where I take clients, and what I would tell a friend who was moving here.</p>
     <div class="spot-grid">
       {cards}
     </div>
