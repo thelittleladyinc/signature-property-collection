@@ -99,6 +99,10 @@
 /communities/weld/erie  /communities/weld/erie.html  301
 /communities/weld/nunn/  /communities/weld/nunn.html  301
 /communities/weld/nunn  /communities/weld/nunn.html  301
+/communities/weld/pierce/  /communities/weld/pierce.html  301
+/communities/weld/pierce  /communities/weld/pierce.html  301
+/communities/weld/carr/  /communities/weld/carr.html  301
+/communities/weld/carr  /communities/weld/carr.html  301
 /communities/boulder/boulder/  /communities/boulder/boulder.html  301
 /communities/boulder/boulder  /communities/boulder/boulder.html  301
 /communities/boulder/longmont/  /communities/boulder/longmont.html  301
@@ -303,5 +307,7 @@
 /press-recognition  /press-recognition.html  301
 /concierge-experience/  /concierge-experience.html  301
 /concierge-experience  /concierge-experience.html  301
+/how-to-choose-a-real-estate-agent/  /how-to-choose-a-real-estate-agent.html  301
+/how-to-choose-a-real-estate-agent  /how-to-choose-a-real-estate-agent.html  301
 /:num-:street-:city-co-:zip/  /current-listings.html  301
 /:num-:street-:city-co-:zip  /current-listings.html  301

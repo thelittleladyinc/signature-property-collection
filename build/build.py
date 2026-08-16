@@ -126,6 +126,8 @@ CITY_DATA_SLUG = {
     "Lyons": "lyons",
     "Longmont": "longmont",
     "Nunn": "nunn",
+    "Pierce": "pierce",
+    "Carr": "carr",
     "Masonville": "masonville", "Windsor": "windsor", "Timnath": "timnath",
     "Wellington": "wellington", "Red Feather Lakes": "red-feather-lakes",
     "Greeley": "greeley", "Severance": "severance", "Eaton": "eaton",
@@ -319,6 +321,13 @@ COUNTIES = [
                    "Johnstown", "Milliken", "Firestone", "Frederick", "Dacono",
                    "Fort Lupton", "Mead", "Erie", "Platteville", "Kersey", "LaSalle",
                    "Gilcrest", "Hudson", "Keenesburg", "Lochbuie", "Nunn", "Pierce",
+                   # 2026-08-16 (Christine: "we need to add in carr and pierce - I have
+                   # listing videos for them too"). Pierce was already listed; Carr was
+                   # not in this list at all, so it appeared nowhere on the site -- no
+                   # page, no pill, not in the Search Homes city dropdown -- despite two
+                   # listing tours with 1,755 views between them and a 2026 closing at
+                   # 54175 County Road 27.
+                   "Carr",
                    "Garden City", "Grover", "New Raymer"],
         "blurb": "Weld County's growth corridor along the South Platte — new builds, "
                  "acreage, and small-town value minutes from Fort Collins and Greeley.",
@@ -619,38 +628,75 @@ BRAND_VIDEOS = [
 # auto-attached once that address hits the live MLS feed — video ID + title
 # from YouTube, address variants lowercase.
 #
-# `status` is cross-checked against Christine's own "Each Listing SOP" Google
-# Sheet (shared with Kendra + Savanna — the real-time source of truth for
-# what's actually live right now), checked 2026-08-11: "live" = address
-# appears there with Stage = Live; "sold" = it doesn't, meaning as far as we
-# can tell that listing has closed or moved on. "sold" entries are what
-# populate the "How I Sold These Homes" showcase on /past-sales.html (see
-# build_nav_pages()) — "live" ones are excluded from that showcase (showing
-# an active seller's home in a "sold" section would be both wrong and
-# awkward for that client). Status is a label for OUR display logic only —
-# it never affects live MLS matching itself, which always checks the real
-# feed regardless of what's recorded here.
+# `status` drives whether the site claims a home was SOLD, so it is now the most
+# load-bearing field in this file. Four values:
+#
+#   "sold"         Christine's own records say it closed. This is the ONLY value that
+#                  puts a home on the sold-homes map or in the "How I Sold These
+#                  Homes" showcase on /past-sales.html.
+#   "live"         Currently listed. Excluded from any sold framing -- showing an
+#                  active seller's home in a "sold" section is both wrong and awkward
+#                  for that client.
+#   "not-sold"     Listed and did not sell. Excluded from everything sold-related.
+#   "unconfirmed"  We do not actually know. Treated exactly like "not-sold" until
+#                  Christine says otherwise.
+#
+# 2026-08-16, and this is the important part. Until today "sold" meant something much
+# weaker: on 2026-08-11 these were cross-checked against her "Each Listing SOP" sheet
+# and anything NOT appearing there as Stage = Live was recorded as sold -- "it doesn't
+# appear, meaning as far as we can tell that listing has closed or moved on".
+#
+# That inference is unsound, and "moved on" is doing the lying. A listing absent from
+# a live-listings sheet may have closed, expired, been withdrawn, or never gone live.
+# Christine read the site today and said: "32 victoria was not sold either was
+# homestead". Both were marked sold by that inference, and both were therefore being
+# published as her past sales -- pins on the sold-homes map and tiles in the showcase.
+# Two wrong out of the twelve she could check.
+#
+# So the eight entries whose only evidence was that inference are no longer claimed.
+# Four remain "sold", each with real evidence:
+#   504 Graefe Ave, 4869 Stuart St, 5705 Snow Mesa Ct -- listed with a sale year on
+#     Christine's own sold-listings page (see sold_homes.json, added 2026-08-15).
+#   913 Green Mountain Dr -- confirmed directly with her on 2026-08-11.
+#
+# The rule going forward: "sold" requires evidence from Christine, not an absence of
+# evidence to the contrary. tests/test-soldclaims.js enforces it -- every "sold" entry
+# must have a matching sold_homes.json pin, and no other status may appear in any sold
+# framing anywhere on the site.
+#
+# Status is a label for OUR display logic only — it never affects live MLS matching
+# itself, which always checks the real feed regardless of what's recorded here.
 _LISTING_VIDEO_ENTRIES = [
+    # 2026-08-16 (Christine: "32 victoria was not sold either was homestead"). Was
+    # marked sold, which put it on the sold-homes map and in the "How I Sold These
+    # Homes" showcase. It did not sell. See the note above _LISTING_VIDEO_ENTRIES's
+    # status field -- the inference that produced this was unsound.
     (["32 victoria dr", "32 victoria drive"],
-     "9aIGz-SvCtI", "Affordable Luxury at 32 Victoria Dr — Johnstown Home Tour", "sold"),
+     "9aIGz-SvCtI", "Affordable Luxury at 32 Victoria Dr — Johnstown Home Tour", "not-sold"),
     (["16225 county road 98", "16225 county rd 98"],
      "N57_J3llZCQ", "45 Acres + Heated Shop — Custom Colorado Ranch, No HOA | 16225 County Road 98", "live"),
     (["929 independent ave", "929 w independent ave", "929 west independent ave",
       "929 independent avenue", "929 w independent avenue"],
-     "TpjE36J71zc", "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado", "sold"),
+     "TpjE36J71zc", "Tour 929 W Independent Ave — Modern 4-Bed Home in LaSalle, Colorado", "unconfirmed"),
     (["294 gila trail", "294 gila trl"],
-     "JvtRGf01JXU", "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail", "sold"),
+     "JvtRGf01JXU", "Why Everyone's Talking About This Ault, Colorado Home | 294 Gila Trail", "unconfirmed"),
     (["39243 boulevard e", "39243 blvd e"],
-     "L-uEVzq1bv4", "Eaton, CO Home Under $400K — 39243 Boulevard E", "sold"),
+     "L-uEVzq1bv4", "Eaton, CO Home Under $400K — 39243 Boulevard E", "unconfirmed"),
     (["1110 quitman st", "1110 s quitman st", "1110 south quitman st",
       "1110 quitman street", "1110 s quitman street"],
+     # 2026-08-16: confirmed SOLD, and by a document rather than an inference. Her
+     # "Bold Collective — Updated Deal Tracker (closings highlighted)" in Drive lists
+     # it Close Date 06/05/2026, $405,000, co-list with Kendra, status CLOSED. This was
+     # one of the six the unsound inference had produced -- reading the real record
+     # promoted exactly one of them, which is roughly what you would expect and is the
+     # reason the other five stay unconfirmed rather than being waved through.
      "e7kMY1yV7GI", "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St", "sold"),
     (["45615 county rd 27", "45615 county road 27"],
-     "dVonJhu_zCo", "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO", "sold"),
+     "dVonJhu_zCo", "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO", "unconfirmed"),
     (["504 graefe ave", "504 graefe avenue"],
      "eiFurERq_As", "Charming Home for Sale at 504 Graefe Ave, Ault CO", "sold"),
     (["1316 cimarron cir", "1316 cimarron circle"],
-     "xWcrj6foJ-Q", "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir", "sold"),
+     "xWcrj6foJ-Q", "Aspen Meadows Ranch Home in Eaton, CO — 1316 Cimarron Cir", "unconfirmed"),
     # 2026-08-15: the MLS record for this sale is 4869 Stuart St, not 4986 --
     # the video title has the digits transposed (there IS a real 4986 W 5th St
     # in Greeley, which is likely where the mix-up came from). Both forms kept
@@ -671,8 +717,10 @@ _LISTING_VIDEO_ENTRIES = [
     # Maplebrook...".
     (["945 maplebrook dr", "945 maplebrook drive"],
      "SAZceZQJrAs", "Is This the Cutest Home in Windsor, Colorado? — 945 Maplebrook Dr Tour", "live"),
+    # 2026-08-16: same correction as 32 Victoria Dr above -- Christine confirmed this
+    # one did not sell either.
     (["475 homestead ln", "475 homestead lane"],
-     "6Hrdv6LZIDM", "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)", "sold"),
+     "6Hrdv6LZIDM", "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)", "not-sold"),
     # Confirmed 2026-08-11 (after an earlier back-and-forth): 913 Green
     # Mountain Dr, Erie was a real past CLIENT sale (Christine represented
     # the seller), not her own home — 2411 Glade Rd, Loveland is her
@@ -697,6 +745,144 @@ _LISTING_VIDEO_ENTRIES = [
      "06q7rZAWEaY", "Inside This 4-Bedroom Broomfield Home — 1082 Lilac Ct Tour", "live"),
 ]
 LISTING_VIDEOS = {addr: (vid, title) for addrs, vid, title, _status in _LISTING_VIDEO_ENTRIES for addr in addrs}
+
+# ------------------------------------------------- HER TOURS, BY TOWN ----
+# 2026-08-16 (Christine: "then we can put videos of listing ive sold on each town
+# page?").
+#
+# Every listing-tour video on her channel that names a town, pulled from vidIQ on
+# 2026-08-16 and grouped by that town. This is the answer to the question a seller
+# actually asks -- "what would you do for MY house, here?" -- with the work itself
+# rather than a claim about it. Until now a town page could show at most one video,
+# and only for the ten towns in CITY_VIDEOS; Nunn had five tours and showed none of
+# them.
+#
+# View counts are captured here so the data is auditable, but they are deliberately
+# NOT rendered in this block. Christine's own words, 2026-08-16: "why would anyone
+# care about how many views?" A buyer reading a town page cares that the tour is
+# real and local; the view count is channel-performance data for her, not a selling
+# point for them.
+#
+# `property_key` groups videos of the SAME house, and it is the reason this is a
+# 4-tuple rather than a 3-tuple. Christine filmed 945 Maplebrook in Windsor three
+# separate times and 475 Homestead in Johnstown twice; without grouping, a section
+# headed "Homes Christine Has Marketed In Windsor" showed one house three times and
+# read as padding. One video per property is shown -- the most-watched.
+#
+# A key of None means "cannot confirm which house this is", and those are left
+# ungrouped on purpose. Merging two videos that turn out to be different homes hides
+# real work; keeping them apart, at worst, shows one home twice. Where the address is
+# not in the title it was read off the video's own transcript (noted inline).
+#
+# (video_id, title, views, property_key)
+TOWN_LISTING_VIDEOS = {
+    "nunn": [
+        ("N57_J3llZCQ", "45 ACRES + 40x60 HEATED SHOP | Custom Colorado Ranch (No HOA) | 16225 County Road 98", 9611, "16225 cr 98"),
+        # Transcript (read 2026-08-16) says 35 acres, three bedrooms plus a private
+        # primary, well, fiber, shop space. 16225 CR 98 is 45 acres. Different
+        # figures, so NOT grouped with it -- see the None rule above.
+        ("5W3w3-0U4eg", "Would You Trade City Life For This Dream Ranch Property?", 1879, None),
+        ("ex-PKMy5nck", "16185 CR 100 — Rent To Own | USDA Eligible | Owner Financing Available", 1580, "16185 cr 100"),
+        ("IebQE-z6ANg", "292 Washington Ave Nunn, Colorado", 119, "292 washington ave"),
+        ("SdvDF_-p9ro", "16185 County Road 100 Nunn, Colorado 80648", 72, "16185 cr 100"),
+    ],
+    "ault": [
+        ("JvtRGf01JXU", "Why Everyone's Talking About This Ault, Colorado Home | Conestoga Subdivision at 294 Gila Trail", 17720, "294 gila trail"),
+    ],
+    "greeley": [
+        ("MLbFLWZc-j4", "Why This Corner Lot in Greeley Stands Out | Backyard Waterfall Tour", 10655, "616 41st ave"),
+        # Transcript: "This is Forest Glenn at Kelly Farm", five beds, 3,500+ sq ft.
+        ("uOTbQVeKjG4", "Is This the Coolest Neighborhood Ever? | Kelly Farm, West Greeley", 1126, "forest glenn at kelly farm"),
+        ("-C1MJfL-7EA", "4 bedroom, 3 bathroom home for sale in Greeley, Colorado", 526, None),
+        # Transcript: "welcome to my new listing here at 5112 West 9th Street".
+        ("WPFxyalHXJU", "Secret Revealed: Exclusive Greeley Home For Sale!", 491, "5112 w 9th st"),
+        ("45pUL85r1SY", "3-Bedroom, 2-Bath Ranch Home in Greeley, CO", 380, None),
+    ],
+    "eaton": [
+        ("L-uEVzq1bv4", "Eaton CO Home Under $400K | 39243 Boulevard E", 3362, "39243 boulevard e"),
+        ("JMsOXf8gg4Y", "The Affordable Eaton Home You Can ACTUALLY Buy | 315 Laurel Ave", 902, "315 laurel ave"),
+        ("xWcrj6foJ-Q", "Discover This Superb Aspen Meadows Ranch Home in Eaton | 1316 Cimarron Cir", 136, "1316 cimarron cir"),
+    ],
+    "loveland": [
+        # Transcript: "life on the old course at Loveland", along the 16th hole.
+        ("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland | Life on The Olde Course", 2113, "olde course 16th hole"),
+        ("MDfyzESb1Yk", "Why is Loveland called the Sweetheart City? Tour 5705 Snow Mesa Dr", 2019, "5705 snow mesa"),
+    ],
+    "broomfield-city": [
+        ("06q7rZAWEaY", "Inside This 4-Bedroom Broomfield Home | Garden Memories & Wine", 3348, "1082 lilac ct"),
+    ],
+    "windsor": [
+        ("SAZceZQJrAs", "Is This the Cutest Home in Windsor, Colorado? | 945 Maplebrook Dr", 1096, "945 maplebrook dr"),
+        ("K8sjM8_7o5I", "Upgrade Your View: Luxurious Living in Windsor, Colorado | 342 McKinley", 744, "342 mckinley"),
+        ("kdR6wbWPMQU", "Windsor Colorado Living! | 945 Maplebrook Dr Tour", 627, "945 maplebrook dr"),
+        ("gMfmRkDC1SY", "Inside 945 Maplebrook | Why Everyone's Moving to Windsor, CO", 272, "945 maplebrook dr"),
+    ],
+    "erie": [
+        ("PxB2iHNqT74", "Luxury Home Tour in Erie Colorado | Signature Property Listing", 2095, None),
+        ("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado | 913 Green Mountain Dr", 521, "913 green mountain dr"),
+    ],
+    "denver-city": [
+        ("e7kMY1yV7GI", "Denver Home Tour | Mid-Century Ranch at 1110 S Quitman St", 1333, "1110 s quitman st"),
+        # 4869 per the MLS record, not the 4986 in the video title -- see the note on
+        # this video in _LISTING_VIDEO_ENTRIES.
+        ("oNZBc-MxzUg", "Stunning Home for Sale | 4986 Stuart St, Denver | Tennyson Art District", 651, "4869 stuart st"),
+        ("RenD0cRPD_k", "Under $450,000 in Denver? Hidden Gem Near Garfield Lake Park", 309, None),
+    ],
+    "johnstown": [
+        ("9aIGz-SvCtI", "Affordable Luxury at 32 Victoria Dr - Johnstown Home for sale", 818, "32 victoria dr"),
+        ("oGmkwNv6rfE", "Charming 3-bedroom Townhome in Johnstown | 32 Victoria Drive Tour", 320, "32 victoria dr"),
+        ("6Hrdv6LZIDM", "Tour This Stunning Johnstown Home | 475 Homestead Ln", 278, "475 homestead ln"),
+        ("zsQenaP_IWA", "Is This The Smartest Home Design in Johnstown Colorado, Ever? | 475 Homestead Ln", 125, "475 homestead ln"),
+    ],
+    "longmont": [
+        ("q-51GPoL4QE", "Backyard Kickball | 12734 Anhawa Ave, Longmont", 191, "12734 anhawa ave"),
+    ],
+    # 2026-08-16 (Christine: "we need to add in carr and pierce - I have listing videos
+    # for them too"). Both towns now have pages, so these tours finally have somewhere to
+    # land. Carr's two are the same 45-acre parcel filmed twice -- the second is titled
+    # "Back on Market!" -- so the property key collapses them to the stronger one.
+    "carr": [
+        ("RRcjuVGRFcU", "Back on Market! 45 Acres of Freedom in Carr, Colorado | Mountain Views & Dream Shop", 952, "54175 county rd 27"),
+        ("dCyU9WVBNZ0", "Would You Trade City Life For THIS Colorado Dream? | 54175 County Road 27, Carr", 803, "54175 county rd 27"),
+    ],
+    "pierce": [
+        ("dVonJhu_zCo", "Dream Ranch on 20 Acres! | 45615 County Rd 27, Pierce CO", 102, "45615 county rd 27"),
+    ],
+}
+
+# Tours held back from the town pages because they lead on price or affordability,
+# which is what a visitor reads or hears before anything else.
+#
+# Same rule Christine already set for the town header videos on 2026-08-14 (see
+# OFF_BRAND_CITY_VIDEOS), applied here rather than quietly excepted: a page arguing
+# for estate-level marketing next to "Home Under $400K" argues against itself.
+#
+# Deliberately NOT extended to the two videos OFF_BRAND_CITY_VIDEOS excludes as a
+# "generic tour" (Broomfield's 1082 Lilac, Denver's 1110 S Quitman). That reason was
+# about the header slot, which is meant to hold a "what it's like to live here" film
+# -- a straight home tour is wrong there and exactly right here. Greeley's 616 41st
+# Ave is included here for the same reason: its title carries no price anchor, it is
+# her single best-performing video at 10,655 views, and on the Greeley page it is
+# precisely on topic. If that judgement is wrong, one line below fixes it.
+#
+# Nothing here is deleted from YouTube and none of it is a judgement about the homes.
+# These six hold ~15,000 views between them. Delete a line and its town page picks
+# the video straight back up.
+OFF_BRAND_LISTING_VIDEOS = {
+    "L-uEVzq1bv4": "title says 'Under $400K'",
+    "JMsOXf8gg4Y": "title says 'The Affordable Eaton Home You Can ACTUALLY Buy'",
+    "9aIGz-SvCtI": "title says 'Affordable Luxury'",
+    "RenD0cRPD_k": "title says 'Under $450,000'",
+    "ex-PKMy5nck": "title leads on Rent To Own / USDA / owner financing",
+    # Title is clean; the voiceover is not. Transcript, first line: "are you looking
+    # for an affordable home in Northern Colorado". Read 2026-08-16.
+    "-C1MJfL-7EA": "voiceover opens on 'an affordable home in Northern Colorado'",
+}
+
+# How many tours one town page may show. Four is where the page stops reading as a
+# town guide with proof on it and starts reading as a video feed -- Greeley and
+# Windsor are the only towns this bites, and both keep their strongest four.
+TOWN_LISTING_VIDEO_LIMIT = 4
 
 # The "sold" subset, deduped to one entry per property (first address variant
 # only) — feeds the "How I Sold These Homes" showcase on /past-sales.html.
@@ -843,6 +1029,7 @@ def _nearby_places_js_helpers():
       '<button type="button" class="nearby-tab active" data-cat="coffee" onclick="showNearbyCat(this)">Coffee</button>' +
       '<button type="button" class="nearby-tab" data-cat="grocery" onclick="showNearbyCat(this)">Grocery</button>' +
       '<button type="button" class="nearby-tab" data-cat="dining" onclick="showNearbyCat(this)">Dining</button>' +
+      '<button type="button" class="nearby-tab" data-cat="gas" onclick="showNearbyCat(this)">Gas</button>' +
       '<button type="button" class="nearby-tab" data-cat="school" onclick="showNearbyCat(this)">Schools</button>' +
       '<button type="button" class="nearby-tab" data-cat="park" onclick="showNearbyCat(this)">Parks</button>' +
       '</div>' +
@@ -888,7 +1075,18 @@ def _nearby_places_js_helpers():
   };
 
   var NEARBY_CAT_LABELS = { grocery: 'grocery stores', coffee: 'coffee shops',
-    dining: 'restaurants', school: 'schools', park: 'parks' };
+    dining: 'restaurants', gas: 'gas stations', school: 'schools', park: 'parks' };
+
+  // "4 min drive · 2.8 mi" where Google gave us a route, plain straight-line miles
+  // where it didn't. Never both kinds of mile in one string: out here they differ by
+  // a factor of three and showing them together looks like a mistake.
+  window.nearbyDistanceLabel = function (p) {
+    if (p.drivingMinutes) {
+      return p.drivingMinutes + ' min drive' +
+        (p.drivingMiles ? ' \\u00b7 ' + p.drivingMiles.toFixed(1) + ' mi' : '');
+    }
+    return Number(p.distanceMiles).toFixed(1) + ' mi';
+  };
 
   function renderNearbyCat(panel, cat) {
     var data = panel._nearbyData;
@@ -912,10 +1110,10 @@ def _nearby_places_js_helpers():
           encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
         : name;
       return '<li><span class="nearby-name">' + inner + '</span>' +
-        '<span class="nearby-distance">' + Number(p.distanceMiles).toFixed(1) + ' mi</span></li>';
+        '<span class="nearby-distance">' + nearbyDistanceLabel(p) + '</span></li>';
     }).join('') + '</ul>' +
-      '<p class="nearby-attrib">Straight-line distances. Places data from ' +
-      '<strong>Google Maps</strong>.</p>';
+      '<p class="nearby-attrib">Drive times where available, otherwise straight-line ' +
+      'distance. Places data from <strong>Google Maps</strong>.</p>';
   }
 """
 
@@ -3056,8 +3254,8 @@ def footer_html():
         <h2 class="footer-col-title">{SITE['name']}</h2>
         <p style="max-width:340px;color:rgba(255,255,255,.7);line-height:1.6">
           {SITE['agent']} &middot; {SITE['brokerage']}<br>
-          Luxury real estate across Loveland, Berthoud, Masonville, and the
-          Larimer, Weld &amp; Boulder County Front Range.
+          Luxury homes, acreage and estate property across Northern Colorado &mdash;
+          Denver north to the Wyoming line.
         </p>
       </div>
       <div>
@@ -3085,6 +3283,7 @@ def footer_html():
           <li><a href="/press-recognition.html">Press &amp; Recognition</a></li>
           <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
+          <li><a href="/how-to-choose-a-real-estate-agent.html">How To Choose An Agent</a></li>
         </ul>
       </div>
       <div>
@@ -3369,10 +3568,26 @@ def build_home():
     body = f"""
 <section class="hero">
   <div class="wrap">
-    <h1>Turning Dreams<br>Into Addresses</h1>
-    <p class="lede">Northern Colorado's luxury real estate collection — representing estate homes,
-    acreage, and architecturally significant properties across Loveland, Berthoud, Masonville, and
-    the Larimer, Weld &amp; Boulder County Front Range.</p>
+    <!-- 2026-08-16 (Christine: "are these words that people search for? and ask ai
+         answers about? we need to mention northern colorado - and say across - I
+         represent Denver north").
+
+         The H1 was "Turning Dreams Into Addresses". It is a nice line and nobody
+         types it into anything. A homepage H1 is one of the strongest signals a page
+         has, for Google and for an answer engine deciding what this site IS, and it
+         was spending that signal on a slogan -- so the page named its own market
+         nowhere in its largest text.
+
+         Now it says the thing people search ("luxury real estate", "Northern
+         Colorado") and the thing they ask an AI ("who covers my area"), with her
+         coverage stated the way she states it herself: Denver north. The slogan is
+         kept as the eyebrow, where it costs nothing. -->
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Turning Dreams Into Addresses</span>
+    <h1>Luxury Real Estate Across Northern Colorado</h1>
+    <p class="lede">{SITE['agent']} represents estate homes, acreage, and architecturally
+    significant properties across Northern Colorado — Denver north to the Wyoming line.
+    Loveland, Fort Collins, Berthoud, Windsor, Greeley, Boulder County and every town
+    in between.</p>
     <div class="btn-row">
       <a class="btn btn-primary" href="/buyers.html">Find Your Home</a>
       <a class="btn btn-outline" href="/sellers.html">List With Us</a>
@@ -3426,9 +3641,16 @@ def build_home():
     body += faq_html
     extra = _leaflet_lazy_loader_extra()
     page(
-        "Luxury Real Estate Loveland & Northern Colorado | Signature Property Collection",
-        "Christine Gwinnup and Signature Property Collection — luxury real estate across Loveland, "
-        "Berthoud, Masonville, and the Larimer, Weld & Boulder County Front Range.",
+        "Northern Colorado Luxury Real Estate Agent | Christine Gwinnup",
+        # 2026-08-16: this named Loveland, Berthoud and Masonville -- one real town and
+        # two of the smallest in the county -- and then three counties out of nine.
+        # The description is the line Google prints, and it was describing a fraction
+        # of the business. Now: what she does, where, and the phrase she uses herself.
+        # Written to fit DESC_BUDGET (160) on purpose: the first draft ran to 217 and
+        # _fit_description trimmed off "Denver north to the Wyoming line", which was
+        # the whole point of rewriting it.
+        "Christine Gwinnup sells luxury homes and acreage across Northern Colorado, "
+        "Denver north to the Wyoming line. 250+ homes sold, 158 five-star Google reviews.",
         "/index.html", None, body, extra,
         schema_extra=[faq_schema, _organization_schema()],
     )
@@ -3738,8 +3960,51 @@ def _district_short(text):
     return t
 
 
+# Towns where "Luxury Homes For Sale" is the wrong title, and actively costs her.
+#
+# 2026-08-16. Every one of the 36 town pages carried "<Town> Luxury Homes For Sale",
+# a template set on 2026-08-14 to fix a real gap (the phrase "luxury homes" appeared
+# nowhere on the site). It works for Fort Collins, Windsor and Erie. It does not work
+# for a prairie community with no store, and building Carr and Pierce made that
+# impossible to ignore: "Carr Luxury Homes For Sale" is what Google would show to
+# someone searching "land for sale carr co", and they would not click it. Christine had
+# already flagged the same thing on Nunn.
+#
+# Two failures at once. A visitor bounces on the mismatch, and Google reads a title
+# promising luxury over a page that honestly describes wells, septic and a twelve-mile
+# drive for dinner -- which is the page it should rank, for the search people are
+# really making.
+#
+# So these towns get a title naming what is actually for sale. They keep every other
+# word of their content; only the title and description change. This is a judgement
+# about market tier, so it is an explicit list rather than anything inferred.
+# Just the middle phrase -- the town name and the county suffix are added by
+# _town_title, exactly as they are for the luxury template, so every town page's title
+# has the same shape. Appending the brand here instead produced titles that were
+# sometimes 30 characters and sometimes 57, because _fit_title strips the brand only
+# when the whole thing runs past 60.
+ACREAGE_TOWN_TITLES = {
+    "nunn":              "Homes & Acreage For Sale",
+    "carr":              "Land & Acreage For Sale",
+    "pierce":            "Homes For Sale",
+    "grover":            "Homes & Land For Sale",
+    "masonville":        "Homes & Acreage For Sale",
+    "red-feather-lakes": "Cabins For Sale",   # "Cabins & Homes" ran the title to 66 chars
+    "log-lane-village":  "Homes For Sale",
+    "wiggins":           "Homes & Acreage For Sale",
+    "brush":             "Homes For Sale",
+    "fort-morgan":       "Homes For Sale",
+}
+
+
+def _town_title(city, data_slug, county_name):
+    """The <title> for a town page — luxury framing only where it is true."""
+    phrase = ACREAGE_TOWN_TITLES.get(data_slug or "") or "Luxury Homes For Sale"
+    return f"{city} {phrase} | {county_name}, CO"
+
+
 def _county_town_comparison(county):
-    """A real comparison of this county's towns: drive time, schools, her coverage.
+    """A real comparison of this county's towns: drive time and schools.
 
     2026-08-16 (Christine, on the block that used to be here: "why is it even there?!!!
     Who cares about that! Lets make it what people are actually searching for!").
@@ -3749,62 +4014,56 @@ def _county_town_comparison(county):
 
     What people actually type is "best places to live in larimer county", "how far is
     Loveland from Denver", "what school district is Timnath in". Those are three
-    different searches with one answer shape: a comparison of the towns. So that is
-    what this is, built from the per-town content the site already carries, with her
-    filmed coverage as one column rather than the whole point.
+    different searches with one answer shape: a comparison of the towns.
+
+    2026-08-16, second pass (Christine: "Places shes filmed?!!!!! What! that is
+    awful"). My first fix kept a fourth column listing the places she had filmed in
+    each town, and it was wrong twice over. It made the agent the subject of a table a
+    buyer opened to compare TOWNS. And because it was honestly empty where she has no
+    footage, five of ten Larimer rows showed a dash -- so a table headed "which town
+    fits you" quietly said she had never been to Estes Park, Timnath, Masonville or
+    Windsor. Windsor and Timnath are towns she works. Her filmed spots already have a
+    home on the town pages and the county map, where they answer "what is this place
+    like" instead of "how much has she filmed here".
+
+    So: three columns, every one of them the buyer's question, and sorted
+    alphabetically rather than by how much footage she has -- a reader looking for
+    Wellington should find it where a list puts Wellington.
 
     Every cell is real or empty. An unwritten commute line leaves a dash, because a
     plausible-looking invented drive time is the one thing here that could cost someone
     a decision."""
-    global LOCAL_SPOTS_BY_CITY_HREF
-    if LOCAL_SPOTS_BY_CITY_HREF is None:
-        LOCAL_SPOTS_BY_CITY_HREF = _local_spots_by_city_href()
     rows = []
     for c, city, url in _all_town_pages():
         if c["slug"] != county["slug"]:
             continue
         data = CITY_CONTENT.get(CITY_DATA_SLUG.get(city) or "") or {}
-        # Primary cityHref only: a place has one address and therefore one county.
-        spots = [sp for sp in LOCAL_SPOTS_DATA.get("spots", [])
-                 if sp.get("cityHref") == url]
-        views = sum((sp.get("views") or 0) + (sp.get("reviewViews") or 0) for sp in spots)
-        # Best-known first, so the two names shown are the two worth recognising.
-        spots.sort(key=lambda sp: -((sp.get("views") or 0) + (sp.get("reviewViews") or 0)))
-        names = [sp["name"] for sp in spots]
-        places = ", ".join(names[:2]) + (f" +{len(names) - 2} more" if len(names) > 2 else "")
         rows.append({
             "city": city, "url": url,
             "commute": _commute_short(data.get("commute")),
             "district": _district_short(data.get("school_district")),
-            "spots": len(spots), "views": views, "places": places,
         })
     if not rows:
         return ""
-    rows.sort(key=lambda r: (-r["views"], r["city"]))
+    rows.sort(key=lambda r: r["city"])
     body = "\n      ".join(
         f"""<tr>
         <th scope="row"><a href="{r['url']}">{esc(r['city'])}</a></th>
         <td>{esc(r['commute']) or "&mdash;"}</td>
         <td>{esc(r['district']) or "&mdash;"}</td>
-        <td>{esc(r['places']) or "&mdash;"}</td>
       </tr>""" for r in rows)
-    covered = [r for r in rows if r["spots"]]
-    first = esc(SITE["agent"].split()[0])
-    lede = (f"Drive times and school districts for every {esc(county['name'])} town "
-            f"{first} works in, side by side.")
-    if covered:
-        lede += (f" The last column is the places {first} has actually been to with a "
-                 f"camera &mdash; tap a town to watch them.")
     return f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Compare Before You Commit</span>
     <h2 class="section-title">Which {esc(county['name'])} Town Fits You?</h2>
-    <p class="lede">{lede}</p>
+    <p class="lede">How far each town is from the places you will actually drive to, and
+    which school district you would be in. Tap a town for what it costs to live there,
+    what is nearby, and homes for sale.</p>
     <div class="town-table-wrap">
       <table class="town-table">
         <thead>
-          <tr><th scope="col">Town</th><th scope="col">Nearest City</th>
-          <th scope="col">School District</th><th scope="col">Places She&rsquo;s Filmed</th></tr>
+          <tr><th scope="col">Town</th><th scope="col">Drive Time</th>
+          <th scope="col">School District</th></tr>
         </thead>
         <tbody>
       {body}
@@ -3902,10 +4161,25 @@ def build_county_pages():
              if _city_url(c["slug"], city) else f'<span class="city-pill">{city}</span>')
             for city in c["cities"]
         )
+        # 2026-08-16 (Christine, on seeing this live: "Core farm areas!? why woud
+        # that matter to the seller - that is awful"). She is right, and it was my
+        # wording, on all eight priority county pages.
+        #
+        # A "farm area" is what an agent calls a patch they prospect. To a seller it
+        # means nothing, and to anyone reading quickly it sounds agricultural -- on a
+        # LARIMER COUNTY page, next to acreage listings. It also said nothing: "we
+        # know this market block by block" is a claim every agent site makes.
+        #
+        # Replaced with the thing a seller is actually deciding, which is whether
+        # this person will price their house right. Same for a buyer reading it.
+        top = c["cities"][:3]
+        top_list = (", ".join(top[:-1]) + " or " + top[-1]) if len(top) > 1 else top[0]
         priority_note = (
-            '<p class="lede" style="margin-top:14px;color:rgba(255,255,255,.85)">This is one '
-            'of our core farm areas — if you\'re buying or selling in '
-            + ", ".join(c["cities"][:3]) + ', we know this market block by block.</p>'
+            '<p class="lede" style="margin-top:14px;color:rgba(255,255,255,.85)">'
+            f'{esc(SITE["agent"].split()[0])} works this county every week. If you\'re buying '
+            f'or selling in {esc(top_list)}, that means straight answers on what your home '
+            'is really worth, which streets hold value, and what is actually selling right '
+            'now &mdash; not a general Colorado opinion.</p>'
             if c["priority"] else ""
         )
         if _live_search(c):
@@ -4072,8 +4346,10 @@ def _local_spots_by_city_href():
     town there are videos maybe to restaurants and thy are also on my mao
     correct? is it smart?"). Yes, and it is the smarter half of the two. The
     county map is ONE page, reached by someone already on this site. The town
-    pages are 141 pages that rank in Google, and "best restaurant in Berthoud"
+    pages are 35 pages that rank in Google, and "best restaurant in Berthoud"
     lands on a town page, never on a county map. Same content, far more doors in.
+    (This said 141 until 2026-08-16. That is the whole site's page count, not the
+    town pages', and it got copied into two later comments before anyone counted.)
 
     Grouped by cityHref rather than by city name because the href is the field
     that was set deliberately per spot -- Poudre Canyon sits in Bellvue but
@@ -4193,6 +4469,190 @@ def _relocation_video_block(data_slug, city_name):
     </div>
   </div>
 </section>"""
+
+
+def _town_listing_videos_block(data_slug, city_name, county_name, exclude_ids=()):
+    """Her own listing tours filmed in this town.
+
+    Returns (html, [VideoObject schema, ...]) -- ("", []) for a town with no tours,
+    so no page ever shows a heading over nothing.
+
+    Replaces a hand-written block that existed for Erie alone. That block was
+    correct and it did not scale: Nunn had five tours on the channel and showed
+    none of them, because adding a town meant writing another section by hand.
+
+    Three rules the wording follows, all of them from Christine:
+      * No view counts. "Why would anyone care about how many views?" -- 2026-08-16.
+      * No sold/live label on any tour. First draft labelled the eight whose status
+        was cross-checked against her SOP sheet; she chose to drop it entirely --
+        "we can always just say examples of marketing in whichever town so they dont
+        have to say sold" -- and she is right that it is the better frame. What a
+        seller is judging is the marketing, which is identical either way, and the
+        section no longer depends on a status table staying accurate as listings
+        close. /past-sales.html still says sold, where every entry is verified.
+      * The heading frames these as examples of the marketing, which is what is
+        provably true of every one of them.
+    """
+    all_vids = TOWN_LISTING_VIDEOS.get(data_slug, [])
+    excluded = set(exclude_ids)
+
+    # A property already on this page is done with, however it got there. Windsor is
+    # the case that forces this: the page header plays 945 Maplebrook, and two MORE
+    # videos of 945 Maplebrook exist. Excluding by video id alone would have shown
+    # that one house three times on one page.
+    shown_properties = {v[3] for v in all_vids if v[3] and v[0] in excluded}
+
+    vids = [v for v in all_vids
+            if v[0] not in OFF_BRAND_LISTING_VIDEOS
+            and v[0] not in excluded
+            and v[3] not in shown_properties]
+
+    # One video per property, most-watched first. A key of None is its own property
+    # (see the data note) -- keyed by video id so those never collapse together.
+    best = {}
+    for v in sorted(vids, key=lambda v: -v[2]):
+        best.setdefault(v[3] or v[0], v)
+    vids = sorted(best.values(), key=lambda v: -v[2])[:TOWN_LISTING_VIDEO_LIMIT]
+    if not vids:
+        return "", []
+    first = SITE["agent"].split()[0]
+
+    cards, schema = [], []
+    for vid, title, _views, _prop in vids:
+        # No caption at all. It held "Sold" on the eight tours whose status was
+        # cross-checked; Christine dropped that, and there is nothing else worth
+        # saying here -- "Loveland, CO" under a video on the Loveland page is words
+        # with no information in them.
+        cards.append(f"""<div>
+      {_yt_embed(vid, title)}
+    </div>""")
+        schema.append(_video_object_schema(
+            vid, title,
+            f"A video tour of a {city_name}, Colorado home marketed by "
+            f"{SITE['agent']} of {SITE['name']}.",
+        ))
+
+    # One tour reads as a statement about that house, several as a body of work, so
+    # the lede changes rather than saying "tours" over a single embed.
+    lede = (
+        f"This is what your listing would look like. Filmed on location in "
+        f"{esc(city_name)} by {esc(first)} herself — not a slideshow, not stock footage "
+        f"of somewhere that looks a bit like {esc(city_name)}."
+        if len(vids) > 1 else
+        f"This is what your listing would look like — filmed on location in "
+        f"{esc(city_name)} by {esc(first)} herself, not a slideshow of stock footage."
+    )
+    # Two across on desktop keeps each embed big enough to actually watch; grid-2
+    # already collapses to one column on mobile.
+    return f"""<section class="tight section-dark">
+  <div class="wrap">
+    <span class="eyebrow">{esc(first)}'s Work In {esc(city_name)}</span>
+    <h2 class="section-title" style="color:#fff;margin-top:6px">Examples Of {esc(first)}'s Marketing In {esc(city_name)}</h2>
+    <p class="lede" style="max-width:70ch">{lede}</p>
+    <div class="grid-2" style="margin-top:28px">
+      {"".join(cards)}
+    </div>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+      <a class="btn btn-outline" href="/past-sales.html">See More Past Sales &rarr;</a>
+      <a class="btn btn-outline" href="/sellers.html">How I Market {esc(county_name)} Homes &rarr;</a>
+    </div>
+  </div>
+</section>""", schema
+
+
+def _town_distance_block(city_name, county_name):
+    """"How far is the nearest restaurant and gas station" for this town.
+
+    2026-08-16 (Christine: "maybe do a miles minutes to the closest restaurant and
+    gas station"). It is the first question a buyer asks about a small town and the
+    one the site could not answer -- the county comparison table gives drive time to
+    Denver and Fort Collins, which is the question people ask about a COMMUTE, not
+    about a Tuesday evening.
+
+    Filled in the browser from nearby-places.js rather than written into the page,
+    and that is a deliberate trade with a real cost. Google's Places data is current
+    and mine is not: I checked Nunn while building this and found its cafe listed
+    both as open and as permanently closed, at the same address, by two sources on
+    the same day. Numbers typed into a town page go stale silently and are then
+    quoted back to a buyer by an agent who trusted them. The cost is that Google
+    cannot index an answer that arrives by fetch, so this does not win the search
+    for "nearest gas station to Nunn" -- if that trade should go the other way for a
+    town, the fix is real verified prose in city_content.json, which is where Great
+    Guns Sporting went for exactly that reason.
+
+    Asks for two categories, not six -- see the `only` parameter in the function.
+    """
+    return f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">How Far Is Everything</span>
+    <h2 class="section-title">Nearest Restaurant And Gas Station To {esc(city_name)}</h2>
+    <p class="lede" style="max-width:70ch">Small-town Colorado is wonderful right up until
+    you need dinner and a tank of gas. Here is the real answer for {esc(city_name)} — drive
+    time, not straight-line distance, because out here those are not the same number.</p>
+    <div class="town-far" data-town="{esc(city_name)}, {esc(county_name)}, CO">
+      <p class="search-status" style="margin:0">Checking drive times&hellip;</p>
+    </div>
+  </div>
+</section>
+<script>
+(function () {{
+  var box = document.querySelector('.town-far');
+  if (!box) return;
+  var LABELS = {{ dining: 'Nearest restaurant', gas: 'Nearest gas station' }};
+  function fail(msg) {{
+    box.innerHTML = '<p class="search-status" style="margin:0">' + msg + '</p>';
+  }}
+  // Escaped, not stripped. Deleting the characters instead silently renamed real
+  // businesses: "Ault Corner Bar & Grill" rendered as "Ault Corner Bar Grill".
+  function esc(s) {{
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }}
+  fetch('/.netlify/functions/nearby-places?only=dining,gas&address=' +
+        encodeURIComponent(box.dataset.town))
+    .then(function (r) {{ return r.json(); }})
+    .then(function (data) {{
+      if (data.error === 'not_configured') return fail('Drive times aren\\u2019t connected yet.');
+      if (data.error) return fail('Couldn\\u2019t look these up right now.');
+      var rows = [];
+      ['dining', 'gas'].forEach(function (cat) {{
+        var p = ((data.categories || {{}})[cat] || [])[0];
+        if (!p) return;
+        var name = esc(p.name);
+        var link = p.placeId
+          ? '<a href="https://www.google.com/maps/place/?q=place_id:' +
+            encodeURIComponent(p.placeId) + '" target="_blank" rel="noopener">' + name + '</a>'
+          : name;
+        rows.push('<li><span class="nearby-name"><strong>' + LABELS[cat] + ':</strong> ' +
+          link + '</span><span class="nearby-distance">' +
+          (window.nearbyDistanceLabel ? window.nearbyDistanceLabel(p)
+            : Number(p.distanceMiles).toFixed(1) + ' mi') + '</span></li>');
+      }});
+      // Nothing found is a real answer for a town this small, and saying so is more
+      // use than an empty box -- but it must not be mistaken for a failed lookup.
+      if (!rows.length) return fail('Google lists nothing within about five miles \\u2014 ' +
+        'worth a conversation before you buy out here.');
+      box.innerHTML = '<ul class="nearby-list">' + rows.join('') + '</ul>' +
+        '<p class="nearby-attrib">Live from <strong>Google Maps</strong>, measured from the ' +
+        'center of town.</p>';
+    }})
+    .catch(function () {{ fail('Couldn\\u2019t look these up right now.'); }});
+}}());
+</script>"""
+
+
+def _spot_video_ids(city_href):
+    """Video ids this town page's local-spots block will already embed.
+
+    Two Windsor spots are backed by Windsor listing tours (the transcripts name the
+    tavern and the lake), so without this the same iframe rendered twice on one
+    page -- once as a place to eat, once as a home for sale.
+    """
+    global LOCAL_SPOTS_BY_CITY_HREF
+    if LOCAL_SPOTS_BY_CITY_HREF is None:
+        LOCAL_SPOTS_BY_CITY_HREF = _local_spots_by_city_href()
+    return [s["videoId"] for s in (LOCAL_SPOTS_BY_CITY_HREF.get(city_href) or [])
+            if s.get("videoId")]
 
 
 def _tour_this_town_block(city_href, city_name):
@@ -4331,6 +4791,7 @@ def build_city_pages():
 
             video_block = ""
             city_video_schema = ""
+            vid_id = None
             if data_slug in _luxury_city_videos():
                 vid_id, vid_title, vid_views = CITY_VIDEOS[data_slug]
                 city_video_schema = _video_object_schema(
@@ -4357,8 +4818,13 @@ def build_city_pages():
             # "Tour It With Me" — this town's local spots, from the same JSON the
             # county map reads. Empty string for towns with no spots yet, so no
             # page ever shows a heading over nothing.
-            tour_block = _tour_this_town_block(
-                _city_url(c["slug"], city) or "", city)
+            town_href = _city_url(c["slug"], city) or ""
+            tour_block = _tour_this_town_block(town_href, city)
+
+            # Drive time to the nearest restaurant and gas station, straight after
+            # "what it's like to live here" -- because that section describes the
+            # appeal of a small town and this one answers the question it raises.
+            distance_block = _town_distance_block(city, c["name"])
 
             # Her "why I moved back" film, above the local spots: the personal
             # reason first, then the proof of how well she knows the place.
@@ -4369,26 +4835,14 @@ def build_city_pages():
             # for the town the reader is actually on.
             nearby_block = _nearby_towns_block(c, city)
 
-            own_home_block = ""
-            if data_slug == "erie":
-                own_home_block = f"""<section class="tight section-dark">
-  <div class="wrap grid-2">
-    <div>
-      <span class="eyebrow">Recently Sold In Erie</span>
-      <h2 class="section-title" style="color:#fff">A Look At {esc(SITE['agent'])}'s Work In Colliers Hill</h2>
-      <p class="lede">913 Green Mountain Dr — a past client sale {esc(SITE['agent'])} represented in Erie's
-      Colliers Hill neighborhood. The video tour shows the same level of cinematic marketing,
-      staging, and presentation every Signature Property Collection listing gets.</p>
-      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
-        <a class="btn btn-outline" href="/past-sales.html">See More Past Sales &rarr;</a>
-        <a class="btn btn-outline" href="/listing-video-portfolio.html">More Video Tours &rarr;</a>
-      </div>
-    </div>
-    <div>
-      {_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", "Colliers Hill, Erie, CO — Sold")}
-    </div>
-  </div>
-</section>"""
+            # Her listing tours filmed in THIS town. Was a hand-written block for
+            # Erie only; now data-driven, so eleven towns carry it. The header video
+            # above is excluded by id -- CITY_VIDEOS and TOWN_LISTING_VIDEOS overlap
+            # for Windsor and Loveland, and the same embed twice on one page reads
+            # like a bug, not like proof.
+            own_home_block, own_home_schema = _town_listing_videos_block(
+                data_slug, city, c["name"],
+                exclude_ids=([vid_id] if vid_id else []) + _spot_video_ids(town_href))
 
             subdivisions_block = ""
             if data_slug == "loveland" and SUBDIVISION_PAGES:
@@ -4558,6 +5012,7 @@ def build_city_pages():
 </section>
 {search_widget_block}
 {local_block}
+{distance_block}
 {video_block}
 {relocation_block}
 {tour_block}
@@ -4620,11 +5075,12 @@ def build_city_pages():
                 # anywhere on the site, despite "luxury" appearing 264 times.
                 # The site was semantically adjacent to its money terms
                 # everywhere and exactly on them nowhere.
-                f"{city} Luxury Homes For Sale | {c['name']}, CO",
+                _town_title(city, data_slug, c["name"]),
                 meta,
                 f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html", "Communities", body,
                 schema_extra=[breadcrumbs, faq_schema]
-                + ([city_video_schema] if city_video_schema else []),
+                + ([city_video_schema] if city_video_schema else [])
+                + own_home_schema,
                 canonical_path=(
                     f"/communities/{DUAL_COUNTY_PRIMARY[city]}/{_city_url_slug(data_slug)}.html"
                     if DUAL_COUNTY_PRIMARY.get(city)
@@ -8111,6 +8567,214 @@ def build_nav_pages():
         "/listing-video-portfolio.html", None, body, schema_extra=[breadcrumbs],
     )
 
+    # ---- How To Choose A Real Estate Agent ----
+    # 2026-08-16 (Christine: "review every single page and make corrections and edits and
+    # make it seo and aeo friendly for each search and how to pick a real estate agent").
+    #
+    # The site had nothing on this, which is a strange gap for an agent site: "how do I
+    # choose a real estate agent" and "what should I ask a realtor" are among the highest
+    # -intent searches a seller makes, and they are asked in exactly the phrasing an
+    # answer engine likes to quote.
+    #
+    # Every word of the substance here is hers, read off the transcripts of her own
+    # Shorts rather than written for her. Both "How Do You Know If a Real Estate Agent Is
+    # Good?" (9Uhl9bAsbLA) and "What are the Top 3 things to ask a Colorado Realtor"
+    # (S2NQcbF6Xag) give the same three, in the same order, in her voice:
+    #   1. Price it exactly where it needs to be -- "keeps more money in your pocket"
+    #   2. Marketing -- "you may have the most beautiful home but unless people can find
+    #      it it's not going to sell"
+    #   3. Negotiation -- "negotiate better than the other real estate agent to keep more
+    #      money in my client's pockets"
+    # and zFJtZuHf4fQ lists the marketing she actually does: photography, videography,
+    # postcards, digital ads, social media ads, door hangers, sometimes billboards.
+    #
+    # That consistency is the point. She has been saying the same three things to camera
+    # for two years and the website never said them once.
+    #
+    # The FAQ block is written for answer engines: full-sentence questions in the form
+    # people type them, each answered in the first sentence, and one deliberately
+    # uncomfortable answer -- the agent who promises the highest price is often the wrong
+    # choice -- because an answer engine has no reason to quote a page that only says the
+    # flattering thing.
+    agent_criteria = [
+        ("Can they price it exactly right?",
+         "Christine's first question, and the one that decides the other two. Price it "
+         "over the market and it sits, goes stale, and sells for less than it would have. "
+         "Price it under and you hand money away. Getting it exactly where it needs to be "
+         "is what keeps the most money in your pocket, and it is a judgement built from "
+         "having sold in your town, not from a website estimate.",
+         "9Uhl9bAsbLA"),
+        ("Do they actually market, or just list?",
+         "In her words: you may have the most beautiful home in the world, but unless "
+         "people can find it, it is not going to sell. Ask any agent what they do after "
+         "the sign goes in. Christine's answer is professional photography and video, "
+         "postcards, digital ads, social ads, door hangers, and sometimes a billboard — "
+         "plus a YouTube channel with real footage of the towns she sells in.",
+         # 6,809 views, against 398 for the Short that was here first. Same argument,
+         # forty times the audience -- and on a page about judging an agent, a video that
+         # many people chose to watch is itself part of the answer.
+         "nidadH0ZWjU"),
+        ("Can they negotiate?",
+         "This is where the money is won or lost, and it is the hardest thing to check "
+         "before you hire someone. What you are looking for is an agent who will protect "
+         "you and your money when the inspection objection lands and the other side asks "
+         "for eight thousand dollars. Ask them to walk you through the last deal they "
+         "renegotiated and what it saved the seller.",
+         "zFJtZuHf4fQ"),
+    ]
+    criteria_html = "\n      ".join(
+        f"""<div class="agent-crit">
+      <h3 class="agent-crit-head"><span>{i}</span>{esc(q)}</h3>
+      <div class="grid-2" style="align-items:start;gap:26px">
+        <p>{esc(a)}</p>
+        <div>{_yt_embed(vid, q)}</div>
+      </div>
+    </div>""" for i, (q, a, vid) in enumerate(agent_criteria, 1))
+
+    choose_faqs = [
+        ("How do I choose a real estate agent?",
+         "Judge them on three things: whether they can price your home exactly right, "
+         "whether they actually market it or simply list it, and whether they can "
+         "negotiate. Christine Gwinnup of Signature Property Collection has answered it "
+         "the same way for years — price, marketing, negotiation, in that order, because "
+         "getting the price wrong makes the other two much harder."),
+        ("How do you know if a real estate agent is good?",
+         "Ask for specifics rather than promises. What did the last three homes they "
+         "listed sell for against asking, and how long did they take? What exactly do "
+         "they do to market a listing beyond putting it in the MLS? Name a deal they "
+         "renegotiated and what it saved the client. A good agent answers all three "
+         "without hesitating."),
+        ("What questions should I ask a realtor before listing my home?",
+         "How did you arrive at that price, and what would change it? What is your "
+         "marketing plan for my house specifically? Who is the buyer for this home and "
+         "where will you find them? What happens if we get an inspection objection? Will "
+         "I be working with you or with someone on your team? And how many homes have you "
+         "sold in my town, not just in the county?"),
+        ("Should I pick the agent who says my home is worth the most?",
+         "Usually not, and this is the most expensive mistake sellers make. Any agent can "
+         "say a high number to win the listing, then ask for a price reduction three weeks "
+         "later once the home has gone stale. Ask instead what that number is based on: "
+         "which comparable sales, in which neighborhood, and how recent. The right agent "
+         "will show you the homes their number came from."),
+        ("Does it matter if an agent works in my specific town?",
+         "It matters more than most sellers expect, because a buyer pool is local. What a "
+         "home in Nunn or Carr is worth, and who is looking for it, has almost nothing in "
+         "common with Fort Collins twenty miles away. Christine sells across Northern "
+         "Colorado from Denver north, and her sold list is published by town so you can "
+         "check whether she has closed in yours before you call."),
+        ("Is Zillow's Zestimate accurate enough to price my home?",
+         "No, and not because it is badly built — it simply cannot see your house. A "
+         "Zestimate works from public records and recent nearby sales, so it does not know "
+         "you replaced the roof, backs onto a canal, or that the comparable sale down the "
+         "street was a gut remodel. Treat it as a starting range and nothing more. "
+         "Christine has a video walking through exactly where these tools go wrong."),
+        (f"Who is the best real estate agent in Northern Colorado?",
+         f"There is no honest single answer, and any agent claiming to be it should be "
+         f"treated with suspicion. What you can check is verifiable: {SITE['agent']} of "
+         f"{SITE['name']} ({SITE['brokerage']}) has sold 150+ homes herself and 250+ as a "
+         f"duo, holds 158 five-star Google reviews, and publishes her closed sales by "
+         f"town. Compare that against any other agent you are considering, on the same "
+         f"three questions."),
+    ]
+    # _faq_block gives the FAQPage JSON-LD and the plain Q&A prose that answer engines
+    # actually quote. Used rather than hand-rolled cards so this page's schema is the same
+    # shape as every other FAQ on the site.
+    choose_faq_html, choose_faq_schema = _faq_block(choose_faqs)
+    choose_body = f"""
+<section class="hero" style="padding:100px 0 70px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Before You Hire Anyone</span>
+    <h1>How To Choose A Real Estate Agent In Northern Colorado</h1>
+    <p class="lede">Every agent will tell you they are the right one. These are the three
+    questions that actually separate them, the answers {esc(SITE['agent'].split()[0])} has
+    been giving to camera for two years, and what to ask before you sign anything.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Three That Matter</span>
+    <h2 class="section-title">Price, Marketing, Negotiation &mdash; In That Order</h2>
+    <p class="lede" style="max-width:70ch">Get the price wrong and the other two get much
+    harder. That is why it is first, and why an agent who leads with anything else is
+    answering a different question than the one you asked.</p>
+    {criteria_html}
+  </div>
+</section>
+{choose_faq_html}
+<section class="tight section-dark">
+  <div class="wrap">
+    <span class="eyebrow">Check It Yourself</span>
+    <h2 class="section-title" style="color:#fff">Don't Take Her Word For Any Of This</h2>
+    <p class="lede" style="max-width:70ch">Both of these are checkable in about two
+    minutes, which is the point of publishing them.</p>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+      <a class="btn btn-outline" href="/past-sales.html">Every Home She's Sold, By Town &rarr;</a>
+      <a class="btn btn-outline" href="/testimonials.html">Read The Reviews &rarr;</a>
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">In Her Own Words</span>
+      <h2 class="section-title">Two Videos Worth Three Minutes</h2>
+      <p class="lede">The first is the short answer to why sellers call her; the second is
+      what "marketing" actually means in practice. Between them they have been watched
+      about 16,000 times, which is not proof of anything on its own &mdash; but the
+      arguments in them are checkable against the sold list.</p>
+    </div>
+    <div>
+      {_yt_embed("BGvBuXzj5FA", "Best Northern Colorado Real Estate Agent, The Little Lady Sells Homes")}
+      <div style="margin-top:18px">{_yt_embed("bn3rConMMIM", "How Accurate Are Home Value Tools Such As Zillow's Zestimate And Homebot?")}</div>
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">Ask Her The Three</span>
+      <h2 class="section-title">Put {esc(SITE['agent'].split()[0])} Through It</h2>
+      <p class="lede">No obligation and no pitch — bring the questions on this page and
+      ask them. If the answers do not convince you, you have lost half an hour and gained
+      a much better set of questions for the next agent you talk to.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-dark" href="/contact.html">Ask {esc(SITE['agent'].split()[0])} Your Questions</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/free-home-valuation.html">What's My Home Worth?</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/how-to-choose-a-real-estate-agent.html">How To Choose An Agent &rarr;</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3>What she'll tell you on that call</h3>
+      <p>What your home is likely to sell for and which recent sales that number comes
+      from. What she would do to market it, specifically. Where the buyer for your house
+      is most likely to come from. And what she would not do &mdash; because an agent who
+      has no reservations about your plan is not actually looking at it.</p>
+    </div>
+  </div>
+</section>
+"""
+    choose_breadcrumbs = _breadcrumb_schema([
+        ("Home", "/index.html"), ("How To Choose A Real Estate Agent", None)])
+    page(
+        "How To Choose A Real Estate Agent In Northern Colorado",
+        "The three questions that separate real estate agents — pricing, marketing and "
+        "negotiation — plus what to ask before you list. From Christine Gwinnup.",
+        "/how-to-choose-a-real-estate-agent.html", None, choose_body,
+        schema_extra=[choose_breadcrumbs, choose_faq_schema]
+        + [_video_object_schema(vid, q,
+                                f"{SITE['agent']} on {q.lower()[:-1]} when choosing a real "
+                                f"estate agent in Northern Colorado.")
+           for q, _a, vid in agent_criteria]
+        + [_video_object_schema(
+            "BGvBuXzj5FA", "Best Northern Colorado Real Estate Agent",
+            f"{SITE['agent']} on what makes a Northern Colorado real estate agent worth "
+            f"hiring."),
+           _video_object_schema(
+            "bn3rConMMIM", "How Accurate Are Zillow's Zestimate And Homebot?",
+            f"{SITE['agent']} on why automated home-value tools miss, and what to use "
+            f"instead when pricing a Northern Colorado home.")],
+    )
+
     # ---- Past Sales ----
     # "How I Sold These Homes" — real video tours of properties Christine has
     # represented that are no longer on her active/live board (cross-checked
@@ -8151,12 +8815,73 @@ def build_nav_pages():
       <button type="button" class="btn btn-outline" style="border-color:#141415;color:#141415;cursor:pointer"
       onclick="document.getElementById('more-sold-tours').style.display='block';this.style.display='none'">View More Videos</button>
     </div>""" if hidden_sold_cards else ""
+    # 2026-08-16 (Christine: "maybe a page with all sold listings not just hte ones
+    # with videos"). Right, and the gap was bigger than it looked: the showcase above
+    # only ever renders sales she happened to FILM, so a page headed "Past Sales" was
+    # showing four homes out of forty-two. The film crew is not the qualification.
+    #
+    # Grouped newest first, because "what have you sold lately" is the actual question
+    # and a 2019 sale answers it differently from a 2025 one. Homes whose year is not
+    # recorded sit in their own group at the end rather than being guessed into one.
+    #
+    # Deliberately address + town + year and nothing else. Price, beds and square
+    # footage for these come out of the IRES IDX feed, whose terms limit that data to
+    # consumers' personal, non-commercial use -- her transaction history is hers to
+    # publish, the MLS's listing content is not. Same rule as sold_homes.json.
+    # 2026-08-16, second pass (Christine: "who cares about the year - lets just get all
+    # these babies up"). The first version grouped by year, newest first, which put a
+    # "Year not recorded" heading on the page and made the reader's first question
+    # "what year is this" instead of "have you sold in my town".
+    #
+    # Grouped by TOWN now. That is what someone actually scans a sold list for -- they
+    # want their own street, or failing that their own town -- and it means the whole
+    # list reads as coverage rather than as a chronology with a gap in it. Towns with
+    # the most sales first, so the strongest coverage is what a visitor sees; the year
+    # stays on each row where it is known and is simply absent where it is not.
+    by_town = {}
+    for pin in SOLD_HOME_PINS:
+        by_town.setdefault(pin.get("city") or "Northern Colorado", []).append(pin)
+    year_blocks = []
+    for town in sorted(by_town, key=lambda t: (-len(by_town[t]), t)):
+        homes = sorted(by_town[town], key=lambda p: (-int(p.get("year") or 0), p["address"]))
+        rows = "\n        ".join(
+            f"""<li><span class="sold-addr">{esc(p['address'])}</span>"""
+            f"""<span class="sold-town">{esc(str(p.get('year') or ''))}</span>"""
+            + (f"""<a class="sold-tour" href="https://www.youtube.com/watch?v={esc(p['videoId'])}" """
+               f"""target="_blank" rel="noopener">Watch the tour &#8599;</a>"""
+               if p.get("videoId") else '<span class="sold-tour"></span>')
+            + "</li>" for p in homes)
+        year_blocks.append(f"""<div class="sold-year">
+      <h3 class="sold-year-head">{esc(town)} <span>{len(homes)} home{'s' if len(homes) != 1 else ''}</span></h3>
+      <ul class="sold-list">
+        {rows}
+      </ul>
+    </div>""")
+    all_sold_section = f"""<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Full List</span>
+    <h2 class="section-title">Every Home {esc(SITE['agent'].split()[0])} Has Sold, By Town</h2>
+    <!-- The count and the "150+ homes" figure in the hero are both true and a reader
+         WILL notice the gap, so it is explained rather than left to look like a
+         contradiction. Only addresses Christine has published herself appear here. -->
+    <p class="lede">{len(SOLD_HOME_PINS)} closed sales, grouped by town so you can find
+    yours. {esc(SITE['agent'].split()[0])} has sold 150+ homes over her career; these are
+    the ones on record here by address, and the list keeps growing as older files go in.
+    Every one is a real closing, not a shortlist of the good ones.</p>
+    {"".join(year_blocks)}
+    <div class="btn-row" style="margin-top:32px">
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/sold-homes-map.html">See Them On A Map &rarr;</a>
+      <a class="btn btn-dark" href="/free-home-valuation.html">What Would Mine Sell For?</a>
+    </div>
+  </div>
+</section>""" if SOLD_HOME_PINS else ""
+
     sold_homes_section = f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">How I Sold These Homes</span>
     <h2 class="section-title">Real Tours From Homes {esc(SITE['agent'].split()[0])} Has Represented</h2>
-    <p class="lede">A look at the actual marketing video for each property, filmed and
-    posted by {esc(SITE['agent'])} herself — real homes, real results, no stock photos.</p>
+    <p class="lede">The ones she filmed. Every video below is her own marketing for that
+    specific house — what a listing with {esc(SITE['agent'].split()[0])} actually looks like.</p>
     <div class="video-grid">
       {visible_sold_cards}
     </div>
@@ -8176,19 +8901,19 @@ def build_nav_pages():
     {SITE['agent']} has sold 150+ homes across Northern Colorado herself, 250+ as a
     duo with Kendra Bajcar — delivering
     top-dollar results and seamless transactions for clients throughout the Front Range.</p>
-    <p class="lede">Looking for current inventory? <a href="/search-homes.html"
-    style="text-decoration:underline">Search live, active IRES MLS listings</a> across
-    Larimer, Weld, and Boulder County, or see <a href="/current-listings.html"
-    style="text-decoration:underline">{esc(SITE['agent'].split()[0])}'s own Current Listings</a>.
-    In the meantime, read real client experiences on the
-    <a href="/testimonials.html" style="text-decoration:underline">Testimonials page</a>,
-    or reach out directly for recent comparable sales in your area.</p>
+    <p class="lede">Buying instead? <a href="/search-homes.html"
+    style="text-decoration:underline">Search every home for sale</a> across Northern
+    Colorado, or see <a href="/current-listings.html"
+    style="text-decoration:underline">{esc(SITE['agent'].split()[0])}'s own listings</a>.
+    For what her clients say about the experience, read the
+    <a href="/testimonials.html" style="text-decoration:underline">testimonials</a>.</p>
     <div class="btn-row">
-      <a class="btn btn-primary" href="/search-homes.html">Search Active Listings</a>
+      <a class="btn btn-primary" href="/free-home-valuation.html">What's My Home Worth?</a>
       <a class="btn btn-outline" href="/testimonials.html">Read Testimonials</a>
     </div>
   </div>
 </section>
+{all_sold_section}
 {sold_homes_section}
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Past Sales", None)])
@@ -8382,19 +9107,17 @@ def build_search_homes():
     body = f"""
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
-    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Every Home On The Market</span>
     <h1>Search Northern Colorado Homes For Sale</h1>
-    <p class="lede">Real, active listings from IRES MLS — updated live, not a stale
-    snapshot. Search all of {', '.join(county_names[:-1])} and {county_names[-1]} County
-    at once, or narrow to a single city, then dial in the exact price range, beds,
-    and baths you're after.</p>
+    <p class="lede">Every home for sale across Northern Colorado and the north Front
+    Range, updated straight from the MLS through the day. Search a whole county or a
+    single town, set your price, and see what is actually available right now.</p>
   </div>
 </section>
 <section>
   <div class="wrap">
-    <p class="search-status" style="margin-top:0">Search an entire county in one click,
-    or pick a city and dial in your price, beds, and baths below. Looking specifically
-    for {esc(SITE['agent'].split()[0])}'s own listings, with video tours where available?
+    <p class="search-status" style="margin-top:0">Want {esc(SITE['agent'].split()[0])}'s own
+    listings instead, with video tours where she has them?
     <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
     {widget_html}
   </div>
@@ -8403,9 +9126,12 @@ def build_search_homes():
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Search Homes", None)])
     page(
-        "Search Northern Colorado Homes For Sale | Live IRES MLS Listings | Signature Property Collection",
-        "Search live, active IRES MLS listings across Larimer, Weld, and Boulder County "
-        "— by county or city, any price range, beds, and baths. Updated every 15 minutes.",
+        "Search Northern Colorado Homes For Sale | Signature Property Collection",
+        # 2026-08-16: this named "Larimer, Weld, and Boulder County" long after the
+        # other six counties came online -- a description under-selling the coverage
+        # by two thirds, in the one line Google shows under the title.
+        "Every home for sale across Larimer, Weld, Boulder and six more Colorado "
+        "counties — search by town, price, beds and baths. Updated through the day.",
         "/search-homes.html", "Search Homes", body, schema_extra=[breadcrumbs],
     )
 
@@ -8959,7 +9685,8 @@ def build_redirects_and_meta():
               "/past-sales.html", "/mortgage-calculator.html",
               "/search-homes.html", "/current-listings.html",
               "/sold-homes-map.html", "/luxury-market.html",
-              "/press-recognition.html", "/concierge-experience.html"]
+              "/press-recognition.html", "/concierge-experience.html",
+              "/how-to-choose-a-real-estate-agent.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
     # discover and index them; everything else is unaffected.
