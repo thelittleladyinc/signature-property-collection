@@ -3318,7 +3318,7 @@ def build_seller_local_proof():
       been watched, and how she&rsquo;d market your home into that same audience. No obligation and
       no pressure to list.</p>
     </div>
-    <form class="lead-form" name="seller-local-proof" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+    <form class="lead-form" name="seller-local-proof" action="/thank-you.html?from=seller-local-proof" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="seller-local-proof">
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
@@ -4807,7 +4807,7 @@ def build_contact():
 </section>
 <section>
   <div class="wrap grid-2">
-    <form class="lead-form" name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+    <form class="lead-form" name="contact" action="/thank-you.html?from=contact" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="contact">
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
@@ -4927,7 +4927,7 @@ def build_guides():
       {bullet_html}
       </ul>
     </div>
-    <form class="lead-form" name="{form_name}" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+    <form class="lead-form" name="{form_name}" action="/thank-you.html?from={form_name}" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="{form_name}">
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
@@ -6236,7 +6236,7 @@ def build_blog():
 
 # ----------------------------------------------------------- NAV PAGES ----
 def _tool_lead_form(form_name, button_label, extra_fields=""):
-    return f"""<form class="lead-form" name="{form_name}" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+    return f"""<form class="lead-form" name="{form_name}" action="/thank-you.html?from={form_name}" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="{form_name}">
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
@@ -8259,16 +8259,113 @@ def build_legal():
              "Signature Property Collection's commitment to an accessible, inclusive website.",
              "/accessibility.html", None, body)
 
+    # 2026-08-16. Two problems with what was here, which was a <h1>Thank You</h1>,
+    # nine words of reassurance, and a link back to the homepage.
+    #
+    #  1. Nothing pointed at it. All 65 forms showed Netlify's default inline
+    #     message instead, so a person who had just handed over their phone number
+    #     got a grey box. This page existed and was unreachable.
+    #  2. It made conversions unmeasurable. A thank-you URL is how any analytics
+    #     tool identifies a completed lead; with no redirect there is no event to
+    #     count, so "which page produces leads" could never be answered -- and that
+    #     is the exact question Christine wants analytics for ("then we could know
+    #     which blogs to write").
+    #
+    # So: every form now redirects here carrying ?from=<form-name>, which both
+    # attributes the conversion and lets the page say something specific about what
+    # the person actually asked for.
+    #
+    # The tailoring is progressive enhancement, deliberately. The default copy below
+    # is complete and correct on its own -- with JS blocked, or if the query string
+    # is missing, the visitor still gets a real answer about what happens next. The
+    # script only ever REPLACES text with something more specific.
+    #
+    # Response time is stated as a promise because a vague "shortly" is what every
+    # other agent's form says, and a specific commitment is the whole differentiator
+    # at the moment a lead is deciding whether they picked the right agent.
+    first = SITE["agent"].split()[0]
+    # The site renders her number as plain text on all 144 pages. Here it is a
+    # tel: link, because this is the one page where the reader has already decided
+    # to make contact and is most likely on a phone. Digits only in the href --
+    # dialers cope with punctuation inconsistently, and the visible text keeps her
+    # formatting.
+    phone_digits = re.sub(r"[^\d+]", "", SITE.get("phone", ""))
     thank_you_body = f"""
-<section class="hero" style="padding:120px 0"><div class="wrap">
-  <h1>Thank You</h1>
-  <p class="lede">Thanks for reaching out — we'll be in touch shortly.</p>
-  <div class="btn-row"><a class="btn btn-primary" href="/index.html">Continue Exploring</a></div>
+<section class="hero" style="padding:110px 0 70px"><div class="wrap">
+  <span class="eyebrow" style="color:var(--dusty-rose)">Got It</span>
+  <h1 style="margin-top:8px">Thank You &mdash; I&rsquo;ve Got Your Message</h1>
+  <p class="lede" id="ty-message">{esc(first)} will personally read this and get back to you
+  &mdash; usually within a couple of hours during the day, and always the same day.
+  Not an assistant, not an auto-responder.</p>
+  <p class="lede" style="margin-top:18px">If it&rsquo;s urgent, call or text
+  <a href="tel:{esc(phone_digits)}">{esc(SITE.get('phone', ''))}</a>
+  and you&rsquo;ll reach {esc(first)} directly.</p>
 </div></section>
+
+<section class="tight"><div class="wrap">
+  <h2 class="section-title">While You&rsquo;re Here</h2>
+  <p class="lede">Three things worth your time, all built from what {esc(first)} actually
+  knows about these towns rather than what a listing portal can tell you.</p>
+  <div class="grid-3" style="margin-top:28px">
+    <a class="card" href="/communities/" style="display:block">
+      <span class="eyebrow" style="font-size:13px;color:var(--deep-mauve)">The Map</span>
+      <h2 class="card-title" style="margin-top:6px">Every Local Spot She&rsquo;s Filmed</h2>
+      <p>The restaurants, trails and lakes {esc(first)} has actually been to, pinned on a
+      map with homes for sale near each one.</p>
+    </a>
+    <a class="card" href="/communities/#quiz" style="display:block">
+      <span class="eyebrow" style="font-size:13px;color:var(--deep-mauve)">Two Minutes</span>
+      <h2 class="card-title" style="margin-top:6px">Which Town Fits You?</h2>
+      <p>Four questions about how you actually want to spend a Saturday, and it tells you
+      which Northern Colorado town matches.</p>
+    </a>
+    <a class="card" href="/search-homes.html" style="display:block">
+      <span class="eyebrow" style="font-size:13px;color:var(--deep-mauve)">Live Feed</span>
+      <h2 class="card-title" style="margin-top:6px">Search Every Listing</h2>
+      <p>Straight from the MLS, updated through the day &mdash; the same data
+      {esc(first)} works from, with no gated sign-up.</p>
+    </a>
+  </div>
+</div></section>
+
+<script>
+/* Says something specific about what they just asked for. Keyed to the form names
+   in netlify/functions/submission-created.js SOURCE_LABELS -- if a form is added
+   there and not here, the default message above is still correct, which is why
+   this is a lookup with no fallback logic of its own. */
+(function () {{
+  var MSG = {{
+    "free-home-valuation": "{esc(first)} will put together a real valuation for your address \\u2014 based on what has actually sold near you, not an algorithm\\u0027s guess \\u2014 and walk you through it. Expect it the same day.",
+    "sellers-page-inquiry": "{esc(first)} will put together a real valuation for your address \\u2014 based on what has actually sold near you, not an algorithm\\u0027s guess \\u2014 and walk you through it. Expect it the same day.",
+    "seller-local-proof": "{esc(first)} will pull the numbers for your town and your address together, so you can see exactly how many people are already watching content about where you live. Same day.",
+    "listing-inquiry": "{esc(first)} will get you the answer on that home \\u2014 including anything not in the listing \\u2014 and can usually get you inside it within a day or two.",
+    "listing-alert-request": "Your search is saved. New listings matching it will land in your inbox as they hit the market, usually before they show up on the big portals.",
+    "neighborhood-quiz": "Your match is on its way, and {esc(first)} will add the part a quiz cannot \\u2014 which streets in that town are actually worth your money right now.",
+    "relocation": "Moving here is the part {esc(first)} has done herself. She will get back to you with the honest version, not a brochure.",
+    "buyers-guide": "Your guide is on the way. {esc(first)} will also check in once \\u2014 no pressure, just in case you have a question the guide does not answer.",
+    "sellers-guide": "Your guide is on the way. {esc(first)} will also check in once \\u2014 no pressure, just in case you have a question the guide does not answer.",
+    "buyers-page-inquiry": "{esc(first)} will get back to you about buying \\u2014 usually within a couple of hours during the day.",
+    "lifestyle-search": "{esc(first)} will match what you described against what is actually on the market, including homes that do not show up in a normal search.",
+    "contact": "{esc(first)} will personally read this and get back to you \\u2014 usually within a couple of hours during the day, and always the same day.",
+    "luxury-market": "{esc(first)} will get back to you personally about the luxury market \\u2014 including the homes that are quietly for sale and never hit the portals.",
+    "concierge-page-inquiry": "{esc(first)} will call you to talk through what the concierge service would actually cover for your home, and what it would cost you. Nothing up front.",
+    "testimonials-page-inquiry": "{esc(first)} will get back to you the same day \\u2014 and if you would like to speak to a past client directly before you decide anything, just ask."
+  }};
+  try {{
+    var from = new URLSearchParams(window.location.search).get("from");
+    var el = document.getElementById("ty-message");
+    if (from && el && MSG[from]) el.textContent = MSG[from];
+  }} catch (e) {{ /* default copy stands */ }}
+}})();
+</script>
 """
     page("Thank You | Signature Property Collection",
-         "Thanks for reaching out to Signature Property Collection — we'll be in touch shortly.",
-         "/thank-you.html", None, thank_you_body)
+         "Thanks for reaching out to Signature Property Collection — "
+         f"{SITE['agent']} will be in touch the same day.",
+         "/thank-you.html", None, thank_you_body,
+         # Kept out of the index: a thank-you page ranking for anything is a
+         # visitor landing on a confirmation for something they never submitted.
+         extra_head='<meta name="robots" content="noindex, follow">')
 
 
 def _truncate_words(text, max_len):

@@ -255,7 +255,7 @@
       <button type="button" class="lb-close" onclick="closeInquiry()" aria-label="Close">&times;</button>
       <h2 class="widget-title" id="inquiry-heading">Ask A Question</h2>
       <p id="inquiry-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
-      <form class="lead-form" name="listing-inquiry" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <form class="lead-form" name="listing-inquiry" action="/thank-you.html?from=listing-inquiry" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="listing-inquiry">
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
@@ -282,7 +282,7 @@
       <button type="button" class="lb-close" onclick="closeListingAlert()" aria-label="Close">&times;</button>
       <h3 id="alert-heading">Email Me New Matches</h3>
       <p id="alert-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
-      <form class="lead-form" name="listing-alert-request" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <form class="lead-form" name="listing-alert-request" action="/thank-you.html?from=listing-alert-request" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="listing-alert-request">
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
@@ -1158,7 +1158,7 @@
       <h3 style="margin-top:48px">Want Your Full Personalized Report?</h3>
       <p class="lede" id="quiz-report-lede">Get a curated list of homes matched to your
       answers — and every runner-up town — sent straight to your inbox.</p>
-      <form class="lead-form" name="neighborhood-quiz" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <form class="lead-form" name="neighborhood-quiz" action="/thank-you.html?from=neighborhood-quiz" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="neighborhood-quiz">
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>

@@ -96,6 +96,15 @@ const SOURCE_LABELS = {
   // people already watch content about their town and asked for it for their own
   // address -- so it is a listing lead, not a browse, and worth its own label.
   "seller-local-proof": "Signature Property Collection - Seller Local Proof (listing lead)",
+  // 2026-08-16: found by cross-checking every form-name rendered into site/ against
+  // the keys here, while adding the thank-you redirect. These three forms exist and
+  // have existed, and were falling through to the raw-slug fallback below -- so a
+  // lead from the luxury page arrived in Lofty labelled "luxury-market", which
+  // sorts and reads like a bug rather than a source. Worth their own labels
+  // especially: two of the three are the highest-intent pages on the site.
+  "luxury-market": "Signature Property Collection - Luxury Market Page",
+  "concierge-page-inquiry": "Signature Property Collection - Concierge Page Inquiry",
+  "testimonials-page-inquiry": "Signature Property Collection - Testimonials Page Inquiry",
 };
 
 function splitName(fullName) {
