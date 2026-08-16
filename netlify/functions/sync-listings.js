@@ -105,6 +105,20 @@ let _lastCloudinaryError = null;
 // below (after the priority pass and after each page) — those make a
 // timeout lose at most the current chunk of work instead of the whole run.
 const TIME_BUDGET_MS = 8000;
+// The most any one sub-task may take of the run's budget. Exists so a failing
+// side-task can never starve the listing replication that is this function's
+// actual job -- see the 2026-08-16 note in the priority pass below, where a
+// broken Cloudinary account was consuming 100% of every run.
+const PRIORITY_PASS_BUDGET_FRACTION = 0.4;
+
+// A Cloudinary error that will fail identically no matter how many times it is
+// retried, because the account or credentials are wrong rather than busy.
+// Deliberately narrow: anything not matched here is treated as transient and
+// keeps its normal retries.
+function isCloudinaryConfigError(message) {
+  return /cloud_name mismatch|invalid signature|invalid api.?key|unknown api.?key|disabled account/i
+    .test(String(message || ""));
+}
 const PAGE_SIZE = 50; // kept small since $expand=Media makes each record heavy
 // 2026-08-12 (rate-limit fix): MLS Grid suspended API access today (and
 // several times before, per notify@mlsgrid.com emails going back to
@@ -817,8 +831,38 @@ exports.handler = async () => {
     .filter((l) => l.listingId && isHerListing(l) && !isFullyCached(l))
     .map((l) => l.listingId);
 
-  for (const listingId of herPendingIds) {
-    if (Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
+  // 2026-08-16, FOUND BY AUDIT and this is the real bug behind a symptom nobody
+  // had explained: her /status showed "Last ran 5 minute(s) ago" with
+  // lastRunPagesFetched 0 and lastRunRecordsSeen 0, and an initial catalog crawl
+  // stuck at $skip=12400 while claiming to be "in progress".
+  //
+  // Cause: Cloudinary's credentials are misconfigured (cloud_name mismatch), so
+  // NONE of her 11 listings can ever become fully cached. isFullyCached is
+  // therefore false for all of them, forever, so this priority pass re-tried all
+  // 11 on every single run -- an MLS Grid call and a throttle wait each -- and
+  // consumed the entire 8-second budget before the bootstrap crawl got a single
+  // page. Broken photo credentials were silently starving listing replication.
+  //
+  // Two guards, and the first matters more than the second:
+  //
+  //   1. NO SUB-TASK MAY EAT THE WHOLE BUDGET. The priority pass is capped at a
+  //      fraction of it, so replication always gets its share no matter what
+  //      else is failing. That property should have existed from the start; the
+  //      Cloudinary outage just exposed its absence.
+  //   2. Don't retry a CONFIGURATION failure. A 403 from mismatched keys will
+  //      fail identically on every attempt, so hammering it 11 times every 15
+  //      minutes is pure waste. A transient error still retries normally.
+  const priorityCutoff = Math.floor((TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) * PRIORITY_PASS_BUDGET_FRACTION);
+  const cloudConfigBroken = isCloudinaryConfigError(state && state.lastCloudinaryError);
+  if (cloudConfigBroken && herPendingIds.length) {
+    console.error(`sync-listings: skipping the photo-caching priority pass for ` +
+      `${herPendingIds.length} listing(s) — Cloudinary's credentials are misconfigured ` +
+      `("${state.lastCloudinaryError}"), so every attempt would fail the same way and the ` +
+      `catalog crawl would be starved of its time budget. Fix the CLOUDINARY_* env vars to re-enable.`);
+  }
+
+  for (const listingId of (cloudConfigBroken ? [] : herPendingIds)) {
+    if (Date.now() - startedAt > priorityCutoff) break;
     await throttle();
     try {
       const result = await refreshOneListing(listingId, listingsById, store, token, startedAt, throttle);
