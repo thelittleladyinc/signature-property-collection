@@ -439,14 +439,21 @@ h2.section-title {
   border-top: 1px solid var(--hairline-rose);
   transition: box-shadow .25s ease, transform .25s ease, border-color .25s ease;
 }
+/* 2026-08-16, merging the discoverability branch. Both sides had rewritten
+   these three rules. Taken deliberately rather than by picking a side:
+   the hover is master's, because it uses the current design tokens
+   (--hairline-strong / --rose) that the other branch predates; the heading
+   selector is the branch's, because its wider reach (.card-title, h2.card-title)
+   is what the promoted h2 headings on 97 guide pages depend on; and .card p is
+   stated once, with the token instead of the branch's hardcoded #57575a, since
+   duplicating the selector was master's own copy-paste slip. */
 .card:hover {
   box-shadow: 0 26px 60px rgba(51,65,79,.07);
   transform: translateY(-2px);
   border-color: var(--hairline-strong);
   border-top-color: var(--rose);
 }
-.card p { color: var(--slate-soft); }
-.card h3 { font-family: var(--font-serif); font-weight: 400; font-size: 21px; margin: 0 0 16px; letter-spacing: .01em; }
+.card h3, .card .card-title, h2.card-title { font-family: var(--font-serif); font-weight: 400; font-size: 21px; margin: 0 0 16px; letter-spacing: .01em; line-height: 1.3; max-width: none; }
 .card p { color: var(--slate-soft); line-height: 1.8; font-size: 14.5px; font-weight: 300; }
 .card a.cta {
   display: inline-block; margin-top: 24px; font-size: 11px; font-weight: 600;
@@ -616,7 +623,7 @@ form.lead-form label.consent { font-size: 12px; color: var(--slate-mist); displa
 .footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1.3fr 1fr; gap: 52px; }
 @media (max-width: 1100px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 600px) { .footer-grid { grid-template-columns: 1fr; } }
-.footer-grid h4 { color: var(--white); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 20px; opacity: .85; }
+.footer-grid h4, .footer-grid .footer-col-title { color: var(--white); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 20px; opacity: .85; font-family: var(--font-sans); font-weight: 600; }
 .footer-grid ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 13px; }
 .footer-grid ul a { color: rgba(255,255,255,.72); font-size: 14px; }
 .footer-grid ul a:hover { color: var(--white); text-decoration: underline; }
@@ -1079,4 +1086,51 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--deep-mauve);
+/* 2026-08-14 (a11y): skip link paired with the new <main id="main">
+   landmark in build.py's page(). Visually hidden until keyboard-focused,
+   so it costs sighted users nothing and gives keyboard/screen-reader
+   users a way past the nav + trust ribbon that repeat on all 136 pages. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  padding: 12px 20px;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+  text-decoration: none;
+  border: 2px solid #B86F7A;
+  border-radius: 0 0 4px 0;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* 2026-08-14 (document outline): article/guide section headings were <h3>
+   sitting directly under the page <h1>, skipping a level on 97 pages. They
+   are now <h2> for a valid outline; this rule preserves the exact previous
+   h3 rendering so the promotion is semantic only, with no visual change. */
+h2.article-subhead {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 1.17em;
+  line-height: 1.35;
+  letter-spacing: 0;
+  margin-bottom: 10px;
+  max-width: none;
+}
+
+/* 2026-08-14 (document outline): the "Ask A Question" and "Share This Page"
+   widget headings were <h3> sitting directly under the page <h1>, skipping
+   a level. Promoted to <h2>; this keeps their previous h3 rendering so the
+   change is semantic only. */
+h2.widget-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 1.17em;
+  line-height: 1.35;
+  letter-spacing: 0;
+  margin: 0 0 10px;
+  max-width: none;
 }

@@ -10,11 +10,24 @@ asset we couldn't (and shouldn't) copy wholesale.
 Run: python3 build.py   -> writes finished HTML into ../site/
 """
 import os
+import re
 import json
 import datetime
 import urllib.parse
-import qrcode
-import qrcode.image.svg
+# qrcode is only needed to generate a per-page QR SVG that does not already
+# exist. All 141 current QR assets are generated and committed under
+# site/assets/qr/, and _page_qr() below skips any file already on disk, so a
+# normal rebuild needs this import for nothing. Made optional so the site can
+# still be rebuilt in an environment without PyPI access; if a genuinely new
+# page is added there, _page_qr() raises with a clear instruction instead of
+# failing at import time.
+try:
+    import qrcode
+    import qrcode.image.svg
+    _HAVE_QRCODE = True
+except ModuleNotFoundError:  # pragma: no cover
+    qrcode = None
+    _HAVE_QRCODE = False
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.abspath(os.path.join(HERE, "..", "site"))
@@ -146,6 +159,22 @@ SITE = {
         "state": "CO",
         "zip": "80538",
     },
+    # 2026-08-14: geo coordinates feed local-pack relevance and were missing
+    # from every RealEstateAgent node on the site. These are LOVELAND
+    # CITY-LEVEL coordinates, deliberately not a precise rooftop geocode of
+    # 2411 Glade Rd -- that address is residential, and publishing exact
+    # rooftop coordinates for a home isn't something to do without asking.
+    # City-level is accurate, honest, and sufficient for a service-area
+    # business. Replace with a precise geocode only if Christine moves to a
+    # commercial address and wants it pinpointed.
+    "geo": {"lat": 40.3978, "lng": -105.0750},
+    # Business hours: intentionally left empty. openingHoursSpecification is
+    # a real completeness signal, but inventing hours for a business that
+    # people will actually try to call would be worse than omitting it.
+    # Fill this in with Christine's real availability, e.g.
+    #   [{"@type": "OpeningHoursSpecification",
+    #     "dayOfWeek": ["Monday", ... ], "opens": "09:00", "closes": "17:00"}]
+    "hours": None,
     # Verified 2026-08-11 via web search (consistent "thelittleladysellshomes"
     # handle across every platform, matching her confirmed YouTube channel
     # and her own thelittleladysellshomes.com domain) — replaces the "#"
@@ -161,6 +190,62 @@ SITE = {
         "Zillow": "https://www.zillow.com/profile/TheLittleLady",
     },
 }
+
+# 2026-08-14: the single canonical entity URI for Christine, referenced by
+# every schema node sitewide (see _real_estate_agent_schema()). Fragment
+# form (#christine-gwinnup) rather than a page URL so the identity is not
+# tied to any one page's lifecycle.
+AGENT_ID = SITE["domain"] + "/#christine-gwinnup"
+ORG_ID = SITE["domain"] + "/#signature-property-collection"
+
+# Off-site profiles that are the SAME entity as AGENT_ID. Two jobs here:
+#
+#  1. Consolidation. Christine's real authority -- 99 five-star Google
+#     reviews, BBB A+, the NoCo Real Producers feature, Yelp, Zillow --
+#     accrued under "Christine Gwinnup" and "The Little Lady Sells Homes".
+#     Listing them as sameAs is how you tell a machine those profiles and
+#     this site are one person, so that authority consolidates here.
+#
+#  2. Disambiguation, which matters more than usual: "Signature Property
+#     Collection" collides with several other Colorado real-estate
+#     "Signature" brands, so the person-level corroboration is what makes
+#     the entity resolvable.
+#
+# 2026-08-14, corrected same day per Christine: she now holds only TWO
+# brands -- Signature Property Collection and The Little Lady Sells Homes.
+# boldcollectivehomes.com was previously listed here and has been REMOVED:
+# it is no longer hers, and a sameAs is an assertion that a URL represents
+# the same entity. Pointing it at a site she does not control would tie her
+# entity to whatever that domain becomes, which is worse than omitting it.
+#
+# thelittleladysellshomes.com stays. She still owns it, and while the
+# business is luxury-only under Signature Property Collection, the Little
+# Lady brand is where a large share of her real authority accrued (reviews,
+# BBB, press, every social handle). Listing it consolidates that authority
+# here. If and when it is 301'd into this domain and Google has re-crawled,
+# remove it -- a sameAs pointing at a URL that redirects back to you is
+# noise rather than signal.
+LEGACY_PROFILES = [
+    "https://www.thelittleladysellshomes.com/",
+]
+DIRECTORY_PROFILES = [
+    "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390",
+    "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2",
+    # Brokerage-hosted agent profile, not a brand she owns -- kept because
+    # it genuinely represents her at LPT Realty. Worth confirming it is
+    # still live and correct before the next deploy.
+    "https://christinegwinnup.lpt.com/",
+]
+
+
+def _same_as_urls():
+    """Every public profile that is the same entity as AGENT_ID."""
+    return (
+        [u for u in SITE["social"].values() if u and u != "#"]
+        + DIRECTORY_PROFILES
+        + LEGACY_PROFILES
+    )
+
 
 NAV = [
     ("Communities", "/communities/index.html"),
@@ -404,6 +489,61 @@ CITY_VIDEOS = {
     "denver-city": ("e7kMY1yV7GI", "Denver Home Tour — Charming Mid-Century Ranch", 1333),
     "red-feather-lakes": ("_ich5kS-VUY", "Red Feather Lakes: The Hidden Gem of Colorado", 1562),
 }
+
+# 2026-08-14 (luxury-only positioning, per Christine): videos whose titles
+# carry an explicit price anchor or entry-market framing, and which
+# therefore contradict a luxury-only brand when embedded on the site.
+#
+# These are NOT deleted from YouTube and should not be -- between them they
+# hold ~18,000 views, and view count plus watch history is real channel
+# authority that took years to build. Deleting them would reset it. They
+# simply stop being showcased on the site and stop receiving VideoObject
+# structured data, so the pages Google and AI engines read no longer
+# advertise "Home Under $400K" or "Affordable Luxury" alongside estate
+# positioning.
+#
+# Kept (town-lifestyle framing, no price anchor -- works for luxury):
+#   ault, windsor, loveland, erie, red-feather-lakes
+#
+# Worth naming plainly: greeley is Christine's single best-performing video
+# at 10,655 views. Pulling it off the site is a real cost, and it is the
+# clearest illustration of what luxury-only actually trades away.
+OFF_BRAND_CITY_VIDEOS = {
+    "eaton",            # "Home Under $400K"
+    "johnstown",        # "Affordable Luxury"
+    "greeley",          # entry-market; top performer, see note above
+    "broomfield-city",  # generic 4-bedroom tour
+    "denver-city",      # generic tour, outside the NoCo luxury farm area
+}
+
+
+def _luxury_city_videos():
+    """CITY_VIDEOS minus the off-brand entries."""
+    return {k: v for k, v in CITY_VIDEOS.items() if k not in OFF_BRAND_CITY_VIDEOS}
+
+
+def _video_object_schema(video_id, title, description, upload_date=None):
+    """VideoObject JSON-LD.
+
+    The site embedded ten real videos (privacy-mode youtube-nocookie
+    iframes, correctly lazy-loaded) and carried zero VideoObject schema on
+    any of them. Video is heavily surfaced in both Google and AI answers
+    for "what is it like to live in X" queries -- which is exactly what
+    these are -- so the videos existed but no crawler was told what they
+    were."""
+    data = {
+        "@context": "https://schema.org",
+        "@type": "VideoObject",
+        "name": title,
+        "description": description,
+        "thumbnailUrl": f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg",
+        "embedUrl": f"https://www.youtube-nocookie.com/embed/{video_id}",
+        "contentUrl": f"https://www.youtube.com/watch?v={video_id}",
+        "publisher": {"@id": AGENT_ID},
+    }
+    if upload_date:
+        data["uploadDate"] = upload_date
+    return json.dumps(data, indent=None)
 
 # Additional "different homes sold" tour videos for the Listing Video Portfolio page's
 # expandable "More Home Tours" row — deliberately distinct properties from the
@@ -1382,7 +1522,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
   <div class="lb-overlay" id="inquiry-overlay" role="dialog" aria-modal="true" aria-labelledby="inquiry-heading" onclick="if (event.target === this) closeInquiry()">
     <div class="lb-box">
       <button type="button" class="lb-close" onclick="closeInquiry()" aria-label="Close">&times;</button>
-      <h3 id="inquiry-heading">Ask A Question</h3>
+      <h2 class="widget-title" id="inquiry-heading">Ask A Question</h2>
       <p id="inquiry-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
       {_tool_lead_form("listing-inquiry", "Send My Message", extra_fields=inquiry_extra_fields)}
     </div>
@@ -2104,7 +2244,7 @@ def _instagram_feed_section():
     return f"""<section class="tight" id="instagram-feed-section">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Follow Along</span>
-    <h2 class="section-title">Real Listings, Real Life &mdash; @thelittleladysellshomes</h2>
+    <h2 class="section-title">Real Listings, Real Life</h2>
     <p class="lede">Straight from {esc(SITE['agent'])}'s own Instagram &mdash; new listings, video
     tours, and the real day-to-day of selling Northern Colorado real estate.</p>
     <div class="{grid_class}" style="justify-items:center">
@@ -2362,29 +2502,54 @@ def _real_estate_agent_schema():
     data = {
         "@context": "https://schema.org",
         "@type": "RealEstateAgent",
+        # 2026-08-14 (entity linking): a single stable @id, used identically
+        # on all 136 pages and referenced by every other schema node on the
+        # site. Without this, each page asserts a *separate* unconnected
+        # "a person called Christine Gwinnup exists" fact and nothing tells
+        # a knowledge-graph builder they're the same entity. That ambiguity
+        # is especially costly here because "Signature Property Collection"
+        # collides with at least six other Colorado real-estate brands
+        # (Signature Real Estate Corp, CC Signature Group, CENTURY 21
+        # Signature Realty, Signature Properties Ebner, resignature.com,
+        # Signature Realty Inc.), so machines need an explicit anchor.
+        # The anchor is the PERSON, not the brand name -- brands can be
+        # retired (see the Little Lady / Bold Collective wind-down), but
+        # every review, credential and press mention traces to Christine.
+        "@id": AGENT_ID,
         "name": SITE["agent"],
-        "url": SITE["domain"] + "/index.html",
+        "url": SITE["domain"] + "/",
         "image": SITE["domain"] + "/assets/img/logo-full.png",
         "telephone": SITE["phone"],
         "email": SITE["email"],
+        # Luxury-only positioning (per Christine, 2026-08-14). Published
+        # NoCo luxury thresholds run $750K+ in Fort Collins/Windsor and
+        # $600K+ in Loveland/Greeley; "$$$$" states the tier without
+        # asserting a specific figure that would go stale.
+        "priceRange": "$$$$",
         "worksFor": {"@type": "Organization", "name": SITE["brokerage"]},
         "areaServed": [{"@type": "AdministrativeArea", "name": n} for n in area_served],
-        "sameAs": [u for u in SITE["social"].values() if u and u != "#"],
+        "sameAs": _same_as_urls(),
         "dateModified": BUILD_DATE,
-        # 2026-08-14: Christine confirmed directly (99 Google reviews, all
-        # 5-star) -- real, current numbers for her actual Google Business
-        # Profile, not an estimate. Schema.org's aggregateRating is exactly
-        # what this data is for, and it's what lets Google/AI answer
-        # engines surface her star rating directly in search results
-        # instead of a visitor having to click through to find it. Update
-        # reviewCount here if/when she reports a new total.
-        "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "5.0",
-            "bestRating": "5",
-            "reviewCount": "99",
-        },
+        # NOTE: aggregateRating deliberately NOT emitted sitewide any more.
+        # Google's structured-data policy treats reviews *about* a business,
+        # hosted *on that business's own site*, as self-serving and
+        # therefore ineligible for rich results on LocalBusiness and its
+        # subtypes (RealEstateAgent is one). Stamping an identical
+        # 5.0 / 99 block onto all 136 pages -- including blog posts and city
+        # pages carrying no review content and no Review objects -- earned
+        # nothing and matched the pattern Google's spam guidance describes.
+        # The real, individually-verified 99/5.0 figure now appears once,
+        # on /testimonials.html, backed by actual Review objects. See
+        # _testimonials_review_schema().
     }
+    if SITE.get("geo"):
+        data["geo"] = {
+            "@type": "GeoCoordinates",
+            "latitude": SITE["geo"]["lat"],
+            "longitude": SITE["geo"]["lng"],
+        }
+    if SITE.get("hours"):
+        data["openingHoursSpecification"] = SITE["hours"]
     if SITE.get("address"):
         a = SITE["address"]
         data["address"] = {
@@ -2418,8 +2583,13 @@ def _kendra_agent_schema():
         "name": "Kendra Bajcar",
         "url": SITE["domain"] + "/about.html",
         "image": SITE["domain"] + "/assets/img/team/kendra-headshot.jpg",
+        "@id": SITE["domain"] + "/about.html#kendra-bajcar",
         "worksFor": {"@type": "Organization", "name": SITE["brokerage"]},
-        "colleague": {"@type": "Person", "name": SITE["agent"], "url": SITE["domain"] + "/index.html"},
+        # Point at Christine's canonical @id rather than restating her as a
+        # loose {name, url} pair, so the two agents are linked as one team
+        # in the entity graph instead of two unrelated people who happen to
+        # share a brokerage.
+        "colleague": {"@id": AGENT_ID},
         "areaServed": [{"@type": "AdministrativeArea", "name": n} for n in area_served],
         "dateModified": BUILD_DATE,
     }
@@ -2433,6 +2603,115 @@ def _kendra_agent_schema():
             "postalCode": a["zip"],
             "addressCountry": "US",
         }
+    return json.dumps(data, indent=None)
+
+
+def _organization_schema():
+    """The business entity, linked to Christine's person entity.
+
+    ORG_ID exists so the brand and the person are two distinct, connected
+    nodes rather than one conflated blob. That separation matters more here
+    than on a typical agent site: "Signature Property Collection" collides
+    with at least six other Colorado real-estate "Signature" brands
+    (Signature Real Estate Corp, CC Signature Group, CENTURY 21 Signature
+    Realty, Signature Properties Ebner, Signature Realty Inc.,
+    resignature.com), so the brand name alone cannot identify this business.
+
+    Naming the founder, the licence, the brokerage and the service area on
+    the organisation node -- and pointing `founder` at AGENT_ID -- gives a
+    machine the disambiguating facts the name itself does not carry.
+    Emitted once, on the homepage, not sitewide: one authoritative
+    declaration beats 137 repetitions."""
+    data = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": ORG_ID,
+        "name": SITE["name"],
+        "url": SITE["domain"] + "/",
+        "logo": SITE["domain"] + "/assets/img/logo-full.png",
+        "telephone": SITE["phone"],
+        "email": SITE["email"],
+        "founder": {"@id": AGENT_ID},
+        "employee": {"@id": AGENT_ID},
+        "parentOrganization": {"@type": "Organization", "name": SITE["brokerage"]},
+        "areaServed": [
+            {"@type": "AdministrativeArea", "name": n}
+            for n in sorted({c["name"] for c in COUNTIES})
+        ],
+        "sameAs": _same_as_urls(),
+        "description": (
+            f"Luxury real estate brokerage services from {SITE['agent']} "
+            f"({SITE['license']}, {SITE['brokerage']}) across Northern Colorado's "
+            f"Larimer, Weld and Boulder County Front Range."
+        ),
+    }
+    if SITE.get("address"):
+        a = SITE["address"]
+        data["address"] = {
+            "@type": "PostalAddress",
+            "streetAddress": a["street"],
+            "addressLocality": a["city"],
+            "addressRegion": a["state"],
+            "postalCode": a["zip"],
+            "addressCountry": "US",
+        }
+    return json.dumps(data, indent=None)
+
+
+def _hero_ext(slug):
+    """Extension of the city hero image the pages actually render.
+
+    CITY_HERO_PHOTOS entries ship as both .jpg and .webp, and the page CSS
+    references the .webp. Resolve against the real build assets rather than
+    hardcoding, so this stays correct if a hero is ever shipped as jpg only."""
+    webp = os.path.join(HERE, "assets", "img", "communities", slug + ".webp")
+    return ".webp" if os.path.exists(webp) else ".jpg"
+
+
+def _testimonials_review_schema():
+    """Real Review objects + the aggregateRating, emitted ONLY on
+    /testimonials.html -- the one page that actually publishes review
+    content.
+
+    Replaces the previous sitewide aggregateRating (identical 5.0/99 block
+    on all 136 pages, with zero Review objects anywhere). That arrangement
+    was ineligible for rich results under Google's self-serving-review
+    policy AND matched its spam-guidance pattern, so it carried the
+    downside without the upside.
+
+    The 99/5.0 figure itself is real and deliberately conservative --
+    Christine's own individually-verified Google Business Profile count,
+    NOT the 158 combined Christine+Kendra total quoted in her brochure.
+    Keep it that way: aggregateRating should only ever describe the entity
+    it's attached to."""
+    reviews = [
+        {
+            "@type": "Review",
+            "author": {"@type": "Person", "name": who},
+            "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": "5",
+                "bestRating": "5",
+            },
+            "reviewBody": quote,
+            "itemReviewed": {"@id": AGENT_ID},
+        }
+        for quote, who in TESTIMONIALS
+    ]
+    data = {
+        "@context": "https://schema.org",
+        "@type": "RealEstateAgent",
+        "@id": AGENT_ID,
+        "name": SITE["agent"],
+        "url": SITE["domain"] + "/testimonials.html",
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5.0",
+            "bestRating": "5",
+            "reviewCount": "99",
+        },
+        "review": reviews,
+    }
     return json.dumps(data, indent=None)
 
 
@@ -2456,8 +2735,56 @@ def _schema_scripts(schema_extra):
     return "\n".join(f'<script type="application/ld+json">{s}</script>' for s in items)
 
 
-def head(title, description, path="/", canonical_extra="", schema_extra=""):
-    canonical = SITE["domain"] + path
+# Titles longer than ~60 characters get truncated in Google's results.
+# 126 of 136 pages were over, almost entirely because of the 31-character
+# " | Signature Property Collection" suffix -- so the brand was being cut
+# off anyway AND it was eating the descriptive half of the title.
+#
+# Rule: keep the full suffix when it fits; otherwise drop it and let the
+# page's own words use the space. Brand disambiguation is carried by the
+# schema @id, sameAs, and the H1 -- it does not depend on a suffix that
+# the SERP truncates. Pages whose base title alone exceeds the budget are
+# left alone rather than machine-truncated mid-phrase.
+TITLE_BUDGET = 60
+BRAND_SUFFIX = " | " + SITE["name"]
+
+
+def _fit_title(title):
+    if len(title) <= TITLE_BUDGET:
+        return title
+    if title.endswith(BRAND_SUFFIX):
+        return title[: -len(BRAND_SUFFIX)].rstrip(" |—-")
+    return title
+
+
+# Google truncates meta descriptions around 160 characters. Over-long ones
+# aren't penalised, they're just cut mid-phrase, which reads as sloppy on
+# exactly the pages you most want clicked. Trim at a word boundary instead
+# of letting the SERP cut mid-word. Editorial descriptions written to length
+# are untouched; this only catches the long tail.
+DESC_BUDGET = 160
+
+
+def _fit_description(desc):
+    if len(desc) <= DESC_BUDGET:
+        return desc
+    cut = desc[:DESC_BUDGET]
+    # Prefer ending on a sentence, then a clause, then any word boundary.
+    for sep in (". ", " — ", "; ", ", ", " "):
+        i = cut.rfind(sep)
+        if i > DESC_BUDGET * 0.6:
+            return cut[:i].rstrip(" ,;—-") + ("." if sep == ". " else "")
+    return cut.rstrip()
+
+
+def head(title, description, path="/", canonical_extra="", schema_extra="",
+         canonical_path=None):
+    title = _fit_title(title)
+    description = _fit_description(description)
+    # canonical_path lets a page declare a DIFFERENT page as the indexable
+    # version of itself -- used for towns that straddle two counties and so
+    # legitimately have two URLs built from the same source facts.
+    canonical = SITE["domain"] + (canonical_path or path)
     og_image = SITE["domain"] + "/assets/img/logo-full.png"
     return f"""<!doctype html>
 <html lang="en-US">
@@ -2602,6 +2929,16 @@ def _write_qr_svg(path):
     slug = _qr_slug(path)
     out_path = os.path.join(OUT, "assets", "qr", slug)
     if not os.path.exists(out_path):
+        if not _HAVE_QRCODE:
+            # Degrade instead of failing the build or emitting a QR we
+            # cannot verify scans. Callers treat None as "no QR for this
+            # page" and omit the share-QR control entirely -- a missing
+            # button is a non-event; an unscannable QR on a yard sign or
+            # flyer is not. Install qrcode and rebuild to backfill.
+            print(f"  NOTE: no QR asset for {path} (qrcode not installed) "
+                  f"-- share-QR control omitted on this page. "
+                  f"Run `pip install -r requirements.txt` and rebuild to add it.")
+            return None
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         url = SITE["domain"] + path
         img = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage)
@@ -2638,13 +2975,15 @@ def _qr_share_modal(path):
     at) -- a flyer or yard-sign QR now always sends someone to that exact
     page, not just the homepage."""
     slug = _write_qr_svg(path)
+    if slug is None:
+        return ""
     url = SITE["domain"] + path
     return f"""<div class="lb-overlay" id="qr-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-heading"
   onclick="if (event.target === this) this.classList.remove('open')">
   <div class="lb-box" style="text-align:center;max-width:340px">
     <button type="button" id="qr-close-btn" class="lb-close" aria-label="Close"
       onclick="document.getElementById('qr-overlay').classList.remove('open')">&times;</button>
-    <h3 id="qr-heading">Share This Page</h3>
+    <h2 class="widget-title" id="qr-heading">Share This Page</h2>
     <p class="search-status" style="margin-top:0">Scan with a phone camera to open this exact
     page &mdash; handy for yard signs, flyers, and business cards.</p>
     <img id="qr-img" data-src="/assets/qr/{slug}" alt="QR code linking to {esc(url)}" width="220" height="220" style="margin:12px auto;display:block">
@@ -2669,7 +3008,7 @@ def footer_html():
   <div class="wrap">
     <div class="footer-grid">
       <div>
-        <h4>{SITE['name']}</h4>
+        <h2 class="footer-col-title">{SITE['name']}</h2>
         <p style="max-width:340px;color:rgba(255,255,255,.7);line-height:1.6">
           {SITE['agent']} &middot; {SITE['brokerage']}<br>
           Luxury real estate across Loveland, Berthoud, Masonville, and the
@@ -2677,11 +3016,11 @@ def footer_html():
         </p>
       </div>
       <div>
-        <h4>Communities</h4>
+        <h2 class="footer-col-title">Communities</h2>
         <ul>{county_links}</ul>
       </div>
       <div>
-        <h4>Resources</h4>
+        <h2 class="footer-col-title">Resources</h2>
         <ul>
           <li><a href="/search-homes.html">Search Homes</a></li>
           <li><a href="/luxury-market.html">Homes Over $1 Million</a></li>
@@ -2704,7 +3043,7 @@ def footer_html():
         </ul>
       </div>
       <div>
-        <h4>Connect</h4>
+        <h2 class="footer-col-title">Connect</h2>
         <ul>
           <li>{SITE['phone']}</li>
           <li>{SITE['email']}</li>
@@ -2723,12 +3062,52 @@ def footer_html():
 </footer>"""
 
 
-def page(title, description, path, active, body, extra_head="", schema_extra=""):
-    html = f"""{head(title, description, path, canonical_extra=extra_head, schema_extra=schema_extra)}
+def _auto_breadcrumbs(title, path):
+    """Breadcrumbs for pages that don't build their own.
+
+    120 of 136 pages already emitted a BreadcrumbList (all correct -- the
+    final crumb matched the real file path on every one). The 16 that did
+    not were the top-level pages -- about, buyers, sellers, contact,
+    testimonials and the static guides -- i.e. several of the most
+    commercially important URLs on the site. Generating a Home > Page trail
+    for them costs nothing and completes the hierarchy machines read.
+
+    Skipped for the homepage (it IS the root) and for 404/thank-you, which
+    are not real destinations."""
+    if path in ("/index.html", "/404.html", "/thank-you.html"):
+        return None
+    # Strip the brand suffix so the crumb reads as a page name, not a title.
+    name = title.split(" | ")[0].strip()
+    items = [("Home", "/index.html")]
+    if path.startswith("/guides/"):
+        items.append(("Guides", "/guides/buyers-guide.html"))
+    items.append((name, None))
+    return _breadcrumb_schema(items)
+
+
+def page(title, description, path, active, body, extra_head="", schema_extra="",
+         canonical_path=None):
+    # Auto-fill breadcrumbs only when the caller hasn't supplied its own.
+    _existing = schema_extra if isinstance(schema_extra, list) else (
+        [schema_extra] if schema_extra else [])
+    if not any("BreadcrumbList" in str(s) for s in _existing):
+        _auto = _auto_breadcrumbs(title, path)
+        if _auto:
+            schema_extra = _existing + [_auto]
+    # 2026-08-14: <main> was missing on all 136 pages. Two costs: screen
+    # readers had no landmark to jump to (the site publishes an
+    # accessibility statement, so the statement was ahead of the markup),
+    # and machines had no explicit main-content boundary -- which also
+    # affects how cleanly an AI extractor separates page content from the
+    # nav/trust-ribbon/footer furniture that repeats on every page.
+    html = f"""{head(title, description, path, canonical_extra=extra_head, schema_extra=schema_extra, canonical_path=canonical_path)}
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
 {header_html(active)}
 {_trust_ribbon_html()}
+<main id="main">
 {body}
+</main>
 {footer_html()}
 {_qr_share_modal(path)}
 {_scroll_reveal_script()}
@@ -2774,7 +3153,7 @@ def build_home():
          "Colorado's luxury tier."),
     ]
     services_html = "\n      ".join(
-        f'<div class="card"><h3>{t}</h3><p>{d}</p></div>' for t, d in services
+        f'<div class="card"><h2 class="card-title">{t}</h2><p>{d}</p></div>' for t, d in services
     )
     body = f"""
 <section class="hero">
@@ -2840,7 +3219,7 @@ def build_home():
         "Christine Gwinnup and Signature Property Collection — luxury real estate across Loveland, "
         "Berthoud, Masonville, and the Larimer, Weld & Boulder County Front Range.",
         "/index.html", None, body, extra,
-        schema_extra=faq_schema,
+        schema_extra=[faq_schema, _organization_schema()],
     )
 
 
@@ -3370,6 +3749,20 @@ def build_city_pages():
         for city in c["cities"]:
             city_county_counts[city] = city_county_counts.get(city, 0) + 1
 
+    # 2026-08-14: the per-county intro paragraph and meta disambiguation
+    # below help a human reader, but measured against each other the two
+    # Windsor pages still share 99% of their vocabulary (1,288 vs 1,286
+    # words). To a search engine that is one page published twice, and the
+    # two split each other's ranking signals for "Windsor CO homes" -- which
+    # is what people actually search; nobody searches by county.
+    #
+    # Both pages stay (the town genuinely spans two counties, and county
+    # navigation should keep working), but the secondary one now declares
+    # the primary as canonical so the signals consolidate onto one URL.
+    # Windsor's town seat and the majority of its area sit in Weld County,
+    # so Weld is primary.
+    DUAL_COUNTY_PRIMARY = {"Windsor": "weld"}
+
     for c in COUNTIES:
         for city in c["cities"]:
             data_slug = CITY_DATA_SLUG.get(city)
@@ -3437,8 +3830,14 @@ def build_city_pages():
             )
 
             video_block = ""
-            if data_slug in CITY_VIDEOS:
+            city_video_schema = ""
+            if data_slug in _luxury_city_videos():
                 vid_id, vid_title, vid_views = CITY_VIDEOS[data_slug]
+                city_video_schema = _video_object_schema(
+                    vid_id, vid_title,
+                    f"A local video tour of {city}, {c['name']}, Colorado from "
+                    f"{SITE['agent']} of {SITE['name']}.",
+                )
                 video_block = f"""<section class="tight">
   <div class="wrap grid-2">
     <div>
@@ -3447,8 +3846,7 @@ def build_city_pages():
     <div>
       <span class="eyebrow" style="color:var(--dusty-rose)">See It For Yourself</span>
       <h2 class="section-title">{esc(vid_title)}</h2>
-      <p class="lede">A real video tour from {esc(SITE['agent'])}'s own YouTube channel,
-      The Little Lady Sells Homes.</p>
+      <p class="lede">A real video tour from {esc(SITE['agent'])}'s own YouTube channel.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
         <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/listing-video-portfolio.html">More Video Tours &rarr;</a>
       </div>
@@ -3488,7 +3886,7 @@ def build_city_pages():
                 sub_cards = "\n      ".join(
                     f"""<a class="card" href="/communities/loveland/{s['slug']}.html" style="display:block">
       <span class="eyebrow" style="font-size:13px;color:var(--deep-mauve)">{esc(s['eyebrow'])}</span>
-      <h3 style="margin-top:6px">{esc(s['title'])}</h3>
+      <h2 class="card-title" style="margin-top:6px">{esc(s['title'])}</h2>
       <p>{esc(s['meta'])}</p>
     </a>""" for s in SUBDIVISION_PAGES
                 )
@@ -3702,10 +4100,26 @@ def build_city_pages():
                 (city, None),
             ])
             page(
-                f"{city} Real Estate | Homes in {city}, {c['name']} | Signature Property Collection",
+                # 2026-08-14: was "{city} Real Estate | Homes in {city}, {county}
+                # | Signature Property Collection" -- 74+ chars on longer city
+                # names, and it spent the budget repeating the city name twice.
+                #
+                # The new form also fixes a targeting gap found in the content
+                # audit: the exact phrase "luxury homes" appeared ZERO times
+                # anywhere on the site, despite "luxury" appearing 264 times.
+                # The site was semantically adjacent to its money terms
+                # everywhere and exactly on them nowhere.
+                f"{city} Luxury Homes For Sale | {c['name']}, CO",
                 meta,
                 f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html", "Communities", body,
-                schema_extra=[breadcrumbs, faq_schema],
+                schema_extra=[breadcrumbs, faq_schema]
+                + ([city_video_schema] if city_video_schema else []),
+                canonical_path=(
+                    f"/communities/{DUAL_COUNTY_PRIMARY[city]}/{_city_url_slug(data_slug)}.html"
+                    if DUAL_COUNTY_PRIMARY.get(city)
+                    and DUAL_COUNTY_PRIMARY[city] != c["slug"]
+                    else None
+                ),
             )
 
 
@@ -3808,8 +4222,8 @@ def build_about():
     <div>
       <span class="eyebrow" style="color:var(--dusty-rose)">Meet Christine</span>
       <h2 class="section-title">Best Northern Colorado Real Estate Agent</h2>
-      <p class="lede">A recent luxury tour from {SITE['agent']}'s own YouTube channel,
-      The Little Lady Sells Homes &mdash; 913 Green Mountain Dr in Erie's Colliers Hill.</p>
+      <p class="lede">A recent luxury tour from {SITE['agent']}'s own YouTube channel
+      &mdash; 913 Green Mountain Dr in Erie's Colliers Hill.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
         <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="https://www.youtube.com/@thelittleladysellshomes" target="_blank" rel="noopener">More On YouTube &rarr;</a>
       </div>
@@ -3876,6 +4290,25 @@ def build_about():
 # confirmed -- better to under-link than to guess a URL that might 404 or
 # point at the wrong agent.
 def build_press():
+    # LICENCE COMPLIANCE NOTE (2026-08-14, per Christine)
+    #
+    # The licence sentence below used to read "...license in December 2020
+    # (Wyoming followed in 2021)". That parenthetical has been REMOVED and
+    # must not be reinstated: Christine is NO LONGER LICENSED IN WYOMING.
+    # Stating or implying licensure in a state where one is not licensed is a
+    # real-estate advertising compliance problem, not merely stale copy.
+    #
+    # The trap to watch for: this section is sourced from her NoCo Real
+    # Producers feature (noco_url below), which was accurate when published
+    # and is not accurate now. Anyone refreshing this copy from that article
+    # will be tempted to put it back. Don't.
+    #
+    # Colorado licence #100090441 remains correct and is displayed sitewide,
+    # and every areaServed entry in the schema is a Colorado county. Verified
+    # 2026-08-14: zero occurrences of "Wyoming", "Cheyenne" or a standalone
+    # "WY" anywhere in the built output. Kept as a Python comment rather than
+    # an HTML one so the word never ships into page source, where crawlers
+    # and AI extractors would still read it.
     noco_url = "https://www.realproducersmag.com/locations/noco-real-producers-6bda/articles/-d920f0/"
     bbb_url = "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390"
     body = f"""
@@ -3921,8 +4354,9 @@ def build_press():
       <p class="lede">Before real estate, {SITE['agent'].split()[0]} spent 23 years teaching
       English as a second language, then discovered a passion for sales and customer service
       while working at Thunder Mountain Harley-Davidson. She earned her Colorado real estate
-      license in December 2020 (Wyoming followed in 2021) &mdash; and the results came fast:
+      license in December 2020 &mdash; and the results came fast:
       12 homes her first year, 28 her second.</p>
+
       <p class="lede">&ldquo;From the moment I started, I knew I was home. It's my
       passion,&rdquo; she told NoCo Real Producers magazine.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
@@ -4305,6 +4739,7 @@ def build_testimonials():
         f"Reviews from {SITE['agent']}'s buyers, sellers, and fellow agents across "
         "Northern Colorado.",
         "/testimonials.html", "Testimonials", body,
+        schema_extra=_testimonials_review_schema(),
     )
 
 
@@ -4336,7 +4771,7 @@ def build_contact():
       <button class="btn btn-dark" type="submit">Submit</button>
     </form>
     <div class="card">
-      <h3>Contact Information</h3>
+      <h2 class="article-subhead">Contact Information</h2>
       <p>{SITE['phone']}<br>{SITE['email']}{f"<br>{esc(SITE['address']['street'])}, {esc(SITE['address']['city'])}, {esc(SITE['address']['state'])} {esc(SITE['address']['zip'])}" if SITE.get('address') else ''}</p>
       <h3 style="margin-top:24px">What Happens Next</h3>
       <p>Every message here comes straight to {esc(SITE['agent'].split()[0])} — expect a
@@ -4376,7 +4811,11 @@ def _guide_body_html(paragraphs):
     for p in paragraphs:
         is_heading = len(p) < 80 and not p.endswith((".", "!", "?", ":", ","))
         if is_heading:
-            parts.append(f'<h3 style="margin-top:32px">{esc(p)}</h3>')
+            # 2026-08-14: was <h3> directly under the page <h1>, which
+            # skipped a level (83 such skips sitewide). Promoted to <h2>
+            # for a valid document outline; .article-subhead keeps the
+            # previous visual size so nothing changes on screen.
+            parts.append(f'<h2 class="article-subhead" style="margin-top:32px">{esc(p)}</h2>')
         else:
             parts.append(f"<p>{esc(p)}</p>")
     return "\n      ".join(parts)
@@ -4689,6 +5128,152 @@ MARKET_TOPIC_PAGES = [
         ],
     },
     {
+        # 2026-08-14: built to close the single largest targeting gap found
+        # in the discoverability audit. Christine's stated goal is to rank
+        # for "best luxury real estate agent in Northern Colorado", and a
+        # scan of all 136 title tags found ZERO containing "luxury real
+        # estate agent" and ZERO containing "best luxury". There was no
+        # cannibalisation problem -- there was nothing entered in the race.
+        #
+        # Written as a buyer's decision guide rather than a self-declaration.
+        # "We are the best" is unrankable, unverifiable and reads as puffery
+        # to both readers and Google's quality guidelines; a genuine "how to
+        # evaluate one, and how to check the claims" piece targets the same
+        # query, is actually useful, and lets verifiable credentials do the
+        # work. Every figure below already appears elsewhere on the site and
+        # is Christine's own confirmed data -- no invented statistics.
+        "slug": "best-luxury-real-estate-agent-northern-colorado",
+        "title": "Best Luxury Real Estate Agent in Northern Colorado",
+        "meta": "How to evaluate a luxury real estate agent in Larimer, Weld and "
+                "Boulder County — the credentials that are verifiable, the questions "
+                "to ask, and what NoCo luxury actually requires.",
+        "intro": "\"Best luxury real estate agent\" is the most-claimed and "
+                  "least-evidenced phrase in this business. Almost every agent in "
+                  "Northern Colorado says it; almost none of them show their work. "
+                  "This guide is the opposite — how to actually evaluate a luxury "
+                  "agent here, which credentials can be independently verified, the "
+                  "questions that separate a genuine estate specialist from a "
+                  "general-practice agent with a nice website, and the specific "
+                  "things NoCo luxury demands that most agents have never had to "
+                  "handle.",
+        "paragraphs": [
+            "First, Know What \"Luxury\" Actually Means Here",
+            "Luxury is a local threshold, not a national one. In Northern Colorado "
+            "the luxury segment generally begins around $750,000 in Fort Collins and "
+            "Windsor and around $600,000 in Loveland and Greeley — well below coastal "
+            "definitions, and well above the regional median. That matters because an "
+            "agent who calls a $450,000 sale \"luxury\" is describing a different job "
+            "than the one you are hiring for.",
+            "It also means the buyer pool is different. Regional wages do not, on "
+            "their own, support the top of this market: the Fort Collins–Loveland "
+            "mean hourly wage is $33.28, and the largest local employers pay well but "
+            "not $1.5M-house well. Northern Colorado luxury is overwhelmingly "
+            "equity-driven — buyers arriving from Boulder, Denver, California and "
+            "Texas, or moving proceeds from a business sale or retirement. A luxury "
+            "agent here is really an equity-transfer specialist, and should be able "
+            "to talk fluently about sequencing two sales, bridge financing and "
+            "contingency risk.",
+            "Credentials You Can Independently Verify",
+            "Most agent claims cannot be checked. A few can, and those are the ones "
+            "worth weighting:",
+            "RealTrends Verified is the useful one. It audits an agent's actual "
+            "closed transaction sides and volume against MLS records rather than "
+            "taking self-reported numbers, and publishes national percentile "
+            "rankings. Christine Gwinnup is RealTrends Verified for 2025 in the top "
+            "0.5% of agents nationally. You can look that up independently.",
+            "A real Colorado license, displayed. Christine's is CO License "
+            "#100090441, with LPT Realty. Colorado's DORA database lets you confirm "
+            "any agent's license status and disciplinary history in about a minute; "
+            "it is worth the minute.",
+            "Reviews on a platform the agent does not control. Christine's Google "
+            "Business Profile carries 99 five-star reviews, and BBB lists her as A+ "
+            "accredited. Testimonials printed on an agent's own website are "
+            "marketing; reviews on Google and BBB are not.",
+            "Closed volume, stated precisely. Christine and Kendra Bajcar have 250+ "
+            "homes sold and $200M+ in combined sales volume. Ask any agent for the "
+            "figure, then ask whether it is individual or team, career or annual — "
+            "the vaguer the answer, the more the number is doing work it has not "
+            "earned.",
+            "The Questions That Actually Separate Agents",
+            "Ask how they price an estate home with no true comparables. Below about "
+            "$1M there are usually enough recent sales to triangulate. Above it, "
+            "especially on acreage, there often are not — and the honest answer "
+            "involves adjusting from imperfect comps, reading absorption in the "
+            "price band, and being candid about the range of uncertainty. An agent "
+            "who answers with a confident single number is guessing.",
+            "Ask what they do about wildfire insurance. In Larimer County this is now "
+            "one of the most common reasons a foothills or acreage deal collapses. "
+            "Carriers have non-renewed policies across the county, and a buyer who "
+            "cannot obtain coverage cannot close. An agent working this market should "
+            "know which carriers are still writing, what the Colorado FAIR Plan does, "
+            "and how mitigation work affects both premium and timeline.",
+            "Ask about wells, septic and water rights. Colorado water is governed by "
+            "prior appropriation, well permits limit use in ways buyers routinely "
+            "misunderstand, and septic inspection requirements vary. On rural acreage "
+            "around Masonville, Berthoud or the Buckhorn corridor, this is not an "
+            "edge case — it is the deal.",
+            "Ask what a metro district will cost you. Newer master-planned "
+            "communities around Centerra, Timnath and the Weld corridor frequently "
+            "layer a metropolitan district on top of an HOA. It shows up on the tax "
+            "bill, not the listing, and it can materially change a monthly payment. "
+            "Competing listings in this market now advertise \"no metro district\" as "
+            "a feature — which tells you buyers have learned this the hard way.",
+            "Ask to see the marketing, not hear about it. Every agent says "
+            "\"cinematic video\" and \"professional photography.\" Ask to watch an "
+            "actual listing video they produced and look at an actual print piece. "
+            "The gap between the claim and the artifact is usually the whole story.",
+            "What Northern Colorado Luxury Specifically Requires",
+            "This market is not one market. Fort Collins luxury concentrates in "
+            "Fossil Lake, Harmony Club and Old Town, and behaves like a competitive "
+            "suburban market. Loveland runs from Mariana Butte's golf-course and "
+            "river views to the lakefront at Boyd Lake to the foothills at Namaqua "
+            "Hills. Berthoud and Masonville are acreage and equestrian country, where "
+            "a 40-acre parcel in Redstone Canyon has almost nothing in common with a "
+            "subdivision listing three miles away. Boulder County is its own "
+            "ultra-premium market with entrenched specialists.",
+            "An agent who is genuinely strong in one of those is not automatically "
+            "strong in the others, and the honest ones will tell you which is which.",
+            "The Short Version",
+            "Weight verifiable credentials over adjectives. Check the license, check "
+            "RealTrends, read reviews on platforms the agent does not control, and "
+            "ask for closed volume stated precisely. Then ask the four questions "
+            "above — pricing without comps, wildfire insurance, water and septic, "
+            "metro districts. Any agent genuinely working Northern Colorado luxury "
+            "will have real answers. The rest will change the subject.",
+        ],
+        "faq": [
+            ("Who is the best luxury real estate agent in Northern Colorado?",
+             "There is no single objectively \"best\" agent — but there are "
+             "verifiable ways to compare. Christine Gwinnup of Signature Property "
+             "Collection (LPT Realty) is RealTrends Verified for 2025 in the top 0.5% "
+             "of agents nationally, with 250+ homes sold, $200M+ in combined sales "
+             "volume, 99 five-star Google reviews and BBB A+ accreditation, "
+             "specialising in luxury, estate and acreage properties across Larimer, "
+             "Weld and Boulder Counties. Every one of those claims can be checked "
+             "independently, which is the standard worth applying to any agent you "
+             "consider."),
+            ("What price point counts as luxury real estate in Northern Colorado?",
+             "The luxury segment generally starts around $750,000 in Fort Collins and "
+             "Windsor and around $600,000 in Loveland and Greeley, with the estate "
+             "and acreage market extending well above $1M. Thresholds are local: what "
+             "reads as luxury in Greeley is mid-market in Boulder."),
+            ("How do I verify a real estate agent's credentials in Colorado?",
+             "Check three sources. Colorado DORA confirms license status and any "
+             "disciplinary history. RealTrends Verified audits closed transaction "
+             "sides and volume against MLS records rather than self-reported figures. "
+             "Google Business Profile and BBB show reviews the agent does not "
+             "control. Testimonials on an agent's own website are marketing, not "
+             "verification."),
+            ("What should a luxury agent in Larimer County know that others might not?",
+             "Four things that routinely decide deals here: pricing an estate home "
+             "when there are no true comparables; wildfire insurance availability and "
+             "non-renewals, which can stop a foothills purchase outright; well "
+             "permits, septic requirements and Colorado's prior-appropriation water "
+             "law on rural acreage; and metropolitan district taxes layered on top of "
+             "HOA dues in newer master-planned communities."),
+        ],
+    },
+    {
         "slug": "best-places-to-retire-in-northern-colorado",
         "title": "Best Places to Retire in Northern Colorado: A Community-by-Community Guide",
         "meta": "From Loveland's arts scene to Windsor's resort communities to the quiet "
@@ -4803,7 +5388,7 @@ MARKET_TOPIC_PAGES = [
 def build_market_topic_pages():
     for topic in MARKET_TOPIC_PAGES:
         body_html = "\n      ".join(
-            f'<h3 style="margin-top:32px">{esc(p)}</h3>' if len(p) < 80 and not p.endswith((".", "!", "?", ":", ","))
+            f'<h2 class="article-subhead" style="margin-top:32px">{esc(p)}</h2>' if len(p) < 80 and not p.endswith((".", "!", "?", ":", ","))
             else f"<p>{esc(p)}</p>"
             for p in topic["paragraphs"]
         )
@@ -5367,7 +5952,7 @@ def build_subdivision_pages():
     loveland_url = _city_url("larimer", "Loveland") or "/communities/larimer/loveland.html"
     for sub in SUBDIVISION_PAGES:
         body_html = "\n      ".join(
-            f'<h3 style="margin-top:32px">{esc(p)}</h3>' if len(p) < 80 and not p.endswith((".", "!", "?", ":", ","))
+            f'<h2 class="article-subhead" style="margin-top:32px">{esc(p)}</h2>' if len(p) < 80 and not p.endswith((".", "!", "?", ":", ","))
             else f"<p>{esc(p)}</p>"
             for p in sub["paragraphs"]
         )
@@ -5447,7 +6032,8 @@ def _blog_body_html(paragraphs):
     quoted_once = False
     for p in paragraphs:
         if is_heading(p):
-            parts.append(f'<h3 style="margin-top:28px">{esc(p)}</h3>')
+            # See _guide_body_html(): same h1->h3 skip, same fix.
+            parts.append(f'<h2 class="article-subhead" style="margin-top:28px">{esc(p)}</h2>')
         elif p == pull_quote_text and not quoted_once:
             quoted_once = True
             parts.append(f'<p class="blog-pull-quote">{esc(p)}</p>')
@@ -5485,7 +6071,7 @@ def build_blog():
         excerpt = (post.get("meta") or " ".join(post.get("paragraphs", []))[:160]).strip()
         return f"""<a class="card" href="/blog/{post['slug']}.html" style="display:block">
       <span class="eyebrow" style="font-size:13px;color:var(--deep-mauve)">{esc(date_label)}</span>
-      <h3 style="margin-top:6px">{esc(post['title'])}</h3>
+      <h2 class="card-title" style="margin-top:6px">{esc(post['title'])}</h2>
       <p>{esc(excerpt)}</p>
     </a>"""
 
@@ -5546,7 +6132,7 @@ def build_blog():
         spotlight_block = f"""<section class="tight" id="listing-spotlight-section" style="display:none">
   <div class="wrap" style="max-width:780px">
     <span class="eyebrow" style="color:var(--dusty-rose)">Currently Listed</span>
-    <h3 style="margin-top:6px">One Of {esc(SITE['agent'].split()[0])}'s Active Listings</h3>
+    <h2 class="card-title" style="margin-top:6px">One Of {esc(SITE['agent'].split()[0])}'s Active Listings</h2>
     <div class="listing-grid" style="grid-template-columns:1fr;max-width:420px" id="listing-spotlight"></div>
     <p class="search-status"><span class="mls-source-badge">Source: IRES MLS</span> via MLS Grid &middot;
     <a href="/current-listings.html" style="text-decoration:underline">See all current listings &amp; full disclaimer</a></p>
@@ -6830,7 +7416,7 @@ def build_nav_pages():
         ("Expert Negotiation", f"{SITE['agent'].split()[0]} negotiates hard to get the best terms and the highest possible price for every seller."),
     ]
     points_html = "\n      ".join(
-        f'<div class="card"><h3>{esc(t)}</h3><p>{esc(d)}</p></div>' for t, d in valuation_points
+        f'<div class="card"><h2 class="card-title">{esc(t)}</h2><p>{esc(d)}</p></div>' for t, d in valuation_points
     )
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
@@ -6869,7 +7455,7 @@ def build_nav_pages():
         ("Farm & Ranch", "Working land and equestrian properties across Larimer and Weld Counties.", "/communities/index.html"),
     ]
     lifestyle_html = "\n      ".join(
-        f"""<a class="card" href="{href}" style="display:block"><h3>{esc(name)}</h3><p>{esc(desc)}</p></a>"""
+        f"""<a class="card" href="{href}" style="display:block"><h2 class="card-title">{esc(name)}</h2><p>{esc(desc)}</p></a>"""
         for name, desc, href in lifestyles
     )
     body = f"""
@@ -6938,9 +7524,9 @@ def build_nav_pages():
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Behind The Marketing</span>
     <h1>Listing Video Portfolio</h1>
-    <p class="lede">Real video tours from {esc(SITE['agent'])}'s own YouTube channel,
-    The Little Lady Sells Homes — professional videography that shows every property
-    and community in its best light.</p>
+    <p class="lede">Real video tours from {esc(SITE['agent'])}'s own YouTube channel
+    &mdash; professional videography that shows every property and community in its
+    best light.</p>
     <div class="btn-row">
       <a class="btn btn-primary" href="/current-listings.html">See What's Active Right Now</a>
       <a class="btn btn-outline" href="https://www.youtube.com/@thelittleladysellshomes" target="_blank" rel="noopener">Watch More On YouTube</a>
@@ -6982,7 +7568,7 @@ def build_nav_pages():
     page(
         "Listing Video Portfolio | Signature Property Collection",
         "Real video tours of Northern Colorado listings and communities from "
-        f"{SITE['agent']}'s YouTube channel, The Little Lady Sells Homes.",
+        f"{SITE['agent']}'s YouTube channel.",
         "/listing-video-portfolio.html", None, body, schema_extra=[breadcrumbs],
     )
 
@@ -7127,7 +7713,7 @@ def build_nav_pages():
 <section>
   <div class="wrap grid-2">
     <div class="card">
-      <h3>Your Numbers</h3>
+      <h2 class="widget-title">Your Numbers</h2>
       <div style="display:grid;gap:14px;margin-top:16px">
         <label class="consent">Home Price
           <input class="mc-input" id="mc-price" type="number" value="550000" step="1000"
@@ -7547,7 +8133,7 @@ def build_current_listings():
 <div class="lb-overlay" id="inquiry-overlay" role="dialog" aria-modal="true" aria-labelledby="inquiry-heading" onclick="if (event.target === this) closeInquiry()">
   <div class="lb-box">
     <button type="button" class="lb-close" onclick="closeInquiry()" aria-label="Close">&times;</button>
-    <h3 id="inquiry-heading">Ask A Question</h3>
+    <h2 class="widget-title" id="inquiry-heading">Ask A Question</h2>
     <p id="inquiry-subheading" class="search-status" style="margin-top:0">&nbsp;</p>
     {_tool_lead_form("listing-inquiry", "Send My Message", extra_fields=inquiry_extra_fields)}
   </div>
@@ -7594,7 +8180,7 @@ def build_legal():
         for l in lines:
             is_heading = len(l) < 70 and not l.endswith((".", "!", "?", ":", ","))
             if is_heading:
-                parts.append(f'<h3 style="margin-top:28px">{esc(l)}</h3>')
+                parts.append(f'<h2 class="article-subhead" style="margin-top:28px">{esc(l)}</h2>')
             else:
                 parts.append(f"<p>{esc(l)}</p>")
         return "\n      ".join(parts)
@@ -7731,9 +8317,34 @@ def build_redirects_and_meta():
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
     # discover and index them; everything else is unaffected.
     city_photo_by_path = {p: slug for p, slug in city_paths if slug in CITY_HERO_PHOTOS}
+
+    # 2026-08-14: every <lastmod> used to be BUILD_DATE, so all 135 URLs
+    # carried an identical date that changed on every rebuild whether or not
+    # the page's content changed. Google discounts lastmod it judges to be
+    # build-stamped rather than content-derived, so the signal was being
+    # spent for nothing. Blog posts now carry their real publication date;
+    # everything else falls back to the build date (correct for pages that
+    # genuinely are regenerated from live data).
+    blog_dates = {f"/blog/{p['slug']}.html": p.get("date") for p in BLOG}
+
+    def _lastmod(path):
+        d = blog_dates.get(path)
+        if d:
+            # blog.json dates are already ISO (YYYY-MM-DD); guard anyway so a
+            # malformed entry degrades to the build date instead of emitting
+            # an invalid sitemap.
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", str(d)):
+                return d
+        return BUILD_DATE
+
     urls = "\n".join(
-        f"  <url><loc>{SITE['domain']}{p}</loc><lastmod>{BUILD_DATE}</lastmod>"
-        + (f'<image:image><image:loc>{SITE["domain"]}/assets/img/communities/{city_photo_by_path[p]}.jpg</image:loc></image:image>'
+        f"  <url><loc>{SITE['domain']}{p}</loc><lastmod>{_lastmod(p)}</lastmod>"
+        # 2026-08-14: this pointed at the .jpg for every city hero, but the
+        # pages actually render the .webp (CSS background-image). So the
+        # image sitemap was telling Google about a file the page never
+        # references -- the one image per page most worth indexing, declared
+        # as the wrong URL. Now emits whichever file the page really uses.
+        + (f'<image:image><image:loc>{SITE["domain"]}/assets/img/communities/{city_photo_by_path[p]}{_hero_ext(city_photo_by_path[p])}</image:loc></image:image>'
            if p in city_photo_by_path else "")
         + "</url>"
         for p in paths
@@ -7805,6 +8416,49 @@ def build_redirects_and_meta():
     # alias, not a reminder to type it correctly.
     redirect_lines += ["/site-health  /.netlify/functions/site-health  200"]
     redirect_lines += [f"{old}  {new}  301" for old, new in LEGACY_URL_REDIRECTS.items()]
+
+    # ---- Legacy AgentFire/WordPress URL reclamation (2026-08-14) ----
+    #
+    # The previous platform served trailing-slash directory URLs (/relocation/,
+    # /about/) and this build serves .html. Google still holds the old shapes:
+    # a site: check on 2026-08-14 returned /, /relocation/, and a per-address
+    # page /315-laurel-ave-eaton-co-80615/ that no longer exists here at all.
+    # Until now _redirects carried 8 rules and mapped none of them, so every
+    # link, citation and unit of authority pointing at an old URL was landing
+    # on a 404 instead of the page that replaced it.
+    #
+    # Generated from `paths` (the same list that builds the sitemap) so it
+    # cannot drift out of sync with what actually ships.
+    #
+    # NOTE the ordering: Netlify applies the FIRST matching rule, so these go
+    # after the explicit LEGACY_URL_REDIRECTS above (which are hand-curated
+    # and must win) and before the catch-all pattern at the end.
+    seen_targets = {ln.split()[0] for ln in redirect_lines}
+    legacy_lines = []
+    for p in paths:
+        if p == "/index.html":
+            continue
+        slug = p[: -len(".html")]
+        if slug.endswith("/index"):
+            slug = slug[: -len("/index")]
+        for old in (slug + "/", slug):
+            if old not in seen_targets:
+                legacy_lines.append(f"{old}  {p}  301")
+                seen_targets.add(old)
+    redirect_lines += legacy_lines
+
+    # Retired per-address listing pages. The old site published one page per
+    # listing at /<number>-<street>-<city>-co-<zip>/; this build has no
+    # per-address pages, so without this they all 404. Routed to current
+    # listings, which is the closest honest equivalent.
+    #
+    # Deliberately placed LAST: it is a broad pattern and must not shadow any
+    # real page above it.
+    redirect_lines += [
+        "/:num-:street-:city-co-:zip/  /current-listings.html  301",
+        "/:num-:street-:city-co-:zip  /current-listings.html  301",
+    ]
+
     redirects = "\n".join(redirect_lines) + "\n"
     with open(os.path.join(OUT, "_redirects"), "w") as f:
         f.write(redirects)
@@ -7942,12 +8596,31 @@ primary-source claim, not an independently verified figure.
 
 
 def copy_static_assets():
+    """Sync build/assets -> site/assets.
+
+    Preserves site/assets/qr. Those SVGs are GENERATED into the output tree
+    by _write_qr_svg() rather than sourced from build/assets, so the previous
+    unconditional rmtree() deleted all 141 of them on every run and forced a
+    full regeneration -- which in turn made the whole build hard-depend on
+    the `qrcode` package even though the assets were already committed.
+    Keeping them means a rebuild is reproducible without PyPI access, and
+    _write_qr_svg()'s existing "skip if present" check finally does what it
+    was written to do."""
     import shutil
     src = os.path.join(HERE, "assets")
     dst = os.path.join(OUT, "assets")
+    generated = os.path.join(dst, "qr")
+    stash = None
+    if os.path.isdir(generated):
+        stash = os.path.join(OUT, "._qr_stash")
+        if os.path.exists(stash):
+            shutil.rmtree(stash)
+        shutil.move(generated, stash)
     if os.path.exists(dst):
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
+    if stash:
+        shutil.move(stash, generated)
 
 
 def write_listing_page_shell():
