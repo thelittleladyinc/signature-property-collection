@@ -153,18 +153,16 @@ for (const [page, { ids, section, town, html }] of Object.entries(embedded)) {
   check(`${page}: ordered most-watched first`,
     views.every((v, n) => n === 0 || views[n - 1] >= v), JSON.stringify(views));
 
-  // The label rule. "Sold" may only appear against a video whose status was
-  // cross-checked against her own SOP sheet.
-  const captioned = [...section.matchAll(
-    /embed\/([\w-]+)"[\s\S]*?(?:<p class="video-embed-caption">([^<]*)<\/p>|<\/div>\s*<\/div>)/g)];
-  for (const [, id, caption] of captioned) {
-    if ((caption || "").trim() === "Sold") {
-      check(`${page}: "Sold" on ${id} is backed by a cross-checked status`, SOLD.has(id));
-    }
-  }
-  const wrongLabel = ids.filter((i) => LIVE.has(i) &&
-    new RegExp(`embed/${i}"[\\s\\S]{0,600}?video-embed-caption">Sold<`).test(section));
-  check(`${page}: no live listing is labelled Sold`, wrongLabel.length === 0, wrongLabel.join(", "));
+  // The label rule, 2026-08-16. This block used to caption the eight tours whose
+  // status was cross-checked as "Sold". Christine dropped it -- "we can always just
+  // say examples of marketing in whichever town so they dont have to say sold" --
+  // and the absolute version is the stronger check: no status word may appear here
+  // at all, so the section can never contradict a listing's real state as it
+  // changes. Sold framing lives on /past-sales.html, where every entry is verified.
+  check(`${page}: no sold/pending/under-contract wording in the block`,
+    !/\b(Sold|Pending|Under Contract|Closed)\b/.test(section.replace(/<iframe[\s\S]*?<\/iframe>/g, "")),
+    (section.match(/\b(Sold|Pending|Under Contract|Closed)\b/) || [])[0]);
+  check(`${page}: no caption under any tour`, !/video-embed-caption/.test(section));
 
   // Views are recorded in the data for auditing but must never be printed here --
   // Christine, 2026-08-16: "why would anyone care about how many views?"
@@ -180,11 +178,12 @@ for (const [page, { ids, section, town, html }] of Object.entries(embedded)) {
 }
 
 console.log("\n3. The heading claims only what is true of all of them");
-// Not "Homes Sold In X": most of these have no cross-checked sold status, and a
-// handful are live listings. "Marketed" is true of every one.
+// Not "Homes Sold In X". Most have no cross-checked sold status and one is a live
+// listing; what IS true of every one is that it is an example of her marketing,
+// which is also the thing a seller is judging.
 for (const [page, { section }] of Object.entries(embedded)) {
-  check(`${page}: heading says marketed, not sold`,
-    /Has Marketed In/.test(section) && !/Homes Sold In/.test(section));
+  check(`${page}: heading offers examples of the marketing, claims no sale`,
+    /Examples Of [^<]*Marketing In/.test(section) && !/Homes Sold In/.test(section));
 }
 
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);

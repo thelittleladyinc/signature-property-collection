@@ -698,12 +698,6 @@ _LISTING_VIDEO_ENTRIES = [
 ]
 LISTING_VIDEOS = {addr: (vid, title) for addrs, vid, title, _status in _LISTING_VIDEO_ENTRIES for addr in addrs}
 
-# video_id -> "sold" / "live", from the table above. The status there is already
-# cross-checked against Christine's own "Each Listing SOP" sheet, so anything that
-# wants to LABEL a video as sold reads it from here rather than guessing from a
-# title. A video absent from this map gets no status label at all.
-LISTING_VIDEO_STATUS = {vid: status for _addrs, vid, _t, status in _LISTING_VIDEO_ENTRIES}
-
 # ------------------------------------------------- HER TOURS, BY TOWN ----
 # 2026-08-16 (Christine: "then we can put videos of listing ive sold on each town
 # page?").
@@ -3884,7 +3878,7 @@ def _district_short(text):
 
 
 def _county_town_comparison(county):
-    """A real comparison of this county's towns: drive time, schools, her coverage.
+    """A real comparison of this county's towns: drive time and schools.
 
     2026-08-16 (Christine, on the block that used to be here: "why is it even there?!!!
     Who cares about that! Lets make it what people are actually searching for!").
@@ -3894,62 +3888,56 @@ def _county_town_comparison(county):
 
     What people actually type is "best places to live in larimer county", "how far is
     Loveland from Denver", "what school district is Timnath in". Those are three
-    different searches with one answer shape: a comparison of the towns. So that is
-    what this is, built from the per-town content the site already carries, with her
-    filmed coverage as one column rather than the whole point.
+    different searches with one answer shape: a comparison of the towns.
+
+    2026-08-16, second pass (Christine: "Places shes filmed?!!!!! What! that is
+    awful"). My first fix kept a fourth column listing the places she had filmed in
+    each town, and it was wrong twice over. It made the agent the subject of a table a
+    buyer opened to compare TOWNS. And because it was honestly empty where she has no
+    footage, five of ten Larimer rows showed a dash -- so a table headed "which town
+    fits you" quietly said she had never been to Estes Park, Timnath, Masonville or
+    Windsor. Windsor and Timnath are towns she works. Her filmed spots already have a
+    home on the town pages and the county map, where they answer "what is this place
+    like" instead of "how much has she filmed here".
+
+    So: three columns, every one of them the buyer's question, and sorted
+    alphabetically rather than by how much footage she has -- a reader looking for
+    Wellington should find it where a list puts Wellington.
 
     Every cell is real or empty. An unwritten commute line leaves a dash, because a
     plausible-looking invented drive time is the one thing here that could cost someone
     a decision."""
-    global LOCAL_SPOTS_BY_CITY_HREF
-    if LOCAL_SPOTS_BY_CITY_HREF is None:
-        LOCAL_SPOTS_BY_CITY_HREF = _local_spots_by_city_href()
     rows = []
     for c, city, url in _all_town_pages():
         if c["slug"] != county["slug"]:
             continue
         data = CITY_CONTENT.get(CITY_DATA_SLUG.get(city) or "") or {}
-        # Primary cityHref only: a place has one address and therefore one county.
-        spots = [sp for sp in LOCAL_SPOTS_DATA.get("spots", [])
-                 if sp.get("cityHref") == url]
-        views = sum((sp.get("views") or 0) + (sp.get("reviewViews") or 0) for sp in spots)
-        # Best-known first, so the two names shown are the two worth recognising.
-        spots.sort(key=lambda sp: -((sp.get("views") or 0) + (sp.get("reviewViews") or 0)))
-        names = [sp["name"] for sp in spots]
-        places = ", ".join(names[:2]) + (f" +{len(names) - 2} more" if len(names) > 2 else "")
         rows.append({
             "city": city, "url": url,
             "commute": _commute_short(data.get("commute")),
             "district": _district_short(data.get("school_district")),
-            "spots": len(spots), "views": views, "places": places,
         })
     if not rows:
         return ""
-    rows.sort(key=lambda r: (-r["views"], r["city"]))
+    rows.sort(key=lambda r: r["city"])
     body = "\n      ".join(
         f"""<tr>
         <th scope="row"><a href="{r['url']}">{esc(r['city'])}</a></th>
         <td>{esc(r['commute']) or "&mdash;"}</td>
         <td>{esc(r['district']) or "&mdash;"}</td>
-        <td>{esc(r['places']) or "&mdash;"}</td>
       </tr>""" for r in rows)
-    covered = [r for r in rows if r["spots"]]
-    first = esc(SITE["agent"].split()[0])
-    lede = (f"Drive times and school districts for every {esc(county['name'])} town "
-            f"{first} works in, side by side.")
-    if covered:
-        lede += (f" The last column is the places {first} has actually been to with a "
-                 f"camera &mdash; tap a town to watch them.")
     return f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Compare Before You Commit</span>
     <h2 class="section-title">Which {esc(county['name'])} Town Fits You?</h2>
-    <p class="lede">{lede}</p>
+    <p class="lede">How far each town is from the places you will actually drive to, and
+    which school district you would be in. Tap a town for what it costs to live there,
+    what is nearby, and homes for sale.</p>
     <div class="town-table-wrap">
       <table class="town-table">
         <thead>
-          <tr><th scope="col">Town</th><th scope="col">Nearest City</th>
-          <th scope="col">School District</th><th scope="col">Places She&rsquo;s Filmed</th></tr>
+          <tr><th scope="col">Town</th><th scope="col">Drive Time</th>
+          <th scope="col">School District</th></tr>
         </thead>
         <tbody>
       {body}
@@ -4047,10 +4035,25 @@ def build_county_pages():
              if _city_url(c["slug"], city) else f'<span class="city-pill">{city}</span>')
             for city in c["cities"]
         )
+        # 2026-08-16 (Christine, on seeing this live: "Core farm areas!? why woud
+        # that matter to the seller - that is awful"). She is right, and it was my
+        # wording, on all eight priority county pages.
+        #
+        # A "farm area" is what an agent calls a patch they prospect. To a seller it
+        # means nothing, and to anyone reading quickly it sounds agricultural -- on a
+        # LARIMER COUNTY page, next to acreage listings. It also said nothing: "we
+        # know this market block by block" is a claim every agent site makes.
+        #
+        # Replaced with the thing a seller is actually deciding, which is whether
+        # this person will price their house right. Same for a buyer reading it.
+        top = c["cities"][:3]
+        top_list = (", ".join(top[:-1]) + " or " + top[-1]) if len(top) > 1 else top[0]
         priority_note = (
-            '<p class="lede" style="margin-top:14px;color:rgba(255,255,255,.85)">This is one '
-            'of our core farm areas — if you\'re buying or selling in '
-            + ", ".join(c["cities"][:3]) + ', we know this market block by block.</p>'
+            '<p class="lede" style="margin-top:14px;color:rgba(255,255,255,.85)">'
+            f'{esc(SITE["agent"].split()[0])} works this county every week. If you\'re buying '
+            f'or selling in {esc(top_list)}, that means straight answers on what your home '
+            'is really worth, which streets hold value, and what is actually selling right '
+            'now &mdash; not a general Colorado opinion.</p>'
             if c["priority"] else ""
         )
         if _live_search(c):
@@ -4354,11 +4357,15 @@ def _town_listing_videos_block(data_slug, city_name, county_name, exclude_ids=()
 
     Three rules the wording follows, all of them from Christine:
       * No view counts. "Why would anyone care about how many views?" -- 2026-08-16.
-      * "Sold" appears only where LISTING_VIDEO_STATUS says sold, which traces back
-        to her own SOP sheet. A tour with no entry gets no label, because guessing
-        would either put a live client's home in a sold list or the reverse.
-      * The heading is what is provably true of all of them -- she marketed these
-        homes here -- rather than a sold claim spread across the whole set.
+      * No sold/live label on any tour. First draft labelled the eight whose status
+        was cross-checked against her SOP sheet; she chose to drop it entirely --
+        "we can always just say examples of marketing in whichever town so they dont
+        have to say sold" -- and she is right that it is the better frame. What a
+        seller is judging is the marketing, which is identical either way, and the
+        section no longer depends on a status table staying accurate as listings
+        close. /past-sales.html still says sold, where every entry is verified.
+      * The heading frames these as examples of the marketing, which is what is
+        provably true of every one of them.
     """
     all_vids = TOWN_LISTING_VIDEOS.get(data_slug, [])
     excluded = set(exclude_ids)
@@ -4386,11 +4393,12 @@ def _town_listing_videos_block(data_slug, city_name, county_name, exclude_ids=()
 
     cards, schema = [], []
     for vid, title, _views, _prop in vids:
-        sold = LISTING_VIDEO_STATUS.get(vid) == "sold"
-        # Caption only when there is something to say. "Loveland, CO" under a video on
-        # the Loveland page is words with no information in them.
+        # No caption at all. It held "Sold" on the eight tours whose status was
+        # cross-checked; Christine dropped that, and there is nothing else worth
+        # saying here -- "Loveland, CO" under a video on the Loveland page is words
+        # with no information in them.
         cards.append(f"""<div>
-      {_yt_embed(vid, title, "Sold" if sold else None)}
+      {_yt_embed(vid, title)}
     </div>""")
         schema.append(_video_object_schema(
             vid, title,
@@ -4413,7 +4421,7 @@ def _town_listing_videos_block(data_slug, city_name, county_name, exclude_ids=()
     return f"""<section class="tight section-dark">
   <div class="wrap">
     <span class="eyebrow">{esc(first)}'s Work In {esc(city_name)}</span>
-    <h2 class="section-title" style="color:#fff;margin-top:6px">Homes {esc(first)} Has Marketed In {esc(city_name)}</h2>
+    <h2 class="section-title" style="color:#fff;margin-top:6px">Examples Of {esc(first)}'s Marketing In {esc(city_name)}</h2>
     <p class="lede" style="max-width:70ch">{lede}</p>
     <div class="grid-2" style="margin-top:28px">
       {"".join(cards)}
@@ -8704,19 +8712,17 @@ def build_search_homes():
     body = f"""
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
-    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Every Home On The Market</span>
     <h1>Search Northern Colorado Homes For Sale</h1>
-    <p class="lede">Real, active listings from IRES MLS — updated live, not a stale
-    snapshot. Search all of {', '.join(county_names[:-1])} and {county_names[-1]} County
-    at once, or narrow to a single city, then dial in the exact price range, beds,
-    and baths you're after.</p>
+    <p class="lede">Every home for sale across Northern Colorado and the north Front
+    Range, updated straight from the MLS through the day. Search a whole county or a
+    single town, set your price, and see what is actually available right now.</p>
   </div>
 </section>
 <section>
   <div class="wrap">
-    <p class="search-status" style="margin-top:0">Search an entire county in one click,
-    or pick a city and dial in your price, beds, and baths below. Looking specifically
-    for {esc(SITE['agent'].split()[0])}'s own listings, with video tours where available?
+    <p class="search-status" style="margin-top:0">Want {esc(SITE['agent'].split()[0])}'s own
+    listings instead, with video tours where she has them?
     <a href="/current-listings.html" style="text-decoration:underline">See her Current Listings</a>.</p>
     {widget_html}
   </div>
@@ -8725,9 +8731,12 @@ def build_search_homes():
 """
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Search Homes", None)])
     page(
-        "Search Northern Colorado Homes For Sale | Live IRES MLS Listings | Signature Property Collection",
-        "Search live, active IRES MLS listings across Larimer, Weld, and Boulder County "
-        "— by county or city, any price range, beds, and baths. Updated every 15 minutes.",
+        "Search Northern Colorado Homes For Sale | Signature Property Collection",
+        # 2026-08-16: this named "Larimer, Weld, and Boulder County" long after the
+        # other six counties came online -- a description under-selling the coverage
+        # by two thirds, in the one line Google shows under the title.
+        "Every home for sale across Larimer, Weld, Boulder and six more Colorado "
+        "counties — search by town, price, beds and baths. Updated through the day.",
         "/search-homes.html", "Search Homes", body, schema_extra=[breadcrumbs],
     )
 
