@@ -126,6 +126,8 @@ CITY_DATA_SLUG = {
     "Lyons": "lyons",
     "Longmont": "longmont",
     "Nunn": "nunn",
+    "Pierce": "pierce",
+    "Carr": "carr",
     "Masonville": "masonville", "Windsor": "windsor", "Timnath": "timnath",
     "Wellington": "wellington", "Red Feather Lakes": "red-feather-lakes",
     "Greeley": "greeley", "Severance": "severance", "Eaton": "eaton",
@@ -319,6 +321,13 @@ COUNTIES = [
                    "Johnstown", "Milliken", "Firestone", "Frederick", "Dacono",
                    "Fort Lupton", "Mead", "Erie", "Platteville", "Kersey", "LaSalle",
                    "Gilcrest", "Hudson", "Keenesburg", "Lochbuie", "Nunn", "Pierce",
+                   # 2026-08-16 (Christine: "we need to add in carr and pierce - I have
+                   # listing videos for them too"). Pierce was already listed; Carr was
+                   # not in this list at all, so it appeared nowhere on the site -- no
+                   # page, no pill, not in the Search Homes city dropdown -- despite two
+                   # listing tours with 1,755 views between them and a 2026 closing at
+                   # 54175 County Road 27.
+                   "Carr",
                    "Garden City", "Grover", "New Raymer"],
         "blurb": "Weld County's growth corridor along the South Platte — new builds, "
                  "acreage, and small-town value minutes from Fort Collins and Greeley.",
@@ -827,6 +836,17 @@ TOWN_LISTING_VIDEOS = {
     ],
     "longmont": [
         ("q-51GPoL4QE", "Backyard Kickball | 12734 Anhawa Ave, Longmont", 191, "12734 anhawa ave"),
+    ],
+    # 2026-08-16 (Christine: "we need to add in carr and pierce - I have listing videos
+    # for them too"). Both towns now have pages, so these tours finally have somewhere to
+    # land. Carr's two are the same 45-acre parcel filmed twice -- the second is titled
+    # "Back on Market!" -- so the property key collapses them to the stronger one.
+    "carr": [
+        ("RRcjuVGRFcU", "Back on Market! 45 Acres of Freedom in Carr, Colorado | Mountain Views & Dream Shop", 952, "54175 county rd 27"),
+        ("dCyU9WVBNZ0", "Would You Trade City Life For THIS Colorado Dream? | 54175 County Road 27, Carr", 803, "54175 county rd 27"),
+    ],
+    "pierce": [
+        ("dVonJhu_zCo", "Dream Ranch on 20 Acres! | 45615 County Rd 27, Pierce CO", 102, "45615 county rd 27"),
     ],
 }
 
@@ -3939,6 +3959,49 @@ def _district_short(text):
     return t
 
 
+# Towns where "Luxury Homes For Sale" is the wrong title, and actively costs her.
+#
+# 2026-08-16. Every one of the 36 town pages carried "<Town> Luxury Homes For Sale",
+# a template set on 2026-08-14 to fix a real gap (the phrase "luxury homes" appeared
+# nowhere on the site). It works for Fort Collins, Windsor and Erie. It does not work
+# for a prairie community with no store, and building Carr and Pierce made that
+# impossible to ignore: "Carr Luxury Homes For Sale" is what Google would show to
+# someone searching "land for sale carr co", and they would not click it. Christine had
+# already flagged the same thing on Nunn.
+#
+# Two failures at once. A visitor bounces on the mismatch, and Google reads a title
+# promising luxury over a page that honestly describes wells, septic and a twelve-mile
+# drive for dinner -- which is the page it should rank, for the search people are
+# really making.
+#
+# So these towns get a title naming what is actually for sale. They keep every other
+# word of their content; only the title and description change. This is a judgement
+# about market tier, so it is an explicit list rather than anything inferred.
+# Just the middle phrase -- the town name and the county suffix are added by
+# _town_title, exactly as they are for the luxury template, so every town page's title
+# has the same shape. Appending the brand here instead produced titles that were
+# sometimes 30 characters and sometimes 57, because _fit_title strips the brand only
+# when the whole thing runs past 60.
+ACREAGE_TOWN_TITLES = {
+    "nunn":              "Homes & Acreage For Sale",
+    "carr":              "Land & Acreage For Sale",
+    "pierce":            "Homes For Sale",
+    "grover":            "Homes & Land For Sale",
+    "masonville":        "Homes & Acreage For Sale",
+    "red-feather-lakes": "Cabins For Sale",   # "Cabins & Homes" ran the title to 66 chars
+    "log-lane-village":  "Homes For Sale",
+    "wiggins":           "Homes & Acreage For Sale",
+    "brush":             "Homes For Sale",
+    "fort-morgan":       "Homes For Sale",
+}
+
+
+def _town_title(city, data_slug, county_name):
+    """The <title> for a town page — luxury framing only where it is true."""
+    phrase = ACREAGE_TOWN_TITLES.get(data_slug or "") or "Luxury Homes For Sale"
+    return f"{city} {phrase} | {county_name}, CO"
+
+
 def _county_town_comparison(county):
     """A real comparison of this county's towns: drive time and schools.
 
@@ -5011,7 +5074,7 @@ def build_city_pages():
                 # anywhere on the site, despite "luxury" appearing 264 times.
                 # The site was semantically adjacent to its money terms
                 # everywhere and exactly on them nowhere.
-                f"{city} Luxury Homes For Sale | {c['name']}, CO",
+                _town_title(city, data_slug, c["name"]),
                 meta,
                 f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html", "Communities", body,
                 schema_extra=[breadcrumbs, faq_schema]
@@ -8556,25 +8619,31 @@ def build_nav_pages():
     # footage for these come out of the IRES IDX feed, whose terms limit that data to
     # consumers' personal, non-commercial use -- her transaction history is hers to
     # publish, the MLS's listing content is not. Same rule as sold_homes.json.
-    by_year = {}
+    # 2026-08-16, second pass (Christine: "who cares about the year - lets just get all
+    # these babies up"). The first version grouped by year, newest first, which put a
+    # "Year not recorded" heading on the page and made the reader's first question
+    # "what year is this" instead of "have you sold in my town".
+    #
+    # Grouped by TOWN now. That is what someone actually scans a sold list for -- they
+    # want their own street, or failing that their own town -- and it means the whole
+    # list reads as coverage rather than as a chronology with a gap in it. Towns with
+    # the most sales first, so the strongest coverage is what a visitor sees; the year
+    # stays on each row where it is known and is simply absent where it is not.
+    by_town = {}
     for pin in SOLD_HOME_PINS:
-        by_year.setdefault(pin.get("year") or "", []).append(pin)
+        by_town.setdefault(pin.get("city") or "Northern Colorado", []).append(pin)
     year_blocks = []
-    # Newest year first, with the undated group forced to the END. `(y == "", y)`
-    # under reverse=True did the opposite -- True sorts above every year string, so
-    # the one home with no recorded year led the list.
-    for year in sorted(by_year, key=lambda y: (y != "", y), reverse=True):
-        homes = sorted(by_year[year], key=lambda p: p["address"])
+    for town in sorted(by_town, key=lambda t: (-len(by_town[t]), t)):
+        homes = sorted(by_town[town], key=lambda p: (-int(p.get("year") or 0), p["address"]))
         rows = "\n        ".join(
             f"""<li><span class="sold-addr">{esc(p['address'])}</span>"""
-            f"""<span class="sold-town">{esc(p['city']) or '&mdash;'}</span>"""
+            f"""<span class="sold-town">{esc(str(p.get('year') or ''))}</span>"""
             + (f"""<a class="sold-tour" href="https://www.youtube.com/watch?v={esc(p['videoId'])}" """
                f"""target="_blank" rel="noopener">Watch the tour &#8599;</a>"""
                if p.get("videoId") else '<span class="sold-tour"></span>')
             + "</li>" for p in homes)
-        label = year if year else "Year not recorded"
         year_blocks.append(f"""<div class="sold-year">
-      <h3 class="sold-year-head">{esc(label)} <span>{len(homes)} home{'s' if len(homes) != 1 else ''}</span></h3>
+      <h3 class="sold-year-head">{esc(town)} <span>{len(homes)} home{'s' if len(homes) != 1 else ''}</span></h3>
       <ul class="sold-list">
         {rows}
       </ul>
@@ -8582,14 +8651,14 @@ def build_nav_pages():
     all_sold_section = f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">The Full List</span>
-    <h2 class="section-title">Every Home {esc(SITE['agent'].split()[0])} Has Sold, By Year</h2>
+    <h2 class="section-title">Every Home {esc(SITE['agent'].split()[0])} Has Sold, By Town</h2>
     <!-- The count and the "150+ homes" figure in the hero are both true and a reader
          WILL notice the gap, so it is explained rather than left to look like a
          contradiction. Only addresses Christine has published herself appear here. -->
-    <p class="lede">{len(SOLD_HOME_PINS)} closed sales with the address on record, newest
-    first. {esc(SITE['agent'].split()[0])} has sold 150+ homes herself over her career;
-    these are the ones documented here by address, and the list grows as older files
-    are added. Every one is a real closing, not a selection of the good ones.</p>
+    <p class="lede">{len(SOLD_HOME_PINS)} closed sales, grouped by town so you can find
+    yours. {esc(SITE['agent'].split()[0])} has sold 150+ homes over her career; these are
+    the ones on record here by address, and the list keeps growing as older files go in.
+    Every one is a real closing, not a shortlist of the good ones.</p>
     {"".join(year_blocks)}
     <div class="btn-row" style="margin-top:32px">
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/sold-homes-map.html">See Them On A Map &rarr;</a>
