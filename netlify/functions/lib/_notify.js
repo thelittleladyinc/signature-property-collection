@@ -160,10 +160,26 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
       // Don't touch the lead. Writing a tag list we can't reconcile with what's
       // already there risks wiping a real client's tags -- see tagsFromLead.
       const shape = describeTagShape(current.json);
-      console.error(`Lofty tag refire skipped for lead ${leadId}: couldn't read current tags (${shape}).`);
+      // 2026-08-16, SETTLED WITH EVIDENCE. Her /status?probe=1 read a real lead
+      // back and reported: "response had no 'tags' field". So Lofty's
+      // GET /leads/{id} does not return tags on this account at all -- it isn't a
+      // shape I failed to parse, the data simply isn't in the response.
+      //
+      // That closes the question and kills the approach. A read-modify-write of
+      // tags is impossible when the read returns no tags, so the re-fire that
+      // would make a "Tag Added" Smart Plan trigger on a REPEAT enquiry cannot be
+      // done safely through this API. The tag sent on the create call still lands
+      // (Lofty appends tags on merge), so a genuinely new contact is fine; it is
+      // the returning buyer that can't be re-triggered.
+      //
+      // Distinguished from a merely unfamiliar shape so /status can state the
+      // limitation as a fact instead of asking her to report it again.
+      const notReturned = /no 'tags' field/.test(shape);
+      console.error(`Lofty tag refire skipped for lead ${leadId}: ${shape}.`);
       return {
-        attempted: true, ok: false, step: "unreadable-tags", tagRestored: true,
-        tagShape: shape,
+        attempted: true, ok: false,
+        step: notReturned ? "tags-not-returned" : "unreadable-tags",
+        tagRestored: true, tagShape: shape,
       };
     }
     const had = tags.includes(triggerTag);

@@ -641,6 +641,19 @@ exports.handler = async (event) => {
       `${loftyLeadCheck.httpStatus}${loftyLeadCheck.body ? ` — ${String(loftyLeadCheck.body).slice(0, 200)}` : ""}. ` +
       "If this is a 404, then GET /leads/{id} isn't available on this account and the trigger " +
       "tag can never be re-fired — which would explain a Smart Plan that never runs.";
+  } else if (/no 'tags' field/.test(loftyLeadCheck.tagShape || "")) {
+    // 2026-08-16: answered, so stop asking. Lofty's GET /leads/{id} returns no
+    // tags on this account, which means the tag can never be re-fired for a
+    // repeat enquiry. Not a fault on this side and not fixable from here, so it
+    // reads as a known limitation with the actual remedy attached.
+    leadRowOk = true;
+    leadRowDetail = `Read lead ${loftyLeadCheck.leadId} back from Lofty ✓ (HTTP 200) — and this ` +
+      `settles the notification question. Lofty's API does NOT return tags for a lead, so this site ` +
+      `cannot check or re-apply the "${LOFTY_TRIGGER_TAG}" tag. The tag sent when the lead is created ` +
+      `still lands, so a brand-new contact is fine; a RETURNING buyer whose contact already exists ` +
+      `cannot have the tag re-added, which is exactly what a "Tag Added" Smart Plan needs in order to ` +
+      `fire a second time. Nothing more can be done through Lofty's API here. The reliable fix is the ` +
+      `backup email row below — it does not depend on Lofty at all.`;
   } else {
     // The three answers, in one line, in plain words.
     leadRowOk = loftyLeadCheck.tagsReadable !== false && loftyLeadCheck.hasTriggerTag !== false;
@@ -683,7 +696,19 @@ exports.handler = async (event) => {
   const covered = [...spotCounts.entries()]
     .map(([href, v]) => ({ href, ...v, city: pageCity.get(href) || v.city }))
     .sort((a, b) => (b.count - a.count) || (b.views - a.views));
-  const empty = townPages.filter((t) => !spotCounts.has(t.href)).map((t) => t.city);
+  // 2026-08-16: her report listed "Windsor, Windsor". Windsor straddles Larimer
+  // and Weld, so it genuinely has two town pages, and printing the bare city name
+  // twice looks like a bug in the report rather than the fact it is. Qualified by
+  // county so the two are distinguishable, and deduped as a backstop.
+  const empty = [...new Set(townPages
+    .filter((t) => !spotCounts.has(t.href))
+    .map((t) => {
+      const county = (String(t.href).match(/^\/communities\/([^/]+)\//) || [])[1];
+      const dupe = townPages.filter((o) => o.city === t.city).length > 1;
+      return dupe && county
+        ? `${t.city} (${county.replace(/-/g, " ")})`
+        : t.city;
+    }))];
   const ranked = covered
     .map((t) => `${t.city} ${t.count}` + (t.views ? ` (${t.views.toLocaleString()} views)` : ""))
     .join(" · ");
