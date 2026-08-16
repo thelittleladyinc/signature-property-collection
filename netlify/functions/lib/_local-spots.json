@@ -13,7 +13,11 @@
       "videoId": "nqPzw2QUjzA",
       "videoTitle": "Sweetheart Winery is one reason I moved back to Loveland",
       "views": 1188,
-      "googlePostUrl": ""
+      "googlePostUrl": "",
+      "reviewViews": 1000,
+      "reviewDate": "2024-03-24",
+      "reviewQuote": "Sweetheart Winery in Loveland isn't just a venue; it's a memorable experience woven into the fabric of my personal and professional life. I chose Sweetheart Winery for my client appreciation party and my daughter's bridal shower. Both events were nothing short of magical, thanks to the breathtaking setting, exceptional service, and exquisite wines.",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Sweet%20Heart%20Winery%20%26%20Event%20Center%20Loveland%20CO"
     },
     {
       "name": "El Pueblito Mexican Restaurant",
@@ -78,7 +82,10 @@
       "videoId": "BQswNwyMDG8",
       "videoTitle": "Venezia: Eaton's Best Italian Restaurant",
       "views": 466,
-      "googlePostUrl": ""
+      "googlePostUrl": "",
+      "reviewViews": 500,
+      "reviewDate": "2024-03-24",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Venezia%20Italian%20Restaurant%20and%20Bar%20Eaton%20CO"
     },
     {
       "name": "Eaton Country Club",
@@ -363,6 +370,33 @@
       "videoId": "dZfHrceqlw4",
       "videoTitle": "Unveiling Eaton, Colorado: Hidden Gem with Gelato, Fun & Family",
       "views": 553,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Dragon Inn",
+      "category": "restaurant",
+      "address": "101 2nd St",
+      "city": "Eaton",
+      "cityHref": "/communities/weld/eaton.html",
+      "searchCity": "Eaton",
+      "blurb": "Generous portions, koi fish and fountains inside, in a farm town of 5,000 — Christine's second most-read review anywhere.",
+      "reviewDate": "2024-03-24",
+      "reviewViews": 4000,
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Dragon%20Inn%20Eaton%20CO",
+      "googlePostUrl": ""
+    },
+    {
+      "name": "A&W Restaurant",
+      "category": "restaurant",
+      "address": "A&W Restaurant",
+      "city": "Eaton",
+      "cityHref": "/communities/weld/eaton.html",
+      "searchCity": "Eaton",
+      "blurb": "Where Christine takes out-of-town buyers to talk about Eaton over a root beer float — she hands out free float coupons.",
+      "reviewQuote": "Whenever I have out-of-town clients interested in the charming properties Eaton has to offer, I always bring them to A&W for a taste of local flavor. It's undoubtedly one of the best casual dining spots in town, where we can discuss homes for sale over root beer floats and classic American burgers.",
+      "reviewDate": "2024-04-20",
+      "reviewViews": 50,
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=A%26W%20Restaurant%20Eaton%20CO",
       "googlePostUrl": ""
     }
   ],

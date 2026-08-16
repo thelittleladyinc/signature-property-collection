@@ -82,7 +82,22 @@
     "    (945 Maplebrook and similar), not a local spot. Its town page has no pins because the footage",
     "    does not exist yet -- which is a filming decision, not a data gap.",
     "  - A broad food/drink keyword sweep returned nothing new, which suggests the spot videos are",
-    "    already largely captured. The remaining volume is in her GOOGLE REVIEWS, not YouTube."
+    "    already largely captured. The remaining volume is in her GOOGLE REVIEWS, not YouTube.",
+    "",
+    "2026-08-16 ('do what you can without me'). Her Takeout export landed in Drive but is 206 MB --",
+    "far too large to pull through the Drive connector, which returns a file as encoded text. So the",
+    "reviews were mined out of GMAIL instead, and Google's own milestone emails turn out to carry the",
+    "full review text, the date, the view count AND a real Maps place link. That is everything needed,",
+    "with no export required.",
+    "",
+    "Found this way: Dragon Inn in Eaton (4,000+ views -- her second most-read review), A&W in Eaton",
+    "(50+, with the root-beer-float-coupon story), plus review text and counts added to Sweet Heart",
+    "Winery (1,000+) and Venezia (500+), which already had videos. A spot can carry BOTH a video and a",
+    "review; the map credits each platform separately.",
+    "",
+    "Skipped deliberately: her reviews of other REALTORS (Emily Sells Centennial, April Brandon, Jeff",
+    "Kurtz, Miranda Cantin, Alissa Rhoades). Real reviews, but colleagues rather than local spots, and",
+    "pinning a competing agent on her own map would be an odd thing to do to her."
   ],
   "_views_as_of": "2026-08-15",
   "spots": [
@@ -97,7 +112,11 @@
       "videoId": "nqPzw2QUjzA",
       "videoTitle": "Sweetheart Winery is one reason I moved back to Loveland",
       "views": 1188,
-      "googlePostUrl": ""
+      "googlePostUrl": "",
+      "reviewViews": 1000,
+      "reviewDate": "2024-03-24",
+      "reviewQuote": "Sweetheart Winery in Loveland isn't just a venue; it's a memorable experience woven into the fabric of my personal and professional life. I chose Sweetheart Winery for my client appreciation party and my daughter's bridal shower. Both events were nothing short of magical, thanks to the breathtaking setting, exceptional service, and exquisite wines.",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Sweet%20Heart%20Winery%20%26%20Event%20Center%20Loveland%20CO"
     },
     {
       "name": "El Pueblito Mexican Restaurant",
@@ -162,7 +181,10 @@
       "videoId": "BQswNwyMDG8",
       "videoTitle": "Venezia: Eaton's Best Italian Restaurant",
       "views": 466,
-      "googlePostUrl": ""
+      "googlePostUrl": "",
+      "reviewViews": 500,
+      "reviewDate": "2024-03-24",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Venezia%20Italian%20Restaurant%20and%20Bar%20Eaton%20CO"
     },
     {
       "name": "Eaton Country Club",
@@ -447,6 +469,33 @@
       "videoId": "dZfHrceqlw4",
       "videoTitle": "Unveiling Eaton, Colorado: Hidden Gem with Gelato, Fun & Family",
       "views": 553,
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Dragon Inn",
+      "category": "restaurant",
+      "address": "101 2nd St",
+      "city": "Eaton",
+      "cityHref": "/communities/weld/eaton.html",
+      "searchCity": "Eaton",
+      "blurb": "Generous portions, koi fish and fountains inside, in a farm town of 5,000 — Christine's second most-read review anywhere.",
+      "reviewDate": "2024-03-24",
+      "reviewViews": 4000,
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Dragon%20Inn%20Eaton%20CO",
+      "googlePostUrl": ""
+    },
+    {
+      "name": "A&W Restaurant",
+      "category": "restaurant",
+      "address": "A&W Restaurant",
+      "city": "Eaton",
+      "cityHref": "/communities/weld/eaton.html",
+      "searchCity": "Eaton",
+      "blurb": "Where Christine takes out-of-town buyers to talk about Eaton over a root beer float — she hands out free float coupons.",
+      "reviewQuote": "Whenever I have out-of-town clients interested in the charming properties Eaton has to offer, I always bring them to A&W for a taste of local flavor. It's undoubtedly one of the best casual dining spots in town, where we can discuss homes for sale over root beer floats and classic American burgers.",
+      "reviewDate": "2024-04-20",
+      "reviewViews": 50,
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=A%26W%20Restaurant%20Eaton%20CO",
       "googlePostUrl": ""
     }
   ],
