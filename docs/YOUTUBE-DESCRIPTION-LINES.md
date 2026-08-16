@@ -6,7 +6,7 @@ real. Regenerate with `python3 build/tools/description_lines.py`.
 ## Why this is worth an evening
 
 These 24 videos have **18,735 views** between them, and your
-reviews add another **14,050**. That audience already exists and already
+reviews add another **15,350**. That audience already exists and already
 trusts your taste in local places. Right now most of those descriptions point at the
 old site or nowhere useful, so the traffic evaporates. One line per video sends it
 somewhere you own — a page listing the other places you've covered in that town, and
@@ -267,7 +267,7 @@ site in the review text itself next time you post or edit one. Keep it natural �
 recommendation that reads like an advert gets ignored, and yours don't.
 
 - **Cocina & Cantina** (10,000 review views) — town page: `https://signaturepropertycollection.com/communities/larimer/berthoud.html`
-- **Dragon Inn** (4,000 review views) — town page: `https://signaturepropertycollection.com/communities/weld/eaton.html`
+- **Dragon Inn** (5,300 review views) — town page: `https://signaturepropertycollection.com/communities/weld/eaton.html`
 - **A&W Restaurant** (50 review views) — town page: `https://signaturepropertycollection.com/communities/weld/eaton.html`
 
 Suggested phrasing to work in, not paste verbatim:
@@ -287,7 +287,7 @@ Bio, pinned comment, Google Business profile, email signature:
 https://signaturepropertycollection.com/communities
 ```
 
-That is the map with all 32 spots on it. From there a visitor reaches every
+That is the map with all 35 spots on it. From there a visitor reaches every
 town page, every video, and a live search of homes near any of them.
 
 ## And for sellers

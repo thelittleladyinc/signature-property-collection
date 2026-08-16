@@ -142,7 +142,7 @@
     {
       "name": "The Loveland Chophouse",
       "category": "restaurant",
-      "address": "The Loveland Chophouse",
+      "address": "225 E 4th St",
       "city": "Loveland",
       "cityHref": "/communities/larimer/loveland.html",
       "searchCity": "Loveland",
@@ -150,7 +150,10 @@
       "videoId": "6EbyMIobZ1Y",
       "videoTitle": "Is This the Best Steakhouse in Loveland?",
       "views": 1322,
-      "googlePostUrl": ""
+      "googlePostUrl": "",
+      "reviewViews": 7240,
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=The%20Loveland%20Chophouse%20Loveland%20CO",
+      "_why": "2026-08-16, from Christine's own Google review list. Her Google review of it has 7,240 views -- more than five times the video's 1,322 -- which makes this Loveland's best-read spot, not just another card. Also fixed the address field, which held the business name instead of a street address."
     },
     {
       "name": "Gnome Road (Elf Lane)",
@@ -381,9 +384,10 @@
       "searchCity": "Eaton",
       "blurb": "Generous portions, koi fish and fountains inside, in a farm town of 5,000 — Christine's second most-read review anywhere.",
       "reviewDate": "2024-03-24",
-      "reviewViews": 4000,
+      "reviewViews": 5300,
       "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Dragon%20Inn%20Eaton%20CO",
-      "googlePostUrl": ""
+      "googlePostUrl": "",
+      "_why": "2026-08-16, from Christine's own Google review list. Review views updated 4,000 -> 5,300 from her live contributions page. She said Ault; the record says Eaton and the record is right -- Yelp confirms 101 2nd St, Eaton. Ault and Eaton are neighbouring US-85 towns and easy to swap, so this is noted rather than silently kept."
     },
     {
       "name": "A&W Restaurant",
@@ -430,6 +434,39 @@
       "alsoOnCityHrefs": [
         "/communities/larimer/windsor.html"
       ]
+    },
+    {
+      "name": "Vatos Tacos + Tequila",
+      "category": "restaurant",
+      "address": "270 N Cleveland Ave",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "Street tacos and premium tequila at The Foundry, right in downtown Loveland — the kind of place that tells you what a downtown is actually like on a Friday night, which no listing photo will.",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Vatos%20Tacos%20and%20Tequila%20Loveland%20CO",
+      "_why": "2026-08-16, from Christine's own Google review list. Address 270 N Cleveland Ave verified via Yelp and Visit Loveland; it sits in The Foundry development downtown. No review view count given yet."
+    },
+    {
+      "name": "The Pizza Palace",
+      "category": "restaurant",
+      "address": "3810 Cleveland Ave",
+      "city": "Wellington",
+      "cityHref": "/communities/larimer/wellington.html",
+      "searchCity": "Wellington",
+      "blurb": "A Wellington fixture since the early 1980s, hand-tossing New York-style pizza in stone ovens actually imported from New York. Forty years in the same small town is its own kind of reference.",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=The%20Pizza%20Palace%20Wellington%20CO",
+      "_why": "2026-08-16, from Christine's own Google review list. Address 3810 Cleveland Ave and the early-1980s founding verified via Yelp and the restaurant's own site. This is the FIRST spot on the Wellington page, which until now had 699 unique words and nothing of hers on it."
+    },
+    {
+      "name": "Asian Cafe & Grill",
+      "category": "restaurant",
+      "address": "1323 Eagle Dr",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "Chinese, Vietnamese, Thai and sushi from one east-Loveland kitchen — the unglamorous neighborhood standby that locals order from on a Tuesday.",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Asian%20Cafe%20and%20Grill%20Loveland%20CO",
+      "_why": "2026-08-16, from Christine's own Google review list. Full name is Asian Cafe & Grill; address 1323 Eagle Dr verified via Yelp. No review view count given yet."
     }
   ],
   "townPages": [

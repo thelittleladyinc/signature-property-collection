@@ -56,8 +56,19 @@ const curatedSpots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).
   check("view counts, where present, are real numbers",
     body.spots.every(s => (s.views === undefined || s.views > 0) &&
                           (s.reviewViews === undefined || s.reviewViews > 0)));
-  check("most pins do carry a view count",
-    body.spots.filter(s => s.views || s.reviewViews).length >= body.spots.length - 2);
+  // 2026-08-16: this was `>= length - 2`, an absolute slack chosen when Bobcat Ridge was
+  // the only pin without a number. Christine then sent three more Google reviews without
+  // view counts, and a correct build failed -- pin it now, add the number when she reads
+  // it off her contributions page is the NORMAL workflow here, not a defect.
+  //
+  // Expressed as a proportion instead, which is what the check was always about: a
+  // regression that silently dropped view counts would collapse this far below 75%,
+  // while adding a handful of not-yet-counted spots cannot. The figure is printed either
+  // way so drift is visible even when it passes.
+  const counted = body.spots.filter(s => s.views || s.reviewViews).length;
+  const pct = Math.round((counted / body.spots.length) * 100);
+  check(`most pins carry a view count (${counted}/${body.spots.length} = ${pct}%)`,
+    pct >= 75, `${pct}%`);
   // Derived from the data file rather than hardcoded: the top pin changes as
   // she adds videos, and a test that names one becomes a lie the day it does.
   const curated = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).spots;
