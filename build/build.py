@@ -2758,6 +2758,20 @@ def _real_estate_agent_schema():
         "worksFor": {"@type": "Organization", "name": SITE["brokerage"]},
         "areaServed": [{"@type": "AdministrativeArea", "name": n} for n in area_served],
         "sameAs": _same_as_urls(),
+        # 2026-08-16 (findability audit): every subject this site actually covers in
+        # depth, declared as topics rather than left to be inferred from prose. No
+        # rich result comes of this and none is expected -- its value is to the
+        # retrieval crawlers (PerplexityBot, ClaudeBot, OAI-SearchBot, all of which
+        # robots.txt already welcomes), which resolve "who covers relocation to
+        # Northern Colorado" against entity topics, not adjectives. Deliberately
+        # limited to things the site genuinely has pages about, because a topic list
+        # that overclaims is worse than none: it is checkable, and it will be checked.
+        "knowsAbout": [
+            "Luxury real estate", "Relocation to Northern Colorado", "Acreage and horse property",
+            "Downsizing", "Estate homes", "New construction", "Land development",
+            "Multi-generational homes", "Retirement relocation", "Expired listings",
+            "Home valuation", "Real estate negotiation",
+        ],
         "dateModified": BUILD_DATE,
         # NOTE: aggregateRating deliberately NOT emitted sitewide any more.
         # Google's structured-data policy treats reviews *about* a business,
@@ -2833,6 +2847,45 @@ def _kendra_agent_schema():
             "addressCountry": "US",
         }
     return json.dumps(data, indent=None)
+
+
+def _website_schema():
+    """WebSite node, for Google's Site Names feature. Homepage only.
+
+    2026-08-16 (findability audit). Two things are true about WebSite schema and
+    most audits get them backwards, so the reasoning is written down here rather
+    than left as a judgement call for the next person:
+
+    1. The sitelinks SEARCH BOX is dead. Google announced its deprecation on
+       2024-10-21 and retired it globally on 2024-11-21. The `potentialAction`
+       / `SearchAction` block that every SEO checklist still tells you to add
+       produces nothing at all now. It is deliberately NOT emitted here. It
+       would also have been a lie in this specific case: search-homes.html
+       accepts `cities`/`city`/`subdivision`, not free text, so a searchbox
+       template would have handed Google a URL that silently returns nothing
+       for any real query a person types.
+
+    2. WebSite schema itself is NOT dead. Google explicitly kept a variation
+       alive for Site Names -- the name shown above the URL in a result. That
+       is the whole reason this function exists, and it matters more than usual
+       here for the same reason _organization_schema() documents: "Signature
+       Property Collection" collides with at least six other Colorado real
+       estate "Signature" brands. Declaring the name and its short form is how
+       the site gets to state which one it is instead of letting Google guess
+       from the <title>.
+    """
+    return json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "@id": SITE["domain"] + "/#website",
+        "url": SITE["domain"] + "/",
+        "name": SITE["name"],
+        # Google picks a shorter display name when it has one; without this it
+        # tends to invent an abbreviation or fall back to the domain.
+        "alternateName": "Signature Property Collection | Christine Gwinnup",
+        "inLanguage": "en-US",
+        "publisher": {"@id": ORG_ID},
+    }, indent=None)
 
 
 def _organization_schema():
@@ -3674,7 +3727,7 @@ def build_home():
         "Christine Gwinnup sells luxury homes and acreage across Northern Colorado, "
         "Denver north to the Wyoming line. 250+ homes sold, 158 five-star Google reviews.",
         "/index.html", None, body, extra,
-        schema_extra=[faq_schema, _organization_schema()],
+        schema_extra=[faq_schema, _organization_schema(), _website_schema()],
     )
 
 
@@ -4827,6 +4880,50 @@ def _usd(n):
     return f"${n:,.0f}"
 
 
+def _town_place_schema(city, county_name, url_path, welcome):
+    """Place node for a town page, so the page declares the entity it is about.
+
+    2026-08-16 (findability audit). These 37 pages are now titled "Living In
+    {Town}, CO" and built around what it is like to live there, and none of them
+    said in machine-readable form that they were ABOUT a place. Everything on
+    them described the town in prose and the only entity declared was the agent.
+
+    Setting expectations honestly: Place produces no rich result and none is
+    expected. The value is entity resolution for the retrieval crawlers this
+    site's robots.txt already invites -- a page that names its subject as a Place
+    inside a named county inside Colorado is easier to return for "what is it
+    like to live in Severance" than one that leaves it to be inferred.
+
+    No `geo` block. city_content.json carries no coordinates, and a plausible-
+    looking latitude is exactly the kind of fabrication that a schema validator
+    will happily accept and a person will never notice. Name, county and state
+    are all real; that is what gets published.
+    """
+    data = {
+        "@context": "https://schema.org",
+        "@type": "Place",
+        "@id": SITE["domain"] + url_path + "#place",
+        "name": f"{city}, Colorado",
+        "address": {
+            "@type": "PostalAddress",
+            "addressLocality": city,
+            "addressRegion": "CO",
+            "addressCountry": "US",
+        },
+        "containedInPlace": {
+            "@type": "AdministrativeArea",
+            "name": county_name,
+            "containedInPlace": {"@type": "State", "name": "Colorado"},
+        },
+    }
+    # Only when there is real copy to describe it with -- an empty or null
+    # description is worse than an absent one.
+    first = welcome.split(". ")[0].strip().rstrip(".") if welcome else ""
+    if first:
+        data["description"] = first + "."
+    return json.dumps(data, indent=None)
+
+
 def _moving_to_block(city, county_name, school_district, commute, relocate_extra, stats=None):
     """The "Moving To {City}" section — the relocation half of a town page.
 
@@ -5352,7 +5449,11 @@ def build_city_pages():
                             disambiguate=city_county_counts[city] > 1),
                 meta,
                 f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html", "Communities", body,
-                schema_extra=[breadcrumbs, faq_schema]
+                schema_extra=[breadcrumbs, faq_schema,
+                              _town_place_schema(
+                                  city, c["name"],
+                                  f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html",
+                                  welcome)]
                 + ([city_video_schema] if city_video_schema else [])
                 + own_home_schema,
                 canonical_path=(
