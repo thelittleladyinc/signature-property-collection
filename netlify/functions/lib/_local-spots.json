@@ -398,6 +398,32 @@
       "reviewViews": 50,
       "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=A%26W%20Restaurant%20Eaton%20CO",
       "googlePostUrl": ""
+    },
+    {
+      "name": "Windsor Mill Tavern",
+      "category": "restaurant",
+      "address": "301 Main St, Unit C",
+      "city": "Windsor",
+      "cityHref": "/communities/weld/windsor.html",
+      "searchCity": "Windsor",
+      "blurb": "Downtown Windsor's tavern, in the garden-level basement of the historic Windsor Mill — century-old stone walls and timber posts that survived the 2017 fire. Christine points buyers here as the reason downtown Windsor is worth being within walking distance of.",
+      "videoId": "K8sjM8_7o5I",
+      "videoTitle": "Upgrade Your View: Luxurious Living in Windsor, Colorado",
+      "views": 744,
+      "_why": "Named in the video: \"with Downtown Windsor being less than a mile away you'll be able to enjoy your evenings at the Windsor Mill Tavern\". Transcript read 2026-08-16; views from vidIQ the same day. Address 301 Main St Unit C per Yelp and the Windsor Chamber listing."
+    },
+    {
+      "name": "Windsor Lake & Boardwalk Park",
+      "category": "lake",
+      "address": "100 N 5th St",
+      "city": "Windsor",
+      "cityHref": "/communities/weld/windsor.html",
+      "searchCity": "Windsor",
+      "blurb": "A 2.25-mile paved loop right off downtown, with a swim beach, boating, fishing and the amphitheater at Boardwalk Park where the town's summer events happen. The reason people who move to Windsor stay in Windsor.",
+      "videoId": "SAZceZQJrAs",
+      "videoTitle": "Is This the Cutest Home in Windsor, Colorado?",
+      "views": 1096,
+      "_why": "Named in the video: \"community events at nearby Windsor Lake\". Transcript read 2026-08-16; views from vidIQ the same day. Address 100 N 5th St per the Town of Windsor / Boardwalk Park listings."
     }
   ],
   "townPages": [

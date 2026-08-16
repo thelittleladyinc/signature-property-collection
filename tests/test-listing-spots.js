@@ -54,9 +54,21 @@ function load(city) {
   check("a review-backed town shows her words instead of a video",
     /spot-quote/.test(berthoud.body) && /views on Google/.test(berthoud.body));
 
-  const windsor = await load("Windsor")({ queryStringParameters: { id: "IRE123" } });
-  check("a town with no spots renders NO empty heading",
-    !/From Christine/.test(windsor.body) && windsor.statusCode === 200);
+  // 2026-08-16: this used to name Windsor, and then Windsor got two spots -- so a
+  // test of "an empty town renders nothing" started failing because the town it
+  // picked stopped being empty. Adding a spot is the whole point of the feature and
+  // must never break a test, so the empty town is now DERIVED: take a town the
+  // listing feed really carries and that the spots data really has nothing for.
+  const townsWithSpots = new Set(all.map((s) => s.city));
+  const emptyTown = ["Greeley", "Timnath", "Wellington", "Johnstown", "Mead", "Severance"]
+    .find((t) => !townsWithSpots.has(t));
+  check("there is still an un-covered town to test with", !!emptyTown,
+    `every candidate now has spots: ${[...townsWithSpots].join(", ")}`);
+  if (emptyTown) {
+    const empty = await load(emptyTown)({ queryStringParameters: { id: "IRE123" } });
+    check(`a town with no spots renders NO empty heading (${emptyTown})`,
+      !/From Christine/.test(empty.body) && empty.statusCode === 200);
+  }
 
   const unknown = await load("Nowheresville")({ queryStringParameters: { id: "IRE123" } });
   check("an unknown town degrades silently", !/From Christine/.test(unknown.body));

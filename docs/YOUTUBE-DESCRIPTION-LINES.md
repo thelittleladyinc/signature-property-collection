@@ -5,7 +5,7 @@ real. Regenerate with `python3 build/tools/description_lines.py`.
 
 ## Why this is worth an evening
 
-These 22 videos have **16,895 views** between them, and your
+These 24 videos have **18,735 views** between them, and your
 reviews add another **14,050**. That audience already exists and already
 trusts your taste in local places. Right now most of those descriptions point at the
 old site or nowhere useful, so the traffic evaporates. One line per video sends it
@@ -98,6 +98,16 @@ Add to the description (near the top, above the hashtags):
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/fort-collins.html
 ```
 
+### 1,096 views — Is This the Cutest Home in Windsor, Colorado?
+`youtube.com/watch?v=SAZceZQJrAs`  ·  covers: Windsor Lake & Boardwalk Park
+
+Add to the description (near the top, above the hashtags):
+
+```
+📍 More of Windsor the way locals actually see it — every spot I've filmed here,
+plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/windsor.html
+```
+
 ### 996 views — Downtown Loveland — Sweetheart City's Best Events!
 `youtube.com/watch?v=OGoRYV2bGA8`  ·  covers: Downtown Loveland, Sage
 
@@ -116,6 +126,16 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+```
+
+### 744 views — Upgrade Your View: Luxurious Living in Windsor, Colorado
+`youtube.com/watch?v=K8sjM8_7o5I`  ·  covers: Windsor Mill Tavern
+
+Add to the description (near the top, above the hashtags):
+
+```
+📍 More of Windsor the way locals actually see it — every spot I've filmed here,
+plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/windsor.html
 ```
 
 ### 557 views — Inside the Eaton Country Club with Mccarty's: A Hidden Gem
@@ -267,7 +287,7 @@ Bio, pinned comment, Google Business profile, email signature:
 https://signaturepropertycollection.com/communities
 ```
 
-That is the map with all 30 spots on it. From there a visitor reaches every
+That is the map with all 32 spots on it. From there a visitor reaches every
 town page, every video, and a live search of homes near any of them.
 
 ## And for sellers
