@@ -3143,6 +3143,8 @@ SPOT_CATEGORY_LABELS = {
     "lake": "On The Water",
     "downtown": "Downtown",
     "scenic": "Worth The Drive",
+    "event": "Annual Event",
+    "spot": "Local Spot",
 }
 
 
@@ -5934,11 +5936,25 @@ def write_local_spots_function_data():
             "local_spots.json: these spots carry nothing of Christine's — no "
             "videoId, no reviewQuote, no googleReviewUrl: " + ", ".join(unsourced)
         )
+    # 2026-08-15 (Christine: "how do i view the highest count for tour it with
+    # me? I have towns and some towns have restuarants and some are parks for ex
+    # windsor town but mentions 3 in town places"). The gap she spotted is real:
+    # a town page's prose can name three places while the Tour It With Me section
+    # has none of them pinned, and nothing on the site said so. So the list of
+    # every town page that EXISTS ships alongside the spots, letting /status show
+    # covered and uncovered towns side by side instead of only what's already
+    # done. A coverage report that can't show zeroes isn't a coverage report.
+    town_pages = sorted({
+        (city, _city_url(c["slug"], city))
+        for c in COUNTIES for city in c["cities"]
+        if _city_url(c["slug"], city)
+    })
     payload = {
         "_generated": "Written by build/build.py from build/data/local_spots.json. "
                       "Do not edit by hand — edit that file and re-run the build.",
         "_views_as_of": LOCAL_SPOTS_DATA.get("_views_as_of"),
         "spots": spots,
+        "townPages": [{"city": city, "href": href} for city, href in town_pages],
     }
     with open(os.path.join(out_dir, "_local-spots.json"), "w") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)

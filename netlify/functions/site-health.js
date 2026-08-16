@@ -27,6 +27,8 @@ const {
 const { isCloudinaryConfigured } = require("./lib/_cloudinary");
 const { resolveMediaFor, fetchMediaResponse, looksPresigned } = require("./lib/_media");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
+// Read for the Tour It With Me coverage row below — same file the map reads.
+const LOCAL_SPOTS = require("./lib/_local-spots.json");
 
 // Must match SUSPENSION_KEY in sync-listings.js — duplicated here rather
 // than exported since it's a single literal string and this file should
@@ -654,6 +656,52 @@ exports.handler = async (event) => {
             `tag, which is the reason a tag-triggered Smart Plan wouldn't fire.`));
   }
   checks.push({ name: "What Lofty says about your last lead", ok: leadRowOk, detail: leadRowDetail });
+
+  // ---- "Tour It With Me" coverage, ranked -----------------------------------
+  // 2026-08-15 (Christine: "how do i view the highest count for tour it with me?
+  // ... for ex windsor town but mentions 3 in town places"). She'd spotted that a
+  // town page's prose can name three places while its Tour It With Me section
+  // pins none of them, and nothing on the site would tell her. This row is that
+  // answer: every town ranked by how many of her spots it carries, with the
+  // empty ones named explicitly. A coverage report that only lists what's done
+  // is a progress bar, not a to-do list.
+  const spotCounts = new Map();
+  for (const s of LOCAL_SPOTS.spots || []) {
+    if (!s.cityHref) continue;
+    const prev = spotCounts.get(s.cityHref) || { city: s.city, count: 0, views: 0 };
+    prev.count += 1;
+    prev.views += (s.views || 0) + (s.reviewViews || 0);
+    spotCounts.set(s.cityHref, prev);
+  }
+  const townPages = Array.isArray(LOCAL_SPOTS.townPages) ? LOCAL_SPOTS.townPages : [];
+  // Label each row by the TOWN PAGE, not by the first spot that happened to land
+  // on it. Several spots sit in one town but belong on another's page — Poudre
+  // Canyon is in Bellvue and Horsetooth Reservoir is in Fort Collins, and both
+  // are on the Fort Collins page. Reading the label off the first spot printed
+  // "Bellvue 2", which names a town that has no page at all.
+  const pageCity = new Map(townPages.map((t) => [t.href, t.city]));
+  const covered = [...spotCounts.entries()]
+    .map(([href, v]) => ({ href, ...v, city: pageCity.get(href) || v.city }))
+    .sort((a, b) => (b.count - a.count) || (b.views - a.views));
+  const empty = townPages.filter((t) => !spotCounts.has(t.href)).map((t) => t.city);
+  const ranked = covered
+    .map((t) => `${t.city} ${t.count}` + (t.views ? ` (${t.views.toLocaleString()} views)` : ""))
+    .join(" · ");
+  checks.push({
+    // Not a failure: an uncovered town is work to do, not something broken.
+    optional: empty.length > 0,
+    name: "Tour It With Me coverage" + (empty.length ? " (towns still empty)" : ""),
+    ok: empty.length === 0,
+    detail: (covered.length
+      ? `Ranked by number of spots — ${ranked}. `
+      : "No town has spots yet. ") +
+      (empty.length
+        ? `${empty.length} of ${townPages.length} town pages have NO spots yet: ${empty.join(", ")}. ` +
+          "Each of those pages already describes local places in its text; they just have nothing " +
+          "of yours pinned to them. Send a business name and town for any of them and it appears " +
+          "on both the town page and the county map."
+        : `All ${townPages.length} town pages have at least one spot.`),
+  });
 
   checks.push({
     optional: emailOptional,

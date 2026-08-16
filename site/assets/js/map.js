@@ -164,6 +164,10 @@
     lake: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 3-2"/><path d="M3 15c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 3-2"/></svg>',
     downtown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l5-3v16"/><path d="M9 21V11l6-3v13"/><path d="M15 21V12l5 2v7"/></svg>',
     scenic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M3 21c2-5 5.5-7 9-7s7 2 9 7"/></svg>',
+    // A street festival / annual event, e.g. Taste of Loveland.
+    event: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21l5-13 8 5Z"/><line x1="9" y1="8" x2="10.5" y2="4"/><circle cx="11" cy="3" r="1.4" fill="currentColor" stroke="none"/></svg>',
+    // The fallback for a category this build doesn't know a glyph for.
+    spot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg>',
   };
   var POI_MARKERS = [
     {
@@ -189,9 +193,27 @@
 
   // Shared by the built-in POI_MARKERS and the fetched local spots, so both
   // kinds of pin behave identically -- one place to change the interaction.
+  // Positions already used by a pin, so co-located pins can be nudged apart.
+  // 2026-08-15: Downtown Loveland and Taste of Loveland genuinely share an
+  // address -- the event happens on that street -- and geocoding both returned
+  // the identical point, so the second marker sat exactly under the first and
+  // could never be clicked. Nudging the duplicate is honest in a way that
+  // inventing a different address for it would not be: the place really is the
+  // same, this is a display offset and nothing more. Deterministic, so pins
+  // don't shuffle between page loads, and ~25m so it reads as "same block".
+  var usedPositions = {};
+  function nudgeIfStacked(lat, lng) {
+    var key = lat.toFixed(4) + ',' + lng.toFixed(4);
+    var n = usedPositions[key] || 0;
+    usedPositions[key] = n + 1;
+    if (!n) return [lat, lng];
+    var angle = (n - 1) * (Math.PI * 2 / 6);
+    return [lat + Math.cos(angle) * 0.00022, lng + Math.sin(angle) * 0.00029];
+  }
+
   function addPoiMarker(map, poi) {
     if (!poi || typeof poi.lat !== 'number' || typeof poi.lng !== 'number') return;
-    var marker = L.marker([poi.lat, poi.lng], {
+    var marker = L.marker(nudgeIfStacked(poi.lat, poi.lng), {
       icon: poiIcon(poi), interactive: true, zIndexOffset: 600,
     }).addTo(map);
     // The view count goes in the tooltip because it is the reason to click: it
@@ -205,7 +227,15 @@
   }
 
   function poiIcon(poi) {
-    var glyph = POI_ICONS[poi.icon] || POI_ICONS.golf;
+    // 2026-08-15: this read poi.icon only. The hardcoded POI_MARKERS above set
+    // `icon`, but the spots fetched from local-spots.js carry `category` — so
+    // every single one of Christine's 19 pins fell through to the golf flag,
+    // including the restaurants. The whole point of adding seven glyphs was that
+    // the map should read at a glance as places a person goes.
+    //
+    // Falling back to `spot` rather than `golf` too: an unrecognised category
+    // should look like a generic place, not silently claim to be a golf course.
+    var glyph = POI_ICONS[poi.icon || poi.category] || POI_ICONS.spot;
     return L.divIcon({
       html: '<div class="poi-icon-marker">' + glyph + '</div>',
       className: '',

@@ -56,7 +56,13 @@
     "Any future sweep of her local content must include Google reviews, not just YouTube.",
     "",
     "Checked and deliberately NOT pinned because both are permanently closed: Grubby'z (Pierce and",
-    "Severance), found via a 'replied to your review' email, and The River Forks Inn in Drake."
+    "Severance), found via a 'replied to your review' email, and The River Forks Inn in Drake.",
+    "",
+    "2026-08-15: she confirmed Bobcat Ridge and Taste of Loveland ('i did bobcat ridge and a taste of",
+    "loveland event!'). Bobcat Ridge has no video or review text here yet -- it is pinned on her word",
+    "that she contributed there, linking to the place, and the quote + view count can be filled in once",
+    "she has the numbers. Taste of Loveland uses the dedicated 'Taste of Loveland 2026' film rather than",
+    "the higher-viewed 'All in a day' clip, which is really about three places at once."
   ],
   "_views_as_of": "2026-08-15",
   "spots": [
@@ -306,6 +312,30 @@
       "reviewDate": "2025-07-15",
       "reviewViews": 10000,
       "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Cocina%20%26%20Cantina%20Berthoud%20CO",
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Bobcat Ridge Natural Area",
+      "category": "trail",
+      "address": "Bobcat Ridge Natural Area",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "Fort Collins-owned open space on the west side of Loveland — ponderosa, old homestead ruins and a long loop most new residents never find.",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Bobcat%20Ridge%20Natural%20Area%20Loveland%20CO",
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Taste of Loveland",
+      "category": "event",
+      "address": "4th St & Lincoln Ave",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "The downtown food-and-drink event Christine works every year — the fastest way to meet half of Loveland in one afternoon.",
+      "videoId": "wMtJCTePofE",
+      "videoTitle": "Taste of Loveland 2026",
+      "views": 156,
       "googlePostUrl": ""
     }
   ],

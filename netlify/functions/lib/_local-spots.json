@@ -249,6 +249,156 @@
       "reviewViews": 10000,
       "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Cocina%20%26%20Cantina%20Berthoud%20CO",
       "googlePostUrl": ""
+    },
+    {
+      "name": "Bobcat Ridge Natural Area",
+      "category": "trail",
+      "address": "Bobcat Ridge Natural Area",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "Fort Collins-owned open space on the west side of Loveland — ponderosa, old homestead ruins and a long loop most new residents never find.",
+      "googleReviewUrl": "https://www.google.com/maps/search/?api=1&query=Bobcat%20Ridge%20Natural%20Area%20Loveland%20CO",
+      "googlePostUrl": ""
+    },
+    {
+      "name": "Taste of Loveland",
+      "category": "event",
+      "address": "4th St & Lincoln Ave",
+      "city": "Loveland",
+      "cityHref": "/communities/larimer/loveland.html",
+      "searchCity": "Loveland",
+      "blurb": "The downtown food-and-drink event Christine works every year — the fastest way to meet half of Loveland in one afternoon.",
+      "videoId": "wMtJCTePofE",
+      "videoTitle": "Taste of Loveland 2026",
+      "views": 156,
+      "googlePostUrl": ""
+    }
+  ],
+  "townPages": [
+    {
+      "city": "Ault",
+      "href": "/communities/weld/ault.html"
+    },
+    {
+      "city": "Berthoud",
+      "href": "/communities/larimer/berthoud.html"
+    },
+    {
+      "city": "Boulder",
+      "href": "/communities/boulder/boulder.html"
+    },
+    {
+      "city": "Broomfield",
+      "href": "/communities/broomfield/broomfield.html"
+    },
+    {
+      "city": "Brush",
+      "href": "/communities/morgan/brush.html"
+    },
+    {
+      "city": "Dacono",
+      "href": "/communities/weld/dacono.html"
+    },
+    {
+      "city": "Denver",
+      "href": "/communities/denver/denver.html"
+    },
+    {
+      "city": "Eaton",
+      "href": "/communities/weld/eaton.html"
+    },
+    {
+      "city": "Erie",
+      "href": "/communities/weld/erie.html"
+    },
+    {
+      "city": "Firestone",
+      "href": "/communities/weld/firestone.html"
+    },
+    {
+      "city": "Fort Collins",
+      "href": "/communities/larimer/fort-collins.html"
+    },
+    {
+      "city": "Fort Lupton",
+      "href": "/communities/weld/fort-lupton.html"
+    },
+    {
+      "city": "Fort Morgan",
+      "href": "/communities/morgan/fort-morgan.html"
+    },
+    {
+      "city": "Frederick",
+      "href": "/communities/weld/frederick.html"
+    },
+    {
+      "city": "Greeley",
+      "href": "/communities/weld/greeley.html"
+    },
+    {
+      "city": "Johnstown",
+      "href": "/communities/weld/johnstown.html"
+    },
+    {
+      "city": "Lafayette",
+      "href": "/communities/boulder/lafayette.html"
+    },
+    {
+      "city": "Log Lane Village",
+      "href": "/communities/morgan/log-lane-village.html"
+    },
+    {
+      "city": "Louisville",
+      "href": "/communities/boulder/louisville.html"
+    },
+    {
+      "city": "Loveland",
+      "href": "/communities/larimer/loveland.html"
+    },
+    {
+      "city": "Masonville",
+      "href": "/communities/larimer/masonville.html"
+    },
+    {
+      "city": "Mead",
+      "href": "/communities/weld/mead.html"
+    },
+    {
+      "city": "Milliken",
+      "href": "/communities/weld/milliken.html"
+    },
+    {
+      "city": "Nederland",
+      "href": "/communities/boulder/nederland.html"
+    },
+    {
+      "city": "Red Feather Lakes",
+      "href": "/communities/larimer/red-feather-lakes.html"
+    },
+    {
+      "city": "Severance",
+      "href": "/communities/weld/severance.html"
+    },
+    {
+      "city": "Timnath",
+      "href": "/communities/larimer/timnath.html"
+    },
+    {
+      "city": "Wellington",
+      "href": "/communities/larimer/wellington.html"
+    },
+    {
+      "city": "Wiggins",
+      "href": "/communities/morgan/wiggins.html"
+    },
+    {
+      "city": "Windsor",
+      "href": "/communities/larimer/windsor.html"
+    },
+    {
+      "city": "Windsor",
+      "href": "/communities/weld/windsor.html"
     }
   ]
 }
