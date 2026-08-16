@@ -698,6 +698,139 @@ _LISTING_VIDEO_ENTRIES = [
 ]
 LISTING_VIDEOS = {addr: (vid, title) for addrs, vid, title, _status in _LISTING_VIDEO_ENTRIES for addr in addrs}
 
+# video_id -> "sold" / "live", from the table above. The status there is already
+# cross-checked against Christine's own "Each Listing SOP" sheet, so anything that
+# wants to LABEL a video as sold reads it from here rather than guessing from a
+# title. A video absent from this map gets no status label at all.
+LISTING_VIDEO_STATUS = {vid: status for _addrs, vid, _t, status in _LISTING_VIDEO_ENTRIES}
+
+# ------------------------------------------------- HER TOURS, BY TOWN ----
+# 2026-08-16 (Christine: "then we can put videos of listing ive sold on each town
+# page?").
+#
+# Every listing-tour video on her channel that names a town, pulled from vidIQ on
+# 2026-08-16 and grouped by that town. This is the answer to the question a seller
+# actually asks -- "what would you do for MY house, here?" -- with the work itself
+# rather than a claim about it. Until now a town page could show at most one video,
+# and only for the ten towns in CITY_VIDEOS; Nunn had five tours and showed none of
+# them.
+#
+# View counts are captured here so the data is auditable, but they are deliberately
+# NOT rendered in this block. Christine's own words, 2026-08-16: "why would anyone
+# care about how many views?" A buyer reading a town page cares that the tour is
+# real and local; the view count is channel-performance data for her, not a selling
+# point for them.
+#
+# `property_key` groups videos of the SAME house, and it is the reason this is a
+# 4-tuple rather than a 3-tuple. Christine filmed 945 Maplebrook in Windsor three
+# separate times and 475 Homestead in Johnstown twice; without grouping, a section
+# headed "Homes Christine Has Marketed In Windsor" showed one house three times and
+# read as padding. One video per property is shown -- the most-watched.
+#
+# A key of None means "cannot confirm which house this is", and those are left
+# ungrouped on purpose. Merging two videos that turn out to be different homes hides
+# real work; keeping them apart, at worst, shows one home twice. Where the address is
+# not in the title it was read off the video's own transcript (noted inline).
+#
+# (video_id, title, views, property_key)
+TOWN_LISTING_VIDEOS = {
+    "nunn": [
+        ("N57_J3llZCQ", "45 ACRES + 40x60 HEATED SHOP | Custom Colorado Ranch (No HOA) | 16225 County Road 98", 9611, "16225 cr 98"),
+        # Transcript (read 2026-08-16) says 35 acres, three bedrooms plus a private
+        # primary, well, fiber, shop space. 16225 CR 98 is 45 acres. Different
+        # figures, so NOT grouped with it -- see the None rule above.
+        ("5W3w3-0U4eg", "Would You Trade City Life For This Dream Ranch Property?", 1879, None),
+        ("ex-PKMy5nck", "16185 CR 100 — Rent To Own | USDA Eligible | Owner Financing Available", 1580, "16185 cr 100"),
+        ("IebQE-z6ANg", "292 Washington Ave Nunn, Colorado", 119, "292 washington ave"),
+        ("SdvDF_-p9ro", "16185 County Road 100 Nunn, Colorado 80648", 72, "16185 cr 100"),
+    ],
+    "ault": [
+        ("JvtRGf01JXU", "Why Everyone's Talking About This Ault, Colorado Home | Conestoga Subdivision at 294 Gila Trail", 17720, "294 gila trail"),
+    ],
+    "greeley": [
+        ("MLbFLWZc-j4", "Why This Corner Lot in Greeley Stands Out | Backyard Waterfall Tour", 10655, "616 41st ave"),
+        # Transcript: "This is Forest Glenn at Kelly Farm", five beds, 3,500+ sq ft.
+        ("uOTbQVeKjG4", "Is This the Coolest Neighborhood Ever? | Kelly Farm, West Greeley", 1126, "forest glenn at kelly farm"),
+        ("-C1MJfL-7EA", "4 bedroom, 3 bathroom home for sale in Greeley, Colorado", 526, None),
+        # Transcript: "welcome to my new listing here at 5112 West 9th Street".
+        ("WPFxyalHXJU", "Secret Revealed: Exclusive Greeley Home For Sale!", 491, "5112 w 9th st"),
+        ("45pUL85r1SY", "3-Bedroom, 2-Bath Ranch Home in Greeley, CO", 380, None),
+    ],
+    "eaton": [
+        ("L-uEVzq1bv4", "Eaton CO Home Under $400K | 39243 Boulevard E", 3362, "39243 boulevard e"),
+        ("JMsOXf8gg4Y", "The Affordable Eaton Home You Can ACTUALLY Buy | 315 Laurel Ave", 902, "315 laurel ave"),
+        ("xWcrj6foJ-Q", "Discover This Superb Aspen Meadows Ranch Home in Eaton | 1316 Cimarron Cir", 136, "1316 cimarron cir"),
+    ],
+    "loveland": [
+        # Transcript: "life on the old course at Loveland", along the 16th hole.
+        ("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland | Life on The Olde Course", 2113, "olde course 16th hole"),
+        ("MDfyzESb1Yk", "Why is Loveland called the Sweetheart City? Tour 5705 Snow Mesa Dr", 2019, "5705 snow mesa"),
+    ],
+    "broomfield-city": [
+        ("06q7rZAWEaY", "Inside This 4-Bedroom Broomfield Home | Garden Memories & Wine", 3348, "1082 lilac ct"),
+    ],
+    "windsor": [
+        ("SAZceZQJrAs", "Is This the Cutest Home in Windsor, Colorado? | 945 Maplebrook Dr", 1096, "945 maplebrook dr"),
+        ("K8sjM8_7o5I", "Upgrade Your View: Luxurious Living in Windsor, Colorado | 342 McKinley", 744, "342 mckinley"),
+        ("kdR6wbWPMQU", "Windsor Colorado Living! | 945 Maplebrook Dr Tour", 627, "945 maplebrook dr"),
+        ("gMfmRkDC1SY", "Inside 945 Maplebrook | Why Everyone's Moving to Windsor, CO", 272, "945 maplebrook dr"),
+    ],
+    "erie": [
+        ("PxB2iHNqT74", "Luxury Home Tour in Erie Colorado | Signature Property Listing", 2095, None),
+        ("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado | 913 Green Mountain Dr", 521, "913 green mountain dr"),
+    ],
+    "denver-city": [
+        ("e7kMY1yV7GI", "Denver Home Tour | Mid-Century Ranch at 1110 S Quitman St", 1333, "1110 s quitman st"),
+        # 4869 per the MLS record, not the 4986 in the video title -- see the note on
+        # this video in _LISTING_VIDEO_ENTRIES.
+        ("oNZBc-MxzUg", "Stunning Home for Sale | 4986 Stuart St, Denver | Tennyson Art District", 651, "4869 stuart st"),
+        ("RenD0cRPD_k", "Under $450,000 in Denver? Hidden Gem Near Garfield Lake Park", 309, None),
+    ],
+    "johnstown": [
+        ("9aIGz-SvCtI", "Affordable Luxury at 32 Victoria Dr - Johnstown Home for sale", 818, "32 victoria dr"),
+        ("oGmkwNv6rfE", "Charming 3-bedroom Townhome in Johnstown | 32 Victoria Drive Tour", 320, "32 victoria dr"),
+        ("6Hrdv6LZIDM", "Tour This Stunning Johnstown Home | 475 Homestead Ln", 278, "475 homestead ln"),
+        ("zsQenaP_IWA", "Is This The Smartest Home Design in Johnstown Colorado, Ever? | 475 Homestead Ln", 125, "475 homestead ln"),
+    ],
+    "longmont": [
+        ("q-51GPoL4QE", "Backyard Kickball | 12734 Anhawa Ave, Longmont", 191, "12734 anhawa ave"),
+    ],
+}
+
+# Tours held back from the town pages because they lead on price or affordability,
+# which is what a visitor reads or hears before anything else.
+#
+# Same rule Christine already set for the town header videos on 2026-08-14 (see
+# OFF_BRAND_CITY_VIDEOS), applied here rather than quietly excepted: a page arguing
+# for estate-level marketing next to "Home Under $400K" argues against itself.
+#
+# Deliberately NOT extended to the two videos OFF_BRAND_CITY_VIDEOS excludes as a
+# "generic tour" (Broomfield's 1082 Lilac, Denver's 1110 S Quitman). That reason was
+# about the header slot, which is meant to hold a "what it's like to live here" film
+# -- a straight home tour is wrong there and exactly right here. Greeley's 616 41st
+# Ave is included here for the same reason: its title carries no price anchor, it is
+# her single best-performing video at 10,655 views, and on the Greeley page it is
+# precisely on topic. If that judgement is wrong, one line below fixes it.
+#
+# Nothing here is deleted from YouTube and none of it is a judgement about the homes.
+# These six hold ~15,000 views between them. Delete a line and its town page picks
+# the video straight back up.
+OFF_BRAND_LISTING_VIDEOS = {
+    "L-uEVzq1bv4": "title says 'Under $400K'",
+    "JMsOXf8gg4Y": "title says 'The Affordable Eaton Home You Can ACTUALLY Buy'",
+    "9aIGz-SvCtI": "title says 'Affordable Luxury'",
+    "RenD0cRPD_k": "title says 'Under $450,000'",
+    "ex-PKMy5nck": "title leads on Rent To Own / USDA / owner financing",
+    # Title is clean; the voiceover is not. Transcript, first line: "are you looking
+    # for an affordable home in Northern Colorado". Read 2026-08-16.
+    "-C1MJfL-7EA": "voiceover opens on 'an affordable home in Northern Colorado'",
+}
+
+# How many tours one town page may show. Four is where the page stops reading as a
+# town guide with proof on it and starts reading as a video feed -- Greeley and
+# Windsor are the only towns this bites, and both keep their strongest four.
+TOWN_LISTING_VIDEO_LIMIT = 4
+
 # The "sold" subset, deduped to one entry per property (first address variant
 # only) — feeds the "How I Sold These Homes" showcase on /past-sales.html.
 SOLD_HOME_VIDEOS = [
@@ -4195,6 +4328,104 @@ def _relocation_video_block(data_slug, city_name):
 </section>"""
 
 
+def _town_listing_videos_block(data_slug, city_name, county_name, exclude_ids=()):
+    """Her own listing tours filmed in this town.
+
+    Returns (html, [VideoObject schema, ...]) -- ("", []) for a town with no tours,
+    so no page ever shows a heading over nothing.
+
+    Replaces a hand-written block that existed for Erie alone. That block was
+    correct and it did not scale: Nunn had five tours on the channel and showed
+    none of them, because adding a town meant writing another section by hand.
+
+    Three rules the wording follows, all of them from Christine:
+      * No view counts. "Why would anyone care about how many views?" -- 2026-08-16.
+      * "Sold" appears only where LISTING_VIDEO_STATUS says sold, which traces back
+        to her own SOP sheet. A tour with no entry gets no label, because guessing
+        would either put a live client's home in a sold list or the reverse.
+      * The heading is what is provably true of all of them -- she marketed these
+        homes here -- rather than a sold claim spread across the whole set.
+    """
+    all_vids = TOWN_LISTING_VIDEOS.get(data_slug, [])
+    excluded = set(exclude_ids)
+
+    # A property already on this page is done with, however it got there. Windsor is
+    # the case that forces this: the page header plays 945 Maplebrook, and two MORE
+    # videos of 945 Maplebrook exist. Excluding by video id alone would have shown
+    # that one house three times on one page.
+    shown_properties = {v[3] for v in all_vids if v[3] and v[0] in excluded}
+
+    vids = [v for v in all_vids
+            if v[0] not in OFF_BRAND_LISTING_VIDEOS
+            and v[0] not in excluded
+            and v[3] not in shown_properties]
+
+    # One video per property, most-watched first. A key of None is its own property
+    # (see the data note) -- keyed by video id so those never collapse together.
+    best = {}
+    for v in sorted(vids, key=lambda v: -v[2]):
+        best.setdefault(v[3] or v[0], v)
+    vids = sorted(best.values(), key=lambda v: -v[2])[:TOWN_LISTING_VIDEO_LIMIT]
+    if not vids:
+        return "", []
+    first = SITE["agent"].split()[0]
+
+    cards, schema = [], []
+    for vid, title, _views, _prop in vids:
+        sold = LISTING_VIDEO_STATUS.get(vid) == "sold"
+        # Caption only when there is something to say. "Loveland, CO" under a video on
+        # the Loveland page is words with no information in them.
+        cards.append(f"""<div>
+      {_yt_embed(vid, title, "Sold" if sold else None)}
+    </div>""")
+        schema.append(_video_object_schema(
+            vid, title,
+            f"A video tour of a {city_name}, Colorado home marketed by "
+            f"{SITE['agent']} of {SITE['name']}.",
+        ))
+
+    # One tour reads as a statement about that house, several as a body of work, so
+    # the lede changes rather than saying "tours" over a single embed.
+    lede = (
+        f"This is what your listing would look like. Filmed on location in "
+        f"{esc(city_name)} by {esc(first)} herself — not a slideshow, not stock footage "
+        f"of somewhere that looks a bit like {esc(city_name)}."
+        if len(vids) > 1 else
+        f"This is what your listing would look like — filmed on location in "
+        f"{esc(city_name)} by {esc(first)} herself, not a slideshow of stock footage."
+    )
+    # Two across on desktop keeps each embed big enough to actually watch; grid-2
+    # already collapses to one column on mobile.
+    return f"""<section class="tight section-dark">
+  <div class="wrap">
+    <span class="eyebrow">{esc(first)}'s Work In {esc(city_name)}</span>
+    <h2 class="section-title" style="color:#fff;margin-top:6px">Homes {esc(first)} Has Marketed In {esc(city_name)}</h2>
+    <p class="lede" style="max-width:70ch">{lede}</p>
+    <div class="grid-2" style="margin-top:28px">
+      {"".join(cards)}
+    </div>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+      <a class="btn btn-outline" href="/past-sales.html">See More Past Sales &rarr;</a>
+      <a class="btn btn-outline" href="/sellers.html">How I Market {esc(county_name)} Homes &rarr;</a>
+    </div>
+  </div>
+</section>""", schema
+
+
+def _spot_video_ids(city_href):
+    """Video ids this town page's local-spots block will already embed.
+
+    Two Windsor spots are backed by Windsor listing tours (the transcripts name the
+    tavern and the lake), so without this the same iframe rendered twice on one
+    page -- once as a place to eat, once as a home for sale.
+    """
+    global LOCAL_SPOTS_BY_CITY_HREF
+    if LOCAL_SPOTS_BY_CITY_HREF is None:
+        LOCAL_SPOTS_BY_CITY_HREF = _local_spots_by_city_href()
+    return [s["videoId"] for s in (LOCAL_SPOTS_BY_CITY_HREF.get(city_href) or [])
+            if s.get("videoId")]
+
+
 def _tour_this_town_block(city_href, city_name):
     """The "Tour <Town> With Me" section, or "" when there are no spots yet.
 
@@ -4331,6 +4562,7 @@ def build_city_pages():
 
             video_block = ""
             city_video_schema = ""
+            vid_id = None
             if data_slug in _luxury_city_videos():
                 vid_id, vid_title, vid_views = CITY_VIDEOS[data_slug]
                 city_video_schema = _video_object_schema(
@@ -4357,8 +4589,8 @@ def build_city_pages():
             # "Tour It With Me" — this town's local spots, from the same JSON the
             # county map reads. Empty string for towns with no spots yet, so no
             # page ever shows a heading over nothing.
-            tour_block = _tour_this_town_block(
-                _city_url(c["slug"], city) or "", city)
+            town_href = _city_url(c["slug"], city) or ""
+            tour_block = _tour_this_town_block(town_href, city)
 
             # Her "why I moved back" film, above the local spots: the personal
             # reason first, then the proof of how well she knows the place.
@@ -4369,26 +4601,14 @@ def build_city_pages():
             # for the town the reader is actually on.
             nearby_block = _nearby_towns_block(c, city)
 
-            own_home_block = ""
-            if data_slug == "erie":
-                own_home_block = f"""<section class="tight section-dark">
-  <div class="wrap grid-2">
-    <div>
-      <span class="eyebrow">Recently Sold In Erie</span>
-      <h2 class="section-title" style="color:#fff">A Look At {esc(SITE['agent'])}'s Work In Colliers Hill</h2>
-      <p class="lede">913 Green Mountain Dr — a past client sale {esc(SITE['agent'])} represented in Erie's
-      Colliers Hill neighborhood. The video tour shows the same level of cinematic marketing,
-      staging, and presentation every Signature Property Collection listing gets.</p>
-      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
-        <a class="btn btn-outline" href="/past-sales.html">See More Past Sales &rarr;</a>
-        <a class="btn btn-outline" href="/listing-video-portfolio.html">More Video Tours &rarr;</a>
-      </div>
-    </div>
-    <div>
-      {_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado — 913 Green Mountain Dr, Erie", "Colliers Hill, Erie, CO — Sold")}
-    </div>
-  </div>
-</section>"""
+            # Her listing tours filmed in THIS town. Was a hand-written block for
+            # Erie only; now data-driven, so eleven towns carry it. The header video
+            # above is excluded by id -- CITY_VIDEOS and TOWN_LISTING_VIDEOS overlap
+            # for Windsor and Loveland, and the same embed twice on one page reads
+            # like a bug, not like proof.
+            own_home_block, own_home_schema = _town_listing_videos_block(
+                data_slug, city, c["name"],
+                exclude_ids=([vid_id] if vid_id else []) + _spot_video_ids(town_href))
 
             subdivisions_block = ""
             if data_slug == "loveland" and SUBDIVISION_PAGES:
@@ -4624,7 +4844,8 @@ def build_city_pages():
                 meta,
                 f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html", "Communities", body,
                 schema_extra=[breadcrumbs, faq_schema]
-                + ([city_video_schema] if city_video_schema else []),
+                + ([city_video_schema] if city_video_schema else [])
+                + own_home_schema,
                 canonical_path=(
                     f"/communities/{DUAL_COUNTY_PRIMARY[city]}/{_city_url_slug(data_slug)}.html"
                     if DUAL_COUNTY_PRIMARY.get(city)
