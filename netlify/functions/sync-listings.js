@@ -836,22 +836,42 @@ exports.handler = async () => {
   // lastRunPagesFetched 0 and lastRunRecordsSeen 0, and an initial catalog crawl
   // stuck at $skip=12400 while claiming to be "in progress".
   //
-  // Cause: Cloudinary's credentials are misconfigured (cloud_name mismatch), so
-  // NONE of her 11 listings can ever become fully cached. isFullyCached is
-  // therefore false for all of them, forever, so this priority pass re-tried all
-  // 11 on every single run -- an MLS Grid call and a throttle wait each -- and
-  // consumed the entire 8-second budget before the bootstrap crawl got a single
-  // page. Broken photo credentials were silently starving listing replication.
+  // CAUSE, corrected on a second sweep. My first write-up of this said the
+  // priority pass "consumed the entire 8-second budget". That was wrong, and the
+  // arithmetic matters too much to leave a wrong explanation in the file:
   //
-  // Two guards, and the first matters more than the second:
+  //   TIME_BUDGET_MS                = 8000
+  //   LATE_WORK_TIME_MARGIN_MS      = 6000   (sized for a ~8s photo upload)
+  //   => every time-gated loop here, INCLUDING the bootstrap crawl, may only
+  //      START new work in the first 8000 - 6000 = 2000ms of a run.
+  //   REQUEST_DELAY_MS              = 1500   (one throttle wait)
   //
-  //   1. NO SUB-TASK MAY EAT THE WHOLE BUDGET. The priority pass is capped at a
-  //      fraction of it, so replication always gets its share no matter what
-  //      else is failing. That property should have existed from the start; the
-  //      Cloudinary outage just exposed its absence.
-  //   2. Don't retry a CONFIGURATION failure. A 403 from mismatched keys will
-  //      fail identically on every attempt, so hammering it 11 times every 15
-  //      minutes is pure waste. A transient error still retries normally.
+  // So the real failure is not that the priority pass ate 8 seconds. It is that
+  // the whole function only has a 2000ms window to start anything, and the work
+  // queued ahead of the crawl -- the Lofty drain, then one throttle plus one
+  // $expand=Media fetch in this pass -- exceeds 2000ms on its own. By the time
+  // the crawl is reached, its own cutoff has already passed, so it breaks
+  // immediately and reports lastRunPagesFetched 0. Cloudinary's broken
+  // credentials are what keeps this pass non-empty forever (isFullyCached can
+  // never become true), so the starvation repeats every 15 minutes instead of
+  // ending once the photos cached.
+  //
+  // Two guards. Both are real fixes; the first is the one that frees the crawl:
+  //
+  //   1. NO SUB-TASK MAY EAT THE SHARED WINDOW. The priority pass is capped at a
+  //      fraction of it, leaving the rest for replication no matter what else is
+  //      failing. That property should have existed from the start.
+  //   2. Don't retry a CONFIGURATION failure. cloud_name mismatch and friends
+  //      fail identically every attempt, so hammering 11 listings every 15
+  //      minutes is pure waste. Transient errors keep their normal retries.
+  //
+  // STILL WORTH DOING, deliberately NOT done here: TIME_BUDGET_MS = 8000 is
+  // simply tight for the work this function now has, and a 6000ms margin leaves
+  // a 2000ms window for everything. Raising the budget is the structural fix,
+  // but the 6000 margin exists because real 499 timeouts were observed killing
+  // whole runs and losing all their work (see the comment above it). Changing it
+  // needs a careful look at Netlify's real limit for scheduled functions, not a
+  // guess at the end of a long session.
   const priorityCutoff = Math.floor((TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) * PRIORITY_PASS_BUDGET_FRACTION);
   const cloudConfigBroken = isCloudinaryConfigError(state && state.lastCloudinaryError);
   if (cloudConfigBroken && herPendingIds.length) {
