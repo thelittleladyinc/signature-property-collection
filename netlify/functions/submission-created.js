@@ -92,6 +92,10 @@ const SOURCE_LABELS = {
   // Lofty Property Alert turned on.
   "listing-alert-request": "Signature Property Collection - Listing Alert Request (saved search)",
   "sellers-page-inquiry": "Signature Property Collection - Sellers Page Inquiry (Home Valuation)",
+  // 2026-08-16: the seller-facing local-proof page. A lead here has seen how many
+  // people already watch content about their town and asked for it for their own
+  // address -- so it is a listing lead, not a browse, and worth its own label.
+  "seller-local-proof": "Signature Property Collection - Seller Local Proof (listing lead)",
 };
 
 function splitName(fullName) {
@@ -176,7 +180,12 @@ exports.handler = async (event) => {
       body.notes = `${banner}\nRelocating from: ${data.moving_from}` +
         (data.message ? ` — "${data.message}"` : "");
     } else if (data.address) {
-      body.notes = `${banner}\nRequested valuation for: ${data.address}`;
+      body.notes = `${banner}\nRequested valuation for: ${data.address}` +
+        // Only the local-proof form sends this, and it says which town's audience
+        // numbers they were looking at when they asked -- a genuinely useful
+        // opening line for the call back.
+        (data.local_proof_town ? `\nSaw the local-proof numbers for: ${data.local_proof_town}` : "");
+      if (formName === "seller-local-proof") body.tags.push("Seller Lead", "Local Proof");
     } else if (data.message) {
       // From the Buyers page's form (build_buyers() in build.py).
       body.notes = `${banner}\n${data.message}`;

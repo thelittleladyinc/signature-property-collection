@@ -2857,6 +2857,150 @@ def _county_name_list():
     return ", ".join(names[:-1]) + ", and " + names[-1]
 
 
+def build_seller_local_proof():
+    """/seller-local-proof.html — the listing-appointment page.
+
+    2026-08-16 (Christine chose this as Layer 2 of the Live Like A Local plan).
+    The map and the town pages point at BUYERS. This one points at sellers, and
+    it is the piece that wins listings rather than showings.
+
+    The pitch it makes, in her own numbers: content about your neighbourhood
+    already reaches this many people, and I am the one who made it. A seller
+    choosing between three agents hears three versions of "I'll market your
+    home." Only one of them can put a number on the audience that already
+    watches content about their street.
+
+    Everything is client-side against the same local_spots.json the map, the town
+    pages and the listing pages read — no geocoding, no API call, no failure mode
+    beyond a town with no spots yet, which is stated honestly rather than hidden.
+    A town dropdown rather than an address lookup on purpose: it cannot
+    mis-geocode, cannot return "no results", and is one tap on a phone at a
+    kitchen table. The address field is optional and exists only to travel with
+    the lead."""
+    by_town = {}
+    for s in LOCAL_SPOTS_DATA.get("spots", []):
+        href = s.get("cityHref")
+        if not href:
+            continue
+        town = s.get("city") or ""
+        entry = by_town.setdefault(href, {"town": town, "spots": []})
+        entry["spots"].append({
+            "name": s.get("name"),
+            "views": (s.get("views") or 0) + (s.get("reviewViews") or 0),
+            "kind": "video" if s.get("videoId") else "review",
+            "videoId": s.get("videoId") or None,
+            "category": s.get("category") or "spot",
+        })
+    # Prefer the town-page name where one exists, so "Bellvue" doesn't appear as a
+    # town she can pick -- Poudre Canyon belongs to the Fort Collins page.
+    for c in COUNTIES:
+        for city in c["cities"]:
+            href = _city_url(c["slug"], city)
+            if href and href in by_town:
+                by_town[href]["town"] = city
+    towns = sorted(by_town.values(), key=lambda e: -sum(x["views"] for x in e["spots"]))
+    for t in towns:
+        t["spots"].sort(key=lambda x: -x["views"])
+        t["total"] = sum(x["views"] for x in t["spots"])
+
+    options = "\n        ".join(
+        f'<option value="{i}">{esc(t["town"])} &mdash; {t["total"]:,} views</option>'
+        for i, t in enumerate(towns)
+    )
+    grand_total = sum(t["total"] for t in towns)
+    body = f"""
+<section class="hero" style="padding:80px 0 40px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">For Sellers</span>
+    <h1>Your Neighborhood Already Has An Audience</h1>
+    <p class="lede">Most agents will tell you they&rsquo;ll market your home. Here is the part
+    they can&rsquo;t put a number on: {esc(SITE['agent'])} has already filmed and reviewed the places
+    around it, and that content has been watched and read <strong>{grand_total:,} times</strong>.
+    Pick your town and see exactly what is already working for you.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <label class="fs-label" for="spt-town">Where is your home?</label>
+    <select id="spt-town" class="fs-select" style="max-width:420px">
+      <option value="">Choose your town&hellip;</option>
+      {options}
+    </select>
+    <div id="spt-out" style="margin-top:28px"></div>
+  </div>
+</section>
+<section class="tight section-dark">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow">Take It To The Table</span>
+      <h2 class="section-title" style="color:#fff">Want this for your address, on paper?</h2>
+      <p class="lede">Send your address and {esc(SITE['agent'])} will put together the local proof
+      for your specific street &mdash; which places she has covered nearby, what those pieces have
+      been watched, and how she&rsquo;d market your home into that same audience. No obligation and
+      no pressure to list.</p>
+    </div>
+    <form class="lead-form" name="seller-local-proof" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name" value="seller-local-proof">
+      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <input type="text" name="name" placeholder="Full Name" required>
+      <input type="email" name="email" placeholder="Email" required>
+      <input type="tel" name="phone" placeholder="Phone">
+      <input type="text" name="address" placeholder="Your home's address" required>
+      <input type="hidden" name="local_proof_town" id="spt-town-field" value="">
+      <label class="consent">
+        <input type="checkbox" required>
+        I agree to receive marketing communication via call, text, or similar automated
+        means from {SITE['name']}. Consent is not a condition of purchase. Msg/data rates
+        may apply. Reply STOP to unsubscribe.
+      </label>
+      <button class="btn btn-dark" type="submit">Send Me My Local Proof</button>
+    </form>
+  </div>
+</section>
+<script>
+(function () {{
+  var TOWNS = {json.dumps(towns, ensure_ascii=False)};
+  var sel = document.getElementById('spt-town');
+  var out = document.getElementById('spt-out');
+  var hidden = document.getElementById('spt-town-field');
+  function esc(s) {{
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {{
+      return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[c];
+    }});
+  }}
+  sel.addEventListener('change', function () {{
+    var t = TOWNS[sel.value];
+    if (!t) {{ out.innerHTML = ''; hidden.value = ''; return; }}
+    hidden.value = t.town;
+    var cards = t.spots.map(function (s) {{
+      var media = s.videoId
+        ? '<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(s.videoId) +
+          '" title="' + esc(s.name) + '" loading="lazy" allowfullscreen></iframe></div>'
+        : '';
+      return '<article class="spot-card"><h3 class="spot-card-title">' + esc(s.name) + '</h3>' + media +
+        '<p class="spot-proof">' + Number(s.views).toLocaleString() + ' views on ' +
+        (s.kind === 'video' ? 'YouTube' : 'Google') + '</p></article>';
+    }}).join('');
+    out.innerHTML =
+      '<span class="eyebrow" style="color:var(--dusty-rose)">' + esc(t.town) + '</span>' +
+      '<h2 class="section-title" style="margin:6px 0 8px">' +
+      Number(t.total).toLocaleString() + ' people have already seen content about ' + esc(t.town) + '</h2>' +
+      '<p class="lede">' + t.spots.length + ' place' + (t.spots.length === 1 ? '' : 's') +
+      ' in and around ' + esc(t.town) + ' that {esc(SITE['agent'])} has filmed or reviewed herself. ' +
+      'When your home goes live, it goes live to the people who watch this.</p>' +
+      '<div class="spot-grid">' + cards + '</div>';
+  }});
+}})();
+</script>
+"""
+    page(
+        "What Your Neighborhood Is Already Worth To You | Signature Property Collection",
+        f"See how many people have already watched or read {SITE['agent']}'s content about your "
+        f"Northern Colorado town — then get the local proof for your own address.",
+        "/seller-local-proof.html", "Sell", body,
+    )
+
+
 def build_communities_index():
     county_btns = "\n        ".join(
         f'<a class="county-btn" data-slug="{c["slug"]}" href="/communities/{c["slug"]}.html">{c["name"]} <span>&rsaquo;</span></a>'
@@ -3598,6 +3742,7 @@ def build_about():
       just gratitude in motion.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:20px">
         <a class="btn btn-dark" href="/sellers.html">List Your Home</a>
+        <a class="btn btn-outline" href="/seller-local-proof.html">What Is My Neighborhood Already Worth? &rarr;</a>
         <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/contact.html">Work With Us</a>
       </div>
     </div>
@@ -4071,6 +4216,17 @@ def build_sellers():
     </div>
     {_tool_lead_form("sellers-page-inquiry", "Get My Free Valuation",
         '<input type="text" name="address" placeholder="Property Address (optional)">')}
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap" style="text-align:center">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Before You Pick An Agent</span>
+    <h2 class="section-title">See What Your Neighborhood Is Already Worth To You</h2>
+    <p class="lede">Every agent says they will market your home. This shows you, with real numbers,
+    how many people have already watched or read {esc(SITE['agent'])}'s content about your town.</p>
+    <div class="btn-row">
+      <a class="btn btn-dark" href="/seller-local-proof.html">Show Me My Local Proof &rarr;</a>
+    </div>
   </div>
 </section>
 """
@@ -7553,7 +7709,7 @@ def build_rss_feed():
 def build_redirects_and_meta():
     # sitemap
     paths = ["/index.html", "/communities/index.html", "/about.html", "/buyers.html",
-             "/sellers.html", "/testimonials.html", "/contact.html",
+             "/sellers.html", "/seller-local-proof.html", "/testimonials.html", "/contact.html",
              "/privacy-policy.html", "/accessibility.html", "/thank-you.html",
              "/guides/buyers-guide.html", "/guides/sellers-guide.html"]
     paths += [f"/communities/{c['slug']}.html" for c in COUNTIES]
@@ -7728,6 +7884,7 @@ def build_llms_txt(paths):
 - [About {SITE['agent']}](/about.html)
 - [Buy A Home](/buyers.html)
 - [Sell A Home](/sellers.html)
+- [What Your Neighborhood Is Already Worth To You](/seller-local-proof.html)
 - [Testimonials](/testimonials.html)
 - [Contact](/contact.html)
 
@@ -7903,6 +8060,7 @@ if __name__ == "__main__":
     write_listing_page_shell()
     write_neighborhood_quiz_script()
     build_home()
+    build_seller_local_proof()
     build_communities_index()
     build_county_pages()
     build_city_pages()
