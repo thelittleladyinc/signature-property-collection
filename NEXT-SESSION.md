@@ -4,9 +4,12 @@ Written at the end of a long session, for whoever picks this up next. Nothing he
 is speculation dressed as fact: where something is unverified it says so, and
 where I was wrong earlier it says that too.
 
-**Current state:** 142 pages, 30 local spots across 9 towns, 13 test suites green
-(`bash tests/run-all.sh`),
-all work pushed to `master` and `claude/non-human-sounding-listings-jhgxqk`.
+**Don't trust these numbers — print them.** `bash tests/run-all.sh` ends by
+reporting the real current counts (pages, spots, towns, views, suites), because any
+figure typed into a document goes stale. As of writing: 142 sitemap pages, 30 local
+spots, 14 suites green.
+
+All work pushed to `master` and `claude/non-human-sounding-listings-jhgxqk`.
 Health check: `signaturepropertycollection.com/status?probe=1&format=json`
 
 ---
@@ -22,8 +25,8 @@ from two different accounts: cloud name from one, API key/secret from another.
 **Why it matters more than "photos":** it was starving the listing crawl. Because
 no listing can ever finish caching, the photo priority pass had a permanently
 non-empty queue and consumed the run's start-work window before the bootstrap
-crawl got a page. Catalog stuck at 18,226 of ~19,000. Guards are now in place
-(see §2.1) so the crawl proceeds regardless, but the photos still don't cache.
+crawl got a page. Guards are now in place (see §2.1) so the crawl proceeds regardless — VERIFIED
+live — but the photos still don't cache, and every run still logs a fresh 403.
 
 **Fix:** cloudinary.com → Dashboard → copy Cloud name, API Key, API Secret from
 that ONE page → replace all three in Netlify.
@@ -155,6 +158,14 @@ True about photos rendering. False about the system: it was starving the crawl.
 Marking that row `optional: true` on `/status` is what made a real problem look
 cosmetic. **Lesson: an "optional" flag on a status page hides consequences that
 aren't visible from the row's own name.**
+
+### 3.2b Two status rows that contradicted each other
+"Cloudinary configured: ✓ All three env vars present" sat on the same page as
+"Cloudinary account healthy: ✗ cloud_name mismatch". Both were true — the vars ARE
+set, they just belong to different accounts — but a reader has to work out which to
+believe, which is worse than one clear red row. The first row now says present is not
+the same as working and points at the row that actually tests it. **Lesson: a status
+page's rows have to be readable together, not just individually correct.**
 
 ### 3.3 "The photo pass consumed the entire 8-second budget" — WRONG
 It gets ~2000ms, not 8000. The real cause is §2.1. The fix worked; the

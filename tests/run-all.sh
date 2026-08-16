@@ -13,4 +13,25 @@ for t in tests/test-*.js; do
   else echo "FAILED"; printf '%s\n' "$out" | grep -E "FAIL" | head -5; fail=1; fi
 done
 [ "$fail" -eq 0 ] && echo "All suites passed." || echo "Some suites FAILED."
+
+# Ground truth, printed rather than trusted. NEXT-SESSION.md quotes these numbers
+# and any hand-written figure goes stale; this prints what is actually true right
+# now so nobody has to believe a document.
+python3 - <<'PYEOF'
+import json, glob, os
+spots = json.load(open("netlify/functions/lib/_local-spots.json"))["spots"]
+views = sum(s.get("views") or 0 for s in spots)
+reviews = sum(s.get("reviewViews") or 0 for s in spots)
+# Two DIFFERENT true measures, labelled so they can't look like a contradiction:
+# town PAGES carrying spots (Bellvue's spot lives on the Fort Collins page), versus
+# distinct town names in the data. Same for html files on disk versus pages the
+# sitemap tracks (404.html is deliberately not in the sitemap).
+town_pages = len({s.get("cityHref") for s in spots if s.get("cityHref")})
+town_names = len({s.get("city") for s in spots if s.get("city")})
+html_files = sum(1 for r, _, fs in os.walk("site") for f in fs if f.endswith(".html"))
+print(f"\nCurrent: {html_files} html files on disk · {len(spots)} local spots on "
+      f"{town_pages} town pages ({town_names} distinct town names) "
+      f"· {views:,} video views + {reviews:,} review views "
+      f"· {len(glob.glob('tests/test-*.js'))} test suites")
+PYEOF
 exit "$fail"

@@ -450,10 +450,19 @@ exports.handler = async (event) => {
       detail: `${mineCount} listing(s) currently known to the site`,
     },
     {
-      name: "Cloudinary configured",
+      // 2026-08-16: this row read a flat green "All three env vars present" on the
+      // same page where the account check said "cloud_name mismatch". Two rows
+      // contradicting each other is worse than one red row, because the reader has
+      // to work out which to believe. "Configured" was never the same claim as
+      // "working": all three vars ARE set, they just belong to different accounts.
+      // So it now says exactly that, and points at the row that knows.
+      optional: true,
+      name: "Cloudinary env vars set (optional)",
       ok: isCloudinaryConfigured(),
       detail: isCloudinaryConfigured()
-        ? "All three env vars present"
+        ? "All three env vars are present. Note that PRESENT is not the same as WORKING — " +
+          "whether they belong to the same Cloudinary account is what the " +
+          "\"Cloudinary account healthy\" row below actually tests."
         : "CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET — one or more isn't set",
     },
     {
