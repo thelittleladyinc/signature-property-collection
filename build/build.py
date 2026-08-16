@@ -62,6 +62,7 @@ BLOG = _load_json("blog.json")  # 60 posts migrated from the live site's blog
 # optional here — see the _README inside the file, and the SOLD MAP section
 # further down, for why that's the whole point of this file existing.
 SOLD_HOMES_DATA = _load_json("sold_homes.json")
+MARKET_REPORT = _load_json("market_report.json")
 LOCAL_SPOTS_DATA = _load_json("local_spots.json")
 
 # Old AgentFire/WordPress URL -> new site path, for anything printed,
@@ -3285,6 +3286,7 @@ def footer_html():
           <li><a href="/expired-listings.html">Expired Listings</a></li>
           <li><a href="/how-to-choose-a-real-estate-agent.html">How To Choose An Agent</a></li>
           <li><a href="/downsizing-in-northern-colorado.html">Downsizing</a></li>
+          <li><a href="/northern-colorado-market-report.html">Monthly Market Report</a></li>
         </ul>
       </div>
       <div>
@@ -7128,6 +7130,46 @@ LOCATION_PHOTO_BY_PATH.update({
 })
 
 
+# 2026-08-16. The failure mode of a monthly hub page is not that it breaks -- it is that
+# it keeps working while quietly going stale. A page headed "Northern Colorado Market
+# Report" still showing June figures in November is worse than no page, because the one
+# thing it exists to prove is that she is on top of the market.
+#
+# So staleness is surfaced twice, and neither is silent. The build prints a warning past
+# MARKET_REPORT_STALE_DAYS. And the page itself tells the reader how old the figures are,
+# because a visitor discovering that for themselves is the outcome worth avoiding.
+MARKET_REPORT_STALE_DAYS = 45
+
+
+def _market_report_age_days(mr):
+    """Days since the reported month ended, or None if the month can't be parsed."""
+    raw = (mr or {}).get("month") or ""
+    try:
+        y, m = (int(x) for x in raw.split("-")[:2])
+        # End of the reported month: the figures cover that month, so age is measured
+        # from its last day rather than its first.
+        nxt = datetime.date(y + (m == 12), (m % 12) + 1, 1)
+        return (datetime.date.today() - nxt).days
+    except Exception:
+        return None
+
+
+def _market_report_age_note(mr):
+    """A dated 'as of' line, which becomes an explicit staleness note once old."""
+    label = esc((mr or {}).get("month_label") or "")
+    src = esc((mr or {}).get("source") or "IRES MLS")
+    win = esc((mr or {}).get("window") or "")
+    age = _market_report_age_days(mr)
+    base = (f'Figures cover <strong>{label}</strong>, from {src}'
+            + (f' ({win})' if win else "") + ".")
+    if age is not None and age > MARKET_REPORT_STALE_DAYS:
+        months = max(1, round(age / 30))
+        base += (f' These are the most recent figures published here and they are about '
+                 f'{months} month{"s" if months != 1 else ""} old &mdash; ask for the '
+                 f'current month and you will get it the same day.')
+    return f'<p class="mr-asof">{base}</p>'
+
+
 def _subdivision_photo(sub):
     """Optional hero photo for a subdivision page.
 
@@ -8820,6 +8862,174 @@ def build_nav_pages():
         "/listing-video-portfolio.html", None, body, schema_extra=[breadcrumbs],
     )
 
+    # ---- Northern Colorado Market Report (the monthly hub) ----
+    # 2026-08-16 (Christine: "lets make a once a month market report - I think i have a lot
+    # built - or should that just be a blog?").
+    #
+    # A hub at a stable URL, not a blog post, and the reasoning decides it: "northern
+    # colorado real estate market report" is searched every month. A June post will never
+    # rank for that search in November -- Google reads it as stale and it deserves to. A
+    # fixed URL that is always current accumulates authority month after month, and an
+    # answer engine asked "what is the Northern Colorado market doing" needs ONE canonical
+    # current source rather than a pile of dated posts to choose between.
+    #
+    # The dated versions still matter, so they stay as blog posts and this page links them
+    # as the archive. That is also the honest proof she has done this consistently.
+    #
+    # The whole page is generated from build/data/market_report.json -- one file to edit
+    # each month. And it states its own age (see _market_report_age_note): a hub silently
+    # showing June figures in November is worse than no hub, because it advertises neglect
+    # on the one page that exists to prove she is on top of the market. The build warns
+    # loudly past 45 days; the page tells the reader past 45 days. Neither pretends.
+    mr = MARKET_REPORT
+    reg, lux = mr.get("region") or {}, mr.get("luxury") or {}
+
+    def _stat(value, label, note=None):
+        if value is None:
+            return ""
+        return (f'<div class="mr-stat"><span class="mr-figure">{esc(value)}</span>'
+                f'<span class="mr-label">{esc(label)}</span>'
+                + (f'<span class="mr-note">{esc(note)}</span>' if note else "")
+                + "</div>")
+
+    region_stats = "".join([
+        _stat(f"${reg['weighted_median_price']:,}" if reg.get("weighted_median_price") else None,
+              "Weighted median sale price", reg.get("weighted_median_note")),
+        _stat(f"{reg['avg_days_on_market']} days" if reg.get("avg_days_on_market") else None,
+              "Average days on market"),
+        _stat(f"{reg['avg_sale_to_list_pct']}%" if reg.get("avg_sale_to_list_pct") else None,
+              "Average sale-to-list ratio",
+              "Sellers still landing close to ask."),
+    ])
+    lux_stats = "".join([
+        _stat(f"{lux['closings']}" if lux.get("closings") else None, "Homes closed at $1M+"),
+        _stat(f"${lux['median_price']:,}" if lux.get("median_price") else None, "Median $1M+ price"),
+        _stat(f"{lux['median_days_on_market']} days" if lux.get("median_days_on_market") else None,
+              "Median days on market"),
+        _stat(f"{lux['avg_pct_of_list']}%" if lux.get("avg_pct_of_list") else None, "Of list price"),
+    ])
+    top_sale = ""
+    if lux.get("top_sale_price"):
+        bits = [f"${lux['top_sale_price']:,}"]
+        if lux.get("top_sale_town"):
+            bits.append(f"in {lux['top_sale_town']}")
+        detail = ", ".join(x for x in [
+            f"{lux['top_sale_beds']} bd" if lux.get("top_sale_beds") else None,
+            f"{lux['top_sale_sqft']:,} sq ft" if lux.get("top_sale_sqft") else None] if x)
+        top_sale = (f"""<p class="lede" style="margin-top:26px"><strong>The month's highest close
+    reached {esc(' '.join(bits))}</strong>{esc(f' ({detail})' if detail else '')} &mdash; address held
+    privately, in respect of the sellers. Full transaction context is available to
+    qualified buyers and sellers on request.</p>""")
+
+    # Dated archive: every market-report post already in the blog, newest first.
+    archive = [b for b in BLOG if "market-report" in b["slug"] or "market report" in b["title"].lower()]
+    archive_html = ""
+    if archive:
+        rows = "\n      ".join(
+            f'<li><a href="/blog/{esc(b["slug"])}.html">{esc(b["title"])}</a></li>'
+            for b in archive)
+        archive_html = f"""<section class="tight">
+  <div class="wrap" style="max-width:820px">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Archive</span>
+    <h2 class="section-title">Previous Months</h2>
+    <p class="lede">Each month is kept rather than overwritten, so you can see which
+    direction the market has actually been moving.</p>
+    <ul class="sold-list" style="margin-top:18px">
+      {rows}
+    </ul>
+  </div>
+</section>"""
+
+    mr_faqs = [
+        (f"What is the Northern Colorado real estate market doing right now?",
+         f"As of {mr['month_label']}, the weighted median sale price across Northern "
+         f"Colorado is ${reg.get('weighted_median_price', 0):,}, homes are averaging "
+         f"{reg.get('avg_days_on_market')} days on market, and sellers are averaging "
+         f"{reg.get('avg_sale_to_list_pct')}% of list. {mr.get('takeaway', '')} "
+         f"Figures from {mr.get('source')}, {mr.get('window')}."),
+        ("Is it a good time to sell a home in Northern Colorado?",
+         f"On the current numbers, a well-priced home is still selling close to ask — the "
+         f"average sale-to-list ratio is {reg.get('avg_sale_to_list_pct')}%. The word doing "
+         f"the work there is well-priced. Homes that come out over the market sit, go stale, "
+         f"and then sell for less than they would have. That is why pricing is the first of "
+         f"the three questions worth asking any agent."),
+        ("How is the luxury market different from the median market here?",
+         f"Days on market run longer at the top — {lux.get('median_days_on_market')} days "
+         f"median for the {lux.get('closings')} homes that closed above $1M — and that is "
+         f"deliberation rather than weakness. Sale-to-list tightens because both sides "
+         f"arrive prepared. Averages across the whole market will not tell you anything "
+         f"useful about a $1.5M property; you need the figures for your actual segment."),
+        ("Where do these numbers come from?",
+         f"{mr.get('source')} — the same multiple listing service used to price every "
+         f"listing, over the {mr.get('window')}. Not a Zestimate and not a national "
+         f"aggregator's model. Aggregate statistics only; individual addresses are held "
+         f"privately."),
+    ]
+    mr_faq_html, mr_faq_schema = _faq_block(mr_faqs)
+    mr_body = f"""
+<section class="hero" style="padding:100px 0 60px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Updated Monthly &middot; {esc(mr['month_label'])}</span>
+    <h1>Northern Colorado Market Report</h1>
+    <p class="lede">What the market actually did last month, from {esc(mr.get('source'))} —
+    the same data used to price every listing. No Zestimates, no national-aggregator
+    guesses.</p>
+    {_market_report_age_note(mr)}
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Whole Market</span>
+    <h2 class="section-title">{esc(mr['month_label'])} At A Glance</h2>
+    <div class="mr-stats">{region_stats}</div>
+    <p class="lede" style="max-width:75ch;margin-top:28px">{esc(mr.get('takeaway') or '')}</p>
+  </div>
+</section>
+<section class="tight section-dark">
+  <div class="wrap">
+    <span class="eyebrow">The $1M+ Tier</span>
+    <h2 class="section-title" style="color:#fff">Northern Colorado Luxury, {esc(mr['month_label'])}</h2>
+    <div class="mr-stats mr-stats-dark">{lux_stats}</div>
+    {top_sale}
+    <div class="btn-row" style="justify-content:flex-start;margin-top:30px">
+      <a class="btn btn-outline" href="/luxury-market.html">Homes Over $1M &rarr;</a>
+      <a class="btn btn-outline" href="/free-home-valuation.html">What's Mine Worth? &rarr;</a>
+    </div>
+  </div>
+</section>
+{mr_faq_html}
+{archive_html}
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">Your Segment, Not The Average</span>
+      <h2 class="section-title">These Are Averages. Your House Isn't.</h2>
+      <p class="lede">A regional median tells you almost nothing about a specific house on a
+      specific street. If you want the figures for your town, your price band and your kind
+      of property, ask — that read is free and takes about fifteen minutes.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-dark" href="/contact.html">Get My Segment's Numbers</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Want this monthly?</h3>
+      <p>This page updates every month. If you would rather it came to you, say so and it
+      will &mdash; along with the county-by-county detail that sits underneath these
+      headline figures.</p>
+    </div>
+  </div>
+</section>
+"""
+    mr_breadcrumbs = _breadcrumb_schema([
+        ("Home", "/index.html"), ("Northern Colorado Market Report", None)])
+    page(
+        f"Northern Colorado Market Report — {mr['month_label']}",
+        f"Northern Colorado real estate market report for {mr['month_label']}: median "
+        f"price, days on market and sale-to-list from IRES MLS, plus the $1M+ tier.",
+        "/northern-colorado-market-report.html", None, mr_body,
+        schema_extra=[mr_breadcrumbs, mr_faq_schema],
+    )
+
     # ---- Downsizing In Northern Colorado ----
     # 2026-08-16 (Christine, on a thumbnail she'd made: "dont like the photo - but good
     # idea for a downsizing page").
@@ -10105,7 +10315,8 @@ def build_redirects_and_meta():
               "/sold-homes-map.html", "/luxury-market.html",
               "/press-recognition.html", "/concierge-experience.html",
               "/how-to-choose-a-real-estate-agent.html",
-              "/downsizing-in-northern-colorado.html"]
+              "/downsizing-in-northern-colorado.html",
+              "/northern-colorado-market-report.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
     # discover and index them; everything else is unaffected.
@@ -10146,6 +10357,15 @@ def build_redirects_and_meta():
         + "</url>"
         for p in paths if p not in NOINDEX_PATHS
     )
+    _age = _market_report_age_days(MARKET_REPORT)
+    if _age is None:
+        print("  ! market_report.json: `month` is missing or unparseable — the market "
+              "report page cannot tell how old it is")
+    elif _age > MARKET_REPORT_STALE_DAYS:
+        print(f"  ! MARKET REPORT IS {_age} DAYS OLD "
+              f"({MARKET_REPORT.get('month_label')}). /northern-colorado-market-report.html "
+              f"is telling visitors so. Update build/data/market_report.json.")
+
     sitemap = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '

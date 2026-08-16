@@ -1,0 +1,43 @@
+{
+  "_README": [
+    "The current Northern Colorado market report, shown on /northern-colorado-market-report.html.",
+    "",
+    "THIS IS THE ONLY FILE TO EDIT EACH MONTH. Change the figures, change `month`, run",
+    "`python3 build/build.py`, commit and push. The page, its schema, and the 'as of' line",
+    "all update together.",
+    "",
+    "IF YOU MISS A MONTH the build prints a loud warning once the report is more than 45",
+    "days old, and the page itself says how old it is rather than pretending to be current.",
+    "That is deliberate: a hub page silently claiming June figures in November is worse",
+    "than no page at all, because it advertises neglect on the one page that exists to",
+    "prove you are on top of the market.",
+    "",
+    "Every figure comes from IRES MLS. Aggregate statistics only -- medians, days on",
+    "market, sale-to-list ratios, counts. Individual listing content (addresses, photos,",
+    "specific list prices) is what the IDX terms restrict, which is why addresses are held",
+    "privately here, the same rule sold_homes.json follows.",
+    "",
+    "Set a field to null and it is simply left off the page rather than rendered empty."
+  ],
+  "month": "2026-06",
+  "month_label": "June 2026",
+  "source": "IRES MLS",
+  "window": "trailing 60 days",
+  "region": {
+    "weighted_median_price": 575000,
+    "weighted_median_note": "Weighted by each town's sale count, so a handful of sales in a small town cannot skew the regional figure.",
+    "avg_days_on_market": 56,
+    "avg_sale_to_list_pct": 98.3
+  },
+  "luxury": {
+    "closings": 18,
+    "median_price": 1260000,
+    "median_days_on_market": 47.5,
+    "avg_pct_of_list": 97,
+    "top_sale_price": 2695000,
+    "top_sale_town": "Berthoud",
+    "top_sale_beds": 5,
+    "top_sale_sqft": 5853
+  },
+  "takeaway": "Sellers are still landing close to ask, and buyers are winning on the homes that were priced properly to begin with. In the $1M+ tier days on market run longer because those buyers are deliberate rather than hesitant -- pricing precision, not pricing volume, decides whether a luxury property trades inside 60 days or sits for six months."
+}

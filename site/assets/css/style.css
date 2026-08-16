@@ -1342,3 +1342,18 @@ h2.widget-title {
   max-width: 70ch;
 }
 .loc-photo figcaption span { color: var(--slate); font-style: italic; }
+
+/* ---------- Monthly market report ----------
+   2026-08-16. The figures ARE the content here, so they get to be the largest thing on
+   the page rather than being set as body copy with numbers in it. */
+.mr-stats { display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 26px; }
+.mr-stat { display: flex; flex-direction: column; gap: 4px; }
+.mr-figure { font-family: var(--font-display); font-size: clamp(30px, 4vw, 44px); line-height: 1.05; color: var(--charcoal); }
+.mr-label { font-family: var(--font-sans); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--deep-mauve); }
+.mr-note { font-size: 13px; line-height: 1.6; color: var(--slate-soft); margin-top: 4px; }
+.mr-stats-dark .mr-figure { color: #fff; }
+.mr-stats-dark .mr-label { color: var(--dusty-rose); }
+.mr-stats-dark .mr-note { color: rgba(255, 255, 255, .7); }
+/* The "as of" line is a credibility statement, not fine print -- it is what separates
+   this from a national aggregator's guess, so it stays legible. */
+.mr-asof { font-size: 14px; line-height: 1.7; color: var(--slate-soft); margin-top: 18px; max-width: 70ch; }
