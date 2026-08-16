@@ -675,7 +675,13 @@ _LISTING_VIDEO_ENTRIES = [
      "L-uEVzq1bv4", "Eaton, CO Home Under $400K — 39243 Boulevard E", "unconfirmed"),
     (["1110 quitman st", "1110 s quitman st", "1110 south quitman st",
       "1110 quitman street", "1110 s quitman street"],
-     "e7kMY1yV7GI", "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St", "unconfirmed"),
+     # 2026-08-16: confirmed SOLD, and by a document rather than an inference. Her
+     # "Bold Collective — Updated Deal Tracker (closings highlighted)" in Drive lists
+     # it Close Date 06/05/2026, $405,000, co-list with Kendra, status CLOSED. This was
+     # one of the six the unsound inference had produced -- reading the real record
+     # promoted exactly one of them, which is roughly what you would expect and is the
+     # reason the other five stay unconfirmed rather than being waved through.
+     "e7kMY1yV7GI", "Denver Home Tour — Charming Mid-Century Ranch at 1110 S Quitman St", "sold"),
     (["45615 county rd 27", "45615 county road 27"],
      "dVonJhu_zCo", "Dream Ranch on 20 Acres — 45615 County Rd 27, Pierce CO", "unconfirmed"),
     (["504 graefe ave", "504 graefe avenue"],
