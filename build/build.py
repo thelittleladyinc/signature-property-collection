@@ -3284,6 +3284,7 @@ def footer_html():
           <li><a href="/concierge-experience.html">The Concierge Experience</a></li>
           <li><a href="/expired-listings.html">Expired Listings</a></li>
           <li><a href="/how-to-choose-a-real-estate-agent.html">How To Choose An Agent</a></li>
+          <li><a href="/downsizing-in-northern-colorado.html">Downsizing</a></li>
         </ul>
       </div>
       <div>
@@ -8819,6 +8820,163 @@ def build_nav_pages():
         "/listing-video-portfolio.html", None, body, schema_extra=[breadcrumbs],
     )
 
+    # ---- Downsizing In Northern Colorado ----
+    # 2026-08-16 (Christine, on a thumbnail she'd made: "dont like the photo - but good
+    # idea for a downsizing page").
+    #
+    # She already had the pieces and no page holding them. "How I Made My House Fit My
+    # Life! Is it time for a ranch home?" has 1,853 views -- one of her best-performing
+    # videos and squarely on this subject. Trilogy by Shea Homes at Kinston is a real 55+
+    # community in the market. And "Downsizing Without Regret" is already a blog post.
+    # Nothing linked them and nothing targeted the search.
+    #
+    # Written for the person who is deciding, not for the transaction. The hardest part of
+    # downsizing is not finding a smaller house -- it is the sequencing (sell first or buy
+    # first) and the arithmetic of whether it actually saves money once you count the HOA
+    # and the fact that smaller does not mean cheaper per foot in this market. Those are
+    # the sections. The capital-gains note is deliberately hedged to "ask your CPA",
+    # because the exclusion has conditions and this is not tax advice.
+    downsize_faqs = [
+        ("Is now a good time to downsize in Northern Colorado?",
+         "It depends far more on your own numbers than on the market's. The question that "
+         "matters is what your current home would sell for against what the smaller one "
+         "costs, plus the HOA you may be taking on — and in this market a newer, smaller "
+         "home often costs more per square foot than the larger older one you are leaving. "
+         "Run those two figures before anything else; if the gap does not work, timing "
+         "will not fix it."),
+        ("Should I sell my current home first or buy the smaller one first?",
+         "Most downsizers should sell first, because buying first usually means either a "
+         "bridge loan or an offer contingent on your sale — and in a normal market a "
+         "contingent offer competes badly. Selling first is stronger and cheaper, and the "
+         "gap can be handled with a rent-back from your buyer, which is common and worth "
+         "negotiating for. If you genuinely cannot move twice, that changes the plan and "
+         "is worth talking through before you list."),
+        ("What kind of smaller homes are actually available in Northern Colorado?",
+         "Three broad options. Ranch and main-floor-primary homes in established "
+         "neighborhoods, which is what most people mean by downsizing here. Patio homes "
+         "and townhomes where an HOA takes over the yard and the snow. And 55+ "
+         "active-adult communities — Trilogy by Shea Homes at Kinston in Loveland's "
+         "Centerra is a planned 550-home community with a first phase of roughly 149 "
+         "homesites and a wellness club including a pool and pickleball courts."),
+        ("Will I pay capital gains tax when I sell the home I have lived in for years?",
+         "Often not, but do not take that from a website. Federal rules allow a "
+         "significant exclusion of gain on a primary residence when you meet the "
+         "ownership and use tests, and many long-term owners fall inside it. Whether YOU "
+         "do depends on your basis, improvements, any period the home was rented, and "
+         "your filing status. Ask your CPA before you list, not after you close — the "
+         "answer occasionally changes the timing."),
+        ("Is a smaller home really cheaper to own?",
+         "Not automatically, and this is where downsizers get caught. Utilities and "
+         "maintenance usually drop. But an HOA of two to four hundred a month, a newer "
+         "home's higher price per square foot, and property tax on a higher assessed "
+         "value can eat the difference. The honest way to decide is to compare total "
+         "monthly cost on both, not purchase price."),
+        ("What do I do with forty years of belongings?",
+         "Start earlier than feels necessary, and start with the rooms you do not use. "
+         "The practical order that works: decide what furniture fits the new floor plan "
+         "first, then work outward, because a room-by-room sort with no destination in "
+         "mind stalls. Estate-sale companies and senior-move managers exist for exactly "
+         "this and are worth the money if the volume is large."),
+    ]
+    downsize_faq_html, downsize_faq_schema = _faq_block(downsize_faqs)
+    downsize_body = f"""
+<section class="hero" style="padding:100px 0 70px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Ranch Homes, Patio Homes &amp; 55+</span>
+    <h1>Downsizing In Northern Colorado</h1>
+    <p class="lede">The hard part is not finding a smaller house. It is the order you do
+    things in, and whether the numbers actually work once you count the HOA. Here is the
+    honest version of both.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow" style="color:var(--dusty-rose)">Is It Time?</span>
+      <h2 class="section-title">Is It Time For A Ranch Home?</h2>
+      <p class="lede">{esc(SITE['agent'].split()[0])} made this move herself and talks
+      through what actually changed — the stairs, the rooms nobody used, and the part
+      people underestimate, which is how much of the decision is about the next ten years
+      rather than this year.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:24px">
+        <a class="btn btn-dark" href="/free-home-valuation.html">What's My Home Worth?</a>
+      </div>
+    </div>
+    <div>
+      {_yt_embed("xiEklJtZUrk", "How I Made My House Fit My Life! Is It Time For A Ranch Home?")}
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap" style="max-width:820px">
+    <h2 class="section-title">The Two Numbers That Decide It</h2>
+    <p>Before floor plans, before neighborhoods: what does your current home sell for, and
+    what does the smaller one cost including its HOA? People assume smaller means cheaper.
+    In this market a newer patio home can cost more per square foot than the larger,
+    older house you are leaving, and a three-hundred-dollar monthly HOA is thirty-six
+    thousand dollars a decade. Sometimes the gap is excellent. Sometimes it is thinner
+    than expected and the right answer is to stay put and renovate. Both are real
+    outcomes and you should know which one you are in before you list.</p>
+    <h2 class="article-subhead" style="margin-top:32px">Sell First, With A Rent-Back</h2>
+    <p>Buying first usually means a bridge loan or an offer contingent on your sale, and a
+    contingent offer competes badly against one that is not. Selling first is stronger and
+    cheaper. The gap is handled with a rent-back from your buyer — you stay in the house
+    for an agreed period after closing — which is common, negotiable, and much less
+    disruptive than moving twice. If moving twice is genuinely impossible for you, say so
+    early, because it changes the whole plan.</p>
+    <h2 class="article-subhead" style="margin-top:32px">What Smaller Actually Looks Like Here</h2>
+    <p>Ranch and main-floor-primary homes in established neighborhoods are what most
+    Northern Colorado downsizers end up buying, and the good ones move quickly because
+    everyone wants the same thing. Patio homes and townhomes hand the yard and the snow to
+    an HOA, which is the entire point for some people and a dealbreaker for others.
+    And there is a genuine 55+ option now: Trilogy by Shea Homes at Kinston, inside
+    Loveland's Centerra, planned at 550 homes with a first phase of roughly 149 homesites
+    and a wellness club including a pool and pickleball courts.</p>
+    <div class="btn-row" style="justify-content:flex-start;margin-top:32px">
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/communities/loveland/kinston-centerra-loveland.html">Kinston &amp; Trilogy 55+ &rarr;</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/blog/downsizing-without-regret-how-sellers-can-let-go-confidently.html">Downsizing Without Regret &rarr;</a>
+    </div>
+  </div>
+</section>
+{downsize_faq_html}
+<section class="tight section-dark">
+  <div class="wrap grid-2">
+    <div>
+      <span class="eyebrow">No Pressure</span>
+      <h2 class="section-title" style="color:#fff">Run The Numbers Before You Decide</h2>
+      <p class="lede">Most people who ask about downsizing are twelve to twenty-four months
+      out, and that is the right time to ask. Bring your current home and the kind of place
+      you are picturing, and you will get both figures and an honest read on whether the
+      move is worth making.</p>
+    </div>
+    <div class="card">
+      <h3>What you'll get on that call</h3>
+      <p>What your home would realistically sell for and which recent sales that comes
+      from. What the smaller version costs right now, HOA included. Whether selling first
+      with a rent-back is the right sequence for you. And if the numbers do not work,
+      you will hear that instead of a listing pitch.</p>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:20px">
+        <a class="btn btn-outline" href="/contact.html">Talk To {esc(SITE['agent'].split()[0])}</a>
+      </div>
+    </div>
+  </div>
+</section>
+"""
+    downsize_breadcrumbs = _breadcrumb_schema([
+        ("Home", "/index.html"), ("Downsizing In Northern Colorado", None)])
+    page(
+        "Downsizing In Northern Colorado: Ranch Homes, Patio Homes & 55+",
+        "How to downsize in Northern Colorado — whether to sell or buy first, what "
+        "smaller homes actually cost with HOA, and the 55+ options. From Christine Gwinnup.",
+        "/downsizing-in-northern-colorado.html", None, downsize_body,
+        schema_extra=[downsize_breadcrumbs, downsize_faq_schema,
+                      _video_object_schema(
+                          "xiEklJtZUrk",
+                          "How I Made My House Fit My Life! Is It Time For A Ranch Home?",
+                          f"{SITE['agent']} on downsizing into a ranch home in Northern "
+                          f"Colorado, and how to tell when it is time.")],
+    )
+
     # ---- How To Choose A Real Estate Agent ----
     # 2026-08-16 (Christine: "review every single page and make corrections and edits and
     # make it seo and aeo friendly for each search and how to pick a real estate agent").
@@ -9946,7 +10104,8 @@ def build_redirects_and_meta():
               "/search-homes.html", "/current-listings.html",
               "/sold-homes-map.html", "/luxury-market.html",
               "/press-recognition.html", "/concierge-experience.html",
-              "/how-to-choose-a-real-estate-agent.html"]
+              "/how-to-choose-a-real-estate-agent.html",
+              "/downsizing-in-northern-colorado.html"]
     # Image sitemap extension (xmlns:image) for the handful of pages with
     # real photography (see CITY_HERO_PHOTOS) -- helps Google Images
     # discover and index them; everything else is unaffected.
