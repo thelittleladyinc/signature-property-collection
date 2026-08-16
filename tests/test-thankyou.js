@@ -92,5 +92,30 @@ if (uncovered.length) {
   console.log(`       note: falling back to the default message: ${uncovered.join(", ")}`);
 }
 
+// --- analytics: opt-in, never committed ---------------------------------------
+// 2026-08-16. GA is wired but gated on GA_MEASUREMENT_ID from the build
+// environment. Two things must stay true, and both are easy to break by accident.
+const withGtag = pages.filter((f) => /googletagmanager/.test(fs.readFileSync(f, "utf8")));
+check("no committed page ships a hardcoded analytics ID",
+  withGtag.length === 0,
+  withGtag.slice(0, 3).map((f) => path.relative(ROOT, f)).join(", "));
+
+const buildPy = fs.readFileSync(path.join(ROOT, "build/build.py"), "utf8");
+check("the measurement ID comes from the environment",
+  /GA_MEASUREMENT_ID\s*=\s*\(os\.environ\.get\("GA_MEASUREMENT_ID"\)/.test(buildPy));
+// A UA- id fails silently in the browser: GA records nothing, which looks exactly
+// like "nobody visited" and would send her chasing a traffic problem she does not
+// have. Better to refuse the build.
+check("a Universal Analytics ID is refused rather than shipped",
+  /Universal Analytics, which Google shut down/.test(buildPy)
+  && /G-\[A-Z0-9\]\{6,\}/.test(buildPy));
+
+// The conversion event has to survive analytics being switched OFF -- it is inline
+// in the page either way, so it must be guarded rather than assumed.
+check("the lead event is guarded on gtag existing",
+  /typeof window\.gtag === "function"/.test(ty));
+check("the lead event carries the form name, not just a bare count",
+  /"generate_lead"[\s\S]{0,80}form_name/.test(ty));
+
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
 process.exit(failures ? 1 : 0);

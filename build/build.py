@@ -2813,6 +2813,7 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
 <link rel="stylesheet" href="/assets/css/style.css">
 <script type="application/ld+json">{_real_estate_agent_schema()}</script>
 {_schema_scripts(schema_extra)}
+{_analytics_tag()}
 {canonical_extra}
 </head>"""
 
@@ -3083,6 +3084,46 @@ def _auto_breadcrumbs(title, path):
         items.append(("Guides", "/guides/buyers-guide.html"))
     items.append((name, None))
     return _breadcrumb_schema(items)
+
+
+# 2026-08-16 (Christine: "we should have google analytics bc then we could know
+# which blogs to write"). That is the right reason to want it -- GA4's landing-page
+# report answers exactly that question -- and there was no measurement of any kind
+# on any of the 144 pages.
+#
+# Read from the environment at BUILD time rather than committed, for two reasons.
+# A measurement ID is not a secret, but hardcoding it means the branch previews and
+# any fork would report into her production property and pollute the very numbers
+# she wants to trust. And this way she pastes one value into Netlify and redeploys,
+# with no code change and nothing for me to get wrong on her behalf.
+#
+# Absent the variable this emits NOTHING -- not a commented-out placeholder, not a
+# disabled script. A site with no analytics configured should ship no analytics
+# bytes, and every local build stays out of her real data.
+GA_MEASUREMENT_ID = (os.environ.get("GA_MEASUREMENT_ID") or "").strip()
+
+
+def _analytics_tag():
+    """The gtag.js snippet, or "" when GA_MEASUREMENT_ID isn't set."""
+    if not GA_MEASUREMENT_ID:
+        return ""
+    # Guarded because a wrong-shaped value fails silently in the browser -- GA
+    # simply never records, which looks identical to "nobody visited" and would
+    # send her chasing a traffic problem she doesn't have.
+    if not re.fullmatch(r"G-[A-Z0-9]{6,}", GA_MEASUREMENT_ID):
+        raise SystemExit(
+            f"GA_MEASUREMENT_ID={GA_MEASUREMENT_ID!r} is not a GA4 measurement ID.\n"
+            "It must look like G-XXXXXXXXXX (Google Analytics -> Admin -> Data streams ->\n"
+            "your web stream). A UA-... id is Universal Analytics, which Google shut down."
+        )
+    gid = GA_MEASUREMENT_ID
+    return (
+        f'<script async src="https://www.googletagmanager.com/gtag/js?id={gid}"></script>\n'
+        "<script>window.dataLayer=window.dataLayer||[];"
+        "function gtag(){{dataLayer.push(arguments);}}"
+        "gtag('js',new Date());"
+        f"gtag('config','{gid}');</script>".replace("{{", "{").replace("}}", "}")
+    )
 
 
 def page(title, description, path, active, body, extra_head="", schema_extra="",
@@ -8355,6 +8396,14 @@ def build_legal():
     var from = new URLSearchParams(window.location.search).get("from");
     var el = document.getElementById("ty-message");
     if (from && el && MSG[from]) el.textContent = MSG[from];
+    /* The conversion event. This is the part that answers "which blogs to write":
+       GA4's generate_lead with the form name attached, so the landing-page report
+       shows which page a lead actually came from instead of a flat total.
+       Guarded on gtag existing, because analytics is optional here -- with
+       GA_MEASUREMENT_ID unset the page still works and simply counts nothing. */
+    if (typeof window.gtag === "function") {{
+      window.gtag("event", "generate_lead", {{ form_name: from || "unknown" }});
+    }}
   }} catch (e) {{ /* default copy stands */ }}
 }})();
 </script>

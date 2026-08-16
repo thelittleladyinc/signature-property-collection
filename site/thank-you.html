@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="/assets/css/style.css">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "@id": "https://signaturepropertycollection.com/#christine-gwinnup", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/", "image": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "thelittleladyinc@gmail.com", "priceRange": "$$$$", "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Morgan County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady", "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390", "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2", "https://christinegwinnup.lpt.com/", "https://www.thelittleladysellshomes.com/"], "dateModified": "2026-08-16", "geo": {"@type": "GeoCoordinates", "latitude": 40.3978, "longitude": -105.075}, "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
 
+
 <meta name="robots" content="noindex, follow">
 </head>
 <body>
@@ -152,6 +153,14 @@
     var from = new URLSearchParams(window.location.search).get("from");
     var el = document.getElementById("ty-message");
     if (from && el && MSG[from]) el.textContent = MSG[from];
+    /* The conversion event. This is the part that answers "which blogs to write":
+       GA4's generate_lead with the form name attached, so the landing-page report
+       shows which page a lead actually came from instead of a flat total.
+       Guarded on gtag existing, because analytics is optional here -- with
+       GA_MEASUREMENT_ID unset the page still works and simply counts nothing. */
+    if (typeof window.gtag === "function") {
+      window.gtag("event", "generate_lead", { form_name: from || "unknown" });
+    }
   } catch (e) { /* default copy stands */ }
 })();
 </script>
