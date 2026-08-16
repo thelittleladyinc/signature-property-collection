@@ -3690,54 +3690,100 @@ def _spot_note_for(url):
             else f" &middot; {esc(top)}")
 
 
-def _county_coverage_block(county):
-    """What Christine actually covers in this county, in numbers.
+def _commute_short(text):
+    """The first, nearest-city leg of a town's commute line, said as she wrote it.
 
-    Every figure is derived, never typed: the town count comes from the same
-    _city_url() the pages are built from, and the spots and view counts from
-    local_spots.json. So this can't drift into a claim that stopped being true."""
+    Deliberately NOT normalised to "minutes to Denver". Christine's own copy anchors
+    each town to its real job centre -- Greeley for Ault, Fort Collins for Timnath,
+    Longmont for Mead -- and forcing a Denver column would leave two thirds of it blank
+    or invented. This takes what is already written and trims it to a table cell."""
+    t = (text or "").strip()
+    if not t:
+        return ""
+    t = re.split(r";|(?<=[a-z0-9)])\.\s", t)[0]
+    t = re.sub(r"\s*—.*$", "", t).strip().rstrip(".,")
+    t = re.sub(r"^About\s+", "", t)
+    if len(t) > 58:                      # long clauses read better cut at the comma
+        t = t.split(",")[0].strip()
+    return t[:1].upper() + t[1:] if t else ""
+
+
+def _district_short(text):
+    """School district without the parenthetical, which is too long for a cell."""
+    t = (text or "").split("(")[0].strip().rstrip(",;.")
+    return t
+
+
+def _county_town_comparison(county):
+    """A real comparison of this county's towns: drive time, schools, her coverage.
+
+    2026-08-16 (Christine, on the block that used to be here: "why is it even there?!!!
+    Who cares about that! Lets make it what people are actually searching for!").
+
+    She was right. What was here counted how many town PAGES this website has and how
+    many places she had filmed -- the site talking about itself. Nobody searches that.
+
+    What people actually type is "best places to live in larimer county", "how far is
+    Loveland from Denver", "what school district is Timnath in". Those are three
+    different searches with one answer shape: a comparison of the towns. So that is
+    what this is, built from the per-town content the site already carries, with her
+    filmed coverage as one column rather than the whole point.
+
+    Every cell is real or empty. An unwritten commute line leaves a dash, because a
+    plausible-looking invented drive time is the one thing here that could cost someone
+    a decision."""
     global LOCAL_SPOTS_BY_CITY_HREF
     if LOCAL_SPOTS_BY_CITY_HREF is None:
         LOCAL_SPOTS_BY_CITY_HREF = _local_spots_by_city_href()
-    towns = [(city, url) for c, city, url in _all_town_pages() if c["slug"] == county["slug"]]
-    if not towns:
+    rows = []
+    for c, city, url in _all_town_pages():
+        if c["slug"] != county["slug"]:
+            continue
+        data = CITY_CONTENT.get(CITY_DATA_SLUG.get(city) or "") or {}
+        # Primary cityHref only: a place has one address and therefore one county.
+        spots = [sp for sp in LOCAL_SPOTS_DATA.get("spots", [])
+                 if sp.get("cityHref") == url]
+        views = sum((sp.get("views") or 0) + (sp.get("reviewViews") or 0) for sp in spots)
+        rows.append({
+            "city": city, "url": url,
+            "commute": _commute_short(data.get("commute")),
+            "district": _district_short(data.get("school_district")),
+            "spots": len(spots), "views": views,
+        })
+    if not rows:
         return ""
-    prefix = f"/communities/{county['slug']}/"
-    spots, views = [], 0
-    for href, ss in LOCAL_SPOTS_BY_CITY_HREF.items():
-        if href.startswith(prefix):
-            for s in ss:
-                if s not in spots:      # alsoOnCityHrefs can list one spot twice
-                    spots.append(s)
-                    views += (s.get("views") or 0) + (s.get("reviewViews") or 0)
-    first = esc(SITE["agent"].split()[0])
-    if spots:
-        named = ", ".join(esc(s["name"]) for s in spots[:4])
-        proof = (
-            f"<p class=\"lede\">{first} has filmed or reviewed {len(spots)} "
-            f"{'place' if len(spots) == 1 else 'places'} in {esc(county['name'])} County"
-            + (f" &mdash; {named}" if named else "")
-            + (f" &mdash; and that coverage has been watched or read "
-               f"<strong>{views:,} times</strong>." if views else ".")
-            + " Every one of them is pinned on the map and on the town page it belongs to.</p>"
-        )
-    else:
-        # Said plainly rather than dressed up. An empty county is an honest gap, and
-        # claiming coverage that doesn't exist is the one thing that would make every
-        # other number here worthless.
-        proof = (
-            f'<p class="lede">{first} hasn\'t filmed in {esc(county["name"])} County yet '
-            f"&mdash; so these pages give you the market and the listings rather than a "
-            f"tour. If there's somewhere here you think is worth covering, tell her.</p>"
-        )
+    rows.sort(key=lambda r: (-r["views"], r["city"]))
+    body = "\n      ".join(
+        f"""<tr>
+        <th scope="row"><a href="{r['url']}">{esc(r['city'])}</a></th>
+        <td>{esc(r['commute']) or "&mdash;"}</td>
+        <td>{esc(r['district']) or "&mdash;"}</td>
+        <td>{(f"{r['spots']} spot{'s' if r['spots'] != 1 else ''} &middot; {r['views']:,} views"
+              if r['spots'] else "&mdash;")}</td>
+      </tr>""" for r in rows)
+    covered = [r for r in rows if r["spots"]]
+    lede = (f"Drive times and school districts for every {esc(county['name'])} town "
+            f"{esc(SITE['agent'].split()[0])} works in, side by side.")
+    if covered:
+        lede += (f" The last column is where she has actually been with a camera &mdash; "
+                 f"{sum(r['spots'] for r in covered)} places, watched and read "
+                 f"{sum(r['views'] for r in covered):,} times.")
     return f"""<section class="tight">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Our Coverage Here</span>
-    <h2 class="section-title">{esc(county['name'])} County, In Numbers</h2>
-    <p class="lede">{len(towns)} {'town' if len(towns) == 1 else 'towns'} in
-    {esc(county['name'])} County {'has' if len(towns) == 1 else 'have'} a page of their own
-    here &mdash; live listings, what the area is actually like, and what it costs.</p>
-    {proof}
+    <span class="eyebrow" style="color:var(--dusty-rose)">Compare Before You Commit</span>
+    <h2 class="section-title">Which {esc(county['name'])} Town Fits You?</h2>
+    <p class="lede">{lede}</p>
+    <div class="town-table-wrap">
+      <table class="town-table">
+        <thead>
+          <tr><th scope="col">Town</th><th scope="col">Nearest City</th>
+          <th scope="col">School District</th><th scope="col">Filmed Locally</th></tr>
+        </thead>
+        <tbody>
+      {body}
+        </tbody>
+      </table>
+    </div>
   </div>
 </section>"""
 
@@ -3755,7 +3801,7 @@ def _town_directory_block():
             f'<li><a href="{url}">{esc(city)}</a><span class="town-dir-note">{_spot_note_for(url)}</span></li>'
             for city, url in sorted(towns))
         cols.append(f"""<div class="town-dir-col">
-        <h3 class="town-dir-county"><a href="/communities/{slug}.html">{esc(name)} County</a></h3>
+        <h3 class="town-dir-county"><a href="/communities/{slug}.html">{esc(name)}</a></h3>
         <ul class="town-dir-list">
           {links}
         </ul>
@@ -3786,7 +3832,7 @@ def _nearby_towns_block(county, current_city):
     return f"""<section class="tight">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Still Deciding?</span>
-    <h2 class="section-title">Other {esc(county['name'])} County Towns</h2>
+    <h2 class="section-title">Other {esc(county['name'])} Towns</h2>
     <p class="lede">Most people looking at {esc(current_city)} are weighing it against
     a neighbour or two. Here is the rest of the county, each with its own page.</p>
     <div class="city-pills" style="margin-top:20px">
@@ -3898,7 +3944,7 @@ def build_county_pages():
         # much of Christine's own filmed and reviewed coverage sits in this county --
         # which is genuinely different per county (Larimer carries thousands of views,
         # Arapahoe none) and is the one claim no other agent's county page can copy.
-        body += _county_coverage_block(c)
+        body += _county_town_comparison(c)
         body += _quiz_disclosure(
             f"Not sure which {esc(c['name'])} town fits? Four quick questions, matched "
             f"against {len(QUIZ_CITIES)} real towns {esc(SITE['agent'])} shows clients "

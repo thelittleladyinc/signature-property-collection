@@ -1225,3 +1225,28 @@ h2.widget-title {
 .town-dir-list a { font-weight: 500; }
 /* The "why click" half is deliberately quieter than the link itself. */
 .town-dir-note { color: var(--slate-mist, #8a8a8f); font-size: 13.5px; font-weight: 300; }
+
+/* ---- Town comparison table on county pages (2026-08-16) ---------------------
+   Christine, on what used to be here: "why is it even there?!!! Who cares about that!
+   Lets make it what people are actually searching for!" She was right -- it counted how
+   many town pages the site has. This answers the three searches people actually make
+   about a county at once: which town, how far, what schools.
+
+   The wrapper scrolls rather than the page: a four-column table on a 360px phone has to
+   overflow somewhere, and the one place it must never overflow is the body. */
+.town-table-wrap { overflow-x: auto; margin-top: 26px; -webkit-overflow-scrolling: touch; }
+.town-table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 620px; }
+.town-table thead th {
+  text-align: left; font-family: var(--font-sans); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--slate-mist, #8a8a8f);
+  padding: 0 16px 10px 0; border-bottom: 1px solid var(--hairline-strong, #e4e4d8);
+  white-space: nowrap;
+}
+.town-table tbody th, .town-table td {
+  padding: 13px 16px 13px 0; border-bottom: 1px solid rgba(20,20,21,.07);
+  vertical-align: top; font-weight: 300; line-height: 1.5; text-align: left;
+}
+.town-table tbody th { font-weight: 500; white-space: nowrap; }
+.town-table tbody th a { font-weight: 600; }
+.town-table tbody tr:last-child th, .town-table tbody tr:last-child td { border-bottom: 0; }
+.town-table tbody tr:hover td, .town-table tbody tr:hover th { background: rgba(184,111,122,.04); }
