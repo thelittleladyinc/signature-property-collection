@@ -42,7 +42,7 @@ const { getStore } = require("@netlify/blobs");
 const {
   SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS,
 } = require("./lib/_mls-shared");
-const { isCloudinaryConfigured } = require("./lib/_cloudinary");
+const { isCloudinaryConfigured, cloudinaryCredentials } = require("./lib/_cloudinary");
 const { resolveMediaFor, fetchMediaResponse, looksPresigned, isThrottled } = require("./lib/_media");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 // Read for the Tour It With Me coverage row below — same file the map reads.
@@ -205,12 +205,14 @@ async function probePhotoPipeline(mineListings, token) {
 async function probeCloudinaryUsage() {
   try {
     const cloudinary = require("cloudinary").v2;
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
-      secure: true,
-    });
+    // 2026-08-17: read through the same resolver the uploads use, so this row can
+    // never test a different set of credentials than the ones actually in play.
+    // It used to read the three env vars directly, which would have quietly tested
+    // the WRONG thing the moment CLOUDINARY_URL became an option -- a health check
+    // that disagrees with the code it is checking is worse than no health check.
+    const creds = cloudinaryCredentials();
+    if (!creds) return { checkedAt: new Date().toISOString(), ok: false, error: "not configured" };
+    cloudinary.config(Object.assign({ secure: true }, creds));
     const usage = await cloudinary.api.usage({ timeout: 6000 });
     const credits = usage && usage.credits;
     return {
@@ -619,7 +621,8 @@ exports.handler = async (event) => {
       // NOT repeated here as a literal: a value hardcoded into a health check is a
       // value that silently goes stale, and this row exists to report reality.
       detail: isCloudinaryConfigured()
-        ? `All three env vars are present, on cloud name "${process.env.CLOUDINARY_CLOUD_NAME}". ` +
+        ? `Configured, on cloud name "${(cloudinaryCredentials() || {}).cloud_name}"` +
+          `${process.env.CLOUDINARY_URL ? " (from CLOUDINARY_URL)" : ""}. ` +
           "PRESENT is not the same as WORKING — the \"Cloudinary account healthy\" row " +
           "below is what actually tests them, and it names the specific problem when " +
           "there is one. Two things to check against that row: the cloud name above " +
@@ -782,7 +785,20 @@ exports.handler = async (event) => {
                   "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
                   "to another. Open cloudinary.com → Dashboard, copy Cloud name, API Key and API Secret " +
                   "from that same page, and replace all three in Netlify → Environment variables."
-                : "Check the three CLOUDINARY_* variables in Netlify against cloudinary.com → Dashboard."))),
+                : /api_secret mismatch/i.test(String(cloudCheck.error))
+                  ? "FIX, and it removes this whole class of mistake rather than " +
+                    "correcting one instance of it: the api_key and api_secret are " +
+                    "from DIFFERENT keys. That console lists several keys, each with " +
+                    "its own secret behind a reveal control, and nothing on the page " +
+                    "stops you combining two rows — so pairing them by hand is a " +
+                    "mistake waiting to recur. Instead copy Cloudinary's own " +
+                    "connection string, which carries all three values from ONE key " +
+                    "as a matched set: on the API Keys page it reads " +
+                    "cloudinary://<api_key>:<api_secret>@<cloud_name>. Add it in " +
+                    "Netlify as a single variable named CLOUDINARY_URL and redeploy. " +
+                    "This site prefers it over the three separate variables, so they " +
+                    "can be left alone or deleted, and a mismatch becomes impossible."
+                  : "Check the three CLOUDINARY_* variables in Netlify against cloudinary.com → Dashboard."))),
   });
 
   // ---- Lofty API key valid? ----

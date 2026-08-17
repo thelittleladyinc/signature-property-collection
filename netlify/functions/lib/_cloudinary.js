@@ -40,21 +40,65 @@
 const cloudinary = require("cloudinary").v2;
 const { fetchMediaResponse } = require("./_media");
 
-let _configured = false;
-function configureCloudinary() {
-  if (_configured) return true;
+// 2026-08-17. CLOUDINARY_URL is now accepted as a single variable, and preferred
+// over the three separate ones, because three separate values is a shape that
+// invites exactly the mistakes Christine hit twice this evening:
+//
+//   1. CLOUDINARY_CLOUD_NAME set to the API key's NAME ("Signature Property
+//      Collection") rather than the cloud name. Reported as a cloud_name error.
+//   2. An api_key from one key row paired with the api_secret from another.
+//      Reported as "api_secret mismatch", which is accurate and tells you nothing
+//      about WHICH of the two is wrong.
+//
+// Neither is carelessness. That console lists several keys, each with its own
+// secret behind a reveal control, and nothing on the page stops you combining two
+// rows. The three-variable shape makes a wrong combination possible at all.
+//
+// Cloudinary's own answer is the connection string, which it shows on that same
+// page: cloudinary://<api_key>:<api_secret>@<cloud_name>. All three values, from
+// one key, in one copyable string -- a matched set by construction. Paste it as
+// CLOUDINARY_URL and the mismatch failure mode stops existing.
+//
+// The three separate vars still work and are still read when CLOUDINARY_URL is
+// absent, so nothing that is already configured breaks.
+function cloudinaryUrlParts() {
+  const raw = (process.env.CLOUDINARY_URL || "").trim();
+  if (!raw) return null;
+  // Deliberately strict. A half-parsed connection string would configure the SDK
+  // with something wrong and produce a confusing auth error two layers away --
+  // which is the exact class of problem this exists to remove.
+  const m = /^cloudinary:\/\/([^:@\s]+):([^@\s]+)@([^/?\s]+)/i.exec(raw);
+  if (!m) {
+    console.warn("_cloudinary: CLOUDINARY_URL is set but is not a " +
+      "cloudinary://<api_key>:<api_secret>@<cloud_name> string — ignoring it and " +
+      "falling back to the three separate variables.");
+    return null;
+  }
+  return { api_key: m[1], api_secret: m[2], cloud_name: m[3] };
+}
+
+function cloudinaryCredentials() {
+  const fromUrl = cloudinaryUrlParts();
+  if (fromUrl) return fromUrl;
   const cloud_name = process.env.CLOUDINARY_CLOUD_NAME;
   const api_key = process.env.CLOUDINARY_API_KEY;
   const api_secret = process.env.CLOUDINARY_API_SECRET;
-  if (!cloud_name || !api_key || !api_secret) return false;
-  cloudinary.config({ cloud_name, api_key, api_secret });
+  if (!cloud_name || !api_key || !api_secret) return null;
+  return { cloud_name, api_key, api_secret };
+}
+
+let _configured = false;
+function configureCloudinary() {
+  if (_configured) return true;
+  const creds = cloudinaryCredentials();
+  if (!creds) return false;
+  cloudinary.config(creds);
   _configured = true;
   return true;
 }
 
 function isCloudinaryConfigured() {
-  return !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY
-    && process.env.CLOUDINARY_API_SECRET);
+  return !!cloudinaryCredentials();
 }
 
 // Minimum byte count we expect from a real image response. An HTTP error
@@ -196,4 +240,9 @@ async function uploadDataUri(dataUri, publicId) {
   });
 }
 
-module.exports = { cachePhotoToCloudinary, isCloudinaryConfigured, MIN_IMAGE_SIZE_BYTES };
+module.exports = {
+  cachePhotoToCloudinary, isCloudinaryConfigured, MIN_IMAGE_SIZE_BYTES,
+  // Exported so site-health can report WHICH cloud is in use, and so the parsing
+  // of CLOUDINARY_URL is testable rather than only reachable through an upload.
+  cloudinaryCredentials,
+};
