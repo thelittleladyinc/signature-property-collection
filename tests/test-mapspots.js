@@ -23,11 +23,13 @@ const ROOT = path.resolve(__dirname, "..");
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
 
-for (const rel of ["build/assets/js/map.js", "site/assets/js/map.js"]) {
-  const file = path.join(ROOT, rel);
-  if (!fs.existsSync(file)) { check(`${rel} exists`, false); continue; }
+// Built copy resolved by stem: build.py content-hashes it (see tests/_assets.js).
+const { builtAsset } = require("./_assets");
+for (const rel of ["build/assets/js/map.js", null]) {
+  const file = rel ? path.join(ROOT, rel) : builtAsset(ROOT, "js", "map", ".js");
+  const label = rel ? "source" : "built";
+  if (!fs.existsSync(file)) { check(`${label} map.js exists`, false); continue; }
   const src = fs.readFileSync(file, "utf8");
-  const label = rel.startsWith("build") ? "source" : "built";
 
   // The function that places every spot — both the hardcoded POI_MARKERS and the
   // ones local-spots.js resolves at runtime, which is the great majority of them.

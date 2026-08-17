@@ -53,7 +53,7 @@ fs.writeFileSync(LIB, JSON.stringify(data, null, 2));
       pin.reviewViews === 10400 && pin.views === undefined, JSON.stringify({ r: pin.reviewViews, v: pin.views }));
 
     // The map's own logic, exercised directly rather than described.
-    const mapJs = fs.readFileSync(`${ROOT}/site/assets/js/map.js`, "utf8");
+    const mapJs = require("./_assets").readBuiltAsset(ROOT, "js", "map", ".js");
     check("tooltip switches to Read for a review pin", /'★ Read: '/.test(mapJs));
     check("no iframe is built without a videoId", /if \(poi\.videoId\) \{[\s\S]{0,400}youtube-nocookie/.test(mapJs));
     check("media panel is hidden rather than left black", /wrap\.style\.display = 'none'/.test(mapJs));

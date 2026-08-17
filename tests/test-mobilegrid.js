@@ -63,7 +63,8 @@ check(
 
 // The class this all depends on must actually exist, with its mobile breakpoint.
 // Without the breakpoint .grid-2col is just .grid-2 with extra steps.
-const css = fs.readFileSync(path.join(SITE, "assets", "css", "style.css"), "utf8");
+// Resolved by stem — build.py content-hashes it. See tests/_assets.js.
+const css = require("./_assets").readBuiltAsset(ROOT, "css", "style", ".css");
 check("style.css defines .grid-2col", /\.grid-2col\s*\{/.test(css));
 check(
   ".grid-2col collapses to one column on small screens",

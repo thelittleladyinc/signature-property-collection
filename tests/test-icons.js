@@ -5,7 +5,8 @@
 // /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
 const ROOT = require("path").resolve(__dirname, "..");
 const fs = require("fs");
-const mapJs = fs.readFileSync(`${ROOT}/site/assets/js/map.js`, "utf8");
+const { readBuiltAsset } = require("./_assets");
+const mapJs = readBuiltAsset(ROOT, "js", "map", ".js");
 const spots = require(`${ROOT}/netlify/functions/lib/_local-spots.json`).spots;
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };

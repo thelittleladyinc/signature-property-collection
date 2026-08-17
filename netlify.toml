@@ -31,10 +31,10 @@
 #  2. No baseline security headers, on a site collecting lead data through
 #     68 forms. Not ranking factors, but standard hygiene.
 #
-# Fingerprinted-by-path assets (images, fonts, vendored JS) get a long
-# immutable TTL; CSS/JS are not content-hashed in this build, so they get a
-# short TTL with revalidation rather than immutable -- otherwise a style
-# change wouldn't reach returning visitors for a year.
+# Every long-lived asset gets an immutable TTL. CSS/JS earned that on 2026-08-17
+# by becoming content-hashed (see the block below and fingerprint_assets() in
+# build.py) -- until then they were deliberately on a short TTL, because caching an
+# unversioned filename for a year would mean a style change never reaching anyone.
 
 [[headers]]
   for = "/*"
@@ -60,15 +60,32 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# 2026-08-17: these were max-age=3600 with UNVERSIONED filenames, and it cost a
+# whole afternoon of confusion. Christine reported two bugs that were already
+# fixed — her map spots "disappearing on zoom" (there is not one zoom handler in
+# map.js) and the market-report stat block rendering as run-together text (the CSS
+# for it is present and correct, and byte-identical to source). Both were her
+# browser serving an asset from before the deploy that fixed them.
+#
+# The general failure is worse than the confusion: for an hour after every deploy,
+# returning visitors ran the OLD JavaScript against the NEW HTML. A mismatch
+# between markup and the script driving it produces behaviour nobody can reproduce.
+#
+# build.py now content-hashes every CSS/JS file and rewrites the references
+# (fingerprint_assets(), the last step of the build), so a changed file gets a new
+# NAME. A deploy therefore reaches everyone instantly — there is nothing stale left
+# to serve — and because the filename now identifies the content, these can be
+# cached as hard as the images are. Repeat visitors stop re-fetching 71KB of CSS
+# and 48KB of map code on every visit.
 [[headers]]
   for = "/assets/css/*"
   [headers.values]
-    Cache-Control = "public, max-age=3600, must-revalidate"
+    Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
   for = "/assets/js/*"
   [headers.values]
-    Cache-Control = "public, max-age=3600, must-revalidate"
+    Cache-Control = "public, max-age=31536000, immutable"
 
 # Replicates Christine's licensed IRES listings from MLS Grid into Netlify
 # Blobs (see sync-listings.js's file comment for why a live per-search query to
