@@ -71,11 +71,27 @@
     Cache-Control = "public, max-age=3600, must-revalidate"
 
 # Replicates Christine's licensed IRES listings from MLS Grid into Netlify
-# Blobs every 15 minutes (MLS Grid's own recommended cadence — see
-# sync-listings.js's file comment for why a live per-search query to MLS
-# Grid doesn't work and this replication step is required instead).
+# Blobs (see sync-listings.js's file comment for why a live per-search query to
+# MLS Grid doesn't work and this replication step is required instead).
+#
+# 2026-08-17: 15 minutes -> 30, at Christine's request, after sustained 429s from
+# MLS Grid's media host. Worth being clear about what this does and does not buy,
+# so nobody later mistakes it for the fix:
+#
+# This job was never the glutton. It is paced at REQUEST_DELAY_MS (1500ms) inside
+# a TIME_BUDGET_MS of 11s, so it makes at most ~7 API calls per run -- roughly 670
+# a day at 15 minutes, and ~335 at 30. Against MLS Grid's limits that is small
+# either way. The 429s are on the MEDIA host and are driven by photo traffic plus
+# the two OTHER apps sharing this account (Listing-Engine, Expired-Luxury), which
+# is the real capacity question.
+#
+# So this halves an already-small footprint. It is cheap, it is safe, and the only
+# visible cost is that a brand-new listing can take up to 30 minutes to appear
+# instead of 15 -- which no visitor will notice. The sync is resumable by design
+# (each run continues where the last stopped), so a longer gap changes pace, never
+# completeness.
 [functions."sync-listings"]
-  schedule = "*/15 * * * *"
+  schedule = "*/30 * * * *"
 
 # Clean, shareable, indexable URL for one listing:
 #   /listing/IRE1234567  ->  netlify/functions/listing-page.js

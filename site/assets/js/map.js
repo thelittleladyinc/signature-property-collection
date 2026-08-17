@@ -233,10 +233,6 @@
     if (count) label += ' (' + Number(count).toLocaleString() + ' views)';
     marker.bindTooltip(label, { direction: 'top', offset: [0, -10] });
     marker.on('click', function () { openPoiModal(poi); });
-    baseMarkers.push(marker);
-    // A spot fetched after a drill-down has already started must not pop up over
-    // the county view -- local-spots.js resolves asynchronously.
-    if (countyView.active && map.hasLayer(marker)) map.removeLayer(marker);
   }
 
   function poiIcon(poi) {
@@ -589,13 +585,27 @@
   // end, and the previous behaviour is the correct fallback rather than a regression.
   var countyView = { active: null, markers: [], layer: null, homeBounds: null };
 
-  // Every marker that belongs to the all-counties view. The county view hides
-  // these: without it, a town that already has an icon marker (Fort Collins,
-  // Masonville, Loveland ...) renders twice, once as its icon and once as a town
-  // pin, which is worse than either alone. Restored on the way back out.
-  var baseMarkers = [];
-  function setBaseMarkersVisible(map, visible) {
-    baseMarkers.forEach(function (m) {
+  // City icon/label markers ONLY. The county view hides these, because a town that
+  // already has an icon marker (Fort Collins, Masonville, Loveland ...) would
+  // otherwise render twice -- once as its icon, once as a town pin -- which is
+  // worse than either alone.
+  //
+  // 2026-08-17, same day, and my regression: this array originally held the POI
+  // markers too, so entering a county hid every one of Christine's spots. Those
+  // pins ARE her content -- the "▶ Watch" markers carrying her YouTube tours and
+  // reviews with their real view counts -- and they are the single thing this map
+  // has that a portal map structurally cannot. She opened a county and said "all
+  // of my embedded videos are all gone!!!!", which is exactly what it looked like.
+  //
+  // Nothing was ever deleted, but that is not the point: hiding them was wrong on
+  // its own terms. The duplication problem was only ever about CITY icons sitting
+  // under town pins. A restaurant or a trailhead is a different place from the town
+  // pin beside it and duplicates nothing, so POI markers now stay visible at every
+  // zoom -- including inside a county, where someone looking at one town is exactly
+  // the person most likely to want them.
+  var cityMarkers = [];
+  function setCityMarkersVisible(map, visible) {
+    cityMarkers.forEach(function (m) {
       if (visible) { if (!map.hasLayer(m)) m.addTo(map); }
       else if (map.hasLayer(m)) map.removeLayer(m);
     });
@@ -631,7 +641,7 @@
     countyView.markers.forEach(function (m) { map.removeLayer(m); });
     countyView.markers = [];
     countyView.active = null;
-    setBaseMarkersVisible(map, true);
+    setCityMarkersVisible(map, true);
     paintCounties(null);
   }
 
@@ -702,7 +712,7 @@
   function enterCounty(map, countyName, data, lyr) {
     clearCountyView(map);
     countyView.active = countyName;
-    setBaseMarkersVisible(map, false);
+    setCityMarkersVisible(map, false);
     paintCounties(countyName);
     renderCountyPanel(map, countyName, data);
 
@@ -817,10 +827,10 @@
         // towns doesn't turn into unreadable overlapping text.
         CITY_ICONS.forEach(function (city) {
           var marker = L.marker([city.lat, city.lng], { icon: cityIcon(city), interactive: true, zIndexOffset: 500 }).addTo(map);
-          baseMarkers.push(marker);
+          cityMarkers.push(marker);
           if (city.priority) {
             var lbl = L.marker([city.lat, city.lng], { icon: cityLabel(city), interactive: false }).addTo(map);
-            baseMarkers.push(lbl);
+            cityMarkers.push(lbl);
           } else {
             marker.bindTooltip(city.name, { direction: 'right', offset: [14, 0] });
           }
