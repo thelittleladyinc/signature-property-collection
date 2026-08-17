@@ -11709,21 +11709,44 @@ def fingerprint_assets():
 
     # Longest path first, so no asset's path can be rewritten by a shorter one.
     ordered = sorted(renames.items(), key=lambda kv: -len(kv[0]))
-    touched = 0
+
+    # Everything this build generates that can reference an asset. site/ is the
+    # obvious half; the second half is the trap.
+    #
+    # 2026-08-17, an hour after shipping the first version of this: the listing
+    # page shell is written by write_listing_page_shell() into
+    # netlify/functions/lib/, NOT into site/, because listing-page.js reads it at
+    # request time. Walking OUT alone therefore left it pointing at
+    # /assets/css/style.css after that file had been renamed -- so every
+    # /listing/<id> page, the feature Christine asked for specifically so a buyer
+    # could text one address to a spouse, served with NO stylesheet at all.
+    #
+    # Worse than the bug: it is invisible from inside site/. Nothing in the static
+    # output was wrong, so no amount of checking the built pages would have found
+    # it. Any future generated file that lives outside site/ and names an asset
+    # belongs in this list, and test-assetcache.js now scans for exactly that
+    # rather than trusting anyone to remember.
+    targets = []
     for root, _dirs, files in os.walk(OUT):
         for name in files:
-            if not name.endswith((".html", ".js", ".xml", ".webmanifest")):
+            if name.endswith((".html", ".js", ".xml", ".webmanifest")):
+                targets.append(os.path.join(root, name))
+    targets.append(os.path.join(HERE, "..", "netlify", "functions", "lib",
+                                "_listing-page-shell.html"))
+
+    touched = 0
+    for fp in targets:
+            if not os.path.exists(fp):
                 continue
-            fp = os.path.join(root, name)
             with open(fp, encoding="utf-8") as f:
                 text = f.read()
-            new = text
-            for old, hashed in ordered:
-                if old in new:
-                    new = new.replace(old, hashed)
-            if new != text:
+            updated = text
+            for old_ref, hashed in ordered:
+                if old_ref in updated:
+                    updated = updated.replace(old_ref, hashed)
+            if updated != text:
                 with open(fp, "w", encoding="utf-8") as f:
-                    f.write(new)
+                    f.write(updated)
                 touched += 1
     print(f"  fingerprinted {len(renames)} asset(s), rewrote {touched} file(s)")
 
