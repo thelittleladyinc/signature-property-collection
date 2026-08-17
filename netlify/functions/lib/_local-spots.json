@@ -114,6 +114,34 @@
       "googlePostUrl": ""
     },
     {
+      "name": "Gray's Cafe",
+      "category": "restaurant",
+      "address": "200 1st St",
+      "city": "Ault",
+      "cityHref": "/communities/weld/ault.html",
+      "searchCity": "Ault",
+      "blurb": "One of our favourite places to eat, right on 1st Street downtown. Breakfast only runs until 2:00, so don't turn up at half past expecting eggs.",
+      "videoId": "NMj7Da93zL8",
+      "videoTitle": "Explore Ault's Hidden Gems and Community Spirit!",
+      "views": 273,
+      "googlePostUrl": "",
+      "_why": "2026-08-17. This closes an item this file listed as open: \"Gray's Cafe and BBC Winery in Ault, both named in a listing description but with no dedicated spot video to attach.\" The video existed all along -- its TITLE says only \"Explore Ault's Hidden Gems and Community Spirit!\", but its transcript names the place outright: \"one of our favorite local restaurants is here at Gray's Cafe in downtown Ault... you can only have breakfast until 2:00\". Same lesson this file already records twice: her titles are coy, the content is not. Address confirmed as 200 1st St against Yelp and Tripadvisor rather than typed from memory."
+    },
+    {
+      "name": "BBC Wines",
+      "category": "winery",
+      "address": "241 E 1st St",
+      "city": "Ault",
+      "cityHref": "/communities/weld/ault.html",
+      "searchCity": "Ault",
+      "blurb": "Teresa and her husband make the wine here themselves, in what used to be a tractor store — she moved the whole operation up from Eaton to do it. Go on a reservation rather than turning up; it isn't a walk-in kind of place.",
+      "videoId": "eLNE6KEZVmQ",
+      "videoTitle": "Get Ready to DISCOVER the Ultimate Wine Experience in Ault, Colorado!",
+      "views": 246,
+      "googlePostUrl": "",
+      "_why": "2026-08-17. The second of the two items this file listed as open in Ault (\"Gray's Cafe and BBC Winery in Ault, both named in a listing description but with no dedicated spot video to attach\"). There IS a dedicated video and it is seven and a half minutes long -- an interview with the owner, Teresa Kernan. It did not surface earlier because vidIQ pages roughly 50 popular + 50 recent and this sits outside both; Christine pasting her own channel listing is what surfaced it. NAMING: the business trades as both \"Bad Bitch Cellars\" and \"BBC Wines\" (its own Eventeny listing reads BAD BITCH CELLARS/BBC WINES). The initialism is used here as the conservative default for a real-estate site, and is also how Christine introduces it on camera -- \"I'm here at BBC, which stands for...\". Her own closing line is \"it's a term of endearment\", so switching to the full name is HER call and a one-word change, not something to decide for her. BY RESERVATION, and that is in the blurb deliberately: this file already holds that a pin sending a buyer to a locked door is worse than no pin, which is why The River Forks Inn and Grubby'z are not on this map. Address 241 E 1st St confirmed against coloradowine.com and the winery's own site, not typed from memory."
+    },
+    {
       "name": "Red Feather Lakes",
       "category": "lake",
       "address": "Red Feather Lakes Village",

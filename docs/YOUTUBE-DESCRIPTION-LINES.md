@@ -5,7 +5,7 @@ real. Regenerate with `python3 build/tools/description_lines.py`.
 
 ## Why this is worth an evening
 
-These 24 videos have **18,735 views** between them, and your
+These 26 videos have **19,254 views** between them, and your
 reviews add another **15,350**. That audience already exists and already
 trusts your taste in local places. Right now most of those descriptions point at the
 old site or nowhere useful, so the traffic evaporates. One line per video sends it
@@ -208,6 +208,16 @@ Add to the description (near the top, above the hashtags):
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/fort-collins.html
 ```
 
+### 273 views — Explore Ault's Hidden Gems and Community Spirit!
+`youtube.com/watch?v=NMj7Da93zL8`  ·  covers: Gray's Cafe
+
+Add to the description (near the top, above the hashtags):
+
+```
+📍 More of Ault the way locals actually see it — every spot I've filmed here,
+plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/ault.html
+```
+
 ### 260 views — Where Is Red Feather Lakes? Exploring Colorado's Hidden Gem & Gnome Road!
 `youtube.com/watch?v=xn5fyEM7EkQ`  ·  covers: Gnome Road (Elf Lane)
 
@@ -216,6 +226,16 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Red Feather Lakes the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html
+```
+
+### 246 views — Get Ready to DISCOVER the Ultimate Wine Experience in Ault, Colorado!
+`youtube.com/watch?v=eLNE6KEZVmQ`  ·  covers: BBC Wines
+
+Add to the description (near the top, above the hashtags):
+
+```
+📍 More of Ault the way locals actually see it — every spot I've filmed here,
+plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/ault.html
 ```
 
 ### 156 views — Taste of Loveland 2026
@@ -229,7 +249,7 @@ plus homes for sale nearby: https://signaturepropertycollection.com/communities/
 ```
 
 ### 78 views — Discover Beaver Meadows: Winter Magic with Elves and Fun Activities!
-`youtube.com/watch?v=NoKEJ3uQQ0Q`  ·  covers: Beaver Meadows Resort
+`youtube.com/watch?v=NoKEJ3uQQ0Q`  ·  covers: Beaver Meadows Resort Ranch
 
 Add to the description (near the top, above the hashtags):
 
@@ -287,7 +307,7 @@ Bio, pinned comment, Google Business profile, email signature:
 https://signaturepropertycollection.com/communities
 ```
 
-That is the map with all 35 spots on it. From there a visitor reaches every
+That is the map with all 39 spots on it. From there a visitor reaches every
 town page, every video, and a live search of homes near any of them.
 
 ## And for sellers
