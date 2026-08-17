@@ -23,18 +23,25 @@ const src = fs.readFileSync(FN, "utf8");
 try { require(FN); check("listing-photo.js loads", true); }
 catch (err) { check("listing-photo.js loads", false, err && err.message); }
 
-// ---- 1. BOUNDED. This blob store also holds the ~27,000-listing IRES catalogue.
-// An image cache with no ceiling over that is gigabytes of storage nobody asked for,
-// and it would grow fastest exactly when the site is busiest.
+// ---- 1. BOUNDED. This blob store also holds the ~27,000-listing IRES catalogue, so
+// the ceiling matters. The one that does the work is the INDEX: covers are what a
+// card shows and therefore what goes grey, and galleries are roughly 40x the volume
+// for photos a visitor has to click to see.
 check(
   "only cover photos are cached",
   /PHOTO_CACHE_MAX_INDEX\s*=\s*0/.test(src),
-  "caching whole galleries turns 11 listings into hundreds of megabytes"
+  "caching whole galleries is ~40x the storage for photos nobody has asked to see"
 );
+// 2026-08-17, revised the same evening. This used to require the cache to be
+// restricted to her own listings. That bound was aimed at the wrong number: she
+// found grey cards on her LUXURY SEARCH page, where nothing is hers, and a search
+// page full of holes is still a broken search page. Growth is bounded by TRAFFIC --
+// a cover is only written after somebody looks at that listing -- not by the size
+// of the catalogue. The index bound below is the one doing the real work.
 check(
-  "and only Christine's own listings",
-  /shouldCachePhoto[\s\S]{0,400}?mineListingIds/.test(src),
-  "a visitor browsing other agents' listings must not fill this store"
+  "the cache is not restricted by ownership any more",
+  !/shouldCachePhoto\([^)]*\)\s*\{[^}]*mineListingIds/.test(src),
+  "restricting to her listings leaves the public search pages grey"
 );
 check(
   "the index bound is enforced on read as well as write",
@@ -134,8 +141,12 @@ function fakeStore(opts) {
   check("behaviour: her cover photo IS cached", await __test.shouldCachePhoto(store, MINE, 0) === true);
   check("behaviour: a gallery photo of hers is NOT", await __test.shouldCachePhoto(store, MINE, 3) === false,
     "index bound not enforced");
-  check("behaviour: another agent's cover photo is NOT", await __test.shouldCachePhoto(store, NOT_MINE, 0) === false,
-    "this is what keeps 27,000 listings out of the store");
+  check("behaviour: another agent's cover photo IS cached too",
+    await __test.shouldCachePhoto(store, NOT_MINE, 0) === true,
+    "her public search pages show other agents' listings and they went grey as well");
+  check("behaviour: but their galleries are still not",
+    await __test.shouldCachePhoto(store, NOT_MINE, 4) === false,
+    "index 0 is the bound that keeps this from being ~40x bigger");
 
   // Round trip.
   const buf = Buffer.from("fake-jpeg-bytes");
@@ -160,11 +171,14 @@ function fakeStore(opts) {
   try { await __test.writeCachedPhoto(deadWrite, MINE, 0, buf, "image/jpeg"); } catch (e) { threw = true; }
   check("behaviour: a store that throws on write does not throw at the caller", !threw);
 
-  // And an unreadable mine-listings key must mean "cache nothing", not "cache all".
+  // A dead blob store must not change what gets cached -- the decision is now a
+  // pure function of the index, so it cannot depend on a read that might fail.
   __test.resetMineCache();
-  check("behaviour: if her listing list is unreadable, nothing is cached",
-    await __test.shouldCachePhoto(fakeStore({ throwOnGet: true }), MINE, 0) === false,
-    "failing open here would fill the store with the whole catalogue");
+  check("behaviour: the cache decision survives an unreadable store",
+    await __test.shouldCachePhoto(fakeStore({ throwOnGet: true }), MINE, 0) === true,
+    "the bound must not depend on a blob read that can fail");
+  check("behaviour: and still refuses a gallery index there",
+    await __test.shouldCachePhoto(fakeStore({ throwOnGet: true }), MINE, 9) === false);
 
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
   process.exit(failures === 0 ? 0 : 1);

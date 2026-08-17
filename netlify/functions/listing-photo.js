@@ -96,13 +96,8 @@ const IMAGE_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=60480
 // can only remember a success it happened to see at an edge, this remembers it for
 // everyone, permanently.
 //
-// BOUNDED ON PURPOSE, two ways, because this store also holds the ~27,000-listing
-// IRES catalogue and an unbounded image cache over that would be gigabytes:
-//   1. Cover photos only (index 0). That is what a card shows, which is what goes
-//      grey. Galleries are opened deliberately and can still show a placeholder.
-//   2. Christine's OWN listings only, read from the tiny mine-listings.json key the
-//      sync already maintains. Her 11 covers are about 4 MB. A visitor browsing
-//      other agents' listings caches nothing.
+// BOUNDED to cover photos only (index 0) -- see shouldCachePhoto for why that is the
+// bound that matters and why the original "her listings only" bound was dropped.
 const PHOTO_CACHE_PREFIX = "photo-cache/";
 const PHOTO_CACHE_MAX_INDEX = 0;
 
@@ -110,8 +105,10 @@ function photoCacheKey(listingId, index) {
   return `${PHOTO_CACHE_PREFIX}${listingId}-${index}.json`;
 }
 
-// Her own listing ids, cached for the life of the container. Failure is silent and
-// returns an empty set, which means "cache nothing" -- the conservative direction.
+// Her own listing ids. No longer gates the photo cache (see shouldCachePhoto), kept
+// because it is the cheap way to tell her listings apart from the catalogue and the
+// next thing that needs that distinction should not re-derive it. Failure is silent
+// and returns an empty set.
 let _mineIds = null;
 async function mineListingIds(store) {
   if (_mineIds) return _mineIds;
@@ -126,10 +123,25 @@ async function mineListingIds(store) {
   return _mineIds;
 }
 
+// 2026-08-17, revised within the hour. The first version cached HER listings only,
+// on the reasoning that this store also holds the ~27,000-listing IRES catalogue and
+// an image cache over that would be gigabytes.
+//
+// That bound was aimed at the wrong number. Christine looked at her LUXURY SEARCH
+// page -- $81.6M in Fraser, $30M in Bennett, other agents' listings -- and had grey
+// cards there too, because nothing on that page is hers: Cloudinary does not re-host
+// it and this cache would not store it. A search page full of holes is still a
+// broken search page.
+//
+// Growth here is bounded by TRAFFIC, not by catalogue size. A cover is only written
+// after somebody actually looks at that listing, so fifty browsed listings costs
+// about 15MB. The catalogue total is the theoretical ceiling of a page nobody visits.
+//
+// The bound that actually does the work is index 0. Covers are what a card shows and
+// therefore what goes grey; galleries are opened deliberately and are ~40x the
+// volume. Keeping that one, dropping the ownership test.
 async function shouldCachePhoto(store, listingId, index) {
-  if (index > PHOTO_CACHE_MAX_INDEX) return false;
-  const mine = await mineListingIds(store);
-  return mine.has(listingId);
+  return index <= PHOTO_CACHE_MAX_INDEX;
 }
 
 // Best-effort in both directions: a cache miss, a write failure or a malformed
