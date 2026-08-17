@@ -366,6 +366,16 @@ fix the blast-radius problem in §1.3. **Sync cadence was moved 15 → 30 minute
 her request on 2026-08-17**, recorded in `netlify.toml` with the honest caveat that
 it halves an already-small footprint and is not the fix.
 
+**Follow-up, same day:** `docs/MLS-GRID-QUOTA.md` now carries the quota research
+— the published limits (2 rps / 7,200 hr / 40,000 day / 4 GB hr, with media
+downloads spending the same budget), whether a token split is permitted and what
+it plausibly costs, the cheaper catalogue-wide cover pre-host option, and the
+email to send MLS Grid support. Headline: MLS Grid's docs say media URLs are
+single-use, one-hour, no hot-linking, self-host what you display — so the
+remaining live-fetch path is less a quota shortage than the last place the site
+still uses the media host the way its docs say not to. Pre-hosting every cover
+removes it whether or not the quota question is ever answered.
+
 ### 2.7 The county map drills into towns (2026-08-17)
 
 Christine: "when i click on any county it moves to this page instead of being able
