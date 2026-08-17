@@ -978,7 +978,29 @@ def _fmt_views(n):
     return f"{n:,} views"
 
 
+# Every video this build embeds, id -> the title shown next to it. Populated by
+# _yt_embed() as it renders, and read by page() to auto-emit VideoObject schema for
+# any embed whose page did not declare one by hand.
+#
+# 2026-08-17 (Search Console, "Videos -> Improve item appearance -> Missing field
+# description"): 43 embedded videos across 14 pages carried no VideoObject at all.
+# Google detects a video from the iframe regardless, finds no structured data for
+# it, and reports the description as missing. The pages that DID declare schema by
+# hand were all fine -- all 33 had descriptions -- which is why the report looked
+# baffling next to the code.
+#
+# The fix records the title at the point it is already known rather than building a
+# second list of video metadata to keep in sync: _yt_embed() is handed the real
+# title by every one of its ~20 call sites, because it puts that title on the
+# iframe for accessibility. Reusing it means the schema can never describe a video
+# differently from the page, and adding a video in future cannot silently skip
+# schema again.
+_EMBED_TITLES = {}
+
+
 def _yt_embed(video_id, title, caption=None):
+    if video_id and title:
+        _EMBED_TITLES.setdefault(video_id, title)
     return f"""<div class="video-embed">
       <iframe src="https://www.youtube-nocookie.com/embed/{video_id}" title="{esc(title)}"
       loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -3575,6 +3597,29 @@ def page(title, description, path, active, body, extra_head="", schema_extra="",
     # Auto-fill breadcrumbs only when the caller hasn't supplied its own.
     _existing = schema_extra if isinstance(schema_extra, list) else (
         [schema_extra] if schema_extra else [])
+    # Any video embedded in this body that the caller did not describe gets a
+    # VideoObject here. See _EMBED_TITLES for why this is centralised rather than
+    # fixed page by page. A video whose title we somehow don't know is skipped
+    # rather than given a made-up description -- an untitled entry would trade one
+    # Search Console warning for a worse problem.
+    _embedded = re.findall(r"youtube-nocookie\.com/embed/([A-Za-z0-9_-]{6,})", body)
+    if _embedded:
+        _described = set()
+        for _s in _existing:
+            for _m in re.finditer(r"/embed/([A-Za-z0-9_-]{6,})", str(_s)):
+                _described.add(_m.group(1))
+        for _vid in dict.fromkeys(_embedded):          # de-duped, order preserved
+            if _vid in _described:
+                continue
+            _title = _EMBED_TITLES.get(_vid)
+            if not _title:
+                continue
+            _existing = _existing + [_video_object_schema(
+                _vid, _title,
+                f"{_title} — video from {SITE['agent']} of {SITE['name']}, "
+                f"covering Northern Colorado real estate.",
+            )]
+        schema_extra = _existing
     if not any("BreadcrumbList" in str(s) for s in _existing):
         _auto = _auto_breadcrumbs(title, path)
         if _auto:
