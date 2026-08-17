@@ -1,0 +1,380 @@
+{
+  "_README": [
+    "Coordinates for each town the site builds a page for, fetched from the",
+    "Google Geocoding API by build/tools/geocode_towns.py.",
+    "",
+    "DO NOT HAND-EDIT. Re-run the script. The whole point of this file is",
+    "that no latitude in this repo was typed in by a person.",
+    "",
+    "build.py reads it and adds a `geo` block to the Place schema on each",
+    "town page. If this file is missing, Place is emitted without geo and",
+    "nothing breaks \u2014 that is the designed fallback, not an error.",
+    "",
+    "Town coordinates do not change, so this is NOT a scheduled job. Run it",
+    "when a town is added to the site. Re-running only fetches towns that",
+    "are missing, unless --force is passed."
+  ],
+  "source": "Google Geocoding API",
+  "towns": {
+    "ault": {
+      "county": "Weld County",
+      "lat": 40.58248,
+      "lng": -104.73191,
+      "resolved": "Ault, CO, USA",
+      "town": "Ault",
+      "types": [
+        "locality"
+      ]
+    },
+    "berthoud": {
+      "county": "Larimer County",
+      "lat": 40.30832,
+      "lng": -105.08109,
+      "resolved": "Berthoud, CO, USA",
+      "town": "Berthoud",
+      "types": [
+        "locality"
+      ]
+    },
+    "boulder": {
+      "county": "Boulder County",
+      "lat": 40.01897,
+      "lng": -105.27474,
+      "resolved": "Boulder, CO, USA",
+      "town": "Boulder",
+      "types": [
+        "locality"
+      ]
+    },
+    "broomfield-city": {
+      "county": "Broomfield County",
+      "lat": 39.92054,
+      "lng": -105.08665,
+      "resolved": "Broomfield, CO, USA",
+      "town": "Broomfield",
+      "types": [
+        "locality"
+      ]
+    },
+    "brush": {
+      "county": "Morgan County",
+      "lat": 40.25887,
+      "lng": -103.62384,
+      "resolved": "Brush, CO 80723, USA",
+      "town": "Brush",
+      "types": [
+        "locality"
+      ]
+    },
+    "carr": {
+      "county": "Weld County",
+      "lat": 40.89322,
+      "lng": -104.87834,
+      "resolved": "Carr, CO 80612, USA",
+      "town": "Carr",
+      "types": [
+        "locality"
+      ]
+    },
+    "dacono": {
+      "county": "Weld County",
+      "lat": 40.08471,
+      "lng": -104.93942,
+      "resolved": "Dacono, CO, USA",
+      "town": "Dacono",
+      "types": [
+        "locality"
+      ]
+    },
+    "denver-city": {
+      "county": "Denver County",
+      "lat": 39.73924,
+      "lng": -104.99025,
+      "resolved": "Denver, CO, USA",
+      "town": "Denver",
+      "types": [
+        "locality"
+      ]
+    },
+    "eaton": {
+      "county": "Weld County",
+      "lat": 40.5194,
+      "lng": -104.70252,
+      "resolved": "Eaton, CO 80615, USA",
+      "town": "Eaton",
+      "types": [
+        "locality"
+      ]
+    },
+    "erie": {
+      "county": "Weld County",
+      "lat": 40.05026,
+      "lng": -105.04998,
+      "resolved": "Erie, CO, USA",
+      "town": "Erie",
+      "types": [
+        "locality"
+      ]
+    },
+    "estes-park": {
+      "county": "Larimer County",
+      "lat": 40.37721,
+      "lng": -105.52167,
+      "resolved": "Estes Park, CO 80517, USA",
+      "town": "Estes Park",
+      "types": [
+        "locality"
+      ]
+    },
+    "firestone": {
+      "county": "Weld County",
+      "lat": 40.11248,
+      "lng": -104.93664,
+      "resolved": "Firestone, CO, USA",
+      "town": "Firestone",
+      "types": [
+        "locality"
+      ]
+    },
+    "fort-collins": {
+      "county": "Larimer County",
+      "lat": 40.58526,
+      "lng": -105.08442,
+      "resolved": "Fort Collins, CO, USA",
+      "town": "Fort Collins",
+      "types": [
+        "locality"
+      ]
+    },
+    "fort-lupton": {
+      "county": "Weld County",
+      "lat": 40.08471,
+      "lng": -104.81303,
+      "resolved": "Fort Lupton, CO 80621, USA",
+      "town": "Fort Lupton",
+      "types": [
+        "locality"
+      ]
+    },
+    "fort-morgan": {
+      "county": "Morgan County",
+      "lat": 40.25026,
+      "lng": -103.79995,
+      "resolved": "Fort Morgan, CO 80701, USA",
+      "town": "Fort Morgan",
+      "types": [
+        "locality"
+      ]
+    },
+    "frederick": {
+      "county": "Weld County",
+      "lat": 40.09915,
+      "lng": -104.9372,
+      "resolved": "Frederick, CO, USA",
+      "town": "Frederick",
+      "types": [
+        "locality"
+      ]
+    },
+    "greeley": {
+      "county": "Weld County",
+      "lat": 40.42331,
+      "lng": -104.70913,
+      "resolved": "Greeley, CO, USA",
+      "town": "Greeley",
+      "types": [
+        "locality"
+      ]
+    },
+    "johnstown": {
+      "county": "Weld County",
+      "lat": 40.33693,
+      "lng": -104.9122,
+      "resolved": "Johnstown, CO, USA",
+      "town": "Johnstown",
+      "types": [
+        "locality"
+      ]
+    },
+    "lafayette": {
+      "county": "Boulder County",
+      "lat": 39.9936,
+      "lng": -105.08971,
+      "resolved": "Lafayette, CO, USA",
+      "town": "Lafayette",
+      "types": [
+        "locality"
+      ]
+    },
+    "log-lane-village": {
+      "county": "Morgan County",
+      "lat": 40.27054,
+      "lng": -103.82967,
+      "resolved": "Log Lane Village, CO, USA",
+      "town": "Log Lane Village",
+      "types": [
+        "locality"
+      ]
+    },
+    "longmont": {
+      "county": "Boulder County",
+      "lat": 40.16721,
+      "lng": -105.10193,
+      "resolved": "Longmont, CO, USA",
+      "town": "Longmont",
+      "types": [
+        "locality"
+      ]
+    },
+    "louisville": {
+      "county": "Boulder County",
+      "lat": 39.97776,
+      "lng": -105.13193,
+      "resolved": "Louisville, CO, USA",
+      "town": "Louisville",
+      "types": [
+        "locality"
+      ]
+    },
+    "loveland": {
+      "county": "Larimer County",
+      "lat": 40.39545,
+      "lng": -105.07458,
+      "resolved": "Loveland, CO, USA",
+      "town": "Loveland",
+      "types": [
+        "locality"
+      ]
+    },
+    "lyons": {
+      "county": "Boulder County",
+      "lat": 40.22471,
+      "lng": -105.27138,
+      "resolved": "Lyons, CO, USA",
+      "town": "Lyons",
+      "types": [
+        "locality"
+      ]
+    },
+    "masonville": {
+      "county": "Larimer County",
+      "lat": 40.48748,
+      "lng": -105.21082,
+      "resolved": "Masonville, CO 80538, USA",
+      "town": "Masonville",
+      "types": [
+        "locality"
+      ]
+    },
+    "mead": {
+      "county": "Weld County",
+      "lat": 40.23332,
+      "lng": -104.99859,
+      "resolved": "Mead, CO, USA",
+      "town": "Mead",
+      "types": [
+        "locality"
+      ]
+    },
+    "milliken": {
+      "county": "Weld County",
+      "lat": 40.32943,
+      "lng": -104.85525,
+      "resolved": "Milliken, CO, USA",
+      "town": "Milliken",
+      "types": [
+        "locality"
+      ]
+    },
+    "nederland": {
+      "county": "Boulder County",
+      "lat": 39.96138,
+      "lng": -105.51083,
+      "resolved": "Nederland, CO 80466, USA",
+      "town": "Nederland",
+      "types": [
+        "locality"
+      ]
+    },
+    "nunn": {
+      "county": "Weld County",
+      "lat": 40.70359,
+      "lng": -104.7808,
+      "resolved": "Nunn, CO 80648, USA",
+      "town": "Nunn",
+      "types": [
+        "locality"
+      ]
+    },
+    "pierce": {
+      "county": "Weld County",
+      "lat": 40.63554,
+      "lng": -104.75525,
+      "resolved": "Pierce, CO 80650, USA",
+      "town": "Pierce",
+      "types": [
+        "locality"
+      ]
+    },
+    "red-feather-lakes": {
+      "county": "Larimer County",
+      "lat": 40.80248,
+      "lng": -105.59166,
+      "resolved": "Red Feather Lakes, CO 80545, USA",
+      "town": "Red Feather Lakes",
+      "types": [
+        "locality"
+      ]
+    },
+    "severance": {
+      "county": "Weld County",
+      "lat": 40.52415,
+      "lng": -104.85108,
+      "resolved": "Severance, CO, USA",
+      "town": "Severance",
+      "types": [
+        "locality"
+      ]
+    },
+    "timnath": {
+      "county": "Larimer County",
+      "lat": 40.52915,
+      "lng": -104.98525,
+      "resolved": "Timnath, CO, USA",
+      "town": "Timnath",
+      "types": [
+        "locality"
+      ]
+    },
+    "wellington": {
+      "county": "Larimer County",
+      "lat": 40.70387,
+      "lng": -105.00859,
+      "resolved": "Wellington, CO 80549, USA",
+      "town": "Wellington",
+      "types": [
+        "locality"
+      ]
+    },
+    "wiggins": {
+      "county": "Morgan County",
+      "lat": 40.23054,
+      "lng": -104.07273,
+      "resolved": "Wiggins, CO 80654, USA",
+      "town": "Wiggins",
+      "types": [
+        "locality"
+      ]
+    },
+    "windsor": {
+      "county": "Larimer County",
+      "lat": 40.47748,
+      "lng": -104.90136,
+      "resolved": "Windsor, CO, USA",
+      "town": "Windsor",
+      "types": [
+        "locality"
+      ]
+    }
+  }
+}
