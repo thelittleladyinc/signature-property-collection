@@ -33,6 +33,25 @@ const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
 // Comfortably inside MLS Grid's ~1-2 hour signature life.
 const URL_CACHE_TTL_MS = 40 * 60 * 1000;
 
+// How long "this listing resolved to no media" is remembered.
+//
+// 2026-08-17. resolveMediaFor() used to `continue` past any listing that came
+// back with an empty Media array, writing nothing. Since the cache is the only
+// thing that stops a lookup, that listing was re-resolved on EVERY page view,
+// forever -- and prewarmPhotoUrls() put it back in `needed` every single time.
+// A handful of photo-less listings sitting in a popular result set is therefore
+// a permanent, self-inflicted drip of MLS Grid requests against an account
+// whose rate limits are shared with Christine's two other apps. And each 429 it
+// provokes sets the photo cooldown, which turns the OTHER cards on the same
+// page grey. So a few listings with no photos could cost photos on listings
+// that have them.
+//
+// Deliberately much shorter than the URL TTL: an empty verdict is about the
+// listing's state rather than a signature's lifetime, and a listing that gets
+// its photos loaded an hour after hitting the feed should not wait 40 minutes
+// to show them. Ten minutes stops the hammering while keeping it responsive.
+const EMPTY_CACHE_TTL_MS = 10 * 60 * 1000;
+
 // The sync's flag: respected everywhere, set only by sync-listings.js.
 const SYNC_SUSPENSION_KEY = "mlsgrid-suspension.json";
 // Photo traffic's own flag, deliberately separate and much shorter.
@@ -51,8 +70,11 @@ function cacheKey(listingId) {
 async function readCachedUrls(store, listingId) {
   const cached = await store.get(cacheKey(listingId), { type: "json" }).catch(() => null);
   if (!cached || !Array.isArray(cached.urls)) return null;
+  // An empty entry is a remembered "this listing has no media" verdict and ages
+  // out on its own, shorter clock -- see EMPTY_CACHE_TTL_MS.
+  const ttl = cached.urls.length ? URL_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS;
   const fresh = typeof cached.cachedAt === "number" &&
-    Date.now() - cached.cachedAt < URL_CACHE_TTL_MS;
+    Date.now() - cached.cachedAt < ttl;
   // Stale entries are still returned, flagged -- a signed URL a little past our
   // conservative TTL is often still valid, and trying it costs MLS Grid nothing.
   return { urls: cached.urls, fresh };
@@ -128,6 +150,15 @@ async function resolveMediaFor(ids, { store, token, baseUrl, selectFields, timeo
       if (!urls.length) continue;
       out[id] = urls;
       await writeCachedUrls(store, id, urls);
+    }
+    // Remember the misses too. Reaching here means the request itself SUCCEEDED
+    // -- the 429, non-ok and timeout paths all returned above -- so an id absent
+    // from `out` is a real answer ("no media", or not visible to us), not an
+    // outage, and it is safe to cache. Without this, every photo-less listing in
+    // a popular result set re-queried MLS Grid on every page view forever. See
+    // EMPTY_CACHE_TTL_MS.
+    for (const id of wanted) {
+      if (!out[String(id)]) await writeCachedUrls(store, id, []);
     }
     return out;
   } catch (err) {
