@@ -40,6 +40,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned rather than relying on whatever the runner ships, matching tests.yml
+      # so a runner image change cannot quietly alter what this job verifies.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -62,6 +68,16 @@ jobs:
 
       - name: Install build dependencies
         run: python3 -m pip install --quiet -r requirements.txt
+
+      # 2026-08-17: the first real run of this workflow geocoded all 36 towns
+      # successfully, rebuilt the site, and then threw the result away — the verify
+      # step below failed with MODULE_NOT_FOUND because the suites require
+      # @netlify/blobs and cloudinary, and nothing had installed them. The commit
+      # step never ran.
+      #
+      # tests.yml has always had this step; this workflow was written without it.
+      - name: Install function dependencies (the test suites need them)
+        run: npm install --no-audit --no-fund
 
       - name: Geocode the towns
         env:

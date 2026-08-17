@@ -125,6 +125,62 @@ if (!live) {
   check("FAQ schema agrees with the visible figures", schemaMismatch.length === 0, schemaMismatch.slice(0, 3).join(" · "));
 }
 
+// ---------------------------------------------------------------------------
+// The stats generator must agree with the sync about the shape of the blob.
+//
+// 2026-08-17. town-market-stats.js reported "the replicated listings blob is
+// empty" and exited 1 while /status said 26,445 listings stored and the
+// Loveland page rendered 510 active homes. The feed was fine; the reader was
+// broken. It checked Array.isArray(raw) and then raw.listings, but
+// sync-listings.js writes an object keyed by listingId, so both checks missed
+// and every run silently aggregated nothing — and the failure blamed MLS Grid.
+//
+// The nasty part is the failure mode: this bug cannot show up as a wrong number
+// on a page, only as an absence, and an absence is exactly what this suite's
+// other checks call the CORRECT safe state. It could have sat there forever.
+// So the shape contract gets pinned directly, on both sides.
+const stats = require(path.join(ROOT, "build", "tools", "town-market-stats.js"));
+
+check("town-market-stats.js exports listingsFromBlob", typeof stats.listingsFromBlob === "function");
+
+if (typeof stats.listingsFromBlob === "function") {
+  // The real shape: an object keyed by listingId. This is the case that
+  // regressed, so it is the case stated first and most explicitly.
+  const byId = {
+    IRE1051807: { listingId: "IRE1051807", city: "Loveland", price: 15300000, status: "Active" },
+    IRE1000031: { listingId: "IRE1000031", city: "Loveland", price: 12000000, status: "Active" },
+  };
+  const fromObject = stats.listingsFromBlob(byId);
+  check(
+    "reads the listingId-keyed object sync-listings.js actually writes",
+    fromObject.length === 2 && fromObject[0].city === "Loveland",
+    `got ${fromObject.length} record(s) — this is the 2026-08-17 regression`
+  );
+
+  // A plain array is tolerated so a future shape change degrades loudly
+  // rather than silently zeroing.
+  check(
+    "tolerates a plain array",
+    stats.listingsFromBlob([{ city: "Windsor", price: 1 }]).length === 1
+  );
+
+  // And genuinely-absent data must still come back empty, or the "silence is
+  // the safe state" guarantee above turns into a crash instead.
+  for (const [label, value] of [["null", null], ["undefined", undefined], ["empty object", {}]]) {
+    check(`${label} yields no listings`, stats.listingsFromBlob(value).length === 0);
+  }
+}
+
+// The other side of the contract: the writer. If someone changes
+// saveListingsCheckpoint to store an array or a wrapper, the assertions above
+// keep passing while the tool goes back to reading nothing.
+const sync = fs.readFileSync(path.join(ROOT, "netlify", "functions", "sync-listings.js"), "utf8");
+check(
+  "sync-listings.js still writes the listings blob as an object keyed by id",
+  /setJSON\(\s*LISTINGS_KEY\s*,\s*listingsById\s*\)/.test(sync),
+  "the write shape changed — re-check listingsFromBlob in build/tools/town-market-stats.js"
+);
+
 // Whatever the data state, nothing may hand-type a median into the generator.
 const buildPy = fs.readFileSync(path.join(ROOT, "build", "build.py"), "utf8");
 const movingBlock = buildPy.slice(buildPy.indexOf("def _moving_to_block"), buildPy.indexOf("def build_city_pages"));

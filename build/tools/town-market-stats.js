@@ -62,6 +62,30 @@ function median(values) {
   return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
 }
 
+// THE SHAPE OF THE LISTINGS BLOB IS AN OBJECT KEYED BY listingId, NOT AN ARRAY.
+//
+// 2026-08-17: the first real run of this script reported "the replicated
+// listings blob is empty" and exited 1, while /status simultaneously said
+// 26,445 listings stored and the Loveland town page showed 510 active. Both
+// were true. This script was the thing that was wrong: it tested
+// Array.isArray(raw), then raw.listings, and LISTINGS_KEY is neither.
+// sync-listings.js writes `store.setJSON(LISTINGS_KEY, listingsById)` (see
+// saveListingsCheckpoint) — an object of { [listingId]: listing }. Both
+// branches missed, it computed over an empty array, and then blamed the feed.
+//
+// listings-search.js has always read this key correctly as a listingsById
+// object, and sync-listings.js itself does Object.values() over it. This
+// reader was the only consumer that disagreed with the writer.
+//
+// Pulled out of main() so tests/test-townmarket.js can exercise it against
+// every shape without needing Blobs credentials — including the exact object
+// form that used to yield zero. A comment is not a mechanism; a test is.
+function listingsFromBlob(raw) {
+  if (Array.isArray(raw)) return raw;               // tolerated, not the real shape
+  if (raw && typeof raw === "object") return Object.values(raw);  // the real shape
+  return [];
+}
+
 async function main() {
   if (!process.env.BLOBS_SITE_ID || !process.env.BLOBS_TOKEN) {
     console.error("!! BLOBS_SITE_ID / BLOBS_TOKEN not set — cannot read the replicated");
@@ -72,10 +96,21 @@ async function main() {
   const { getStore } = require("@netlify/blobs");
   const store = getBlobStore(getStore, BLOB_STORE_NAME);
   const raw = await store.get(LISTINGS_KEY, { type: "json" });
-  const listings = Array.isArray(raw) ? raw : (raw && raw.listings) || [];
+
+  const listings = listingsFromBlob(raw);  // see the note on that function
 
   if (!listings.length) {
-    console.error("!! The replicated listings blob is empty. Has sync-listings.js run?");
+    // Distinguishing these two matters: the first is "the sync has not run",
+    // the second is "the sync ran and this reader cannot understand it" —
+    // which is the exact failure above, and it must never again be reported
+    // as an empty feed.
+    if (!raw) {
+      console.error("!! No listings blob at " + LISTINGS_KEY + " at all. Has sync-listings.js run?");
+    } else {
+      console.error("!! The listings blob exists but yielded no records — its shape is not");
+      console.error("!! what this script expects (an object keyed by listingId, or an array).");
+      console.error("!! Compare against saveListingsCheckpoint() in sync-listings.js.");
+    }
     console.error("!! Not writing a file — stale numbers are worse than none.");
     process.exit(1);
   }
@@ -142,7 +177,14 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error("!! town-market-stats failed:", err && err.message ? err.message : err);
-  process.exit(1);
-});
+// Only run when invoked as a script. `require`-ing this file (which
+// tests/test-townmarket.js does, to check listingsFromBlob against every blob
+// shape) must not try to reach Netlify Blobs or write build/data.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("!! town-market-stats failed:", err && err.message ? err.message : err);
+    process.exit(1);
+  });
+}
+
+module.exports = { listingsFromBlob, median, MIN_SAMPLE };
