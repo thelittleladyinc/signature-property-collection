@@ -65,6 +65,21 @@ const LOFTY_TRIGGER_TAG = "Hot Lead - Website";
 const PHOTO_CHECK_KEY = "photo-pipeline-check.json";
 const CLOUDINARY_CHECK_KEY = "cloudinary-usage-check.json";
 
+// MUST MATCH the cron in netlify.toml's [functions."sync-listings"] block.
+//
+// 2026-08-17: the schedule moved 15 -> 30 minutes and this row did not follow it.
+// It kept telling Christine the sync "should be every 15", and — the part that
+// actually mattered — it went RED at 20 minutes, so a completely healthy sync on
+// the new schedule would report itself broken for a third of every cycle. A health
+// page that cries wolf is worse than no health page, because the next real failure
+// gets read as the same noise.
+//
+// The lateness threshold is derived rather than typed, so changing the interval
+// can't leave a stale number behind again. One full missed run plus a margin: the
+// sync is resumable and a single skipped run is not a fault worth alarming on.
+const SYNC_INTERVAL_MINUTES = 30;
+const SYNC_LATE_AFTER_MINUTES = SYNC_INTERVAL_MINUTES * 2 + 5;
+
 // 2026-08-15: Lofty's own API page (Settings > Integrations > API) documents
 // this exact call as its usage example, which makes it the ideal key test --
 // GET, read-only, and it either recognizes the key or it doesn't:
@@ -552,11 +567,11 @@ exports.handler = async (event) => {
   const checks = [
     {
       name: "Sync running on schedule",
-      ok: !isSuspended && minutesSinceLastRun !== null && minutesSinceLastRun < 20,
+      ok: !isSuspended && minutesSinceLastRun !== null && minutesSinceLastRun < SYNC_LATE_AFTER_MINUTES,
       detail: isSuspended
         ? `MLS Grid rate-limit circuit breaker is OPEN — paused until ${new Date(suspendedUntil).toLocaleString("en-US")}`
         : (lastRunAt != null
-          ? `Last ran ${minutesSinceLastRun} minute(s) ago (should be every 15)`
+          ? `Last ran ${minutesSinceLastRun} minute(s) ago (should be every ${SYNC_INTERVAL_MINUTES})`
           : "Has never run yet"),
     },
     {
@@ -587,10 +602,26 @@ exports.handler = async (event) => {
       optional: true,
       name: "Cloudinary env vars set (optional)",
       ok: isCloudinaryConfigured(),
+      // 2026-08-17: this row said "all three are present" and stopped there, which
+      // could not answer the question that actually mattered. Christine has TWO
+      // Cloudinary accounts -- Listing-Engine (on Render) uploads to one happily,
+      // while this site's uploads 403 against the other. Knowing WHICH account this
+      // site points at is the whole diagnosis, and the row was silent about it.
+      //
+      // The cloud name is safe to print: it is the first path segment of every
+      // res.cloudinary.com delivery URL, so it is already public wherever an image
+      // is served. The key and secret are never shown, only whether they are set.
+      // This also confirms a credential swap actually took effect, which "present"
+      // never could -- the old and new values are both "present".
       detail: isCloudinaryConfigured()
-        ? "All three env vars are present. Note that PRESENT is not the same as WORKING — " +
-          "whether they belong to the same Cloudinary account is what the " +
-          "\"Cloudinary account healthy\" row below actually tests."
+        ? `All three env vars are present, on cloud name "${process.env.CLOUDINARY_CLOUD_NAME}". ` +
+          "PRESENT is not the same as WORKING — the \"Cloudinary account healthy\" row " +
+          "below is what actually tests them. If that row reports a Media Optimization " +
+          "account, this site is pointed at the wrong one of your two Cloudinary " +
+          "accounts: Media Optimization is delivery-only and has no upload API, which " +
+          "is why photo uploads 403. Compare this cloud name against the working one " +
+          "in Render → Listing-Engine → Environment, and copy all three values across " +
+          "if they differ."
         : "CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET — one or more isn't set",
     },
     {
@@ -716,12 +747,37 @@ exports.handler = async (event) => {
             " If credits are at or near 100%, that is what the upload 403 means."
           : `Cloudinary refused the account check${cloudCheck.httpCode ? ` (HTTP ${cloudCheck.httpCode})` : ""}: ` +
             `${cloudCheck.error}. Same credentials the photo uploads use. ` +
-            (/cloud_name mismatch/i.test(String(cloudCheck.error))
-              ? "FIX: the three CLOUDINARY_* variables in Netlify are not all from the same " +
-                "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
-                "to another. Open cloudinary.com → Dashboard, copy Cloud name, API Key and API Secret " +
-                "from that same page, and replace all three in Netlify → Environment variables."
-              : "Check the three CLOUDINARY_* variables in Netlify against cloudinary.com → Dashboard."))),
+            // 2026-08-17. Order matters: the media-optimization case was being caught
+            // by the generic "check your variables against the Dashboard" advice, which
+            // is the ONE thing that cannot fix it. The credentials are valid — Cloudinary
+            // authenticated them and then named the account type — so re-copying them
+            // from that account's Dashboard reproduces the same 403 exactly.
+            (/media optimization/i.test(String(cloudCheck.error))
+              ? "FIX: this site is pointed at the wrong one of Christine's TWO Cloudinary " +
+                "accounts. The credentials are valid — Cloudinary authenticated them and " +
+                "then named the account type — so re-copying them from THIS account's " +
+                "Dashboard cannot help. Media Optimization is delivery-only and has no " +
+                "upload API, which is exactly why photo uploads get a flat 403 and why a " +
+                "res.cloudinary.com fetch URL for this cloud name 404s. " +
+                "The other account is the one to use: cloud name \"listingengine\" " +
+                "(console.cloudinary.com → account switcher, top left → \"Listing Engine\"). " +
+                "It is a Programmable Media account — its sidebar has Assets, Image, Video " +
+                "and a Product environment settings → Upload section, none of which exist " +
+                "on the Media Optimization one. Open its Settings → API Keys and copy the " +
+                "cloud name, an API key and that key's secret into Netlify → Site " +
+                "configuration → Environment variables, replacing all three CLOUDINARY_* " +
+                "values here. Generating a key named for this site, rather than reusing " +
+                "Listing-Engine's, keeps the two revocable independently. " +
+                "NOTE FOR WHOEVER READS THIS NEXT: \"1 product environment (limit 1)\" on " +
+                "the Product Environments page counts environments in the account you are " +
+                "SIGNED INTO, not across accounts. Misreading that as \"she only has one\" " +
+                "is what made me wrongly declare this unfixable on 2026-08-17."
+              : /cloud_name mismatch/i.test(String(cloudCheck.error))
+                ? "FIX: the three CLOUDINARY_* variables in Netlify are not all from the same " +
+                  "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
+                  "to another. Open cloudinary.com → Dashboard, copy Cloud name, API Key and API Secret " +
+                  "from that same page, and replace all three in Netlify → Environment variables."
+                : "Check the three CLOUDINARY_* variables in Netlify against cloudinary.com → Dashboard."))),
   });
 
   // ---- Lofty API key valid? ----
