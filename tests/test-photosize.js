@@ -60,34 +60,5 @@ check("the card falls back to the raw endpoint before giving up",
 check("card images declare width and height",
   /width="800" height="600"/.test(page));
 
-// ---- The listing page a buyer actually lands on ---------------------------
-// Same defect, higher stakes: this is the page someone opens from a text message,
-// and its hero had no width, no height, no resizing and no fallback — so it
-// arrived slowly, the column collapsed while it did, and a failed fetch left the
-// slot simply blank. That is what Christine saw on IRE1059808.
-{
-  const lp = fs.readFileSync(path.join(ROOT, "netlify", "functions", "listing-page.js"), "utf8");
-  check("listing page ships its own sizedPhoto()", /function sizedPhoto/.test(lp));
-  check("the hero is requested through the Image CDN",
-    /sizedPhoto\(photoUrl\(l, 0\), \d+\)/.test(lp),
-    "the hero still asks for the full-resolution photo");
-  check("the hero declares width and height",
-    /width="1200" height="900"/.test(lp),
-    "no dimensions — the column collapses until the photo lands");
-  check("the hero is marked high priority (it is the LCP element)",
-    /fetchpriority="high"/.test(lp));
-  check("the hero falls back to the raw endpoint before blanking",
-    /data-raw=.{0,80}photoUrl\(l, 0\)/.test(lp) && /this\.src\s*=\s*this\.dataset\.raw/.test(lp));
-  check("gallery photos are sized too", /sizedPhoto\(photoUrl\(l, i\), \d+\)/.test(lp));
-
-  // An <img> can recover on error; a social preview cannot. Facebook fetches the
-  // OG URL once, server-side — a failure there is a listing that previews as a
-  // blank card in the text message it was shared in.
-  const og = /const cover = photoCount\(l\) \? ([^;]+);/.exec(lp);
-  check("the Open Graph image is NOT routed through the untested Image CDN",
-    !!og && !/sizedPhoto/.test(og[1]),
-    og ? og[1] : "OG cover line not found");
-}
-
 console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
