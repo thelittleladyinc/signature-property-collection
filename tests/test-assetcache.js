@@ -37,12 +37,58 @@ const REF = /\/assets\/(?:css|js)\/[A-Za-z0-9._-]+\.(?:css|js)/g;
 // A fingerprinted name carries an 8-hex-char segment before the extension.
 const HASHED = /\/assets\/(?:css|js)\/[A-Za-z0-9_-]+\.[0-9a-f]{8}\.(?:css|js)$/;
 
+// EVERYTHING this build generates that can name an asset — not just site/.
+//
+// 2026-08-17, an hour after fingerprinting shipped: the listing page shell is
+// written into netlify/functions/lib/, because listing-page.js reads it at request
+// time. The fingerprint pass walked site/ only, so the shell kept pointing at
+// /assets/css/style.css after that file was renamed — and every /listing/<id> page,
+// the feature Christine asked for so a buyer could text one address to a spouse,
+// served with NO stylesheet at all.
+//
+// The dangerous part is that it was invisible from inside site/: every static page
+// was correct, so checking the built output could never have found it. This suite
+// therefore scans the generated files OUTSIDE site/ too, which is the only way a
+// future one gets caught without someone remembering it exists.
+const EXTRA_GENERATED = [
+  path.join(ROOT, "netlify", "functions", "lib", "_listing-page-shell.html"),
+];
+
 const refs = new Map();           // reference -> first file that used it
-for (const f of walk(SITE)) {
+for (const f of [...walk(SITE), ...EXTRA_GENERATED.filter(fs.existsSync)]) {
   const text = fs.readFileSync(f, "utf8");
   for (const m of text.match(REF) || []) {
-    if (!refs.has(m)) refs.set(m, path.relative(SITE, f));
+    if (!refs.has(m)) refs.set(m, path.relative(ROOT, f));
   }
+}
+
+// And nothing anywhere else in the repo may name an asset without being listed
+// above — a served file that references one is a page with no stylesheet.
+{
+  const scanned = [];
+  const stack = [path.join(ROOT, "netlify")];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === "node_modules") continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) stack.push(p);
+      else if (/\.(html|js)$/.test(e.name)) scanned.push(p);
+    }
+  }
+  const known = new Set(EXTRA_GENERATED);
+  const unlisted = [];
+  for (const f of scanned) {
+    if (known.has(f)) continue;
+    const hits = (fs.readFileSync(f, "utf8").match(REF) || []);
+    if (hits.length) unlisted.push(`${path.relative(ROOT, f)} → ${hits[0]}`);
+  }
+  check(
+    "no served file outside site/ names an asset without being fingerprinted",
+    unlisted.length === 0,
+    unlisted.slice(0, 4).join(" · ") +
+      " — add it to EXTRA_GENERATED here and to targets in fingerprint_assets()"
+  );
 }
 check("the site references CSS/JS at all", refs.size > 0, `${refs.size} references`);
 
