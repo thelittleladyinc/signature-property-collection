@@ -11650,6 +11650,49 @@ def write_map_county_data():
     """
     out_dir = os.path.join(OUT, "assets", "data")
     os.makedirs(out_dir, exist_ok=True)
+
+    # 2026-08-17 (Christine, on the county map: "when i click on any county it moves
+    # to this page instead of being able to click in more ... can we click into the
+    # county and then have the popup search?").
+    #
+    # She was right, and about the more important half of it. Clicking a county went
+    # straight to a price filter scoped to the whole county -- and a county is not a
+    # scope anyone shops in. Fort Collins alone carries 842 active listings. Worse,
+    # it routed people PAST the 37 town pages, which are this site's strongest
+    # content (live market figures, schools, commute times, videos, FAQ schema) and
+    # the pages that match how people actually search: "moving to Windsor Colorado",
+    # not "Weld County real estate".
+    #
+    # So the map now drills county -> towns, and the price popup moved to the town
+    # level where the scope is real. That needs per-town data the map never had: a
+    # URL to the town's page, and a coordinate to place and zoom to. Both are
+    # generated here from the same single source of truth as everything else --
+    # `cities` stays exactly as it was so nothing that reads it changes behaviour.
+    #
+    # Coordinates come from build/data/town_geo.json (the Google Geocoding run), and
+    # a town missing from it is simply omitted from `towns` rather than guessed at:
+    # the map falls back to the county-wide popup for those, which is the same
+    # behaviour as before this change. No latitude here was typed by hand.
+    def _towns_for(county):
+        towns = []
+        seen = set()
+        for city in county["cities"]:
+            data_slug = CITY_DATA_SLUG.get(city)
+            if not data_slug or data_slug not in CITY_CONTENT or data_slug in seen:
+                continue
+            geo = (TOWN_GEO or {}).get(data_slug) or {}
+            lat, lng = geo.get("lat"), geo.get("lng")
+            if lat is None or lng is None:
+                continue
+            seen.add(data_slug)
+            towns.append({
+                "name": city,
+                "url": _city_url(county["slug"], city),
+                "lat": lat,
+                "lng": lng,
+            })
+        return sorted(towns, key=lambda t: t["name"])
+
     payload = {
         "_generated": "Written by build/build.py from COUNTIES. Do not edit by hand.",
         "counties": {
@@ -11657,6 +11700,7 @@ def write_map_county_data():
                 "slug": c["slug"],
                 "cities": c["cities"],
                 "liveSearch": bool(_live_search(c)),
+                "towns": _towns_for(c),
             }
             for c in COUNTIES
         },

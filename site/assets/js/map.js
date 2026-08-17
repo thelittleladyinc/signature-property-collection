@@ -54,6 +54,14 @@
   };
   var IRES_COUNTIES = { 'Larimer': true, 'Weld': true, 'Boulder': true };
 
+  // The full per-county record from county-search.json, keyed by the geojson NAME.
+  // The three constants above stay as they are because other code reads them; this
+  // is what the 2026-08-17 drill-down needs, since it wants `towns` (name, url and
+  // real geocoded coordinates) rather than just the city-name list. Empty until the
+  // fetch lands, and an empty entry simply means "no drill-down for this county",
+  // which falls back to the county-wide popup.
+  var COUNTY_DATA = {};
+
   // Replaces the three constants above with build.py's generated copy. Resolves
   // either way -- a failed or malformed fetch just leaves the fallbacks in
   // place, so the map still draws and still links to every county guide.
@@ -65,6 +73,7 @@
         if (!counties) return;
         Object.keys(counties).forEach(function (name) {
           var c = counties[name] || {};
+          COUNTY_DATA[name] = c;
           if (c.slug) COUNTY_SLUGS[name] = c.slug;
           if (Array.isArray(c.cities) && c.cities.length) COUNTY_CITIES[name] = c.cities;
           if (c.liveSearch) IRES_COUNTIES[name] = true;
@@ -224,6 +233,10 @@
     if (count) label += ' (' + Number(count).toLocaleString() + ' views)';
     marker.bindTooltip(label, { direction: 'top', offset: [0, -10] });
     marker.on('click', function () { openPoiModal(poi); });
+    baseMarkers.push(marker);
+    // A spot fetched after a drill-down has already started must not pop up over
+    // the county view -- local-spots.js resolves asynchronously.
+    if (countyView.active && map.hasLayer(marker)) map.removeLayer(marker);
   }
 
   function poiIcon(poi) {
@@ -548,6 +561,183 @@
     overlay.classList.add('open');
   }
 
+  // ---- County drill-down ---------------------------------------------------
+  // 2026-08-17 (Christine: "when i click on any county it moves to this page
+  // instead of being able to click in more ... can we click into the county and
+  // then have the popup search? not sure the smartest way").
+  //
+  // She was right, and about the more important half of it. A county click went
+  // straight to a price filter scoped to the whole county, and a county is not a
+  // scope anyone shops in -- Fort Collins alone carries 842 active listings. It
+  // also routed people PAST the 37 town pages, which are this site's strongest
+  // content (live market figures, schools, commute times, videos, FAQ schema) and
+  // the pages that match how people actually search: "moving to Windsor Colorado",
+  // not "Weld County real estate". The map was sending traffic away from the pages
+  // built to win it.
+  //
+  // It was inconsistent too: the sidebar's "Larimer County" link went to the county
+  // guide while the same county on the map opened a price box. Same county, two
+  // different outcomes.
+  //
+  // So a county click now zooms to that county, swaps the sidebar to its towns, and
+  // leaves the price popup for the town level, where the scope is real. "Search all
+  // of <County>" is still one click away for anyone who genuinely wants the wide net.
+  //
+  // Counties with no town pages yet (Jefferson, Arapahoe, Adams -- cities listed but
+  // no pages built) have an empty `towns` array, and fall straight through to the old
+  // county-wide popup. That is deliberate: an empty drill-down panel would be a dead
+  // end, and the previous behaviour is the correct fallback rather than a regression.
+  var countyView = { active: null, markers: [], layer: null, homeBounds: null };
+
+  // Every marker that belongs to the all-counties view. The county view hides
+  // these: without it, a town that already has an icon marker (Fort Collins,
+  // Masonville, Loveland ...) renders twice, once as its icon and once as a town
+  // pin, which is worse than either alone. Restored on the way back out.
+  var baseMarkers = [];
+  function setBaseMarkersVisible(map, visible) {
+    baseMarkers.forEach(function (m) {
+      if (visible) { if (!map.hasLayer(m)) m.addTo(map); }
+      else if (map.hasLayer(m)) map.removeLayer(m);
+    });
+  }
+
+  function townMarkerIcon(name) {
+    return L.divIcon({
+      className: '',
+      html: '<div class="town-pin"><span>' + name + '</span></div>',
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+  }
+
+  // Fill the chosen county, fade the others. Zoom alone does not communicate the
+  // state change: fitBounds on a container this tall keeps every neighbour in
+  // frame, so the map looks much as it did and the drill-down reads as an
+  // unrelated sidebar change rather than a selection.
+  function paintCounties(selected) {
+    var layers = countyView.layer || {};
+    Object.keys(layers).forEach(function (n) {
+      if (!selected) {
+        layers[n].setStyle({ fillColor: BASE_FILL, fillOpacity: 0.9, opacity: 1 });
+      } else if (n === selected) {
+        layers[n].setStyle({ fillColor: CLICK_FILL, fillOpacity: 0.55, opacity: 1 });
+      } else {
+        layers[n].setStyle({ fillColor: BASE_FILL, fillOpacity: 0.9, opacity: 0.25 });
+      }
+    });
+  }
+
+  function clearCountyView(map) {
+    countyView.markers.forEach(function (m) { map.removeLayer(m); });
+    countyView.markers = [];
+    countyView.active = null;
+    setBaseMarkersVisible(map, true);
+    paintCounties(null);
+  }
+
+  // Rebuilds the sidebar. Two states only: the county list it ships with, and one
+  // county's towns. Kept in this file rather than pre-rendered per county because
+  // the town list already exists in county-search.json and duplicating it into the
+  // HTML would be a second copy to keep in sync -- the exact problem the comment on
+  // write_map_county_data() in build.py describes.
+  function renderCountyPanel(map, countyName, data) {
+    var list = document.querySelector('.county-list');
+    if (!list) return;
+    if (!list.dataset.home) list.dataset.home = list.innerHTML;
+
+    var slug = COUNTY_SLUGS[countyName];
+    var towns = (data && data.towns) || [];
+    var html = '<button type="button" class="county-back">&lsaquo; All counties</button>' +
+      '<p class="county-panel-title">' + countyName + ' County</p>';
+
+    towns.forEach(function (t) {
+      // A real link, not a button: these are the town pages, and they must stay
+      // crawlable and middle-clickable. The click handler enhances, it doesn't
+      // replace -- see the listener below.
+      html += '<a class="county-btn town-btn" href="' + t.url + '" data-town="' + t.name + '">' +
+        t.name + ' <span>&rsaquo;</span></a>';
+    });
+
+    html += '<button type="button" class="county-wide-btn">Search all of ' + countyName + ' County &rsaquo;</button>';
+    if (slug) {
+      html += '<a class="county-guide-link" href="/communities/' + slug + '.html">' +
+        'Full ' + countyName + ' County guide &rsaquo;</a>';
+    }
+    list.innerHTML = html;
+
+    list.querySelector('.county-back').addEventListener('click', function () {
+      list.innerHTML = list.dataset.home;
+      bindHomePanel(map);
+      clearCountyView(map);
+      if (countyView.homeBounds) map.fitBounds(countyView.homeBounds, { padding: [20, 20] });
+    });
+
+    list.querySelector('.county-wide-btn').addEventListener('click', function () {
+      openQuickSearch({
+        label: countyName + ' County',
+        cities: (data && data.cities) || COUNTY_CITIES[countyName] || [],
+        covered: !!IRES_COUNTIES[countyName],
+        guideHref: slug ? '/communities/' + slug + '.html' : null,
+      });
+    });
+
+    // Clicking a town in the panel opens its price search rather than navigating,
+    // because the price filter is the thing that was missing at this level. The
+    // href stays for crawlers, middle-click and cmd-click; the guide is reachable
+    // from inside the popup via Full Area Guide.
+    Array.prototype.forEach.call(list.querySelectorAll('.town-btn'), function (a) {
+      a.addEventListener('click', function (ev) {
+        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+        ev.preventDefault();
+        openQuickSearch({
+          label: a.dataset.town,
+          cities: [a.dataset.town],
+          covered: true,
+          guideHref: a.getAttribute('href'),
+        });
+      });
+    });
+  }
+
+  function enterCounty(map, countyName, data, lyr) {
+    clearCountyView(map);
+    countyView.active = countyName;
+    setBaseMarkersVisible(map, false);
+    paintCounties(countyName);
+    renderCountyPanel(map, countyName, data);
+
+    if (lyr && lyr.getBounds) map.fitBounds(lyr.getBounds(), { padding: [30, 30] });
+
+    ((data && data.towns) || []).forEach(function (t) {
+      var m = L.marker([t.lat, t.lng], {
+        icon: townMarkerIcon(t.name), zIndexOffset: 900, interactive: true,
+      }).addTo(map);
+      m.on('click', function () {
+        openQuickSearch({
+          label: t.name, cities: [t.name], covered: true, guideHref: t.url,
+        });
+      });
+      countyView.markers.push(m);
+    });
+  }
+
+  // The sidebar's county links: same drill-down as the map, so one county cannot
+  // mean two things. preventDefault only on a plain left click, so the href still
+  // works for crawlers and for anyone opening it in a new tab on purpose.
+  function bindHomePanel(map) {
+    Array.prototype.forEach.call(document.querySelectorAll('.county-list .county-btn'), function (a) {
+      if (a.classList.contains('town-btn')) return;
+      a.addEventListener('click', function (ev) {
+        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+        var name = (a.textContent || '').replace(/\s*›\s*$/, '').replace(/\s*County\s*$/i, '').trim();
+        var data = COUNTY_DATA[name];
+        if (!data || !(data.towns || []).length) return;  // no towns yet -> let the link do its job
+        ev.preventDefault();
+        enterCounty(map, name, data, countyView.layer && countyView.layer[name]);
+      });
+    });
+  }
+
   function init() {
     var mapEl = document.getElementById('county-map');
     if (!mapEl || typeof L === 'undefined') return;
@@ -587,18 +777,33 @@
             });
 
             lyr.on('mouseover', function () {
+              if (countyView.active) return;   // don't fight the selection paint
               lyr.setStyle({ fillColor: HOVER_FILL });
             });
             lyr.on('mouseout', function () {
+              if (countyView.active) return;
               lyr.setStyle({ fillColor: BASE_FILL });
             });
+            // Remembered so the sidebar's county links can zoom to the same
+            // bounds the map click does.
+            countyView.layer = countyView.layer || {};
+            countyView.layer[name] = lyr;
+
             lyr.on('click', function () {
+              var data = COUNTY_DATA[name];
+              // Drill into the towns when there are any. See the note above
+              // enterCounty() for why this beats jumping to a county-wide price
+              // filter; counties with no town pages keep the old behaviour rather
+              // than opening an empty panel.
+              if (data && (data.towns || []).length) {
+                enterCounty(map, name, data, lyr);
+                return;
+              }
               lyr.setStyle({ fillColor: CLICK_FILL });
-              var covered = !!IRES_COUNTIES[name];
               openQuickSearch({
                 label: name + ' County',
                 cities: COUNTY_CITIES[name] || [],
-                covered: covered,
+                covered: !!IRES_COUNTIES[name],
                 guideHref: slug ? '/communities/' + slug + '.html' : null,
               });
             });
@@ -612,8 +817,10 @@
         // towns doesn't turn into unreadable overlapping text.
         CITY_ICONS.forEach(function (city) {
           var marker = L.marker([city.lat, city.lng], { icon: cityIcon(city), interactive: true, zIndexOffset: 500 }).addTo(map);
+          baseMarkers.push(marker);
           if (city.priority) {
-            L.marker([city.lat, city.lng], { icon: cityLabel(city), interactive: false }).addTo(map);
+            var lbl = L.marker([city.lat, city.lng], { icon: cityLabel(city), interactive: false }).addTo(map);
+            baseMarkers.push(lbl);
           } else {
             marker.bindTooltip(city.name, { direction: 'right', offset: [14, 0] });
           }
@@ -659,7 +866,11 @@
           }).addTo(map);
         });
 
-        map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+        countyView.homeBounds = layer.getBounds();
+        map.fitBounds(countyView.homeBounds, { padding: [20, 20] });
+        // Sidebar links drill down the same way the map shapes do, now that the
+        // county data and the layers both exist.
+        bindHomePanel(map);
       });
   }
 
@@ -667,6 +878,30 @@
   // (Leaflet renders tooltips outside our normal CSS scope).
   var style = document.createElement('style');
   style.textContent =
+    // Town pins for the drill-down. A labelled dot rather than a bare marker: at
+    // county zoom the whole point is reading which town is which, and the icon-only
+    // pins the map already uses need a hover to identify.
+    '.town-pin{transform:translate(-7px,-7px);display:flex;align-items:center;gap:7px;' +
+    'white-space:nowrap;cursor:pointer}' +
+    '.town-pin::before{content:"";width:14px;height:14px;border-radius:50%;' +
+    'background:#B86F7A;border:2px solid #F9F9EC;box-shadow:0 1px 5px rgba(0,0,0,.6);' +
+    'flex:0 0 auto}' +
+    '.town-pin span{font-family:"Poppins",sans-serif;font-weight:600;font-size:12px;' +
+    'color:#F9F9EC;text-shadow:0 1px 4px rgba(0,0,0,.9);letter-spacing:.02em}' +
+    '.town-pin:hover::before{background:#F9F9EC;border-color:#B86F7A}' +
+    '.county-back{display:block;width:100%;text-align:left;background:none;border:none;' +
+    'color:#BA8C84;font-family:"Poppins",sans-serif;font-size:12px;letter-spacing:.08em;' +
+    'text-transform:uppercase;padding:0 0 14px;cursor:pointer}' +
+    '.county-back:hover{color:#F9F9EC}' +
+    '.county-panel-title{font-family:"Poppins",sans-serif;color:#F9F9EC;font-size:13px;' +
+    'letter-spacing:.1em;text-transform:uppercase;margin:0 0 12px;opacity:.7}' +
+    '.county-wide-btn{display:block;width:100%;text-align:left;margin-top:14px;' +
+    'background:none;border:1px solid rgba(249,249,236,.35);color:#F9F9EC;' +
+    'font-family:"Poppins",sans-serif;font-size:13px;padding:14px 18px;cursor:pointer}' +
+    '.county-wide-btn:hover{border-color:#BA8C84;color:#BA8C84}' +
+    '.county-guide-link{display:block;margin-top:12px;color:#BA8C84;font-size:12px;' +
+    'font-family:"Poppins",sans-serif;text-decoration:underline}' +
+    '.county-guide-link:hover{color:#F9F9EC}' +
     '.county-label-tooltip{background:transparent;border:none;box-shadow:none;' +
     'color:#F9F9EC;font-family:"Poppins",sans-serif;font-weight:700;font-size:13px;' +
     'letter-spacing:.04em;text-shadow:0 1px 4px rgba(0,0,0,.85);}' +
