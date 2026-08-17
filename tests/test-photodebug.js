@@ -200,6 +200,62 @@ function apiThen(imageImpl, api = mediaOk) {
       res.headers["Content-Type"] === "image/jpeg", res.headers["Content-Type"]);
   }
 
+  // ---- A media-host 429 must cause an actual BACKOFF -------------------------
+  // 2026-08-17, Christine's second debug reading:
+  //   {"httpStatus":429,"mediaHost":"media.mlsgrid.com","attempts":[{"mode":"auth","status":429}]}
+  // setPhotoCooldown() had exactly one caller -- resolveMediaFor(), for API 429s.
+  // A 429 from the MEDIA host returned a grey placeholder and changed nothing, so
+  // a dozen cards kept requesting into a limit that therefore never cleared. The
+  // grey box was both the symptom and the cause of the next one.
+  console.log("\n  media-host rate limiting:");
+  {
+    const s2 = store();
+    const writes = [];
+    s2.setJSON = async (k, v) => { writes.push(k); };
+    const h = load(s2, apiThen(() => ({
+      ok: false, status: 429,
+      headers: { get: (k) => (String(k).toLowerCase() === "retry-after" ? "20" : null) },
+    })));
+    const res = await call(h, { debug: "1" });
+    const body = JSON.parse(res.body);
+    check("  a media 429 is reported as rate limiting, not a broken photo",
+      body.reason === "media_rate_limited", body.reason);
+    check("  a cooldown is actually written", writes.includes("mlsgrid-media-cooldown.json"),
+      JSON.stringify(writes) + " — nothing backed off, so the limit sustains itself");
+    check("  and Retry-After is honoured", body.retryAfterSeconds === 20, String(body.retryAfterSeconds));
+  }
+  {
+    // While that cooldown is live, no further image request may go out at all.
+    let imgCalls = 0;
+    const h = load(
+      store({ "mlsgrid-media-cooldown.json": { until: Date.now() + 30_000 } }),
+      apiThen(() => { imgCalls += 1; return { ok: true, status: 200, headers: imgHeaders("image/jpeg"), arrayBuffer: async () => new ArrayBuffer(10) }; })
+    );
+    const res = await call(h, { debug: "1" });
+    const body = JSON.parse(res.body);
+    check("  during the cooldown no image request is made", imgCalls === 0, `${imgCalls} request(s)`);
+    check("  and the reason says so", body.reason === "media_rate_limited", body.reason);
+    check("  with the wait time", body.retryAfterSeconds > 0 && body.retryAfterSeconds <= 30,
+      String(body.retryAfterSeconds));
+  }
+  {
+    // The two cooldowns must stay SEPARATE. An API-resolve cooldown blanking a
+    // photo whose URL is already cached and would serve fine is its own
+    // crying-wolf failure — the exact mistake this file has made before.
+    let imgCalls = 0;
+    const h = load(
+      store({
+        "mlsgrid-photo-cooldown.json": { until: Date.now() + 30_000 },   // API cooldown
+        "photo-urls/IRE1000029.json": { urls: ["https://media.test/a.jpg"], cachedAt: Date.now() },
+      }),
+      apiThen(() => { imgCalls += 1; return { ok: true, status: 200, headers: imgHeaders("image/jpeg"), arrayBuffer: async () => new ArrayBuffer(10) }; })
+    );
+    const res = await call(h);
+    check("  an API cooldown does NOT block a cached photo from serving",
+      res.headers["Content-Type"] === "image/jpeg" && imgCalls === 1,
+      `${res.headers["Content-Type"]}, ${imgCalls} image request(s)`);
+  }
+
   // The success path must keep working — it was the only one that ever did.
   {
     const h = load(store(), apiThen(() => ({
