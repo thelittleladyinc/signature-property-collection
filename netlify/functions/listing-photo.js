@@ -60,7 +60,7 @@
 //      rate -- a dead photo re-asking MLS Grid every five minutes, forever, from
 //      every CDN edge, feeding the 429s that then grey out photos which work.
 const { getStore } = require("@netlify/blobs");
-const { getBlobStore, BASE_URL, SELECT_FIELDS } = require("./lib/_mls-shared");
+const { getBlobStore, BASE_URL, SELECT_FIELDS, MINE_LISTINGS_KEY } = require("./lib/_mls-shared");
 const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
   isMediaThrottled, setMediaCooldown,
@@ -78,6 +78,123 @@ const MAX_INLINE_IMAGE_BYTES = 4_400_000;
 // caching with a week of stale-while-revalidate keeps MLS Grid traffic near
 // zero while still picking changes up.
 const IMAGE_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800";
+
+// ---- LAST-KNOWN-GOOD PHOTO COPY -----------------------------------------
+// 2026-08-17. Christine, for the fourth time today: "photos still arent showing".
+//
+// Every explanation offered so far has been true and none of them fixed anything.
+// The cover photo of her Greeley listing is grey because MLS Grid's media host is
+// rate-limiting us; the CDN cache does not help, because a photo that never
+// succeeded has nothing to cache; and the permanent fix -- Cloudinary re-hosting --
+// is blocked on credentials only she can set. Meanwhile her main listings page has
+// a hole in it.
+//
+// So the site keeps its own copy. Once a photo has been fetched successfully even
+// ONCE, it is written to Blobs, and every later failure serves that copy instead of
+// a grey square. A 429 stops being visible to anyone. This needs no third party, no
+// account and no key, and it is strictly better than what the CDN can do: the CDN
+// can only remember a success it happened to see at an edge, this remembers it for
+// everyone, permanently.
+//
+// BOUNDED ON PURPOSE, two ways, because this store also holds the ~27,000-listing
+// IRES catalogue and an unbounded image cache over that would be gigabytes:
+//   1. Cover photos only (index 0). That is what a card shows, which is what goes
+//      grey. Galleries are opened deliberately and can still show a placeholder.
+//   2. Christine's OWN listings only, read from the tiny mine-listings.json key the
+//      sync already maintains. Her 11 covers are about 4 MB. A visitor browsing
+//      other agents' listings caches nothing.
+const PHOTO_CACHE_PREFIX = "photo-cache/";
+const PHOTO_CACHE_MAX_INDEX = 0;
+
+function photoCacheKey(listingId, index) {
+  return `${PHOTO_CACHE_PREFIX}${listingId}-${index}.json`;
+}
+
+// Her own listing ids, cached for the life of the container. Failure is silent and
+// returns an empty set, which means "cache nothing" -- the conservative direction.
+let _mineIds = null;
+async function mineListingIds(store) {
+  if (_mineIds) return _mineIds;
+  try {
+    const raw = await store.get(MINE_LISTINGS_KEY, { type: "json" });
+    const list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.listings) ? raw.listings : []);
+    _mineIds = new Set(list.map((l) => String((l && (l.listingId || l.ListingId)) || "")).filter(Boolean));
+  } catch (err) {
+    console.warn("listing-photo: could not read mine-listings.json:", err && err.message);
+    _mineIds = new Set();
+  }
+  return _mineIds;
+}
+
+async function shouldCachePhoto(store, listingId, index) {
+  if (index > PHOTO_CACHE_MAX_INDEX) return false;
+  const mine = await mineListingIds(store);
+  return mine.has(listingId);
+}
+
+// Best-effort in both directions: a cache miss, a write failure or a malformed
+// entry must never turn a working photo into an error. Everything here is wrapped.
+async function readCachedPhoto(store, listingId, index) {
+  if (index > PHOTO_CACHE_MAX_INDEX) return null;
+  try {
+    const hit = await store.get(photoCacheKey(listingId, index), { type: "json" });
+    if (hit && typeof hit.b64 === "string" && hit.b64.length) return hit;
+  } catch (err) {
+    console.warn(`listing-photo: cache read failed for ${listingId}/${index}:`, err && err.message);
+  }
+  return null;
+}
+
+async function writeCachedPhoto(store, listingId, index, buf, contentType) {
+  try {
+    await store.setJSON(photoCacheKey(listingId, index), {
+      b64: buf.toString("base64"),
+      contentType,
+      bytes: buf.length,
+      storedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn(`listing-photo: cache write failed for ${listingId}/${index}:`, err && err.message);
+  }
+}
+
+// The single door every rescuable failure goes through: try the stored copy, and
+// only fall back to a grey square if there isn't one.
+//
+// Debug requests skip the cache ON PURPOSE. `?debug=1` exists to answer "why is this
+// photo grey", and serving a cached image would answer a different question and hide
+// the very failure being investigated. Christine has spent hours today reading that
+// output; it has to keep describing the live fetch.
+async function servedOrPlaceholder(store, listingId, index, reason, debug, extra) {
+  if (!debug && store) {
+    const hit = await readCachedPhoto(store, listingId, index);
+    if (hit) {
+      console.warn(`listing-photo: ${listingId}/${index} served from stored copy (${reason})`);
+      return cachedPhotoResponse(hit, reason);
+    }
+  }
+  return placeholder(reason, debug, extra);
+}
+
+// Serve the stored copy. Deliberately NOT marked as a fallback in any way a visitor
+// can see: it is the same image, fetched from the same source, just earlier.
+function cachedPhotoResponse(hit, reason) {
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": hit.contentType || "image/jpeg",
+      "Cache-Control": IMAGE_CACHE_CONTROL,
+      "X-Photo-Bytes": String(hit.bytes || 0),
+      // For the network tab when something still looks wrong: this says the live
+      // fetch failed and why, while the visitor saw a perfectly good photo.
+      "X-Photo-Cache": "hit",
+      "X-Photo-Cache-Reason": String(reason || "unknown"),
+      "X-Photo-Cache-Stored": String(hit.storedAt || ""),
+    },
+    body: hit.b64,
+    isBase64Encoded: true,
+  };
+}
 // How long the CDN may serve a FAILURE, by reason.
 //
 // 2026-08-17. Every placeholder was cached for 300s regardless of why it failed,
@@ -232,6 +349,15 @@ async function resolvePhotoUrls(listingId, store, token) {
   return { urls: resolved[listingId] || (cached ? cached.urls : null), throttledUntil: null };
 }
 
+// Exported for tests only. The photo cache's guarantees -- bounded to her own cover
+// photos, never fatal, honest about what is missing -- are behaviour, and a test that
+// only greps this file for strings proves none of them. tests/test-photocache.js
+// drives these against a fake store.
+exports.__test = {
+  photoCacheKey, shouldCachePhoto, readCachedPhoto, writeCachedPhoto,
+  resetMineCache: () => { _mineIds = null; },
+};
+
 exports.handler = async (event) => {
   const params = (event && event.queryStringParameters) || {};
   // Read FIRST, and OUTSIDE the try, so every return below honours it -- the
@@ -252,7 +378,7 @@ exports.handler = async (event) => {
     const store = getBlobStore(getStore, BLOB_STORE_NAME);
     const { urls, throttledUntil } = await resolvePhotoUrls(listingId, store, token);
     if (throttledUntil && (!urls || !urls.length)) {
-      return placeholder("throttled", debug, {
+      return await servedOrPlaceholder(store, listingId, index, "throttled", debug, {
         listingId, index, retryAfterSeconds: Math.max(1, Math.ceil((throttledUntil - Date.now()) / 1000)),
       });
     }
@@ -268,7 +394,7 @@ exports.handler = async (event) => {
     // this function, so this only ever pauses photos that were about to fail.
     const mediaCooldown = await isMediaThrottled(store);
     if (mediaCooldown) {
-      return placeholder("media_rate_limited", debug, {
+      return await servedOrPlaceholder(store, listingId, index, "media_rate_limited", debug, {
         listingId, index, urlCount: urls.length,
         retryAfterSeconds: Math.max(1, Math.ceil((mediaCooldown - Date.now()) / 1000)),
       });
@@ -281,7 +407,7 @@ exports.handler = async (event) => {
     const attempt = await fetchMediaResponse(urls[index], token, IMAGE_FETCH_TIMEOUT_MS);
     const imgRes = attempt && attempt.res;
     if (!imgRes) {
-      return placeholder("image_fetch_failed", debug, {
+      return await servedOrPlaceholder(store, listingId, index, "image_fetch_failed", debug, {
         listingId, index, urlCount: urls.length, mediaHost,
         authMode: attempt && attempt.mode, error: attempt && attempt.error,
         attempts: attempt && attempt.attempts,
@@ -294,7 +420,7 @@ exports.handler = async (event) => {
       const waitMs = await setMediaCooldown(store, imgRes.headers.get("retry-after"));
       console.error(`listing-photo: ${listingId} photo ${index} -> HTTP 429 from ${mediaHost}; ` +
         `media cooldown set for ${Math.round(waitMs / 1000)}s`);
-      return placeholder("media_rate_limited", debug, {
+      return await servedOrPlaceholder(store, listingId, index, "media_rate_limited", debug, {
         listingId, index, mediaHost, urlCount: urls.length,
         authMode: attempt.mode, attempts: attempt.attempts,
         retryAfterSeconds: Math.round(waitMs / 1000),
@@ -304,7 +430,7 @@ exports.handler = async (event) => {
       console.error(`listing-photo: ${listingId} photo ${index} -> HTTP ${imgRes.status} (mode ${attempt.mode})`);
       // The status is a field now rather than part of the reason string, so
       // callers can group these without parsing a code they have to guess at.
-      return placeholder("image_http_error", debug, {
+      return await servedOrPlaceholder(store, listingId, index, "image_http_error", debug, {
         listingId, index, httpStatus: imgRes.status, authMode: attempt.mode, mediaHost,
         urlCount: urls.length,
         // Both auth modes, so a 404 can be read as "the photo is gone" rather than
@@ -315,7 +441,7 @@ exports.handler = async (event) => {
 
     const contentType = imgRes.headers.get("content-type") || "image/jpeg";
     if (!contentType.startsWith("image/")) {
-      return placeholder("not_an_image", debug, { listingId, index, contentType, mediaHost });
+      return await servedOrPlaceholder(store, listingId, index, "not_an_image", debug, { listingId, index, contentType, mediaHost });
     }
 
     const buf = Buffer.from(await imgRes.arrayBuffer());
@@ -338,7 +464,7 @@ exports.handler = async (event) => {
     if (buf.length > MAX_INLINE_IMAGE_BYTES) {
       console.error(`listing-photo: ${listingId} photo ${index} is ${buf.length} bytes — ` +
         `over the ${MAX_INLINE_IMAGE_BYTES}-byte inline ceiling.`);
-      return placeholder("too_large", debug, {
+      return await servedOrPlaceholder(store, listingId, index, "too_large", debug, {
         listingId, index, bytes: buf.length, limitBytes: MAX_INLINE_IMAGE_BYTES,
         overBy: buf.length - MAX_INLINE_IMAGE_BYTES, contentType, mediaHost, urlCount: urls.length,
       });
@@ -354,6 +480,17 @@ exports.handler = async (event) => {
           authMode: attempt.mode, urlCount: urls.length, mediaHost,
         }, null, 2),
       };
+    }
+
+    // The one write. Awaited rather than fired and forgotten: a Netlify function can
+    // be frozen the moment it returns, so unawaited work is not reliably finished --
+    // and a cache that only sometimes gets written is worse than none, because the
+    // failure it is meant to cover would still show up at random.
+    //
+    // Bounded to her own cover photos (see shouldCachePhoto), and best-effort: a
+    // write failure logs and the visitor still gets their photo.
+    if (await shouldCachePhoto(store, listingId, index)) {
+      await writeCachedPhoto(store, listingId, index, buf, contentType);
     }
 
     return {
