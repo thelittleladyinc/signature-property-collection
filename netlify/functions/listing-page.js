@@ -102,6 +102,25 @@ function photoUrl(listing, i) {
   return `/.netlify/functions/listing-photo?id=${encodeURIComponent(listing.listingId)}&i=${i}`;
 }
 
+// 2026-08-17. The same problem the listing CARDS had, on the page a buyer actually
+// lands on when someone texts them the link: the hero was requesting the
+// FULL-RESOLUTION MLS photo, with no width, no height, and no fallback. So it
+// arrived slowly, the column collapsed while it did, and if the fetch failed the
+// slot was simply empty -- which is what Christine saw on IRE1059808.
+//
+// Netlify's Image CDN resizes and re-encodes at the edge and caches the result.
+// Only OUR endpoint is wrapped: a Cloudinary URL is already re-hosted and
+// optimised, and is a remote host the CDN would need allowlisting for.
+function sizedPhoto(url, width) {
+  if (!url || url.indexOf("/.netlify/functions/listing-photo") !== 0) return url;
+  return `/.netlify/images?url=${encodeURIComponent(url)}&w=${width}&fit=cover&fm=webp&q=74`;
+}
+
+// Deliberately NOT applied to the Open Graph image below. An <img> can fall back
+// on error; a social preview cannot -- Facebook fetches the URL once, server-side,
+// and a failure there is a listing that previews as a blank card in a text message.
+// Until the Image CDN is confirmed working live, OG keeps the raw endpoint.
+
 function photoCount(listing) {
   if (Array.isArray(listing.photos) && listing.photos.length) return listing.photos.length;
   if (typeof listing.photoCount === "number") return listing.photoCount;
@@ -166,7 +185,9 @@ function listingBody(l, fetchedAt) {
   const gallery = count > 1
     ? `<div class="listing-detail-thumbs">` +
       Array.from({ length: Math.min(count, 12) }, (_, i) =>
-        `<img src="${esc(photoUrl(l, i))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}" loading="lazy">`
+        `<img src="${esc(sizedPhoto(photoUrl(l, i), 1000))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}"
+        loading="lazy" decoding="async" data-raw="${esc(photoUrl(l, i))}"
+        onerror="if(this.dataset.raw&&this.src.indexOf('/.netlify/images')>-1){this.src=this.dataset.raw}">`
       ).join("") +
       (count > 12 ? `<p class="fs-advanced-note">Showing 12 of ${count} photos &mdash;
        <a href="/contact.html" style="text-decoration:underline">ask for the full set</a>.</p>` : "") +
@@ -208,8 +229,12 @@ function listingBody(l, fetchedAt) {
 <section class="tight" style="padding-top:10px">
   <div class="wrap grid-2">
     <div>
-      ${count ? `<img src="${esc(photoUrl(l, 0))}" alt="${esc(addressLine)}"
-        style="width:100%;border-radius:4px;box-shadow:0 10px 30px rgba(20,20,21,.10)">` : ""}
+      ${count ? `<img src="${esc(sizedPhoto(photoUrl(l, 0), 1200))}" alt="${esc(addressLine)}"
+        width="1200" height="900" fetchpriority="high" decoding="async"
+        data-raw="${esc(photoUrl(l, 0))}"
+        onerror="if(this.dataset.raw&&this.src.indexOf('/.netlify/images')>-1){this.src=this.dataset.raw;return}
+                 this.onerror=null;this.style.background='#eee';this.style.aspectRatio='4/3';this.removeAttribute('src')"
+        style="width:100%;height:auto;border-radius:4px;box-shadow:0 10px 30px rgba(20,20,21,.10)">` : ""}
     </div>
     <div>
       <p class="listing-price" style="font-size:34px;margin:0 0 12px">${esc(money(l.price))}</p>
