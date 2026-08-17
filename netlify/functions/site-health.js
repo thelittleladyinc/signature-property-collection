@@ -602,10 +602,26 @@ exports.handler = async (event) => {
       optional: true,
       name: "Cloudinary env vars set (optional)",
       ok: isCloudinaryConfigured(),
+      // 2026-08-17: this row said "all three are present" and stopped there, which
+      // could not answer the question that actually mattered. Christine has TWO
+      // Cloudinary accounts -- Listing-Engine (on Render) uploads to one happily,
+      // while this site's uploads 403 against the other. Knowing WHICH account this
+      // site points at is the whole diagnosis, and the row was silent about it.
+      //
+      // The cloud name is safe to print: it is the first path segment of every
+      // res.cloudinary.com delivery URL, so it is already public wherever an image
+      // is served. The key and secret are never shown, only whether they are set.
+      // This also confirms a credential swap actually took effect, which "present"
+      // never could -- the old and new values are both "present".
       detail: isCloudinaryConfigured()
-        ? "All three env vars are present. Note that PRESENT is not the same as WORKING — " +
-          "whether they belong to the same Cloudinary account is what the " +
-          "\"Cloudinary account healthy\" row below actually tests."
+        ? `All three env vars are present, on cloud name "${process.env.CLOUDINARY_CLOUD_NAME}". ` +
+          "PRESENT is not the same as WORKING — the \"Cloudinary account healthy\" row " +
+          "below is what actually tests them. If that row reports a Media Optimization " +
+          "account, this site is pointed at the wrong one of your two Cloudinary " +
+          "accounts: Media Optimization is delivery-only and has no upload API, which " +
+          "is why photo uploads 403. Compare this cloud name against the working one " +
+          "in Render → Listing-Engine → Environment, and copy all three values across " +
+          "if they differ."
         : "CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET — one or more isn't set",
     },
     {
@@ -731,12 +747,28 @@ exports.handler = async (event) => {
             " If credits are at or near 100%, that is what the upload 403 means."
           : `Cloudinary refused the account check${cloudCheck.httpCode ? ` (HTTP ${cloudCheck.httpCode})` : ""}: ` +
             `${cloudCheck.error}. Same credentials the photo uploads use. ` +
-            (/cloud_name mismatch/i.test(String(cloudCheck.error))
-              ? "FIX: the three CLOUDINARY_* variables in Netlify are not all from the same " +
-                "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
-                "to another. Open cloudinary.com → Dashboard, copy Cloud name, API Key and API Secret " +
-                "from that same page, and replace all three in Netlify → Environment variables."
-              : "Check the three CLOUDINARY_* variables in Netlify against cloudinary.com → Dashboard."))),
+            // 2026-08-17. Order matters: the media-optimization case was being caught
+            // by the generic "check your variables against the Dashboard" advice, which
+            // is the ONE thing that cannot fix it. The credentials are valid — Cloudinary
+            // authenticated them and then named the account type — so re-copying them
+            // from that account's Dashboard reproduces the same 403 exactly.
+            (/media optimization/i.test(String(cloudCheck.error))
+              ? "FIX: this is the wrong Cloudinary ACCOUNT, not a wrong credential. " +
+                "Cloudinary authenticated these keys and then said the account is a Media " +
+                "Optimization customer — a delivery-only product with no upload API, which " +
+                "is exactly why photo uploads get a flat 403. Re-copying these same values " +
+                "from that account's Dashboard cannot fix it. Christine has a SECOND " +
+                "Cloudinary account that uploads fine from Listing-Engine: open Render → " +
+                "the Listing-Engine service → Environment, and copy its CLOUDINARY_CLOUD_NAME, " +
+                "CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET into Netlify → Environment " +
+                "variables here. The row above prints the cloud name this site is currently " +
+                "using, so it is easy to see which account is which, and to confirm the swap."
+              : /cloud_name mismatch/i.test(String(cloudCheck.error))
+                ? "FIX: the three CLOUDINARY_* variables in Netlify are not all from the same " +
+                  "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
+                  "to another. Open cloudinary.com → Dashboard, copy Cloud name, API Key and API Secret " +
+                  "from that same page, and replace all three in Netlify → Environment variables."
+                : "Check the three CLOUDINARY_* variables in Netlify against cloudinary.com → Dashboard."))),
   });
 
   // ---- Lofty API key valid? ----
