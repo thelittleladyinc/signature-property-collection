@@ -75,6 +75,32 @@ LOCAL_SPOTS_DATA = _load_json("local_spots.json")
 # notes/page_urls.txt, captured from the live site). Add more entries here
 # as the AgentFire audit turns up other URLs that need to keep working.
 LEGACY_URL_REDIRECTS = {
+    # 2026-08-17, from Search Console's actual "Not found (404)" list rather than
+    # from guessing which old URLs might exist. Five URLs were reported; these are
+    # the only two worth redirecting.
+    #
+    # Both are per-address listing pages from the previous AgentFire site, which
+    # gave every listing its own URL of this shape. This site does not publish a
+    # page per address (IDX terms are why -- see _mls_disclaimer_html), so the
+    # honest destination is the town the property is in: someone who followed a
+    # link to a Nunn acreage listing wants Nunn, and that page carries the live
+    # IRES inventory for the town plus schools, commute and drive times.
+    #
+    # Not a redirect to the homepage. A redirect that ignores what the visitor
+    # asked for is a soft 404 wearing a nicer status code, and Google treats it
+    # that way.
+    "/50842-county-road-33-nunn-co-80648/": "/communities/weld/nunn.html",
+    "/50842-county-road-33-nunn-co-80648": "/communities/weld/nunn.html",
+    "/475-homestead-ln-johnstown-co-80534/": "/communities/weld/johnstown.html",
+    "/475-homestead-ln-johnstown-co-80534": "/communities/weld/johnstown.html",
+    #
+    # The other three 404s are deliberately NOT redirected, because 404 is the
+    # correct answer for all three and inventing a destination would be worse:
+    #   /wp-json/agentfire/v1/core/cron/1781382236  -- WordPress REST cron endpoint
+    #   /wp-includes/js/tinymce                     -- WordPress core editor asset
+    #   /cdn-cgi/l/email-protection                 -- Cloudflare email obfuscation
+    # None was ever a page, none has link equity worth preserving, and none has a
+    # sensible equivalent here. Google drops them on its own once they keep 404ing.
     "/expiredlisting/": "/expired-listings.html",
     "/expiredlisting": "/expired-listings.html",
     # 2026-08-14: these two blog posts were removed (not just unpublished)
@@ -978,7 +1004,29 @@ def _fmt_views(n):
     return f"{n:,} views"
 
 
+# Every video this build embeds, id -> the title shown next to it. Populated by
+# _yt_embed() as it renders, and read by page() to auto-emit VideoObject schema for
+# any embed whose page did not declare one by hand.
+#
+# 2026-08-17 (Search Console, "Videos -> Improve item appearance -> Missing field
+# description"): 43 embedded videos across 14 pages carried no VideoObject at all.
+# Google detects a video from the iframe regardless, finds no structured data for
+# it, and reports the description as missing. The pages that DID declare schema by
+# hand were all fine -- all 33 had descriptions -- which is why the report looked
+# baffling next to the code.
+#
+# The fix records the title at the point it is already known rather than building a
+# second list of video metadata to keep in sync: _yt_embed() is handed the real
+# title by every one of its ~20 call sites, because it puts that title on the
+# iframe for accessibility. Reusing it means the schema can never describe a video
+# differently from the page, and adding a video in future cannot silently skip
+# schema again.
+_EMBED_TITLES = {}
+
+
 def _yt_embed(video_id, title, caption=None):
+    if video_id and title:
+        _EMBED_TITLES.setdefault(video_id, title)
     return f"""<div class="video-embed">
       <iframe src="https://www.youtube-nocookie.com/embed/{video_id}" title="{esc(title)}"
       loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -3575,6 +3623,29 @@ def page(title, description, path, active, body, extra_head="", schema_extra="",
     # Auto-fill breadcrumbs only when the caller hasn't supplied its own.
     _existing = schema_extra if isinstance(schema_extra, list) else (
         [schema_extra] if schema_extra else [])
+    # Any video embedded in this body that the caller did not describe gets a
+    # VideoObject here. See _EMBED_TITLES for why this is centralised rather than
+    # fixed page by page. A video whose title we somehow don't know is skipped
+    # rather than given a made-up description -- an untitled entry would trade one
+    # Search Console warning for a worse problem.
+    _embedded = re.findall(r"youtube-nocookie\.com/embed/([A-Za-z0-9_-]{6,})", body)
+    if _embedded:
+        _described = set()
+        for _s in _existing:
+            for _m in re.finditer(r"/embed/([A-Za-z0-9_-]{6,})", str(_s)):
+                _described.add(_m.group(1))
+        for _vid in dict.fromkeys(_embedded):          # de-duped, order preserved
+            if _vid in _described:
+                continue
+            _title = _EMBED_TITLES.get(_vid)
+            if not _title:
+                continue
+            _existing = _existing + [_video_object_schema(
+                _vid, _title,
+                f"{_title} — video from {SITE['agent']} of {SITE['name']}, "
+                f"covering Northern Colorado real estate.",
+            )]
+        schema_extra = _existing
     if not any("BreadcrumbList" in str(s) for s in _existing):
         _auto = _auto_breadcrumbs(title, path)
         if _auto:
@@ -4905,6 +4976,12 @@ RELOCATION_GUIDE_PDF = "/assets/guides/northern-colorado-relocation-guide.pdf"
 # script's header for why this exists and why the numbers are not typed by hand.
 TOWN_MARKET = _load_json("town_market.json")
 
+# Real coordinates per town, fetched by build/tools/geocode_towns.py from the
+# Google Geocoding API. Absent file -> {} -> Place schema is emitted without geo,
+# which is exactly what it did before this existed. Never hand-edited: see that
+# script's header for why a typed-in latitude is worse than no latitude.
+TOWN_GEO = (_load_json("town_geo.json") or {}).get("towns") or {}
+
 # How old the figures may get before the pages stop showing them. Active inventory
 # turns over fast; a median from two months ago is not "slightly old", it is wrong,
 # and it would be wrong on the one block whose entire job is to look current. The
@@ -4942,7 +5019,7 @@ def _usd(n):
     return f"${n:,.0f}"
 
 
-def _town_place_schema(city, county_name, url_path, welcome):
+def _town_place_schema(city, county_name, url_path, welcome, data_slug=None):
     """Place node for a town page, so the page declares the entity it is about.
 
     2026-08-16 (findability audit). These 37 pages are now titled "Living In
@@ -4956,10 +5033,11 @@ def _town_place_schema(city, county_name, url_path, welcome):
     inside a named county inside Colorado is easier to return for "what is it
     like to live in Severance" than one that leaves it to be inferred.
 
-    No `geo` block. city_content.json carries no coordinates, and a plausible-
-    looking latitude is exactly the kind of fabrication that a schema validator
-    will happily accept and a person will never notice. Name, county and state
-    are all real; that is what gets published.
+    Coordinates come from build/data/town_geo.json, fetched from the Google
+    Geocoding API by build/tools/geocode_towns.py — never typed in. A plausible-
+    looking latitude is exactly the kind of fabrication a schema validator accepts
+    and a person never notices, so when that file is absent this emits Place
+    WITHOUT geo rather than guessing. Missing is the honest state; wrong is not.
     """
     data = {
         "@context": "https://schema.org",
@@ -4983,6 +5061,13 @@ def _town_place_schema(city, county_name, url_path, welcome):
     first = _first_sentence(welcome)
     if first:
         data["description"] = first
+    geo = TOWN_GEO.get(data_slug or "")
+    if geo and isinstance(geo.get("lat"), (int, float)) and isinstance(geo.get("lng"), (int, float)):
+        data["geo"] = {
+            "@type": "GeoCoordinates",
+            "latitude": geo["lat"],
+            "longitude": geo["lng"],
+        }
     return json.dumps(data, indent=None)
 
 
@@ -5515,7 +5600,7 @@ def build_city_pages():
                               _town_place_schema(
                                   city, c["name"],
                                   f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html",
-                                  welcome)]
+                                  welcome, data_slug)]
                 + ([city_video_schema] if city_video_schema else [])
                 + own_home_schema,
                 canonical_path=(
@@ -11050,8 +11135,28 @@ def build_redirects_and_meta():
                "Perplexity-User", "Google-Extended", "ClaudeBot", "anthropic-ai",
                "CCBot", "Bytespider", "Applebot-Extended"]
     ai_bot_rules = "\n".join(f"User-agent: {bot}\nAllow: /" for bot in ai_bots)
+    # 2026-08-17 (Search Console: "Server error (5xx)" on 7 URLs, on a static site
+    # that cannot 5xx). The XHR endpoints are the only thing here that runs code.
+    # /.netlify/functions/listings-search and nearby-places are referenced in the
+    # JavaScript of 108 pages (147 and 145 references), and Googlebot follows URLs
+    # it finds in JS — so it has been calling the site's API without the query
+    # parameters the browser always sends, which is not a request either function
+    # is written to answer.
+    #
+    # Disallowing them is what robots.txt is actually for. It costs nothing: fetch()
+    # and XHR do not consult robots.txt, so every widget on the site keeps working
+    # exactly as before. What it buys is two things — Search Console stops reporting
+    # errors for endpoints that were never pages, and crawl budget stops being spent
+    # on them, which matters on a site where 66 real pages are sitting in
+    # "crawled — currently not indexed".
+    #
+    # /status and /site-health stay crawlable on purpose: they are deliberate,
+    # bookmarkable routes (see the redirects below), and they return 200.
     robots = (
-        f"User-agent: *\nAllow: /\n\n{ai_bot_rules}\n\n"
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /.netlify/functions/\n"
+        f"\n{ai_bot_rules}\n\n"
         f"Sitemap: {SITE['domain']}/sitemap.xml\n"
     )
     with open(os.path.join(OUT, "robots.txt"), "w") as f:
