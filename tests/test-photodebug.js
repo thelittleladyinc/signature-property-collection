@@ -146,6 +146,60 @@ function apiThen(imageImpl, api = mediaOk) {
     );
   }
 
+  // ---- Both auth modes must be tried before a 404 is believed ----------------
+  // 2026-08-17, from Christine's live debug output on a grey land listing:
+  //   {"reason":"image_http_error","httpStatus":404,"authMode":"auth","urlCount":4}
+  // MLS Grid resolved 4 photo URLs and the image came back 404 -- but the retry
+  // only fired on 401/403, so that photo had only ever been fetched ONE way. A 404
+  // is not trustworthy until both modes have been tried, because S3/CloudFront
+  // answer 404 rather than 403 for objects a caller may not know exists, and
+  // looksPresigned() is a heuristic a path-signed URL slips past.
+  console.log("\n  both auth modes on a 404:");
+  {
+    const seen = [];
+    const h = load(store(), apiThen(() => {
+      seen.push("img");
+      return { ok: false, status: 404, headers: imgHeaders("text/plain") };
+    }));
+    const res = await call(h, { debug: "1" });
+    const body = JSON.parse(res.body);
+    check("  a 404 is retried with the other auth mode", seen.length === 2,
+      `${seen.length} image request(s) — a 404 is being believed after one try`);
+    check("  and every attempt is reported", Array.isArray(body.attempts) && body.attempts.length === 2,
+      JSON.stringify(body.attempts));
+    check("  naming both modes tried",
+      Array.isArray(body.attempts) &&
+      body.attempts.map((a) => a.mode).sort().join(",") === "anon,auth",
+      JSON.stringify(body.attempts));
+    check("  with the status each returned",
+      Array.isArray(body.attempts) && body.attempts.every((a) => a.status === 404));
+  }
+  {
+    // A 500 is still not worth a second request — this must not become "retry
+    // everything", which would double every failure against a shared-quota API.
+    const seen = [];
+    const h = load(store(), apiThen(() => {
+      seen.push("img");
+      return { ok: false, status: 500, headers: imgHeaders("text/plain") };
+    }));
+    await call(h, { debug: "1" });
+    check("  a 500 is NOT retried", seen.length === 1, `${seen.length} image request(s)`);
+  }
+  {
+    // And a photo that works on the SECOND mode must actually be served — the
+    // outcome this change exists to make possible.
+    let n = 0;
+    const h = load(store(), apiThen(() => {
+      n += 1;
+      if (n === 1) return { ok: false, status: 404, headers: imgHeaders("text/plain") };
+      return { ok: true, status: 200, headers: imgHeaders("image/jpeg"),
+        arrayBuffer: async () => new ArrayBuffer(4096) };
+    }));
+    const res = await call(h);
+    check("  a photo that 404s on one mode and works on the other IS served",
+      res.headers["Content-Type"] === "image/jpeg", res.headers["Content-Type"]);
+  }
+
   // The success path must keep working — it was the only one that ever did.
   {
     const h = load(store(), apiThen(() => ({
