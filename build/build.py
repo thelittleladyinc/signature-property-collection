@@ -4433,6 +4433,42 @@ def _faq_block(qa_pairs):
     return html, json.dumps(schema)
 
 
+# Abbreviations that end in a period and are followed by a capitalised word, so a
+# naive split on ". " mistakes them for the end of a sentence. Found by reading the
+# rendered output rather than by guessing: Lyons' meta description was shipping as
+# "Lyons sits where the North and South St." -- the welcome copy says "North and
+# South St. Vrain Rivers meet", and the splitter cut it in half. That is a broken
+# sentence in the one place Google prints verbatim.
+#
+# Only Lyons is affected by today's content, which is exactly why this is worth
+# fixing centrally instead of editing one string: the next town whose blurb
+# mentions a saint, a mount, an avenue or a junior breaks the same way, silently,
+# and nobody would look.
+_SENTENCE_ABBREVS = (
+    "St", "Mt", "Mtn", "Ave", "Rd", "Dr", "Blvd", "Ln", "Ct", "Hwy",
+    "Jr", "Sr", "Co", "Inc", "No", "Fig", "Est", "approx", "U.S",
+)
+
+
+def _first_sentence(text):
+    """First real sentence of a blurb, without splitting inside an abbreviation.
+
+    Returns it with a single trailing period, or "" for empty input. Shared by the
+    meta description, the town FAQ answers and the Place schema description so the
+    three can never disagree about where a sentence ends -- they were three copies
+    of `split(". ")[0]` before, which meant three chances to ship the same bug.
+    """
+    if not text:
+        return ""
+    parts = text.split(". ")
+    out = parts[0]
+    i = 1
+    while i < len(parts) and out.rstrip().rsplit(" ", 1)[-1].rstrip(".") in _SENTENCE_ABBREVS:
+        out = f"{out}. {parts[i]}"
+        i += 1
+    return out.strip().rstrip(".") + "."
+
+
 def _city_meta_description(city, county_name, welcome_text, budget=158, disambiguate=False):
     """2026-08-13 (SEO fix): city_content.json's own "meta" field is
     scraped AgentFire boilerplate -- literally
@@ -4471,8 +4507,7 @@ def _city_meta_description(city, county_name, welcome_text, budget=158, disambig
     )
     hook = ""
     if welcome_text:
-        hook = welcome_text.split(". ")[0].strip().rstrip(".")
-        hook = f"{hook}." if hook else ""
+        hook = _first_sentence(welcome_text)
     if hook and len(hook) + len(suffix) <= budget:
         return hook + suffix
     if hook:
@@ -4945,9 +4980,9 @@ def _town_place_schema(city, county_name, url_path, welcome):
     }
     # Only when there is real copy to describe it with -- an empty or null
     # description is worse than an absent one.
-    first = welcome.split(". ")[0].strip().rstrip(".") if welcome else ""
+    first = _first_sentence(welcome)
     if first:
-        data["description"] = first + "."
+        data["description"] = first
     return json.dumps(data, indent=None)
 
 
@@ -5380,7 +5415,7 @@ def build_city_pages():
             # An FAQ that only ever says yes is worth nothing to the person reading
             # it and, increasingly, nothing to the engine quoting it.
             faq_pairs = []
-            welcome_first = welcome.split(". ")[0].strip().rstrip(".") if welcome else ""
+            welcome_first = _first_sentence(welcome).rstrip(".")
             if welcome_first:
                 good_place = [f"That depends on what you're weighing. {welcome_first}."]
                 if school_district:
