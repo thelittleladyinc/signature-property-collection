@@ -40,9 +40,10 @@ RESOLVED today:
   filter. See §2.7.
 
 STILL OPEN and genuinely unresolved — do not report these as done:
-- **Card photos are still served at full MLS resolution** — the fix wrecked her
-  listing cards and was reverted. Diagnosis good, execution wrong. §2.9. NOTE: the
-  Cloudinary switch (§1.1, done the same evening) may resolve this on its own as
+- **Card photos are still served at full MLS resolution** (the SLOW problem, not the
+  GREY one — §2.9 separates them). The fix wrecked her listing cards and was
+  reverted: diagnosis good, execution wrong. §2.9b. Grey cards are fixed (§2.9a).
+  NOTE: the Cloudinary switch (§1.1) would resolve the slowness on its own as
   listings re-host — check "photos permanently cached" on /status before rebuilding
   anything.
 - The two land listings' photos (§2.7b).
@@ -426,9 +427,44 @@ that needs re-running. Pinned by `test-healthlive.js`.
 rather than red. If that ever hides something real, flip it — but read
 `test-healthlive.js` case 5 first, which pins that a FRESH failure still fails.
 
-### 2.9 Card photos are still full-resolution — the fix was shipped and reverted
+### 2.9 Card photos — TWO separate problems. One is fixed, one is still open.
 
-**The problem is real and still open.** Christine: "pictures just still arent coming
+They got conflated all evening, so separate them before touching anything:
+
+| | Symptom | Status |
+|---|---|---|
+| **A. Grey cards** | A card shows nothing at all | **FIXED 2026-08-17** — see 2.9a |
+| **B. Slow photos** | The photo arrives, but it is 1–3MB for a 400px slot | Still open — see below |
+
+### 2.9a Grey cards — fixed by keeping our own copy
+
+Christine said "photos still arent showing" **four times** on 2026-08-17. Every answer
+given to her was accurate and none of them changed what she was looking at:
+
+- MLS Grid's media host was 429ing, so the fetch failed;
+- the CDN could not help, because a photo that never succeeded has nothing to cache;
+- Cloudinary re-hosting would fix it permanently, but is blocked on credentials only
+  she can set (§1.1), and stayed blocked all evening.
+
+All true. Her main listings page still had a hole in it. **The lesson is the one worth
+keeping: an accurate explanation is not a fix, and repeating it is not progress.**
+
+`listing-photo.js` now writes a successful photo to Blobs and serves that copy on any
+later failure. One success is permanent; a rate limit stops being something a visitor
+can see. No third party, no key.
+
+**Bounded deliberately** — this store also holds the ~27,000-listing IRES catalogue:
+cover photos only (`PHOTO_CACHE_MAX_INDEX = 0`), her own listings only (via
+`mine-listings.json`), and it fails SAFE — an unreadable listing list means cache
+nothing, never everything. `test-photocache.js` drives the real functions against a
+fake store and is control-tested; unbounding the index makes it fail.
+
+**It does not repair a photo that has never once succeeded** — it makes the next
+success permanent. A card can still be grey until its first clear window.
+
+### 2.9b Slow photos — still open, and the reverted attempt
+
+**Still true.** Christine: "pictures just still arent coming
 through very quickly". A listing card renders at roughly 400px wide and is handed the
 FULL-RESOLUTION MLS photo — routinely 1–3MB of JPEG for a slot that needs about 60KB.
 `listing-photo.js` caches hard at the CDN, so a repeat view is fast and still

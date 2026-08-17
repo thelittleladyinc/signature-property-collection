@@ -79,10 +79,22 @@ check(
 );
 
 // --- The cloud name makes it verifiable ---
+// 2026-08-17: this used to require the row to interpolate CLOUDINARY_CLOUD_NAME
+// directly. That became the WRONG assertion the moment CLOUDINARY_URL was accepted
+// as a single variable -- the row must print whichever cloud is actually in use, so
+// it has to go through the same resolver the uploads do. Reading the raw env var
+// would print nothing at all for a site configured by connection string, which is
+// precisely the failure this row exists to prevent.
 check(
   "the env-vars row prints which cloud name is in use",
-  /cloud name.*CLOUDINARY_CLOUD_NAME|CLOUDINARY_CLOUD_NAME\}/.test(src),
+  /cloud name "\$\{\(cloudinaryCredentials\(\) \|\| \{\}\)\.cloud_name\}/.test(src),
   "without it there is no way to tell the two accounts apart, or confirm a swap took"
+);
+check(
+  "and it resolves that name the same way the uploads do",
+  /cloudinaryCredentials\(\)/.test(src) &&
+    !/cloud name "\$\{process\.env\.CLOUDINARY_CLOUD_NAME\}/.test(src),
+  "reading the raw env var prints nothing for a site configured by CLOUDINARY_URL"
 );
 
 // The two mistakes actually made while switching accounts, both of which look
