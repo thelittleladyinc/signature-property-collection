@@ -366,15 +366,34 @@ fix the blast-radius problem in §1.3. **Sync cadence was moved 15 → 30 minute
 her request on 2026-08-17**, recorded in `netlify.toml` with the honest caveat that
 it halves an already-small footprint and is not the fix.
 
-**Follow-up, same day:** `docs/MLS-GRID-QUOTA.md` now carries the quota research
-— the published limits (2 rps / 7,200 hr / 40,000 day / 4 GB hr, with media
-downloads spending the same budget), whether a token split is permitted and what
-it plausibly costs, the cheaper catalogue-wide cover pre-host option, and the
-email to send MLS Grid support. Headline: MLS Grid's docs say media URLs are
-single-use, one-hour, no hot-linking, self-host what you display — so the
-remaining live-fetch path is less a quota shortage than the last place the site
-still uses the media host the way its docs say not to. Pre-hosting every cover
-removes it whether or not the quota question is ever answered.
+**Follow-up, same day — and it overturns the conclusion above.** MLS Grid's own
+API documentation, read against this codebase, says the remaining problem is not
+the shared quota. `docs/MLS-GRID-QUOTA.md` has the full audit; the headlines:
+
+- **Media URLs are SINGLE-USE.** `URL_CACHE_TTL_MS` caches them for 40 minutes and
+  re-serves them, so every second use fails by design — a grey card that has
+  nothing to do with rate limiting. The docs say plainly: "do not store or cache a
+  Media URL for later use."
+- **"There is NEVER a reason to download the same media more than once."** Detail
+  pages re-download photos 1–11 on every view, because the photo cache stops at
+  index 0. That is the biggest consumer on this site's side of the token.
+- **From 8 September 2026 media moves to a path-signed URL format with no query
+  string**, which `looksPresigned()` cannot detect — so the Bearer header goes out
+  on signed URLs and 403s, the exact failure the auth-mode split was built to
+  avoid.
+- **The `anon` fetch branch omits `User-Agent: <token>`**, which the docs say is
+  mandatory on ALL media downloads or the request is blocked.
+- **The media resolve query is out of spec twice**: eleven `or` operators against a
+  documented max of five, and no `OriginatingSystemName`, which is required on
+  every request. That is likely why the feed "sometimes ignores a ListingId
+  filter and returns an unrelated record".
+
+Also: **usage is self-serve** — Manage Subscriptions → Edit Data Subscription
+Details → Usage tab → Usage Logs gives the hourly and 24-hour breakdown without
+emailing anybody. And the subscription types (IDX/VOW/BO/PT) are use-case
+licences, not capacity tiers, so adding a feed buys no headroom. Christine's IDX
+subscription is $28/month; a second one is worth having for attribution and blast
+radius, but it was never going to fix the photos.
 
 ### 2.7 The county map drills into towns (2026-08-17)
 
