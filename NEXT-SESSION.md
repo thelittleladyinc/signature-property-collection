@@ -1,4 +1,4 @@
-# Handoff — every known gap, as of 2026-08-16
+# Handoff — every known gap, as of 2026-08-17
 
 Written at the end of a long session, for whoever picks this up next. Nothing here
 is speculation dressed as fact: where something is unverified it says so, and
@@ -9,8 +9,40 @@ reporting the real current counts (pages, spots, towns, views, suites), because 
 figure typed into a document goes stale. As of writing: 142 sitemap pages, 30 local
 spots, 14 suites green.
 
-All work pushed to `master` and `claude/non-human-sounding-listings-jhgxqk`.
+All work pushed to `master` and `claude/potter-realty-comparison-fdq1lc`.
 Health check: `signaturepropertycollection.com/status?probe=1&format=json`
+— and NOTE the `?probe=1`: a plain `/status` load makes no outbound calls and can
+therefore show readings hours or days old. Since 2026-08-17 every probe row prints
+when it was checked and a summary row at the top names anything stale, but the habit
+still matters. See §2.8.
+
+## 0. What changed 2026-08-17 (read this before §1)
+
+Thirteen PRs. The competitive work Christine originally asked for — beating Potter,
+Kittle, Basner, Hawbaker, Big Dog, Lemmings, Hammonds, Hansen — is finished and
+merged. Verified flat across every one of those merges: **155 pages, 160 video
+embeds (59 unique), 37 local spots**. Nothing was lost at any point.
+
+RESOLVED today:
+- **town-market-stats.js read the listings blob wrong** and blamed MLS Grid for
+  being empty while /status showed 26,445 stored. It expected an array;
+  sync-listings writes an object keyed by listing id. Town prices are live now
+  (Loveland 510 active / $499,500, cross-checked against the site's own search).
+- **Both generator workflows destroyed each other's runs.** geocode-towns fetched
+  36 real coordinates, rebuilt 37 pages, passed every suite, then lost a `git push`
+  race by one second and threw it all away. `scripts/commit-generated.sh` now
+  rebuilds onto the new master instead of rebasing generated HTML. All 37 town
+  pages now carry real Google-geocoded `Place` coordinates.
+- **`?debug=1` on listing-photo could not explain a failing photo** — it was handled
+  after every failure return, so it only ever described photos that already worked.
+- **Nothing backed off from a 429 on the MEDIA host.** See §2.6, rewritten.
+- **The county map now drills into towns** instead of jumping to a county-wide price
+  filter. See §2.7.
+
+STILL OPEN and genuinely unresolved — do not report these as done:
+- The two land listings' photos (§2.7b).
+- Whether the shared MLS Grid quota needs splitting (§2.6).
+- Everything in §1, which is still hers.
 
 ---
 
@@ -18,7 +50,14 @@ Health check: `signaturepropertycollection.com/status?probe=1&format=json`
 
 These need her dashboards. Do not spend time trying to work around them.
 
-### 1.1 Cloudinary credentials — HIGHEST IMPACT
+### 1.1 Cloudinary credentials — LIKELY ALREADY FIXED, VERIFY BEFORE REPEATING
+**2026-08-17: Christine said "i feel like i already did the cloud thing yesterday".
+She had. I read a stale `/status` row and told her it was still broken.** Do not
+repeat that mistake — the row below may be describing a verdict from days ago.
+**Verify with `/status?probe=1` before saying a word about it.** The staleness
+disclosure added the same day (§2.8) now makes an old reading say so out loud.
+
+Original diagnosis, kept because it is still the fix if the row does come back red:
 `/status` reports `cloud_name mismatch`. The three `CLOUDINARY_*` env vars are
 from two different accounts: cloud name from one, API key/secret from another.
 
@@ -117,7 +156,13 @@ and either attach it or have Christine send it on reply. **Until then the promis
 only as good as her follow-up**, and the follow-up currently depends on §1.2
 (`RESEND_API_KEY`) actually alerting her that the lead arrived.
 
-### 1.5 Two GitHub secrets — the town-page prices are off until these are set
+### 1.5 Two GitHub secrets — DONE 2026-08-17, prices are live
+
+`BLOBS_SITE_ID` / `BLOBS_TOKEN` and `GOOGLE_MAPS_API_KEY` are set, both workflows
+have run successfully, and the numbers are on the pages. Nothing to do here. The
+original rationale is kept below because it explains why the feature exists.
+
+**Original note —** the town-page prices are off until these are set
 
 Added 2026-08-16 after searching the queries the town pages were re-aimed at. Every
 page outranking this site leads with numbers — "median list price $672,792 … 92 days
@@ -154,6 +199,19 @@ week, and `python3 build/build.py` prints a one-line reminder every time it runs
 To generate the file once by hand from a machine with the credentials:
 
     BLOBS_SITE_ID=... BLOBS_TOKEN=... node build/tools/town-market-stats.js
+
+### 1.6b Jefferson, Arapahoe and Adams have NO town pages — found 2026-08-17
+
+Surfaced by building the county drill-down. Those three counties list **27 cities
+between them** in `COUNTIES`, and not one has a town page behind it. They appear in
+the Search Homes dropdown and on their county pages with nothing to land on.
+Larimer/Weld/Boulder have 31 town pages; Morgan, Denver and Broomfield got theirs;
+these three were missed.
+
+The map handles it gracefully — an empty `towns` array falls through to the old
+county-wide popup rather than opening an empty panel — so this is a content gap,
+not a bug. But town pages are the ranking asset, and 27 of them are missing.
+Needs `city_content.json` entries, which is real writing, not generation.
 
 ### 1.6 Small, cheap, still open
 - **"Driven Steakhouse"** — real Loveland restaurant, she says she has a Facebook
@@ -234,28 +292,122 @@ caught `/seller-local-proof.html` before it shipped. When adding a page, add it 
   views, how many spots exist). Assertions now derive expected values from the
   data. Keep doing that.
 
-### 2.6 MLS Grid 429s — rate limiting, and partly self-inflicted
-2026-08-16: `/status?probe=1` reported a 429 on the photo fetch right after several
-refreshes. The pipeline was intact — the URLs resolved fine. Two contributing causes:
+### 2.6 MLS Grid 429s — the real diagnosis, 2026-08-17
 
-1. The raised time budget (§2.1) means the crawl now actually fetches pages, each
-   with `$expand=Media`. Real extra load on an account shared with two other apps.
-2. **The probe itself.** Each `?probe=1` costs a media-resolve plus a real image
-   fetch. Refreshing it repeatedly caused some of the 429 it then reported.
+Supersedes the 2026-08-16 note, which blamed the crawl and the probe. Both were
+contributors; neither was the main event.
 
-Fixed both reporting problems: a 429 now reads "Rate limited, not broken" and
-explains the shared-account limit, and the probe **refuses to run at all while a
-cool-off is active** rather than adding to it. A diagnostic that changes what it
-measures is worse than no diagnostic.
+**Measured, not guessed:** `sync-listings` is paced at `REQUEST_DELAY_MS` (1500ms)
+inside `TIME_BUDGET_MS` (11s), so it makes **at most ~7 API calls per run** — ~670
+a day at the old 15-minute cadence. That is small against MLS Grid's limits. This
+job was never the glutton, and throttling it further is not the lever it looks like.
 
-**If 429s persist beyond bursts**, the lever is `REQUEST_DELAY_MS` (1500ms) or
-lowering `TIME_BUDGET_MS` back toward 9000 — not removing the guards. Photos degrade
-to a grey placeholder that retries on the next view, so it is visible but not
-destructive.
+The 429s Christine hit were on **`media.mlsgrid.com`, not the API**, and persisted
+across a 35-minute gap — a sustained condition, not a burst.
+
+Three things were making it worse, all now fixed:
+
+1. **Nothing backed off from a media-host 429.** `setPhotoCooldown()` had exactly
+   one caller: `resolveMediaFor()`, for API 429s. A 429 on the image fetch returned
+   a grey placeholder and changed nothing, so a page of cards kept requesting into
+   a limit that therefore never cleared — the grey box was both the symptom and the
+   cause of the next one. There is now a SEPARATE `MEDIA_COOLDOWN_KEY` (separate on
+   purpose: an API cooldown must not blank photos whose URLs are already cached).
+2. **Every failure placeholder was cached 300s regardless of reason**, so a photo
+   that was never coming back re-asked MLS Grid every five minutes forever, from
+   every CDN edge. Now per-reason: 60s for rate limits, an hour for a photo
+   confirmed gone.
+3. **A listing that resolved to no media was never negative-cached**, so it was
+   re-resolved on every single page view.
+
+**What is still open.** After all three, the account may simply not have the
+headroom. The token is shared with Listing-Engine and Expired-Luxury and the limits
+are per ACCOUNT, so nobody can currently attribute usage to an app. Christine has
+been advised to ask MLS Grid two questions: what her actual limits and recent usage
+are, and whether each application needs its own data access agreement and key —
+which is likely a licensing requirement, not just a nice-to-have, and would also
+fix the blast-radius problem in §1.3. **Sync cadence was moved 15 → 30 minutes at
+her request on 2026-08-17**, recorded in `netlify.toml` with the honest caveat that
+it halves an already-small footprint and is not the fix.
+
+### 2.7 The county map drills into towns (2026-08-17)
+
+Christine: "when i click on any county it moves to this page instead of being able
+to click in more". A county click went straight to a price filter scoped to the
+whole county — not a scope anyone shops in (Fort Collins alone has 842 active) —
+and routed people PAST the 37 town pages, which are this site's best content and
+the pages that match how people search. Clicking a county now fills it, fades the
+others, zooms in, and swaps the sidebar to its towns; the price popup moved to the
+town level. Town data comes from `county-search.json`, generated from `COUNTIES`
+and `town_geo.json`, so the map cannot drift from the rest of the site.
+
+**A LESSON WORTH KEEPING.** Building that, I hid every base marker on entering a
+county so town pins would not double up with city icons — and the same array held
+the POI markers, which are Christine's spots. She opened a county and wrote "all of
+my embedded videos are all gone!!!! I had so many". Nothing had been deleted, and
+that was beside the point: those pins are the one thing this map has that a portal
+map structurally cannot. `tests/test-mapspots.js` now fails if anything registers a
+spot with a hide list. **When optimising a view, check what else is in the bucket
+you are emptying.**
+
+### 2.7b The two land listings' photos — STILL UNRESOLVED
+
+`IRE1000029` / `IRE1000031` ("0 Rickenbacker Rd", legacy records with sequential low
+ids) render grey. Three readings, in order:
+
+1. `image_http_error`, **404**, `authMode: "auth"`, `urlCount: 4` — MLS Grid resolves
+   4 photo URLs fine; the image itself 404s. **Ruled out** the 4.4MB inline ceiling,
+   which was my first suspicion.
+2. After adding a retry: **429** — rate-limited before the second auth mode could be
+   tried.
+3. After adding the media cooldown: **429 again**, backoff working correctly.
+
+**The open question:** a 404 confirmed on BOTH auth modes means the files are gone
+from MLS Grid and nothing here can retrieve them — at which point the honest fix is
+cosmetic (stop the card advertising "View All 4 Photos"). A 404 on one mode and
+success on the other means the auth heuristic was wrong and the photos come back.
+`RETRY_OTHER_MODE_ON` now includes 404 and the debug JSON reports every attempt, so
+**one load of `/.netlify/functions/listing-photo?id=IRE1000029&i=0&debug=1` once the
+limit is clear will settle it.** Do that before touching anything else in the photo
+path.
+
+### 2.8 The health page could show days-old readings as current (2026-08-17)
+
+Five `/status` rows are cached probes that only re-run under `?probe=1`, and the
+display had no staleness handling at all — three of the five printed no date. That
+is how §1.1 happened.
+
+**My first fix was wrong and the tests caught it.** I made the probes refresh
+themselves; that broke three suites, each guarding a lesson already paid for here:
+a plain page load makes no outbound calls (`test-leadprobe.js`), rows must not go
+red for things that are not broken — "the crying-wolf mistake the Cloudinary row
+already taught us" (`test-optional.js`), and a considered cached verdict must not be
+silently overwritten (`test-tagsnotreturned.js`). **Probing was never the missing
+piece; disclosure was.** Every row now prints when it was checked, a stale reading
+is flagged and stops counting as a pass or a fail, and a summary row names anything
+that needs re-running. Pinned by `test-healthlive.js`.
+
+**A deliberate trade to know about:** a STALE failure now renders green-with-warning
+rather than red. If that ever hides something real, flip it — but read
+`test-healthlive.js` case 5 first, which pins that a FRESH failure still fails.
 
 ---
 
 ## 3. Corrections to earlier advice — read before repeating it
+
+### 3.0 Added 2026-08-17
+- **"Cloudinary is still broken"** — WRONG, and I said it to her face. I read a
+  stale `/status` row after she had already fixed it. See §1.1 and §2.8.
+- **"The land photos are probably hitting the 4.4MB ceiling"** — WRONG. Her debug
+  output said 404. I had a plausible story (land listings carry huge aerials and
+  plat maps) and it was not what was happening. The site already shipped the tool
+  that answered it; I should have read it before theorising.
+- **"Make the health probes refresh themselves"** — WRONG, reverted the same
+  session. Three existing suites each encoded a reason not to. See §2.8.
+- **`git push origin <branch>` while standing on `master`** pushes the LOCAL branch
+  of that name, not your commits, and `git rev-parse HEAD` will happily report a
+  sha that was never pushed. Two commits looked shipped and were not. **Verify
+  pushes with `git ls-remote origin <branch>`, never with local HEAD.**
 
 ### 3.1 "Lofty should work, Resend is a backup" — WRONG
 I said this repeatedly. Lofty's API cannot return tags, so the tag-triggered
