@@ -4905,6 +4905,12 @@ RELOCATION_GUIDE_PDF = "/assets/guides/northern-colorado-relocation-guide.pdf"
 # script's header for why this exists and why the numbers are not typed by hand.
 TOWN_MARKET = _load_json("town_market.json")
 
+# Real coordinates per town, fetched by build/tools/geocode_towns.py from the
+# Google Geocoding API. Absent file -> {} -> Place schema is emitted without geo,
+# which is exactly what it did before this existed. Never hand-edited: see that
+# script's header for why a typed-in latitude is worse than no latitude.
+TOWN_GEO = (_load_json("town_geo.json") or {}).get("towns") or {}
+
 # How old the figures may get before the pages stop showing them. Active inventory
 # turns over fast; a median from two months ago is not "slightly old", it is wrong,
 # and it would be wrong on the one block whose entire job is to look current. The
@@ -4942,7 +4948,7 @@ def _usd(n):
     return f"${n:,.0f}"
 
 
-def _town_place_schema(city, county_name, url_path, welcome):
+def _town_place_schema(city, county_name, url_path, welcome, data_slug=None):
     """Place node for a town page, so the page declares the entity it is about.
 
     2026-08-16 (findability audit). These 37 pages are now titled "Living In
@@ -4956,10 +4962,11 @@ def _town_place_schema(city, county_name, url_path, welcome):
     inside a named county inside Colorado is easier to return for "what is it
     like to live in Severance" than one that leaves it to be inferred.
 
-    No `geo` block. city_content.json carries no coordinates, and a plausible-
-    looking latitude is exactly the kind of fabrication that a schema validator
-    will happily accept and a person will never notice. Name, county and state
-    are all real; that is what gets published.
+    Coordinates come from build/data/town_geo.json, fetched from the Google
+    Geocoding API by build/tools/geocode_towns.py — never typed in. A plausible-
+    looking latitude is exactly the kind of fabrication a schema validator accepts
+    and a person never notices, so when that file is absent this emits Place
+    WITHOUT geo rather than guessing. Missing is the honest state; wrong is not.
     """
     data = {
         "@context": "https://schema.org",
@@ -4983,6 +4990,13 @@ def _town_place_schema(city, county_name, url_path, welcome):
     first = _first_sentence(welcome)
     if first:
         data["description"] = first
+    geo = TOWN_GEO.get(data_slug or "")
+    if geo and isinstance(geo.get("lat"), (int, float)) and isinstance(geo.get("lng"), (int, float)):
+        data["geo"] = {
+            "@type": "GeoCoordinates",
+            "latitude": geo["lat"],
+            "longitude": geo["lng"],
+        }
     return json.dumps(data, indent=None)
 
 
@@ -5515,7 +5529,7 @@ def build_city_pages():
                               _town_place_schema(
                                   city, c["name"],
                                   f"/communities/{c['slug']}/{_city_url_slug(data_slug)}.html",
-                                  welcome)]
+                                  welcome, data_slug)]
                 + ([city_video_schema] if city_video_schema else [])
                 + own_home_schema,
                 canonical_path=(
