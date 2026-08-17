@@ -245,8 +245,27 @@
     // Falling back to `spot` rather than `golf` too: an unrecognised category
     // should look like a generic place, not silently claim to be a golf course.
     var glyph = POI_ICONS[poi.icon || poi.category] || POI_ICONS.spot;
+
+    // 2026-08-17 (Christine: "if we could zoom in and a little video icon of it pops
+    // up - that would be asesome!").
+    //
+    // The glyph says what KIND of place a pin is. It never said which pins carry a
+    // film of hers, and that is the thing worth advertising -- a portal map can show
+    // a restaurant, it cannot show her standing in one. Until now that was only
+    // discoverable by hovering each pin one at a time to read the tooltip.
+    //
+    // A badge rather than a different glyph: the category is still the useful thing
+    // at a glance, so this adds to it instead of replacing it. Shown only when zoomed
+    // in (see .map-zoomed-in in style.css) because at county level the pins cluster
+    // and a badge on every one is just noise -- which is exactly what she described.
+    var badge = poi.videoId
+      ? '<span class="poi-video-badge" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>' +
+        '</span>'
+      : '';
     return L.divIcon({
-      html: '<div class="poi-icon-marker">' + glyph + '</div>',
+      html: '<div class="poi-icon-marker' + (poi.videoId ? ' has-video' : '') + '">' +
+        glyph + badge + '</div>',
       className: '',
       iconSize: [28, 28],
       iconAnchor: [14, 14],
@@ -763,6 +782,24 @@
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
       maxZoom: 18,
     }).addTo(map);
+
+    // 2026-08-17: reveal the play badge on video-backed pins once you are zoomed in
+    // far enough that pins are not on top of each other. See poiIcon().
+    //
+    // THIS HANDLER TOGGLES A CSS CLASS AND DOES NOTHING ELSE, and that restraint is
+    // the whole point. On 2026-08-17 a view change of mine hid every one of her spot
+    // pins and she wrote "all of my embedded videos are all gone!!!! I had so many" --
+    // and separately, a browser-cache issue had her reporting that pins "disappear
+    // when we zoom in" for a bug that never existed. Zoom on this map has now been
+    // suspected twice. So this must never add, remove, hide or re-create a layer:
+    // if it only ever sets a class name, it cannot be the cause of a third one.
+    // Pinned by test-mapspots.js.
+    var ZOOM_SHOW_VIDEO_BADGE = 10;
+    function syncZoomClass() {
+      mapEl.classList.toggle('map-zoomed-in', map.getZoom() >= ZOOM_SHOW_VIDEO_BADGE);
+    }
+    map.on('zoomend', syncZoomClass);
+    syncZoomClass();
 
     // County data first: the popup's live-search decision and city list come
     // from it, and a polygon is clickable the moment it's drawn.

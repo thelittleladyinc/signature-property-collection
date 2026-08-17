@@ -2532,7 +2532,7 @@ def _social_follow_section(heading="Follow For More Beautiful Homes"):
     if not links:
         return ""
     return f"""<section class="county-hero" style="padding:60px 0">
-  <div class="wrap" style="text-align:center">
+  <div class="wrap center">
     <span class="eyebrow">Follow Along</span>
     <h2 class="section-title" style="color:var(--white)">{esc(heading)}</h2>
     <p class="lede" style="color:rgba(255,255,255,.85);max-width:560px;margin:0 auto">
@@ -6419,7 +6419,7 @@ def build_sellers():
   </div>
 </section>
 <section class="tight">
-  <div class="wrap" style="text-align:center">
+  <div class="wrap center">
     <span class="eyebrow" style="color:var(--dusty-rose)">Before You Pick An Agent</span>
     <h2 class="section-title">See What Your Neighborhood Is Already Worth To You</h2>
     <p class="lede">Every agent says they will market your home. This shows you, with real numbers,
@@ -9513,7 +9513,7 @@ def build_nav_pages():
 </section>
 {_trust_ribbon_html()}
 <section class="tight">
-  <div class="wrap" style="max-width:640px;text-align:center">
+  <div class="wrap center" style="max-width:640px">
     <span class="eyebrow" style="color:var(--dusty-rose)">The Invitation</span>
     <h2 class="section-title">Discipline Over Drama</h2>
     <p class="lede">Most listings don't fail loudly. They fade quietly over time. A relaunch
