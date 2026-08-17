@@ -66,6 +66,35 @@ function isRehosted(url) {
   return typeof url === "string" && url.indexOf("res.cloudinary.com") !== -1;
 }
 
+// How many photos this listing is believed to have. ONE definition, used by the
+// gallery count, the card's "View All N Photos" label AND the decision to emit a
+// cover-photo URL — because those disagreeing is what broke the cards.
+//
+// 2026-08-17 (Christine: "still no photos - they worked awhile back"). She was right
+// on both counts, and the cause was a contradiction inside a single commit from
+// 2026-08-15. That commit wrote, for the COUNT: "The stored photoCount has to win
+// when photos[] is absent." It then guarded the URL on `listing.photo` and
+// `listing.photos` only, ignoring photoCount. So for a listing whose stored photo
+// URLs had expired and been dropped but whose photoCount survived, the card
+// simultaneously believed there were 50 photos and refused to ask for photo 0.
+//
+// The visible result was a grey box next to the words "View All 50 Photos", and the
+// giveaway was in her own DevTools: NO REQUEST for the photo at all. Not a failed
+// one — none. Every rate limit, cooldown and placeholder we chased for hours was
+// real and was happening to a request the page never made. I dismissed that empty
+// Network tab as "DevTools opened after load"; it was the actual evidence.
+//
+// The guard's intent was sound — don't emit a URL that can only render a
+// placeholder — but it tested the wrong thing. listing-photo.js resolves fresh
+// signed URLs from MLS Grid by LISTING ID (resolvePhotoUrls) and needs no stored
+// URL whatsoever, which her own debug output proved while the card sat grey:
+// urlCount: 50 for the very listing that was showing nothing.
+function knownPhotoCount(listing) {
+  if (Array.isArray(listing.photos) && listing.photos.length) return listing.photos.length;
+  if (typeof listing.photoCount === "number") return listing.photoCount;
+  return listing.photo ? 1 : 0;
+}
+
 function photoUrlFor(listing, index) {
   const i = index || 0;
   const rehosted = Array.isArray(listing.cloudinaryPhotos) ? listing.cloudinaryPhotos[i] : null;
@@ -76,17 +105,15 @@ function photoUrlFor(listing, index) {
     : (Array.isArray(listing.photos) ? listing.photos[i] : null);
   if (isRehosted(stored)) return stored;
   if (!listing.listingId) return null;
-  // No photo at all? Don't send a URL that can only render a placeholder.
-  if (i === 0 && !listing.photo && !(Array.isArray(listing.photos) && listing.photos.length)) {
-    return null;
-  }
+  // Genuinely no photos? Don't send a URL that can only render a placeholder.
+  // Asked of the SAME count the card displays, so the two can never contradict
+  // each other again.
+  if (i >= knownPhotoCount(listing)) return null;
   return `/.netlify/functions/listing-photo?id=${encodeURIComponent(listing.listingId)}&i=${i}`;
 }
 
 function galleryUrlsFor(listing) {
-  const count = Array.isArray(listing.photos) && listing.photos.length
-    ? listing.photos.length
-    : (typeof listing.photoCount === "number" ? listing.photoCount : (listing.photo ? 1 : 0));
+  const count = knownPhotoCount(listing);
   const urls = [];
   for (let i = 0; i < count; i += 1) {
     const url = photoUrlFor(listing, i);
@@ -239,9 +266,13 @@ exports.handler = async (event) => {
         // isn't Christine's and records the count instead. Recomputing from
         // l.photo alone reported "1 photo" for a listing with 40 -- which the
         // gallery button reads, so it silently hid most photos on most cards.
-        photoCount: Array.isArray(photos)
-          ? photos.length
-          : (typeof l.photoCount === "number" ? l.photoCount : (l.photo ? 1 : 0)),
+        //
+        // 2026-08-17: this now goes through knownPhotoCount(), the SAME function
+        // photoUrlFor() asks before deciding whether to emit a cover URL. Having
+        // two copies of this rule is what broke her cards: this one trusted
+        // photoCount and the URL guard did not, so a card could say "View All 50
+        // Photos" beside a grey square and never request photo 0 at all.
+        photoCount: knownPhotoCount(Array.isArray(photos) ? { ...l, photos } : l),
       };
     });
 
