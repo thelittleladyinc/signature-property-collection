@@ -42,9 +42,42 @@ const AGENT_NAME = "Christine Gwinnup";
 const AGENT_PHONE = "303-709-4262";
 
 // Cached across warm invocations -- it's a static 12KB file.
+//
+// 2026-08-17: this threw ENOENT in production and Netlify answered every
+// /listing/<id> request with its red "This function has crashed" page, stack
+// trace and all. Two things were wrong and only one of them was the missing file.
+//
+// The missing file is fixed in netlify.toml (included_files -- the bundler traces
+// require(), and this is the one lib/ file read with fs). But a public endpoint
+// that a buyer reaches from a text message must not be one readFileSync away from
+// showing a stack trace to a stranger. So the read is now guarded: if the shell is
+// somehow absent, the page degrades to a plain, self-contained document that still
+// shows the listing and still links home, and the failure is logged for us instead
+// of rendered for them.
+const FALLBACK_SHELL = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+  '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+  '<title>{{TITLE}}</title><meta name="description" content="{{DESCRIPTION}}">' +
+  '<link rel="canonical" href="{{CANONICAL}}">{{SCHEMA}}' +
+  '<style>body{font-family:system-ui,-apple-system,sans-serif;margin:0;padding:32px;' +
+  'line-height:1.6;color:#141415;background:#f7f5f2}a{color:#B86F7A}' +
+  'main{max-width:70ch;margin:0 auto}</style></head><body><main>{{BODY}}' +
+  '<p style="margin-top:40px"><a href="/">' + AGENT_NAME + ' — Signature Property Collection</a></p>' +
+  '</main></body></html>';
+
 let _shell = null;
 function shell() {
-  if (_shell === null) _shell = fs.readFileSync(SHELL_PATH, "utf8");
+  if (_shell === null) {
+    try {
+      _shell = fs.readFileSync(SHELL_PATH, "utf8");
+    } catch (err) {
+      console.error(
+        `listing-page: shell missing at ${SHELL_PATH} (${err && err.code}) — serving the ` +
+        "plain fallback. Check included_files in netlify.toml; the bundler cannot trace " +
+        "an fs.readFileSync, so this file has to be declared explicitly."
+      );
+      _shell = FALLBACK_SHELL;
+    }
+  }
   return _shell;
 }
 

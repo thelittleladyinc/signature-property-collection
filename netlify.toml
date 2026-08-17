@@ -20,6 +20,21 @@
 
 [functions]
   directory = "netlify/functions"
+  # 2026-08-17: /listing/<id> crashed in production with
+  #   ENOENT: no such file or directory, open
+  #   '/var/task/netlify/functions/lib/_listing-page-shell.html'
+  #
+  # The file is committed and not ignored. The problem is that Netlify's bundler
+  # ships what it can TRACE, and it traces require(). Every other file in lib/ is
+  # .js or .json and gets pulled in that way -- _local-spots.json and
+  # _sold-homes-data.json are both require()d, which is why they have always
+  # worked. The shell is the one file read at runtime with fs.readFileSync, which
+  # the bundler cannot see, so it was never packaged.
+  #
+  # This is why the feature could pass every static check and still be broken: the
+  # file exists in the repo, the reference is correct, the build produces it -- and
+  # none of that puts it inside the deployed function.
+  included_files = ["netlify/functions/lib/_listing-page-shell.html"]
 
 # 2026-08-14: there was no [[headers]] block at all. Two costs, in order of
 # impact:
