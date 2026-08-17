@@ -82,70 +82,151 @@ const PLACEHOLDER_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3" width="800" height="600">' +
   '<rect width="4" height="3" fill="#eeeeee"/></svg>';
 
-function placeholder(reason) {
+// 2026-08-17. ?debug=1 used to be handled by a single block at the very BOTTOM
+// of the handler -- after every `return placeholder(...)`. So it reported only on
+// photos that already worked, and answered a failing photo with the same silent
+// grey square as a normal request. Christine opened the debug URL for a land
+// listing that renders grey and got a grey rectangle back; the one tool built to
+// explain a blank photo could not explain a blank photo.
+//
+// The reason was never actually missing -- it goes out as X-Photo-Fallback on
+// every placeholder -- but reading a response header means opening devtools,
+// which is not a thing to ask someone to do to find out why a photo is grey.
+//
+// So the reason now travels with the placeholder, and every failure path returns
+// it as readable JSON when debug=1. `extra` carries whatever that particular
+// failure knows (HTTP status, byte count, how many URLs resolved) instead of
+// making the reason string carry it by concatenation.
+function placeholder(reason, debug, extra) {
+  if (debug) {
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      body: JSON.stringify({
+        ok: false,
+        reason,
+        // Plain-English reading of `reason`, so the answer doesn't depend on
+        // knowing this file. Anything unrecognised falls through to the code.
+        explanation: EXPLANATIONS[reason] || `Unrecognised failure code: ${reason}`,
+        ...(extra || {}),
+      }, null, 2),
+    };
+  }
   return {
     statusCode: 200,
     headers: {
       "Content-Type": "image/svg+xml",
       "Cache-Control": PLACEHOLDER_CACHE_CONTROL,
-      // Read this header in the browser's network tab to see why a photo is
-      // blank without needing the function logs.
+      // Still sent on the image response, for the network tab and for anything
+      // that samples these at scale.
       "X-Photo-Fallback": reason,
     },
     body: PLACEHOLDER_SVG,
   };
 }
 
+// Keyed by the reason codes used below. The point of each entry is to say what
+// to DO about it, since a code alone still leaves the next step unclear.
+const EXPLANATIONS = {
+  bad_id: "The listing id in the URL isn't a valid MLS id.",
+  not_configured: "MLSGRID_API_TOKEN is not set on this deploy, so no photo can be fetched at all.",
+  no_media: "MLS Grid returned no photos for this listing. Either the listing genuinely has none, " +
+    "or its media is not visible to this feed. The card's photo count comes from the last sync, so a " +
+    "count above zero here means the media has gone away since then.",
+  index_out_of_range: "This listing has fewer photos than the requested index.",
+  throttled: "MLS Grid rate-limited us recently and the photo cooldown is still active, so no request " +
+    "was made. This one is temporary — the same URL should work within a minute.",
+  image_fetch_failed: "The photo URL resolved, but fetching the image itself failed outright " +
+    "(timeout or network error) rather than returning an HTTP error.",
+  not_an_image: "The photo URL returned something that isn't an image.",
+  image_http_error: "MLS Grid's media host refused the image. A 403 usually means the signed URL " +
+    "expired or was fetched with the wrong auth mode; a 404 means the photo is gone.",
+  too_large: "The photo downloaded fine but is too big to return through a Netlify function. " +
+    "A function response is capped at 6 MB and base64 encoding inflates it by a third, so the real " +
+    "ceiling is about 4.4 MB. Full-resolution aerials and scanned plat maps — common on land " +
+    "listings — routinely exceed it while ordinary house photos don't.",
+  exception: "The function threw. Check the Netlify function logs for this request.",
+};
+
+
 // One MLS Grid call per listing, cached for both this photo and the other 29 in
 // the same gallery. listings-search.js normally warms this ahead of the
 // browser's requests (see prewarmPhotoUrls in lib/_media.js) -- this path is the
 // fallback for a direct hit, a shared link, or a cache that expired mid-visit.
+// Returns { urls, throttledUntil }. Reporting the throttle separately matters
+// for diagnosis: "we were rate-limited so we didn't ask" and "we asked and this
+// listing has no photos" both produce a grey square but need opposite responses
+// -- the first fixes itself in under a minute, the second never does.
 async function resolvePhotoUrls(listingId, store, token) {
   const cached = await readCachedUrls(store, listingId);
-  if (cached && cached.fresh) return cached.urls;
+  if (cached && cached.fresh) return { urls: cached.urls, throttledUntil: null };
 
   // Respects the sync's suspension flag AND the photo-specific cooldown, and
   // sets only the latter -- photo traffic must never pause listing replication.
   const throttledUntil = await isThrottled(store);
-  if (throttledUntil) return cached ? cached.urls : null;
+  if (throttledUntil) return { urls: cached ? cached.urls : null, throttledUntil };
 
   const resolved = await resolveMediaFor([listingId], {
     store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS,
     timeoutMs: SINGLE_TIMEOUT_MS,
   });
-  return resolved[listingId] || (cached ? cached.urls : null);
+  return { urls: resolved[listingId] || (cached ? cached.urls : null), throttledUntil: null };
 }
 
 exports.handler = async (event) => {
+  const params = (event && event.queryStringParameters) || {};
+  // Read FIRST, and OUTSIDE the try, so every return below honours it -- the
+  // exception handler included, which is the one place a caller most needs an
+  // explanation rather than a grey square. It used to be read at the very bottom
+  // of this function, so it only ever described a success. See placeholder().
+  const debug = params.debug === "1";
   try {
-    const params = (event && event.queryStringParameters) || {};
     const listingId = String(params.id || params.listingId || "").trim();
     if (!listingId || !/^[A-Za-z0-9_-]{3,40}$/.test(listingId)) {
-      return placeholder("bad_id");
+      return placeholder("bad_id", debug, { listingId });
     }
     const index = Math.max(0, parseInt(params.i, 10) || 0);
 
     const token = process.env.MLSGRID_API_TOKEN;
-    if (!token) return placeholder("not_configured");
+    if (!token) return placeholder("not_configured", debug, { listingId });
 
     const store = getBlobStore(getStore, BLOB_STORE_NAME);
-    const urls = await resolvePhotoUrls(listingId, store, token);
-    if (!urls || !urls.length) return placeholder("no_media");
-    if (index >= urls.length) return placeholder("index_out_of_range");
+    const { urls, throttledUntil } = await resolvePhotoUrls(listingId, store, token);
+    if (throttledUntil && (!urls || !urls.length)) {
+      return placeholder("throttled", debug, {
+        listingId, index, retryAfterSeconds: Math.max(1, Math.ceil((throttledUntil - Date.now()) / 1000)),
+      });
+    }
+    if (!urls || !urls.length) return placeholder("no_media", debug, { listingId, index, urlCount: 0 });
+    if (index >= urls.length) {
+      return placeholder("index_out_of_range", debug, { listingId, index, urlCount: urls.length });
+    }
 
     // 2026-08-15: the Authorization header is chosen per URL rather than always
     // sent -- MLS Grid's pre-signed media URLs 403 when a second auth mechanism
     // rides along, which is what was blanking some cards. See fetchMediaResponse.
+    const mediaHost = (() => { try { return new URL(urls[index]).host; } catch (e) { return null; } })();
     const attempt = await fetchMediaResponse(urls[index], token, IMAGE_FETCH_TIMEOUT_MS);
     const imgRes = attempt && attempt.res;
-    if (!imgRes) return placeholder("image_fetch_failed");
+    if (!imgRes) {
+      return placeholder("image_fetch_failed", debug, {
+        listingId, index, urlCount: urls.length, mediaHost,
+        authMode: attempt && attempt.mode, error: attempt && attempt.error,
+      });
+    }
     if (!imgRes.ok) {
       console.error(`listing-photo: ${listingId} photo ${index} -> HTTP ${imgRes.status} (mode ${attempt.mode})`);
-      return placeholder("image_http_" + imgRes.status);
+      // The status is a field now rather than part of the reason string, so
+      // callers can group these without parsing a code they have to guess at.
+      return placeholder("image_http_error", debug, {
+        listingId, index, httpStatus: imgRes.status, authMode: attempt.mode, mediaHost, urlCount: urls.length,
+      });
     }
 
     const contentType = imgRes.headers.get("content-type") || "image/jpeg";
-    if (!contentType.startsWith("image/")) return placeholder("not_an_image");
+    if (!contentType.startsWith("image/")) {
+      return placeholder("not_an_image", debug, { listingId, index, contentType, mediaHost });
+    }
 
     const buf = Buffer.from(await imgRes.arrayBuffer());
 
@@ -167,18 +248,20 @@ exports.handler = async (event) => {
     if (buf.length > MAX_INLINE_IMAGE_BYTES) {
       console.error(`listing-photo: ${listingId} photo ${index} is ${buf.length} bytes — ` +
         `over the ${MAX_INLINE_IMAGE_BYTES}-byte inline ceiling.`);
-      return placeholder("too_large_" + buf.length);
+      return placeholder("too_large", debug, {
+        listingId, index, bytes: buf.length, limitBytes: MAX_INLINE_IMAGE_BYTES,
+        overBy: buf.length - MAX_INLINE_IMAGE_BYTES, contentType, mediaHost, urlCount: urls.length,
+      });
     }
 
-    if (params.debug === "1") {
+    if (debug) {
       // One URL Christine can open to see what happened, instead of a grey box.
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
         body: JSON.stringify({
           listingId, index, ok: true, bytes: buf.length, contentType,
-          authMode: attempt.mode, urlCount: urls.length,
-          mediaHost: (() => { try { return new URL(urls[index]).host; } catch (e) { return null; } })(),
+          authMode: attempt.mode, urlCount: urls.length, mediaHost,
         }, null, 2),
       };
     }
@@ -197,6 +280,6 @@ exports.handler = async (event) => {
     };
   } catch (err) {
     console.error("listing-photo error:", err && err.message);
-    return placeholder("exception");
+    return placeholder("exception", debug, { error: err && err.message });
   }
 };
