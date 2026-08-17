@@ -3913,6 +3913,11 @@ def build_home():
       <div class="county-list">
         {county_btns}
       </div>
+      <!-- Filled in by map.js once the spots load, and left empty if they don't:
+           chips for the kinds of places Christine actually goes, so a visitor can
+           look for somewhere to eat rather than reading every pin. Deliberately
+           carries no counts (2026-08-17, her call). -->
+      <div id="spot-filters" class="spot-filters" hidden></div>
     </div>
     <div id="county-map"></div>
   </div>
@@ -4166,6 +4171,11 @@ def build_communities_index():
       <div class="county-list">
         {county_btns}
       </div>
+      <!-- Filled in by map.js once the spots load, and left empty if they don't:
+           chips for the kinds of places Christine actually goes, so a visitor can
+           look for somewhere to eat rather than reading every pin. Deliberately
+           carries no counts (2026-08-17, her call). -->
+      <div id="spot-filters" class="spot-filters" hidden></div>
     </div>
     <div id="county-map"></div>
   </div>
