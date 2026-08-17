@@ -40,6 +40,8 @@ RESOLVED today:
   filter. See §2.7.
 
 STILL OPEN and genuinely unresolved — do not report these as done:
+- **Card photos are still served at full MLS resolution** — the fix wrecked her
+  listing cards and was reverted. Diagnosis good, execution wrong. §2.9.
 - The two land listings' photos (§2.7b).
 - Whether the shared MLS Grid quota needs splitting (§2.6).
 - Everything in §1, which is still hers.
@@ -391,6 +393,41 @@ that needs re-running. Pinned by `test-healthlive.js`.
 rather than red. If that ever hides something real, flip it — but read
 `test-healthlive.js` case 5 first, which pins that a FRESH failure still fails.
 
+### 2.9 Card photos are still full-resolution — the fix was shipped and reverted
+
+**The problem is real and still open.** Christine: "pictures just still arent coming
+through very quickly". A listing card renders at roughly 400px wide and is handed the
+FULL-RESOLUTION MLS photo — routinely 1–3MB of JPEG for a slot that needs about 60KB.
+`listing-photo.js` caches hard at the CDN, so a repeat view is fast and still
+enormous. The bytes are the problem, not the pipeline. That diagnosis still stands.
+
+**What was shipped (#18, #19) and reverted (#20):** `sizedPhoto()` wrapped our own
+photo endpoint in `/.netlify/images?url=…&w=800&fm=webp`, with a `data-raw` fallback
+to the untransformed endpoint, plus `width="800" height="600"` on the img to stop
+layout shift. Christine's next screenshot showed Current Listings rendering card
+images as **enormous grey boxes, roughly 800×900** — the whole page wrecked.
+
+**The most likely cause, untested:** the transform requested `w` only, which
+preserves the source aspect ratio, so a portrait MLS photo came back 800×1200. That
+collided with the hardcoded `width="800" height="600"` attributes and with
+`.listing-card img { aspect-ratio: 4/3 }` in the stylesheet. Grey means the box was
+laid out and the image had not arrived or had failed — consistent with the attributes
+reserving a box the transform never filled at that shape.
+
+**If you retry it, in this order:**
+1. Request a fixed box, not a width: `w=800&h=600&fit=cover`. Then the returned
+   image matches both the attributes and the CSS aspect ratio.
+2. Change **one page** and deploy it. Not every card on the site at once.
+3. **Get a live screenshot from Christine before expanding.** This is the point the
+   last attempt skipped, and it is the only step that would have caught it — every
+   static check passed on a change that visibly destroyed her main listings page.
+
+**The pattern this is the fourth instance of.** The shell that was never bundled, the
+fingerprinting that missed the shell, the map view that swept up her spots, and now
+this: *static checks passing while production is broken.* Everything in this repo
+that can only be verified in a browser needs a browser, on one page, before it
+touches all of them.
+
 ---
 
 ## 3. Corrections to earlier advice — read before repeating it
@@ -408,6 +445,8 @@ rather than red. If that ever hides something real, flip it — but read
   of that name, not your commits, and `git rev-parse HEAD` will happily report a
   sha that was never pushed. Two commits looked shipped and were not. **Verify
   pushes with `git ls-remote origin <branch>`, never with local HEAD.**
+- **"Route the card photos through Netlify's Image CDN"** — right diagnosis, shipped
+  wrong, reverted. See §2.9 before trying it again.
 
 ### 3.1 "Lofty should work, Resend is a backup" — WRONG
 I said this repeatedly. Lofty's API cannot return tags, so the tag-triggered
