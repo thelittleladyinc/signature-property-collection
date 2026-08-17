@@ -11361,7 +11361,31 @@ def build_redirects_and_meta():
             slug = slug[: -len("/index")]
         for old in (slug + "/", slug):
             if old not in seen_targets:
-                legacy_lines.append(f"{old}  {p}  301")
+                # 301! — the bang FORCES the redirect. Without it these rules were
+                # dead letters, and every page on this site answered at two URLs.
+                #
+                # 2026-08-17, confirmed empirically rather than reasoned about:
+                # Christine opened signaturepropertycollection.com/lifestyle-search
+                # and the address bar stayed extensionless while the page rendered
+                # normally. Netlify resolves /foo to foo.html and serves it 200, and
+                # a non-forced 301 is skipped whenever something already answers the
+                # requested path — so the rule below never fired.
+                #
+                # The cost was real: /lifestyle-search and /lifestyle-search.html
+                # both returned 200 with identical content, on all ~155 pages. The
+                # canonical tags kept Google pointed at the .html form, which is why
+                # this never became a ranking disaster, but crawl budget was being
+                # spent twice on every page — on a site with 66 pages sitting in
+                # "crawled - currently not indexed", that is not a rounding error.
+                # Four of the seven recently-crawled URLs in that report were
+                # extensionless duplicates of pages that were already indexed under
+                # their .html form.
+                #
+                # Forcing it makes one URL serve each page, and that URL is the one
+                # the canonical tag, the sitemap and every internal link already
+                # name. No loop is possible: /foo 301s to /foo.html, and /foo.html
+                # has no rule of its own.
+                legacy_lines.append(f"{old}  {p}  301!")
                 seen_targets.add(old)
     redirect_lines += legacy_lines
 
