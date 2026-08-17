@@ -75,6 +75,32 @@ LOCAL_SPOTS_DATA = _load_json("local_spots.json")
 # notes/page_urls.txt, captured from the live site). Add more entries here
 # as the AgentFire audit turns up other URLs that need to keep working.
 LEGACY_URL_REDIRECTS = {
+    # 2026-08-17, from Search Console's actual "Not found (404)" list rather than
+    # from guessing which old URLs might exist. Five URLs were reported; these are
+    # the only two worth redirecting.
+    #
+    # Both are per-address listing pages from the previous AgentFire site, which
+    # gave every listing its own URL of this shape. This site does not publish a
+    # page per address (IDX terms are why -- see _mls_disclaimer_html), so the
+    # honest destination is the town the property is in: someone who followed a
+    # link to a Nunn acreage listing wants Nunn, and that page carries the live
+    # IRES inventory for the town plus schools, commute and drive times.
+    #
+    # Not a redirect to the homepage. A redirect that ignores what the visitor
+    # asked for is a soft 404 wearing a nicer status code, and Google treats it
+    # that way.
+    "/50842-county-road-33-nunn-co-80648/": "/communities/weld/nunn.html",
+    "/50842-county-road-33-nunn-co-80648": "/communities/weld/nunn.html",
+    "/475-homestead-ln-johnstown-co-80534/": "/communities/weld/johnstown.html",
+    "/475-homestead-ln-johnstown-co-80534": "/communities/weld/johnstown.html",
+    #
+    # The other three 404s are deliberately NOT redirected, because 404 is the
+    # correct answer for all three and inventing a destination would be worse:
+    #   /wp-json/agentfire/v1/core/cron/1781382236  -- WordPress REST cron endpoint
+    #   /wp-includes/js/tinymce                     -- WordPress core editor asset
+    #   /cdn-cgi/l/email-protection                 -- Cloudflare email obfuscation
+    # None was ever a page, none has link equity worth preserving, and none has a
+    # sensible equivalent here. Google drops them on its own once they keep 404ing.
     "/expiredlisting/": "/expired-listings.html",
     "/expiredlisting": "/expired-listings.html",
     # 2026-08-14: these two blog posts were removed (not just unpublished)
