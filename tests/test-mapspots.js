@@ -98,6 +98,33 @@ for (const rel of ["build/assets/js/map.js", null]) {
     }
   }
 
+  // 2026-08-17: category chips now filter the pins. Filtering is a legitimate thing
+  // a VISITOR asks for and can undo; the county drill-down that hid her spots was
+  // not. The difference has to be structural, not a promise, so the filter is pure
+  // CSS against classes on each pin — there is no marker list for it to empty, and
+  // it dims rather than removes, so the map never looks emptier than it is.
+  const spotsArr = /var spotsOnMap = \[\]/.test(src);
+  if (spotsArr) {
+    // spotsOnMap exists only so the chips know which groups are represented. If it
+    // ever gains the power to move markers, this stops being safe.
+    for (const [what, re] of [
+      ["remove a marker", /spotsOnMap[\s\S]{0,400}?removeLayer/],
+      ["hide a marker directly", /spotsOnMap[\s\S]{0,400}?style\.display/],
+    ]) {
+      check(
+        `${label}: the spots array cannot ${what}`,
+        !re.test(src),
+        "this array is for building the filter chips, not for controlling pins"
+      );
+    }
+    check(
+      `${label}: filtering dims rather than removes`,
+      /opacity/.test(fs.readFileSync(path.join(ROOT, "build", "assets", "css", "style.css"), "utf8")
+        .match(/#county-map\[class\*="only-"\][^}]*\}/)?.[0] || ""),
+      "a filter that sets display:none makes her map look emptier than it is"
+    );
+  }
+
   // And the badge must be additive: a pin without a video still gets its glyph.
   const iconAt = src.indexOf("function poiIcon");
   const iconBody = iconAt === -1 ? "" : src.slice(iconAt, src.indexOf("\n  }", iconAt));

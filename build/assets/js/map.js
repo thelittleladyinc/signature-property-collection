@@ -225,13 +225,28 @@
     var marker = L.marker(nudgeIfStacked(poi.lat, poi.lng), {
       icon: poiIcon(poi), interactive: true, zIndexOffset: 600,
     }).addTo(map);
-    // The view count goes in the tooltip because it is the reason to click: it
-    // says a few thousand people have already watched this, which no stock
-    // amenity pin on a portal map can say.
-    var label = (poi.videoId ? '▶ Watch: ' : '★ Read: ') + poi.name;
-    var count = poi.views || poi.reviewViews;
-    if (count) label += ' (' + Number(count).toLocaleString() + ' views)';
-    marker.bindTooltip(label, { direction: 'top', offset: [0, -10] });
+    // 2026-08-17. This used to be text only, and it carried the view count on the
+    // reasoning that "a few thousand people watched this" was the reason to click.
+    // Christine has now said twice that it isn't -- "why would anyone care about how
+    // many views?" and "nobody cares that I filmed 13 placces - just be more gentle
+    // like Loving the comminity I sell homes in". A count is a fact about her channel;
+    // hovering a pin, a person wants to know what the PLACE is.
+    //
+    // So the count is gone and the video's own thumbnail takes its place. It shows the
+    // room, the food, her face -- which is the actual invitation, and it makes a
+    // video-backed pin obviously worth clicking without saying a number out loud.
+    // Loaded lazily and straight from YouTube's image host; if it fails the tooltip is
+    // still a perfectly good label, so there is nothing to fall back to.
+    var name = String(poi.name || '').replace(/[<>&"]/g, '');
+    var line = (poi.videoId ? '▶ Watch: ' : '★ Read: ') + name;
+    var tip = poi.videoId
+      ? '<span class="poi-tip has-thumb">' +
+          '<img src="https://i.ytimg.com/vi/' + encodeURIComponent(poi.videoId) + '/mqdefault.jpg"' +
+          ' alt="" loading="lazy" width="160" height="90">' +
+          '<span class="poi-tip-name">' + line + '</span>' +
+        '</span>'
+      : '<span class="poi-tip">' + line + '</span>';
+    marker.bindTooltip(tip, { direction: 'top', offset: [0, -10], className: 'poi-tooltip' });
     marker.on('click', function () { openPoiModal(poi); });
   }
 
@@ -263,13 +278,106 @@
           '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>' +
         '</span>'
       : '';
+    // 2026-08-17: the category also goes on the marker's OWN class, which is what
+    // makes filtering possible without a marker registry. See filterSpots() -- the
+    // chips toggle one class on the map container and CSS does the rest, so nothing
+    // here has to hold a list of markers that some later view could empty. That is
+    // deliberate: a registry of pins is exactly what swept up her spots this morning.
     return L.divIcon({
       html: '<div class="poi-icon-marker' + (poi.videoId ? ' has-video' : '') + '">' +
         glyph + badge + '</div>',
-      className: '',
+      className: 'poi-pin cat-' + spotCategory(poi),
       iconSize: [28, 28],
       iconAnchor: [14, 14],
     });
+  }
+
+  // One place that decides a spot's category, so the marker class, the filter chips
+  // and the counts can never disagree about what a place is.
+  function spotCategory(poi) {
+    var raw = poi.icon || poi.category || 'spot';
+    return String(raw).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+
+  // Grouped for the chips. Christine, 2026-08-17: "nobody cares that I filmed 13
+  // placces - just be more gentle like Loving the comminity I sell homes in -
+  // restaurants categories etc". So these are labelled as things a person might feel
+  // like doing, not as an inventory of what she has produced. No counts on the chips
+  // for the same reason -- a number here would put the emphasis straight back on how
+  // much she has filmed, which is the thing she just said nobody cares about.
+  var FILTER_GROUPS = [
+    { key: 'eat',      label: 'Where I eat',    cats: ['restaurant'] },
+    { key: 'drink',    label: 'Wine & drinks',  cats: ['winery'] },
+    { key: 'outdoors', label: 'Outdoors',       cats: ['trail', 'lake', 'scenic', 'golf'] },
+    { key: 'town',     label: 'Around town',    cats: ['downtown', 'event', 'spot'] },
+  ];
+
+  // Every spot the map has drawn, kept only so the chips know which groups are
+  // actually represented. NOTHING filters, hides or removes a marker through this
+  // array -- the filtering is pure CSS against the classes poiIcon() puts on each
+  // pin. That separation is on purpose: an array of markers plus a view change is
+  // precisely what made her spots vanish this morning, so this one is never allowed
+  // to grow that power. Pinned by test-mapspots.js.
+  var spotsOnMap = [];
+
+  // The bounds of Christine's own spots inside one county, or null when they would
+  // make a worse frame than the county outline. READ-ONLY over spotsOnMap -- it
+  // computes a rectangle and returns it. It does not touch a single marker, which is
+  // what keeps this safe to call from a view change.
+  function boundsOfSpotsIn(countyName, data) {
+    if (!spotsOnMap.length || typeof L === 'undefined') return null;
+    // A spot knows its town, not its county, so the county's own town list is what
+    // matches them up -- the same source the panel and the search already use, so
+    // the map cannot disagree with the sidebar about which town is where.
+    var towns = {};
+    ((data && data.towns) || []).forEach(function (t) {
+      towns[String(t.name || '').toLowerCase()] = true;
+    });
+    if (!Object.keys(towns).length) return null;
+    var pts = [];
+    spotsOnMap.forEach(function (s) {
+      var city = String(s.searchCity || s.city || s.cityLabel || '').toLowerCase();
+      if (towns[city] && typeof s.lat === 'number' && typeof s.lng === 'number') {
+        pts.push([s.lat, s.lng]);
+      }
+    });
+    return pts.length >= 2 ? L.latLngBounds(pts) : null;
+  }
+
+  function buildSpotFilters() {
+    var host = document.getElementById('spot-filters');
+    if (!host) return;
+    var present = {};
+    spotsOnMap.forEach(function (s) { present[spotCategory(s)] = true; });
+    var groups = FILTER_GROUPS.filter(function (g) {
+      return g.cats.some(function (c) { return present[c]; });
+    });
+    // One group is not a filter, it is a label with nothing to choose.
+    if (groups.length < 2) return;
+
+    var mapEl = document.getElementById('county-map');
+    host.innerHTML = '';
+    var all = chip('Everywhere', '', true);
+    host.appendChild(all);
+    groups.forEach(function (g) { host.appendChild(chip(g.label, g.key, false)); });
+    host.hidden = false;
+
+    function chip(label, key, on) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'spot-chip' + (on ? ' is-on' : '');
+      b.textContent = label;
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        Array.prototype.forEach.call(host.children, function (c) {
+          c.classList.remove('is-on'); c.setAttribute('aria-pressed', 'false');
+        });
+        b.classList.add('is-on'); b.setAttribute('aria-pressed', 'true');
+        FILTER_GROUPS.forEach(function (g) { mapEl.classList.remove('only-' + g.key); });
+        if (key) mapEl.classList.add('only-' + key);
+      });
+      return b;
+    }
   }
 
   // ---- POI video modal ---------------------------------------------------
@@ -735,7 +843,24 @@
     paintCounties(countyName);
     renderCountyPanel(map, countyName, data);
 
-    if (lyr && lyr.getBounds) map.fitBounds(lyr.getBounds(), { padding: [30, 30] });
+    // 2026-08-17 (Christine picked this one: "do #3 to frame"). Entering a county
+    // used to fit the COUNTY OUTLINE, which for Larimer or Weld means most of the
+    // frame is rangeland with nothing in it and her places sit in one corner, small.
+    //
+    // Fitting her spots instead opens on the part of the county she actually knows.
+    // Nothing is hidden either way -- the county is still on screen, this only
+    // chooses where to look first.
+    //
+    // Falls back to the outline whenever the spots are not a sensible frame: none in
+    // this county, or only one (fitBounds on a single point zooms to street level,
+    // which is disorienting). The outline is also what happens if the spots fetch is
+    // still in flight, which is correct -- it is the honest default, not a failure.
+    var spotBounds = boundsOfSpotsIn(countyName, data);
+    if (spotBounds) {
+      map.fitBounds(spotBounds, { padding: [55, 55], maxZoom: 11 });
+    } else if (lyr && lyr.getBounds) {
+      map.fitBounds(lyr.getBounds(), { padding: [30, 30] });
+    }
 
     ((data && data.towns) || []).forEach(function (t) {
       var m = L.marker([t.lat, t.lng], {
@@ -895,6 +1020,8 @@
           .then(function (data) {
             if (!data || !Array.isArray(data.spots)) return;
             data.spots.forEach(function (spot) { addPoiMarker(map, spot); });
+            spotsOnMap = spotsOnMap.concat(data.spots);
+            buildSpotFilters();
           })
           .catch(function () { /* map already works without them */ });
 

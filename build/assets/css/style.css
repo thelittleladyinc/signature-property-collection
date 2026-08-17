@@ -1144,6 +1144,50 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 .poi-icon-marker .poi-video-badge svg { width: 8px; height: 8px; }
 #county-map.map-zoomed-in .poi-icon-marker.has-video .poi-video-badge { display: flex; }
 
+/* Category chips (2026-08-17). Christine: "nobody cares that I filmed 13 placces -
+   just be more gentle like Loving the comminity I sell homes in - restaurants
+   categories etc". So these read as things to do, not as an inventory, and they
+   carry no counts.
+
+   The filtering itself is pure CSS against the classes poiIcon() puts on each pin —
+   no marker list, nothing removed from the map. Selecting "Where I eat" dims the
+   other pins rather than deleting them, so the map never looks emptier than it is
+   and a mis-click costs nothing. */
+.spot-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.spot-chip {
+  font-family: inherit; font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+  padding: 9px 16px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: rgba(255,255,255,.78);
+  border: 1px solid rgba(255,255,255,.28);
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.spot-chip:hover { border-color: rgba(255,255,255,.6); color: #fff; }
+.spot-chip.is-on { background: var(--dusty-rose); border-color: var(--dusty-rose); color: #fff; }
+.spot-chip:focus-visible { outline: 2px solid var(--dusty-rose); outline-offset: 2px; }
+
+#county-map[class*="only-"] .poi-pin { opacity: .2; }
+#county-map.only-eat      .poi-pin.cat-restaurant,
+#county-map.only-drink    .poi-pin.cat-winery,
+#county-map.only-outdoors .poi-pin.cat-trail,
+#county-map.only-outdoors .poi-pin.cat-lake,
+#county-map.only-outdoors .poi-pin.cat-scenic,
+#county-map.only-outdoors .poi-pin.cat-golf,
+#county-map.only-town     .poi-pin.cat-downtown,
+#county-map.only-town     .poi-pin.cat-event,
+#county-map.only-town     .poi-pin.cat-spot { opacity: 1; }
+
+/* The hover card: her own thumbnail rather than a view count (2026-08-17). */
+.poi-tooltip { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.poi-tooltip::before { display: none; }
+.poi-tip {
+  display: block; max-width: 190px; padding: 8px 10px; border-radius: 8px;
+  background: rgba(20,20,21,.94); color: #fff; font-size: 12.5px; line-height: 1.35;
+  box-shadow: 0 4px 16px rgba(20,20,21,.45);
+}
+.poi-tip.has-thumb { padding: 0; overflow: hidden; }
+.poi-tip img { display: block; width: 100%; height: auto; }
+.poi-tip-name { display: block; padding: 8px 10px; }
+
 /* Respect a reduced-motion preference: the badge is information, the scale is not. */
 @media (prefers-reduced-motion: reduce) {
   .poi-icon-marker { transition: none; }

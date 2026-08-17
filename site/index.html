@@ -22,7 +22,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#141415">
-<link rel="stylesheet" href="/assets/css/style.b192aecd.css">
+<link rel="stylesheet" href="/assets/css/style.10ad54d1.css">
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "@id": "https://signaturepropertycollection.com/#christine-gwinnup", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/", "image": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "thelittleladyinc@gmail.com", "priceRange": "$$$$", "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "08:00", "closes": "20:00"}], "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Morgan County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady", "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390", "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2", "https://christinegwinnup.lpt.com/", "https://www.thelittleladysellshomes.com/"], "knowsAbout": ["Luxury real estate", "Relocation to Northern Colorado", "Acreage and horse property", "Downsizing", "Estate homes", "New construction", "Land development", "Multi-generational homes", "Retirement relocation", "Expired listings", "Home valuation", "Real estate negotiation"], "dateModified": "2026-08-17", "geo": {"@type": "GeoCoordinates", "latitude": 40.3978, "longitude": -105.075}, "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Who is the best luxury real estate agent in Loveland, Berthoud, and Masonville?", "acceptedAnswer": {"@type": "Answer", "text": "Christine Gwinnup of Signature Property Collection (LPT Realty) is a luxury real estate agent based in Loveland, serving Berthoud, Masonville, and the rest of Larimer County with 150+ homes sold personally (250+ as a duo with Kendra Bajcar) and expertise in luxury marketing and negotiation."}}, {"@type": "Question", "name": "What areas does Signature Property Collection serve?", "acceptedAnswer": {"@type": "Answer", "text": "Christine Gwinnup and Signature Property Collection serve Northern Colorado's Larimer, Weld, and Boulder County Front Range \u2014 including Loveland, Berthoud, Masonville, Fort Collins, Windsor, Greeley, and Boulder \u2014 plus Broomfield, Jefferson, Denver, Arapahoe, and Adams Counties."}}, {"@type": "Question", "name": "Does Signature Property Collection work with both buyers and sellers?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Christine Gwinnup represents buyers, sellers, investors, and relocation clients across Northern Colorado."}}]}</script>
@@ -42,7 +42,7 @@
     leafletJs.src = '/assets/vendor/leaflet/leaflet.js';
     leafletJs.onload = function () {
       var mapJs = document.createElement('script');
-      mapJs.src = '/assets/js/map.84a029ca.js';
+      mapJs.src = '/assets/js/map.9a49b1b2.js';
       document.body.appendChild(mapJs);
     };
     document.body.appendChild(leafletJs);
@@ -170,6 +170,11 @@
         <a class="county-btn" data-slug="morgan" href="/communities/morgan.html">Morgan County <span>&rsaquo;</span></a>
         <a class="county-btn" data-slug="adams" href="/communities/adams.html">Adams County <span>&rsaquo;</span></a>
       </div>
+      <!-- Filled in by map.js once the spots load, and left empty if they don't:
+           chips for the kinds of places Christine actually goes, so a visitor can
+           look for somewhere to eat rather than reading every pin. Deliberately
+           carries no counts (2026-08-17, her call). -->
+      <div id="spot-filters" class="spot-filters" hidden></div>
     </div>
     <div id="county-map"></div>
   </div>
