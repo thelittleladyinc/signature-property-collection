@@ -11177,6 +11177,29 @@ def build_redirects_and_meta():
                 return d
         return BUILD_DATE
 
+    # 2026-08-17 audit: never submit a URL that names a different canonical.
+    # /communities/larimer/windsor.html canonicalises to the Weld copy -- correct,
+    # since Windsor straddles both counties and the two pages are near-identical --
+    # but it was ALSO listed here, which tells Google "index this" and "no, index
+    # that other one" in the same breath. That is the mixed signal that lands a page
+    # in "Duplicate, Google chose a different canonical", and it was doing it to the
+    # one town this site has two pages for.
+    _self_canonical = []
+    _non_canonical = set()
+    for _p in paths:
+        _f = os.path.join(OUT, _p.lstrip("/"))
+        _canon = None
+        if os.path.exists(_f):
+            _m = re.search(r'<link rel="canonical" href="([^"]+)"',
+                           open(_f, encoding="utf-8").read())
+            _canon = _m.group(1) if _m else None
+        if _canon and _canon != f"{SITE['domain']}{_p}":
+            print(f"  sitemap: excluding {_p} — it canonicalises to {_canon}")
+            _non_canonical.add(_p)
+            continue
+        _self_canonical.append(_p)
+    paths = _self_canonical
+
     urls = "\n".join(
         f"  <url><loc>{SITE['domain']}{p}</loc><lastmod>{_lastmod(p)}</lastmod>"
         # 2026-08-14: this pointed at the .jpg for every city hero, but the
@@ -11248,7 +11271,10 @@ def build_redirects_and_meta():
         for f in _glob.glob(os.path.join(OUT, "**", "*.html"), recursive=True)
     }
     listed = set(paths)
-    unlisted = sorted(on_disk - listed - {"/404.html"} - NOINDEX_PATHS)
+    # A page excluded just above for naming a different canonical is not a
+    # missing page -- reporting it as one would make this guard cry wolf on
+    # every single build, which is how a load-bearing guard stops being read.
+    unlisted = sorted(on_disk - listed - {"/404.html"} - NOINDEX_PATHS - _non_canonical)
     stale = sorted(listed - on_disk)
     if unlisted:
         print(f"  ! sitemap: {len(unlisted)} built page(s) NOT in the sitemap "
@@ -11627,6 +11653,81 @@ def write_listing_page_shell():
     print(f"  listing page shell: {len(shell):,} bytes, all placeholders present")
 
 
+def fingerprint_assets():
+    """Content-hash every CSS/JS file and rewrite every reference to it.
+
+    2026-08-17. Christine reported two bugs in one afternoon that were both already
+    fixed: her map spots "disappearing when we zoom in" (map.js contains no zoom
+    handler at all) and the market-report stat block rendering as run-together text
+    (that CSS is present, correct, and byte-identical to source). In both cases her
+    browser was serving an asset from before the deploy that fixed it. She was
+    reading bugs that no longer existed and had no way to know.
+
+    The general failure is worse than the confusion it caused. /assets/js/* and
+    /assets/css/* were cached for an hour under filenames that never change, so for
+    an hour after EVERY deploy a returning visitor ran the old JavaScript against the
+    new HTML. A mismatch between markup and the script driving it produces behaviour
+    that cannot be reproduced by whoever is asked to fix it.
+
+    Content-hashing fixes both halves:
+
+      1. A changed file gets a NEW NAME, so a deploy reaches everyone immediately --
+         there is no stale copy left to serve.
+      2. Because the name now identifies the content, these can be cached
+         `immutable` for a year like the images already are (see netlify.toml).
+         Repeat visitors stop re-fetching 71KB of CSS and 48KB of map code, which is
+         a real Core Web Vitals win on the community pages that need to rank.
+
+    Runs LAST, after every page and generated script exists, and rewrites references
+    in .html AND .js -- the map is injected by a loader that names its own path.
+
+    Vendored files (leaflet) are untouched: already versioned by directory and
+    already immutable. Images are untouched too -- they are already immutable, and
+    their names appear in schema and in links Christine has shared, so renaming them
+    would break things outside this repo.
+    """
+    import hashlib
+
+    renames = {}
+    for sub in ("css", "js"):
+        d = os.path.join(OUT, "assets", sub)
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            path = os.path.join(d, name)
+            stem, ext = os.path.splitext(name)
+            if not os.path.isfile(path) or ext not in (".css", ".js"):
+                continue
+            with open(path, "rb") as f:
+                digest = hashlib.sha1(f.read()).hexdigest()[:8]
+            hashed = f"{stem}.{digest}{ext}"
+            os.rename(path, os.path.join(d, hashed))
+            renames[f"/assets/{sub}/{name}"] = f"/assets/{sub}/{hashed}"
+
+    if not renames:
+        return
+
+    # Longest path first, so no asset's path can be rewritten by a shorter one.
+    ordered = sorted(renames.items(), key=lambda kv: -len(kv[0]))
+    touched = 0
+    for root, _dirs, files in os.walk(OUT):
+        for name in files:
+            if not name.endswith((".html", ".js", ".xml", ".webmanifest")):
+                continue
+            fp = os.path.join(root, name)
+            with open(fp, encoding="utf-8") as f:
+                text = f.read()
+            new = text
+            for old, hashed in ordered:
+                if old in new:
+                    new = new.replace(old, hashed)
+            if new != text:
+                with open(fp, "w", encoding="utf-8") as f:
+                    f.write(new)
+                touched += 1
+    print(f"  fingerprinted {len(renames)} asset(s), rewrote {touched} file(s)")
+
+
 def write_map_county_data():
     """Emit the county -> {slug, cities, liveSearch} map that map.js reads.
 
@@ -11745,4 +11846,5 @@ if __name__ == "__main__":
     build_legal()
     build_404()
     build_redirects_and_meta()
+    fingerprint_assets()   # LAST: rewrites references in everything above
     print("\nDone. Output in", OUT)
