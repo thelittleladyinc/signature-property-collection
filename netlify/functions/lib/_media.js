@@ -54,9 +54,33 @@ const EMPTY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 // The sync's flag: respected everywhere, set only by sync-listings.js.
 const SYNC_SUSPENSION_KEY = "mlsgrid-suspension.json";
-// Photo traffic's own flag, deliberately separate and much shorter.
+// Photo traffic's own flag, deliberately separate and much shorter. Set when the
+// API (api.mlsgrid.com) rate-limits a media RESOLVE.
 const PHOTO_COOLDOWN_KEY = "mlsgrid-photo-cooldown.json";
 const PHOTO_COOLDOWN_MS = 45 * 1000;
+
+// 2026-08-17, from Christine's debug output on a grey land listing:
+//
+//   {"httpStatus":429,"mediaHost":"media.mlsgrid.com","attempts":[{"mode":"auth","status":429}]}
+//
+// A 429 from the MEDIA HOST, and nothing in this codebase backed off from it.
+// setPhotoCooldown() had exactly one caller: resolveMediaFor(), which handles a 429
+// from the API. The image fetch in listing-photo.js just returned a grey
+// placeholder and moved on.
+//
+// That is self-sustaining. A search page fires a dozen image requests; the media
+// host starts refusing; every refusal becomes a grey card AND another request on
+// the next view, with nothing anywhere reducing the rate. The limit never gets a
+// chance to clear. It is a strong candidate for the "some photos show and some
+// don't" pattern that has been chased three times in this file's history.
+//
+// A SEPARATE key from the resolve cooldown on purpose. These are two different
+// resources -- api.mlsgrid.com and media.mlsgrid.com -- and collapsing them means
+// an API rate-limit blanks photos whose URLs are already cached and would have
+// served fine, which is its own crying-wolf failure. Each backs off from the
+// service that actually complained.
+const MEDIA_COOLDOWN_KEY = "mlsgrid-media-cooldown.json";
+const MEDIA_COOLDOWN_MS = 45 * 1000;
 
 const BATCH_TIMEOUT_MS = 5000;
 const SINGLE_TIMEOUT_MS = 6000;
@@ -98,6 +122,31 @@ async function isThrottled(store) {
 
 async function setPhotoCooldown(store) {
   await store.setJSON(PHOTO_COOLDOWN_KEY, { until: Date.now() + PHOTO_COOLDOWN_MS }).catch(() => {});
+}
+
+// Backoff for the media host specifically. `retryAfterSeconds` honours a
+// Retry-After header when the host sends one -- it knows better than our constant
+// does -- clamped so a hostile or mistaken value cannot park photos for an hour.
+async function setMediaCooldown(store, retryAfterSeconds) {
+  var ms = MEDIA_COOLDOWN_MS;
+  var n = Number(retryAfterSeconds);
+  if (isFinite(n) && n > 0) ms = Math.min(Math.max(n * 1000, 5000), 5 * 60 * 1000);
+  await store.setJSON(MEDIA_COOLDOWN_KEY, { until: Date.now() + ms }).catch(() => {});
+  return ms;
+}
+
+// True when the MEDIA host should be left alone. Respects the sync's suspension
+// flag too, since that means the whole account is in trouble.
+async function isMediaThrottled(store) {
+  const [sync, media] = await Promise.all([
+    store.get(SYNC_SUSPENSION_KEY, { type: "json" }).catch(() => null),
+    store.get(MEDIA_COOLDOWN_KEY, { type: "json" }).catch(() => null),
+  ]);
+  const until = Math.max(
+    (sync && typeof sync.suspendedUntil === "number") ? sync.suspendedUntil : 0,
+    (media && typeof media.until === "number") ? media.until : 0,
+  );
+  return until > Date.now() ? until : null;
 }
 
 // MLS Grid can't sort inside $expand (its docs say so explicitly), so Order
@@ -322,6 +371,9 @@ module.exports = {
   writeCachedUrls,
   isThrottled,
   setPhotoCooldown,
+  setMediaCooldown,
+  isMediaThrottled,
+  MEDIA_COOLDOWN_KEY,
   mediaUrlsFrom,
   resolveMediaFor,
   prewarmPhotoUrls,

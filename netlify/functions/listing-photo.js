@@ -60,6 +60,7 @@ const { getStore } = require("@netlify/blobs");
 const { getBlobStore, BASE_URL, SELECT_FIELDS } = require("./lib/_mls-shared");
 const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
+  isMediaThrottled, setMediaCooldown,
 } = require("./lib/_media");
 
 const BLOB_STORE_NAME = "mls-listings";
@@ -144,6 +145,11 @@ const EXPLANATIONS = {
     "A 404 from BOTH modes means the photo is genuinely gone from MLS Grid even though the " +
     "listing still advertises it — nothing on this site can bring it back, and the card falls " +
     "back to a neutral grey tile.",
+  media_rate_limited: "MLS Grid's media host is rate-limiting us, so this photo was not fetched. " +
+    "This is temporary and NOT a broken photo — the site now backs off for a few seconds when this " +
+    "happens instead of continuing to hammer the host, which is what used to keep the limit alive. " +
+    "Reload after `retryAfterSeconds`. If it recurs constantly, the MLS Grid quota shared with " +
+    "Listing-Engine and Expired-Luxury is the thing to look at, not this site.",
   too_large: "The photo downloaded fine but is too big to return through a Netlify function. " +
     "A function response is capped at 6 MB and base64 encoding inflates it by a third, so the real " +
     "ceiling is about 4.4 MB. Full-resolution aerials and scanned plat maps — common on land " +
@@ -205,6 +211,19 @@ exports.handler = async (event) => {
       return placeholder("index_out_of_range", debug, { listingId, index, urlCount: urls.length });
     }
 
+    // The media host is refusing requests right now, so don't add one. Checked
+    // AFTER the URL resolve because the two are separately rate-limited: a
+    // resolve cooldown must not blank photos whose URLs are already cached and
+    // would serve fine. Successful photos are CDN-cached for a day and never reach
+    // this function, so this only ever pauses photos that were about to fail.
+    const mediaCooldown = await isMediaThrottled(store);
+    if (mediaCooldown) {
+      return placeholder("media_rate_limited", debug, {
+        listingId, index, urlCount: urls.length,
+        retryAfterSeconds: Math.max(1, Math.ceil((mediaCooldown - Date.now()) / 1000)),
+      });
+    }
+
     // 2026-08-15: the Authorization header is chosen per URL rather than always
     // sent -- MLS Grid's pre-signed media URLs 403 when a second auth mechanism
     // rides along, which is what was blanking some cards. See fetchMediaResponse.
@@ -216,6 +235,19 @@ exports.handler = async (event) => {
         listingId, index, urlCount: urls.length, mediaHost,
         authMode: attempt && attempt.mode, error: attempt && attempt.error,
         attempts: attempt && attempt.attempts,
+      });
+    }
+    if (imgRes.status === 429) {
+      // 2026-08-17: nothing used to back off from this. See MEDIA_COOLDOWN_KEY in
+      // _media.js -- an unanswered media-host 429 is self-sustaining, because every
+      // refusal becomes both a grey card and another request on the next view.
+      const waitMs = await setMediaCooldown(store, imgRes.headers.get("retry-after"));
+      console.error(`listing-photo: ${listingId} photo ${index} -> HTTP 429 from ${mediaHost}; ` +
+        `media cooldown set for ${Math.round(waitMs / 1000)}s`);
+      return placeholder("media_rate_limited", debug, {
+        listingId, index, mediaHost, urlCount: urls.length,
+        authMode: attempt.mode, attempts: attempt.attempts,
+        retryAfterSeconds: Math.round(waitMs / 1000),
       });
     }
     if (!imgRes.ok) {
