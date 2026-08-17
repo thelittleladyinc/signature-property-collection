@@ -31,9 +31,34 @@ live — but the photos still don't cache, and every run still logs a fresh 403.
 **Fix:** cloudinary.com → Dashboard → copy Cloud name, API Key, API Secret from
 that ONE page → replace all three in Netlify.
 
-### 1.2 `RESEND_API_KEY` — the only reliable lead notification
+### 1.2 Lead notification — and the keyless option, since she does not use Resend
 Code is written, tested and deployed (`lib/_notify.js`, `sendLeadAlertEmail`).
 One env var away from working. See §3.1 for why this is not optional anymore.
+
+**2026-08-17, correction from Christine: "I dont use resend."** That contradicts
+the note at the top of `_notify.js`, which says she already has it for
+sellerintelligence's daily digest. Either way, the practical situation is the same:
+`RESEND_API_KEY` is unset, so `sendLeadAlertEmail()` returns
+`{attempted: false, reason: "RESEND_API_KEY not set"}` and no alert email is sent.
+The function degrades cleanly — nothing is broken, she is simply not told.
+
+There are two ways to fix it and **the second needs no key and no code**:
+
+1. **Resend** — free tier covers this volume comfortably. Create a key, add
+   `RESEND_API_KEY` in Netlify env vars, done. Also set `LEAD_ALERT_TO` /
+   `LEAD_ALERT_FROM`; until a domain is verified, Resend only delivers to the
+   account's own address, which is fine here since she is the only recipient.
+2. **Netlify Forms' own email notification** — every form on this site is a
+   Netlify form, and Netlify will email submissions directly with no API key and
+   no code: Netlify → Forms → (form) → Settings & usage → Form notifications →
+   Add notification → Email. It sends the raw field values rather than
+   `_notify.js`'s formatted HTML, and it will not include the Lofty push result,
+   but it does the one job that matters: she finds out a lead arrived.
+
+Option 2 is the right answer if she wants this working today without signing up
+for anything. Option 1 is better long-term because the email is formatted, names
+the source page, and reports whether the Lofty push succeeded. **The Lofty push
+itself is independent of both** — that already works via `LOFTY_API_KEY`.
 
 ### 1.3 Rotate the API keys, then mark them secret
 `MLSGRID_API_TOKEN`, `LOFTY_API_KEY`, `BLOBS_TOKEN` and `CLOUDINARY_API_SECRET`
@@ -46,7 +71,91 @@ Order matters: rotate at each provider → save new values in a password manager
 THEN tick "Contains secret value" in Netlify. Marking secret is one-way; the value
 becomes unreadable afterwards. She has NOT confirmed doing this.
 
-### 1.4 Small, cheap, still open
+### 1.4 The Relocation Guide — DONE 2026-08-17, and how to regenerate it
+
+The 22-page PDF now exists and is delivered. Superseded notes kept below for the
+reasoning, because the "no PDF" state is what the Buyer's and Seller's Guide
+landers are *still* in.
+
+- **Generator:** `build/tools/relocation_guide_pdf.py` (reportlab). Reads
+  `build/data/city_content.json` through `build.py`, so all 36 town profiles,
+  school districts and commute figures come from the same source the town pages
+  use. Regenerate after editing town content: `python3 build/tools/relocation_guide_pdf.py`
+- **reportlab is deliberately NOT in `requirements.txt`** and not imported by
+  `build.py`. The Netlify deploy must never depend on it. The PDF is a committed
+  artifact.
+- **Output goes to `build/assets/guides/`, not `site/assets/guides/`** —
+  `copy_static_assets()` rmtree's `site/assets` on every build, so anything
+  written straight there survives exactly one build and then vanishes.
+- **Delivery:** `/thank-you.html` reveals the download only when
+  `?from=relocation-guide`. The lander itself does not link the PDF — a magnet you
+  can download without giving an email address captures nothing.
+- **No market figures in it, on purpose.** A median inside a PDF cannot be
+  refreshed after download; it points at the live town pages and the monthly
+  report instead.
+
+Still true for the *other* two guides: the Buyer's and Seller's Guide landers have
+no document behind them. Same generator pattern would work if she wants them.
+
+### 1.4b Original note (superseded) — what the gap used to be
+
+`/guides/northern-colorado-relocation-guide.html` went live 2026-08-16 as the site's
+single named lead magnet, linked from all 37 town pages, the homepage and
+`/relocation.html`. It is built on the exact pattern the Buyer's and Seller's Guide
+landers already use: **no PDF is attached, on any of the three.** The form captures the
+lead, it lands in Lofty tagged "Relocation Guide Download", and `/thank-you.html`
+promises Christine reads it personally and replies the same day. That is how the other
+two have always worked, so this is not a new gap — but it is now a gap on the page the
+whole relocation funnel points at.
+
+The lander's "What's Inside" list is six specific promises (town-by-town comparison,
+measured drive times, school districts, the out-of-state buying process, water/wells/
+septic/metro districts, month-by-month market read). Every one is deliverable from
+material already on this site — the drive times, school districts and town comparisons
+are live data, not something to research. Someone needs to assemble it into a document
+and either attach it or have Christine send it on reply. **Until then the promise is
+only as good as her follow-up**, and the follow-up currently depends on §1.2
+(`RESEND_API_KEY`) actually alerting her that the lead arrived.
+
+### 1.5 Two GitHub secrets — the town-page prices are off until these are set
+
+Added 2026-08-16 after searching the queries the town pages were re-aimed at. Every
+page outranking this site leads with numbers — "median list price $672,792 … 92 days
+on market … median home value $485,976" — and ours led with a paragraph explaining
+why we wouldn't print one. That argument was right about *their* method (hand-typed
+into a blog post, then left to rot) and wrong as a conclusion, because this site is
+the only one in that search result with a raw MLS feed in its own code rather than a
+vendor IDX widget it cannot read from. Their numbers are stuck in a widget Google
+doesn't index; ours can be baked into the HTML and into FAQPage schema, which is the
+form an AI answer engine actually quotes.
+
+So the town pages now say "there are 214 active listings in Loveland, at a median
+asking price of $689,000", computed from the live IRES inventory
+`sync-listings.js` already replicates into Netlify Blobs. Nothing is typed by hand,
+and `tests/test-townmarket.js` fails the build if a figure on a page ever disagrees
+with its source.
+
+**What's needed:** add these two repo secrets (Settings → Secrets and variables →
+Actions). They are the same values the Netlify functions already use — Netlify →
+Site settings → Environment variables:
+
+    BLOBS_SITE_ID
+    BLOBS_TOKEN
+
+Then `.github/workflows/town-market.yml` refreshes the figures Mondays and Thursdays
+and commits them, which triggers the normal Netlify rebuild.
+
+**Until they are set, no prices appear.** That is deliberate and safe — `build.py`
+suppresses every figure once the data is missing or more than 21 days old, and the
+pages fall back to their qualitative copy. Nothing breaks; the site just doesn't get
+the win. The scheduled job skips itself with a notice rather than failing red every
+week, and `python3 build/build.py` prints a one-line reminder every time it runs.
+
+To generate the file once by hand from a machine with the credentials:
+
+    BLOBS_SITE_ID=... BLOBS_TOKEN=... node build/tools/town-market-stats.js
+
+### 1.6 Small, cheap, still open
 - **"Driven Steakhouse"** — real Loveland restaurant, she says she has a Facebook
   post about it. No YouTube video and no Gmail review notification mentions it, so
   it can't be pinned yet. NB: the Google AI Overview claiming she and the
