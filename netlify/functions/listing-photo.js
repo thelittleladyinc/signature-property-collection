@@ -63,7 +63,7 @@ const { getStore } = require("@netlify/blobs");
 const { getBlobStore, BASE_URL, SELECT_FIELDS, MINE_LISTINGS_KEY } = require("./lib/_mls-shared");
 const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
-  isMediaThrottled, setMediaCooldown,
+  isMediaThrottled, setMediaCooldown, usableUrl, markUrlUsed,
 } = require("./lib/_media");
 
 const BLOB_STORE_NAME = "mls-listings";
@@ -96,10 +96,31 @@ const IMAGE_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=60480
 // can only remember a success it happened to see at an edge, this remembers it for
 // everyone, permanently.
 //
-// BOUNDED to cover photos only (index 0) -- see shouldCachePhoto for why that is the
-// bound that matters and why the original "her listings only" bound was dropped.
+// BOUNDED to the photos a page actually renders -- see shouldCachePhoto for why that
+// is the bound that matters and why the original "her listings only" bound was
+// dropped.
 const PHOTO_CACHE_PREFIX = "photo-cache/";
-const PHOTO_CACHE_MAX_INDEX = 0;
+
+// 2026-08-17, raised from 0 to 11. MLS Grid's Media documentation, in two places:
+//
+//   "You must maintain your own copy of all media files."
+//   "There is NEVER a reason to download the same media more than once."
+//
+// The cover-only bound met neither. listing-page.js renders up to TWELVE photos
+// (Math.min(count, 12) in listingBody), and indexes 1-11 were re-downloaded from
+// MLS Grid on every view that missed a CDN edge -- eleven parallel requests per
+// visit, from an account limited to two per second, recurring for as long as the
+// page keeps getting traffic. That was the largest consumer on this site's side of
+// the shared token, and no amount of extra quota would have stopped it growing.
+//
+// 11 is not a guess: it is exactly what listing-page.js displays. Keep the two in
+// step -- caching fewer than are rendered puts the difference back on MLS Grid,
+// caching more stores photos nobody is shown.
+//
+// Growth is still bounded by TRAFFIC, not catalogue size: a photo is only stored
+// after somebody opens that listing. ~12 photos x ~300KB x 1.33 (base64) is about
+// 4.8MB per listing anyone actually looks at.
+const PHOTO_CACHE_MAX_INDEX = 11;
 
 function photoCacheKey(listingId, index) {
   return `${PHOTO_CACHE_PREFIX}${listingId}-${index}.json`;
@@ -227,6 +248,9 @@ const PLACEHOLDER_TTL = {
   // clears -- and the cooldown, not the CDN, is what protects the host meanwhile.
   media_rate_limited: 60,
   throttled: 60,
+  // The URL we held was single-use and already spent, and re-resolving didn't
+  // produce another. Self-healing on the next resolve, so treat it like a limit.
+  url_unavailable: 60,
   // A network blip. Worth retrying soon-ish, not instantly.
   image_fetch_failed: 300,
   exception: 300,
@@ -316,6 +340,11 @@ const EXPLANATIONS = {
   index_out_of_range: "This listing has fewer photos than the requested index.",
   throttled: "MLS Grid rate-limited us recently and the photo cooldown is still active, so no request " +
     "was made. This one is temporary — the same URL should work within a minute.",
+  url_unavailable: "The listing has this photo, but we couldn't get a usable download URL for it. " +
+    "MLS Grid's media URLs are SINGLE-USE — once one has been spent on a download it can never be " +
+    "replayed — and the attempt to resolve a fresh one either failed or was throttled. Temporary: " +
+    "the next request resolves again. If this is the steady state for one listing, the resolve step " +
+    "is what to look at, not the image fetch.",
   image_fetch_failed: "The photo URL resolved, but fetching the image itself failed outright " +
     "(timeout or network error) rather than returning an HTTP error.",
   not_an_image: "The photo URL returned something that isn't an image.",
@@ -345,20 +374,48 @@ const EXPLANATIONS = {
 // for diagnosis: "we were rate-limited so we didn't ask" and "we asked and this
 // listing has no photos" both produce a grey square but need opposite responses
 // -- the first fixes itself in under a minute, the second never does.
-async function resolvePhotoUrls(listingId, store, token) {
-  const cached = await readCachedUrls(store, listingId);
-  if (cached && cached.fresh) return { urls: cached.urls, throttledUntil: null };
+// 2026-08-17: this used to return the whole URL list and let the caller index it.
+// It is now per-index, because whether a cached URL may be used is a per-index
+// question: MLS Grid Media URLs are SINGLE-USE ("the URL may be used to download
+// its image only once. A second request using the same URL will fail"), so an entry
+// can be perfectly fresh and still be worthless for the one photo being asked for.
+// usableUrl() is the only thing allowed to answer that.
+//
+// `force` skips the cache entirely -- used for the one retry after a cached URL
+// fails, which is the case that used to be indistinguishable from a rate limit.
+async function resolvePhotoUrl(listingId, index, store, token, force) {
+  const cached = force ? null : await readCachedUrls(store, listingId);
+  const cachedUrl = cached ? usableUrl(cached, index) : null;
+  const cachedCount = cached ? cached.urls.length : 0;
+
+  // Fast path: fresh and not yet spent.
+  if (cached && cached.fresh && cachedUrl) {
+    return { url: cachedUrl, urlCount: cachedCount, fromCache: true, throttledUntil: null };
+  }
+  // A fresh EMPTY entry is a remembered "this listing has no media" verdict, and
+  // re-asking is exactly the drip EMPTY_CACHE_TTL_MS exists to stop.
+  if (cached && cached.fresh && !cachedCount) {
+    return { url: null, urlCount: 0, fromCache: true, throttledUntil: null };
+  }
 
   // Respects the sync's suspension flag AND the photo-specific cooldown, and
   // sets only the latter -- photo traffic must never pause listing replication.
   const throttledUntil = await isThrottled(store);
-  if (throttledUntil) return { urls: cached ? cached.urls : null, throttledUntil };
+  if (throttledUntil) {
+    return { url: cachedUrl, urlCount: cachedCount, fromCache: true, throttledUntil };
+  }
 
   const resolved = await resolveMediaFor([listingId], {
     store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS,
     timeoutMs: SINGLE_TIMEOUT_MS,
   });
-  return { urls: resolved[listingId] || (cached ? cached.urls : null), throttledUntil: null };
+  const urls = resolved[listingId];
+  if (Array.isArray(urls) && urls.length) {
+    return { url: urls[index] || null, urlCount: urls.length, fromCache: false, throttledUntil: null };
+  }
+  // The resolve found nothing or failed. A stale-but-unspent URL is still worth a
+  // try -- MLS Grid's own window is an hour and ours is five minutes.
+  return { url: cachedUrl, urlCount: cachedCount, fromCache: true, throttledUntil: null };
 }
 
 // Exported for tests only. The photo cache's guarantees -- bounded to her own cover
@@ -384,19 +441,48 @@ exports.handler = async (event) => {
     }
     const index = Math.max(0, parseInt(params.i, 10) || 0);
 
+    const store = getBlobStore(getStore, BLOB_STORE_NAME);
+
+    // ---- OUR OWN COPY FIRST -------------------------------------------------
+    // 2026-08-17. This check used to live only on the FAILURE paths, so a photo we
+    // already held was still re-resolved and re-downloaded from MLS Grid on every
+    // request that missed a CDN edge -- against a documented rule that could not be
+    // plainer: "There is NEVER a reason to download the same media more than once."
+    //
+    // Asking the store first is what turns this function from a proxy into a cache.
+    // It also means a stored photo survives a missing token, a suspension, and MLS
+    // Grid being down altogether.
+    //
+    // debug=1 deliberately skips it, for the same reason servedOrPlaceholder does:
+    // the one tool for answering "why is this photo grey" has to keep describing the
+    // live fetch.
+    if (!debug) {
+      const stored = await readCachedPhoto(store, listingId, index);
+      if (stored) return cachedPhotoResponse(stored, "stored");
+    }
+
     const token = process.env.MLSGRID_API_TOKEN;
     if (!token) return placeholder("not_configured", debug, { listingId });
 
-    const store = getBlobStore(getStore, BLOB_STORE_NAME);
-    const { urls, throttledUntil } = await resolvePhotoUrls(listingId, store, token);
-    if (throttledUntil && (!urls || !urls.length)) {
+    let resolved = await resolvePhotoUrl(listingId, index, store, token);
+    const { throttledUntil, urlCount } = resolved;
+    if (throttledUntil && !resolved.url) {
       return await servedOrPlaceholder(store, listingId, index, "throttled", debug, {
         listingId, index, retryAfterSeconds: Math.max(1, Math.ceil((throttledUntil - Date.now()) / 1000)),
       });
     }
-    if (!urls || !urls.length) return placeholder("no_media", debug, { listingId, index, urlCount: 0 });
-    if (index >= urls.length) {
-      return placeholder("index_out_of_range", debug, { listingId, index, urlCount: urls.length });
+    if (!urlCount) return placeholder("no_media", debug, { listingId, index, urlCount: 0 });
+    if (index >= urlCount) {
+      return placeholder("index_out_of_range", debug, { listingId, index, urlCount });
+    }
+    // The listing has this photo, but we could not get a URL we are allowed to use
+    // -- the cached one is spent and the re-resolve failed or was throttled. That is
+    // a transient, self-healing state and deliberately NOT reported as "no media",
+    // which would be a lie about the listing.
+    if (!resolved.url) {
+      return await servedOrPlaceholder(store, listingId, index, "url_unavailable", debug, {
+        listingId, index, urlCount,
+      });
     }
 
     // The media host is refusing requests right now, so don't add one. Checked
@@ -407,7 +493,7 @@ exports.handler = async (event) => {
     const mediaCooldown = await isMediaThrottled(store);
     if (mediaCooldown) {
       return await servedOrPlaceholder(store, listingId, index, "media_rate_limited", debug, {
-        listingId, index, urlCount: urls.length,
+        listingId, index, urlCount,
         retryAfterSeconds: Math.max(1, Math.ceil((mediaCooldown - Date.now()) / 1000)),
       });
     }
@@ -415,12 +501,37 @@ exports.handler = async (event) => {
     // 2026-08-15: the Authorization header is chosen per URL rather than always
     // sent -- MLS Grid's pre-signed media URLs 403 when a second auth mechanism
     // rides along, which is what was blanking some cards. See fetchMediaResponse.
-    const mediaHost = (() => { try { return new URL(urls[index]).host; } catch (e) { return null; } })();
-    const attempt = await fetchMediaResponse(urls[index], token, IMAGE_FETCH_TIMEOUT_MS);
+    const hostOf = (u) => { try { return new URL(u).host; } catch (e) { return null; } };
+    let mediaHost = hostOf(resolved.url);
+    let attempt = await fetchMediaResponse(resolved.url, token, IMAGE_FETCH_TIMEOUT_MS);
+    // Spent, whatever came back. A URL that has reached MLS Grid is single-use and
+    // gone; handing it to the next visitor would guarantee them a failure that looks
+    // exactly like a rate limit. Marked before the response is even inspected, so no
+    // early return can skip it.
+    await markUrlUsed(store, listingId, index);
+
+    // ONE retry, and only where it is justified: the URL came from our cache, so it
+    // may have been spent or expired in a way a fresh one would not be. A 429 is
+    // excluded deliberately -- retrying into a rate limit is what kept the limit
+    // alive in the first place -- and so is a live-resolved URL, which has no better
+    // version to fetch.
+    const worthRetrying = resolved.fromCache &&
+      (!attempt || !attempt.res || (!attempt.res.ok && attempt.res.status !== 429));
+    if (worthRetrying) {
+      const fresh = await resolvePhotoUrl(listingId, index, store, token, true);
+      if (fresh.url && fresh.url !== resolved.url) {
+        console.warn(`listing-photo: ${listingId}/${index} cached URL failed ` +
+          `(${(attempt && attempt.res && attempt.res.status) || "no response"}); retrying with a freshly resolved one`);
+        resolved = fresh;
+        mediaHost = hostOf(fresh.url);
+        attempt = await fetchMediaResponse(fresh.url, token, IMAGE_FETCH_TIMEOUT_MS);
+        await markUrlUsed(store, listingId, index);
+      }
+    }
     const imgRes = attempt && attempt.res;
     if (!imgRes) {
       return await servedOrPlaceholder(store, listingId, index, "image_fetch_failed", debug, {
-        listingId, index, urlCount: urls.length, mediaHost,
+        listingId, index, urlCount, mediaHost,
         authMode: attempt && attempt.mode, error: attempt && attempt.error,
         attempts: attempt && attempt.attempts,
       });
@@ -433,7 +544,7 @@ exports.handler = async (event) => {
       console.error(`listing-photo: ${listingId} photo ${index} -> HTTP 429 from ${mediaHost}; ` +
         `media cooldown set for ${Math.round(waitMs / 1000)}s`);
       return await servedOrPlaceholder(store, listingId, index, "media_rate_limited", debug, {
-        listingId, index, mediaHost, urlCount: urls.length,
+        listingId, index, mediaHost, urlCount,
         authMode: attempt.mode, attempts: attempt.attempts,
         retryAfterSeconds: Math.round(waitMs / 1000),
       });
@@ -444,7 +555,7 @@ exports.handler = async (event) => {
       // callers can group these without parsing a code they have to guess at.
       return await servedOrPlaceholder(store, listingId, index, "image_http_error", debug, {
         listingId, index, httpStatus: imgRes.status, authMode: attempt.mode, mediaHost,
-        urlCount: urls.length,
+        urlCount,
         // Both auth modes, so a 404 can be read as "the photo is gone" rather than
         // "we only ever asked one way". See RETRY_OTHER_MODE_ON in _media.js.
         attempts: attempt.attempts,
@@ -478,7 +589,7 @@ exports.handler = async (event) => {
         `over the ${MAX_INLINE_IMAGE_BYTES}-byte inline ceiling.`);
       return await servedOrPlaceholder(store, listingId, index, "too_large", debug, {
         listingId, index, bytes: buf.length, limitBytes: MAX_INLINE_IMAGE_BYTES,
-        overBy: buf.length - MAX_INLINE_IMAGE_BYTES, contentType, mediaHost, urlCount: urls.length,
+        overBy: buf.length - MAX_INLINE_IMAGE_BYTES, contentType, mediaHost, urlCount,
       });
     }
 
@@ -489,7 +600,7 @@ exports.handler = async (event) => {
         headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
         body: JSON.stringify({
           listingId, index, ok: true, bytes: buf.length, contentType,
-          authMode: attempt.mode, urlCount: urls.length, mediaHost,
+          authMode: attempt.mode, urlCount, mediaHost,
         }, null, 2),
       };
     }

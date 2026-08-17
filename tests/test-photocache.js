@@ -24,14 +24,34 @@ try { require(FN); check("listing-photo.js loads", true); }
 catch (err) { check("listing-photo.js loads", false, err && err.message); }
 
 // ---- 1. BOUNDED. This blob store also holds the ~27,000-listing IRES catalogue, so
-// the ceiling matters. The one that does the work is the INDEX: covers are what a
-// card shows and therefore what goes grey, and galleries are roughly 40x the volume
-// for photos a visitor has to click to see.
+// the ceiling matters. The bound that does the work is the INDEX.
+//
+// 2026-08-17: raised from 0 to 11, and the reasoning inverted. Cover-only was chosen
+// because "galleries are roughly 40x the volume for photos a visitor has to click to
+// see". True of a 50-photo lightbox; false of the photos the site actually renders.
+// listing-page.js shows Math.min(count, 12) of them, and every index above 0 was
+// re-downloaded from MLS Grid on every view that missed a CDN edge -- against a
+// documented rule that leaves no room: "There is NEVER a reason to download the same
+// media more than once."
+//
+// So the bound must be exactly what a page renders. Below it, the difference is
+// handed straight back to MLS Grid; above it, we store photos nobody is shown.
 check(
-  "only cover photos are cached",
-  /PHOTO_CACHE_MAX_INDEX\s*=\s*0/.test(src),
-  "caching whole galleries is ~40x the storage for photos nobody has asked to see"
+  "the cache covers exactly the photos a listing page renders",
+  /PHOTO_CACHE_MAX_INDEX\s*=\s*11/.test(src),
+  "the bound has to match listing-page.js's Math.min(count, 12)"
 );
+// The two really do have to move together, so read the other file rather than
+// trusting a comment about it.
+{
+  const pageSrc = fs.readFileSync(path.join(ROOT, "netlify", "functions", "listing-page.js"), "utf8");
+  const m = pageSrc.match(/Math\.min\(count,\s*(\d+)\)/);
+  check(
+    "and that is still what listing-page.js renders",
+    !!m && Number(m[1]) === 12,
+    m ? `listing-page renders ${m[1]} photos but the cache bound is 12` : "listing-page's photo count is unreadable"
+  );
+}
 // 2026-08-17, revised the same evening. This used to require the cache to be
 // restricted to her own listings. That bound was aimed at the wrong number: she
 // found grey cards on her LUXURY SEARCH page, where nothing is hers, and a search
@@ -139,14 +159,18 @@ function fakeStore(opts) {
   __test.resetMineCache();
   let store = fakeStore();
   check("behaviour: her cover photo IS cached", await __test.shouldCachePhoto(store, MINE, 0) === true);
-  check("behaviour: a gallery photo of hers is NOT", await __test.shouldCachePhoto(store, MINE, 3) === false,
-    "index bound not enforced");
+  check("behaviour: a photo her listing page renders IS cached too",
+    await __test.shouldCachePhoto(store, MINE, 3) === true,
+    "a rendered photo that isn't stored is re-downloaded from MLS Grid on every view");
   check("behaviour: another agent's cover photo IS cached too",
     await __test.shouldCachePhoto(store, NOT_MINE, 0) === true,
     "her public search pages show other agents' listings and they went grey as well");
-  check("behaviour: but their galleries are still not",
-    await __test.shouldCachePhoto(store, NOT_MINE, 4) === false,
-    "index 0 is the bound that keeps this from being ~40x bigger");
+  check("behaviour: and so are their rendered gallery photos",
+    await __test.shouldCachePhoto(store, NOT_MINE, 11) === true,
+    "index 11 is the last photo listing-page.js draws");
+  check("behaviour: but a photo past what any page shows is NOT",
+    await __test.shouldCachePhoto(store, NOT_MINE, 12) === false,
+    "storing photos nobody is shown is unbounded growth for no benefit");
 
   // Round trip.
   const buf = Buffer.from("fake-jpeg-bytes");
@@ -177,8 +201,8 @@ function fakeStore(opts) {
   check("behaviour: the cache decision survives an unreadable store",
     await __test.shouldCachePhoto(fakeStore({ throwOnGet: true }), MINE, 0) === true,
     "the bound must not depend on a blob read that can fail");
-  check("behaviour: and still refuses a gallery index there",
-    await __test.shouldCachePhoto(fakeStore({ throwOnGet: true }), MINE, 9) === false);
+  check("behaviour: and still refuses an index past what any page renders",
+    await __test.shouldCachePhoto(fakeStore({ throwOnGet: true }), MINE, 40) === false);
 
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
   process.exit(failures === 0 ? 0 : 1);

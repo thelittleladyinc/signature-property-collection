@@ -272,8 +272,16 @@ function statusClause() {
 // refreshOneListing. MlgCanView/StandardStatus are both in MLS Grid's
 // allowed-filter-fields list, so this is just choosing to filter on fewer
 // of them for the incremental pass -- still fully within their contract.
+// MLS Grid v2: "Each request must contain a single OriginatingSystemName specified
+// in the filter criteria of the request." It was inlined here and MISSING from the
+// three single-purpose queries below, which is very likely the real explanation for
+// the behaviour refreshOneListing documents as MLS Grid "silently ignoring a
+// ListingId filter and returning an unrelated record" -- that is what an unscoped
+// query looks like from the outside.
+const ORIGINATING_SYSTEM_CLAUSE = "OriginatingSystemName eq 'ires'";
+
 function baseFilter(sinceTimestamp) {
-  const clauses = ["OriginatingSystemName eq 'ires'"];
+  const clauses = [ORIGINATING_SYSTEM_CLAUSE];
   if (sinceTimestamp) {
     clauses.push(`ModificationTimestamp gt ${sinceTimestamp}`);
   } else {
@@ -418,7 +426,7 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt,
 // logic.
 async function refreshOneListing(listingId, listingsById, store, token, startedAt, throttle, photoDeadlineMs) {
   const qs = new URLSearchParams({
-    "$filter": `ListingId eq '${listingId}' and MlgCanView eq true`,
+    "$filter": `${ORIGINATING_SYSTEM_CLAUSE} and ListingId eq '${listingId}' and MlgCanView eq true`,
     "$select": SELECT_FIELDS,
     "$expand": "Media",
     "$top": "1",
@@ -481,7 +489,7 @@ async function discoverHerOfficeMlsId(listingsById, token) {
   if (!known) return null; // nothing to look up from yet -- try again once bootstrap finds at least one
   try {
     const qs = new URLSearchParams({
-      "$filter": `ListingId eq '${known.listingId}' and MlgCanView eq true`,
+      "$filter": `${ORIGINATING_SYSTEM_CLAUSE} and ListingId eq '${known.listingId}' and MlgCanView eq true`,
       "$select": "ListingId,ListOfficeMlsId",
       "$top": "1",
     });
@@ -513,7 +521,7 @@ async function discoverHerOfficeMlsId(listingsById, token) {
 const OFFICE_DISCOVERY_MAX_PAGES = 3;
 async function discoverListingsByOffice(officeMlsId, listingsById, store, token, startedAt, throttle) {
   const qs = new URLSearchParams({
-    "$filter": `ListOfficeMlsId eq '${officeMlsId}' and MlgCanView eq true and ${statusClause()}`,
+    "$filter": `${ORIGINATING_SYSTEM_CLAUSE} and ListOfficeMlsId eq '${officeMlsId}' and MlgCanView eq true and ${statusClause()}`,
     "$select": SELECT_FIELDS,
     "$expand": "Media",
     "$top": String(PAGE_SIZE),

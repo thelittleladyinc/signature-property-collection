@@ -396,23 +396,54 @@ Question 4 is deliberate: telling them the backfill is coming, before running it
 turns tens of thousands of paced downloads from a recently-throttled account into
 an agreed-in-advance operation.
 
-## 7. Open items
+## 7. What is now fixed, and how to check it in production
 
-Code:
+All six findings are fixed, and `tests/test-mediarules.js` is a new suite that
+pins each one to the sentence of MLS Grid documentation it comes from — 39 suites
+pass. What changed:
 
-- [ ] Finding 3 — `looksPresigned()` misses path-signed `media.mlsgrid.com` URLs
-- [ ] Finding 4 — `User-Agent: token` missing on the `anon` fetch branch
-- [ ] Finding 5 — media resolve: add `OriginatingSystemName eq 'ires'`, swap
-      `or`-chains for `in`
-- [ ] Finding 1 — stop caching single-use Media URLs (`URL_CACHE_TTL_MS`)
-- [ ] Finding 2 — cache the displayed photo set, keyed by MediaKey, not index 0 only
-- [ ] Finding 6 — chunk or clamp the 24-vs-12 pre-warm gap
-- [ ] Finding 7 — repoint the refresh sweep; consider raw-byte storage; Cloudinary
-      for oversize photos
+| Finding | Fix |
+|---|---|
+| 1 — single-use URLs cached 40 min | `URL_CACHE_TTL_MS` 40 min → 5 min, and every index is marked spent (`markUrlUsed`) the moment a download is attempted. A spent index is never handed out again, however fresh the entry. A cached URL that fails is retried once with a freshly resolved one — but never on a 429. |
+| 2 — re-downloading media | `PHOTO_CACHE_MAX_INDEX` 0 → 11, matching exactly what `listing-page.js` renders, and the handler now asks its own store **before** it contacts MLS Grid at all. A stored photo is served even with no token and with MLS Grid down. |
+| 3 — path-signed URLs | `looksPresigned()` treats any `media.mlsgrid.com` URL as signed, so the Bearer header never rides along with a signature. Legacy AWS query-string detection kept for URLs still in flight. |
+| 4 — missing User-Agent | `User-Agent: <token>` now goes on **both** fetch modes; only `Authorization` varies. |
+| 5 — out-of-spec query | Media resolves send `OriginatingSystemName eq 'ires'` and use `ListingId in (…)` — zero `or` operators. A 400 on `in` falls back to `or` chunked to five ids and remembers, so one wrong assumption about the feed can't blank a page. `sync-listings.js`'s three single-purpose queries also carry the originating system now. |
+| 6 — 24-vs-12 pre-warm | Batch cap raised to 24 to match the largest page `listings-search.js` will serve, and an over-cap batch logs instead of truncating silently. |
+| also | `site-health.js`'s `?probe=1` marks the URL it spends, so the diagnostic stops creating the fault it exists to find. |
+
+**How to confirm it worked, in order:**
+
+1. **`?debug=1` on a photo that was grey.** `/.netlify/functions/listing-photo?id=IRE…&i=0&debug=1`
+   should return `"ok": true`. If it fails, `reason` now distinguishes
+   `url_unavailable` (spent URL, self-healing) from `media_rate_limited` (a real
+   429) — those were indistinguishable before.
+2. **Load the same listing page twice.** The second load should serve from our own
+   store: response header `X-Photo-Cache: hit`, and no MLS Grid traffic at all.
+3. **Watch the Usage tab** (§1) over a day. If Findings 1 and 2 were the bulk of
+   it, media requests should drop sharply and keep dropping as the cache fills.
+4. **`/site-health?probe=1`** for a live end-to-end resolve-plus-fetch.
+
+**Deliberately not changed:**
+
+- **The refresh sweep** still runs 5 listings per 30-minute run. Its photo-freshness
+  half is now pointless (nothing serves stored MLS URLs), but its status-checking
+  half is real, and repointing it at a catalogue-wide cover backfill is Option B —
+  which should wait for support's answer on pacing.
+- **Base64 storage in Blobs** (~33% overhead). The proven path is worth more than
+  the saving right now, and storage is the cheap axis.
+- **Photos over 4.4 MB** still cannot be served through a function response. Only
+  Cloudinary fixes that; it needs her credentials and is Option B's territory.
+- **The pre-warm still resolves URLs for listings whose photos are already stored** —
+  one wasted API call per search page render, bounded and harmless, but it would
+  need cross-module knowledge of the photo store to avoid.
+
+## 8. Open items
 
 External:
 
-- [ ] Read the Usage tab and record what the three apps actually consume
+- [ ] Read the Usage tab and record what the three apps actually consume (do this
+      AFTER the fixes have been live for a day, so the number means something)
 - [ ] Support: CDN migration before 8 September 2026
 - [ ] Support: per-token vs per-account budgets; cost of a second IDX subscription
 - [ ] IRES: setup fee and approval for an additional feed

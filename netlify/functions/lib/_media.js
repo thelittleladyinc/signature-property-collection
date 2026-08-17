@@ -18,10 +18,13 @@
 // Two fixes, both here:
 //
 //   1. BATCH. listings-search.js resolves the media for every listing on the
-//      page in ONE MLS Grid call (OR-joined ListingId clauses -- `in` isn't
-//      reliably supported on this feed) and writes them all to the cache before
-//      the browser ever asks for an image. So a page costs 1 API call instead
-//      of 12, and the image requests are cache hits.
+//      page in ONE MLS Grid call and writes them all to the cache before the
+//      browser ever asks for an image. So a page costs 1 API call instead of 12,
+//      and the image requests are cache hits. (This originally OR-joined the
+//      ListingId clauses, noting `in` "isn't reliably supported on this feed".
+//      MLS Grid's v2 documentation says the opposite -- `in` is new in v2 and
+//      PREFERRED, and no more than five `or` operators are allowed per query,
+//      which a 12-id batch broke by more than double. See MAX_OR_IDS_PER_REQUEST.)
 //   2. DON'T POISON THE SYNC. The first pass had listing-photo.js call
 //      markSuspended() on a 429, which is the flag sync-listings.js uses to
 //      stop itself. A burst of photo requests could therefore pause the
@@ -30,8 +33,29 @@
 //      own, shorter cooldown instead.
 const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
 
-// Comfortably inside MLS Grid's ~1-2 hour signature life.
-const URL_CACHE_TTL_MS = 40 * 60 * 1000;
+// 2026-08-17. This was 40 minutes, on the reasoning that it sat "comfortably
+// inside MLS Grid's ~1-2 hour signature life". Lifetime was never the binding
+// constraint. From MLS Grid's Media documentation:
+//
+//   "Single-use - the URL may be used to download its image only once. A second
+//    request using the same URL will fail."
+//   "do not store or cache a Media URL for later use. Retrieve it from the API
+//    and download the image promptly."
+//
+// So a 40-minute cache of URLs guaranteed failure: the first visitor spent each
+// URL, and every reload, every other CDN edge and every later visitor in that
+// window replayed a URL that was already dead. That is a grey card with nothing
+// whatsoever to do with rate limiting -- and it is indistinguishable, from the
+// outside, from the 429s that have been chased all day.
+//
+// Two changes together make this safe. Each index is marked USED the moment a
+// download is attempted (markUrlUsed), so it is never handed out twice; and the
+// window is short, purely to bridge the gap between prewarmPhotoUrls resolving a
+// page and the browser asking for its images seconds later. Nothing here is a
+// durable store any more -- the durable store is the PHOTO BYTES, in
+// listing-photo.js, which is what the docs actually ask for: "You must maintain
+// your own copy of all media files."
+const URL_CACHE_TTL_MS = 5 * 60 * 1000;
 
 // How long "this listing resolved to no media" is remembered.
 //
@@ -84,13 +108,40 @@ const MEDIA_COOLDOWN_MS = 45 * 1000;
 
 const BATCH_TIMEOUT_MS = 5000;
 const SINGLE_TIMEOUT_MS = 6000;
-// One MLS Grid URL has to stay a sane length, and $top bounds the response.
-const MAX_IDS_PER_BATCH = 12;
+// Matches the maximum `top` listings-search.js will serve (24), so a full page is
+// always one request. It was 12 while the maximum page was 24, which silently left
+// half a large page unwarmed -- each of those cards then resolving on its own, which
+// is the exact burst the prewarm exists to prevent. `in` (below) makes 24 ids as
+// cheap as 12; the or-fallback chunks instead.
+const MAX_IDS_PER_BATCH = 24;
+
+// MLS Grid v2: "Each request must contain a single OriginatingSystemName specified
+// in the filter criteria of the request." It was missing from every media resolve --
+// present only in sync-listings.js's replication filter. Beyond being out of spec,
+// it is the most plausible explanation for the behaviour this file already works
+// around below: a feed that "sometimes ignores a ListingId filter and returns an
+// unrelated record" is what an unscoped query looks like.
+const ORIGINATING_SYSTEM_NAME = "ires";
+
+// MLS Grid v2: "The query must include no more than 5 'or' operators per query...
+// It is preferred to use the in operator instead which is new in version 2.0."
+// A 12-id batch was eleven 'or' operators -- more than double the documented
+// ceiling, on the highest-frequency call this site makes.
+//
+// `in` is documented and preferred, so it is what we send. But a photo path that
+// fails completely if one assumption about someone else's feed is wrong is not
+// worth the elegance, so a 400 falls back to or-chains chunked to five ids -- and
+// remembers, so the 400 is paid once per container rather than once per request.
+const MAX_OR_IDS_PER_REQUEST = 5;
+let _inOperatorRejected = false;
 
 function cacheKey(listingId) {
   return `${PHOTO_URL_CACHE_PREFIX}${listingId}.json`;
 }
 
+// Returns { urls, fresh, used } where `used` is the set of indexes whose URL has
+// already been handed to a download attempt and is therefore spent. A caller must
+// treat a used index as no URL at all -- see usableUrl().
 async function readCachedUrls(store, listingId) {
   const cached = await store.get(cacheKey(listingId), { type: "json" }).catch(() => null);
   if (!cached || !Array.isArray(cached.urls)) return null;
@@ -99,13 +150,45 @@ async function readCachedUrls(store, listingId) {
   const ttl = cached.urls.length ? URL_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS;
   const fresh = typeof cached.cachedAt === "number" &&
     Date.now() - cached.cachedAt < ttl;
-  // Stale entries are still returned, flagged -- a signed URL a little past our
-  // conservative TTL is often still valid, and trying it costs MLS Grid nothing.
-  return { urls: cached.urls, fresh };
+  const used = new Set(Array.isArray(cached.used) ? cached.used : []);
+  // Stale entries are still returned, flagged: an unused URL a little past our
+  // conservative window is often still inside MLS Grid's own hour, and trying it
+  // costs one request. A SPENT one is different -- it is known to fail, so
+  // usableUrl() refuses it regardless of freshness.
+  return { urls: cached.urls, fresh, used };
+}
+
+// The one place that decides whether a cached URL may be used. Single-use is not a
+// TTL question, so freshness alone is never enough.
+function usableUrl(cached, index) {
+  if (!cached || !Array.isArray(cached.urls)) return null;
+  if (cached.used && cached.used.has(index)) return null;
+  const url = cached.urls[index];
+  return typeof url === "string" && url ? url : null;
 }
 
 async function writeCachedUrls(store, listingId, urls) {
-  await store.setJSON(cacheKey(listingId), { urls, cachedAt: Date.now() }).catch(() => {});
+  await store.setJSON(cacheKey(listingId), { urls, cachedAt: Date.now(), used: [] }).catch(() => {});
+}
+
+// Spend an index. Called the moment a download is ATTEMPTED, not when one succeeds:
+// a request that reached MLS Grid has consumed the URL whatever it answered, and
+// re-offering it to the next visitor would produce a guaranteed failure that looks
+// exactly like a rate limit. Best-effort -- if this write is lost, the worst case is
+// one wasted request that then re-resolves.
+async function markUrlUsed(store, listingId, index) {
+  try {
+    const cached = await store.get(cacheKey(listingId), { type: "json" });
+    if (!cached || !Array.isArray(cached.urls)) return;
+    const used = new Set(Array.isArray(cached.used) ? cached.used : []);
+    if (used.has(index)) return;
+    used.add(index);
+    await store.setJSON(cacheKey(listingId), {
+      urls: cached.urls, cachedAt: cached.cachedAt, used: Array.from(used),
+    });
+  } catch (err) {
+    console.warn(`markUrlUsed failed for ${listingId}/${index}:`, err && err.message);
+  }
 }
 
 async function isThrottled(store) {
@@ -166,12 +249,69 @@ function mediaUrlsFrom(record) {
 // Resolves media for one or many listing ids in a single request. Returns a
 // {listingId: urls[]} map of whatever came back, and writes each to the cache.
 // Never throws: on any failure it resolves to whatever it managed to get.
+// OData string literals escape a single quote by doubling it. Listing ids are
+// already validated upstream, so this is belt and braces rather than a live
+// injection route -- but an id with an apostrophe would otherwise produce a filter
+// that silently means something else.
+function odataString(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+// The documented, preferred shape: one OriginatingSystemName, one `in` list, no
+// `or` operators at all.
+function inFilter(ids) {
+  return `OriginatingSystemName eq ${odataString(ORIGINATING_SYSTEM_NAME)} and ` +
+    `ListingId in (${ids.map(odataString).join(",")}) and MlgCanView eq true`;
+}
+
+// The fallback, used only after MLS Grid has rejected `in` once. Chunked so it can
+// never exceed the documented five-`or` ceiling the way the original did.
+function orFilter(ids) {
+  const clause = ids.map((id) => `ListingId eq ${odataString(id)}`).join(" or ");
+  return `OriginatingSystemName eq ${odataString(ORIGINATING_SYSTEM_NAME)} and ` +
+    `(${clause}) and MlgCanView eq true`;
+}
+
+function chunk(items, size) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 async function resolveMediaFor(ids, { store, token, baseUrl, selectFields, timeoutMs }) {
-  const wanted = ids.slice(0, MAX_IDS_PER_BATCH).filter(Boolean);
-  if (!wanted.length || !token) return {};
-  const idClause = wanted.map((id) => `ListingId eq '${id}'`).join(" or ");
+  const all = ids.filter(Boolean);
+  if (!all.length || !token) return {};
+  if (all.length > MAX_IDS_PER_BATCH) {
+    // Never silent. A truncated batch used to look identical to a batch that
+    // simply found nothing, which is how half a large page could go unwarmed
+    // without leaving a trace anywhere.
+    console.warn(`resolveMediaFor: ${all.length} ids requested, ` +
+      `resolving the first ${MAX_IDS_PER_BATCH}`);
+  }
+  const wanted = all.slice(0, MAX_IDS_PER_BATCH);
+
+  // One request in the normal case. Only the `or` fallback splits, and only after
+  // MLS Grid has actually rejected `in`.
+  const groups = _inOperatorRejected ? chunk(wanted, MAX_OR_IDS_PER_REQUEST) : [wanted];
+  const out = {};
+  for (let g = 0; g < groups.length; g += 1) {
+    const group = groups[g];
+    // 2 rps is a hard ceiling, so a multi-chunk fallback paces itself rather than
+    // firing back to back.
+    if (g > 0) await new Promise((r) => setTimeout(r, 550));
+    const got = await resolveOneBatch(group, { store, token, baseUrl, selectFields, timeoutMs });
+    if (got === null) return out; // throttled or hard failure -- stop asking
+    Object.assign(out, got);
+  }
+  return out;
+}
+
+// Returns a {listingId: urls[]} map, or null when the request failed in a way that
+// means "stop" (429, timeout, non-ok). The null/{} distinction matters: {} is a
+// real answer worth negative-caching, null is an outage that must not be.
+async function resolveOneBatch(wanted, { store, token, baseUrl, selectFields, timeoutMs }) {
   const qs = new URLSearchParams({
-    "$filter": `(${idClause}) and MlgCanView eq true`,
+    "$filter": _inOperatorRejected ? orFilter(wanted) : inFilter(wanted),
     "$select": selectFields,
     "$expand": "Media",
     "$top": String(wanted.length),
@@ -184,9 +324,24 @@ async function resolveMediaFor(ids, { store, token, baseUrl, selectFields, timeo
     if (res.status === 429) {
       // Our own cooldown, NOT the sync's suspension flag.
       await setPhotoCooldown(store);
-      return {};
+      return null;
     }
-    if (!res.ok) return {};
+    // A 400 on the `in` form means this feed doesn't support it after all. Say so
+    // once, remember it, and retry this same batch the documented long way rather
+    // than returning a page of grey cards over a query-syntax preference.
+    if (res.status === 400 && !_inOperatorRejected) {
+      _inOperatorRejected = true;
+      console.warn("resolveMediaFor: MLS Grid rejected the `in` operator (400) — " +
+        "falling back to chunked `or` filters for the life of this container.");
+      const out = {};
+      for (const group of chunk(wanted, MAX_OR_IDS_PER_REQUEST)) {
+        const got = await resolveOneBatch(group, { store, token, baseUrl, selectFields, timeoutMs });
+        if (got === null) return out;
+        Object.assign(out, got);
+      }
+      return out;
+    }
+    if (!res.ok) return null;
     const json = await res.json();
     const out = {};
     // This feed is documented to sometimes ignore a ListingId filter and return
@@ -212,7 +367,7 @@ async function resolveMediaFor(ids, { store, token, baseUrl, selectFields, timeo
     return out;
   } catch (err) {
     console.error("resolveMediaFor failed:", err && err.message);
-    return {};
+    return null;
   }
 }
 
@@ -235,7 +390,11 @@ async function prewarmPhotoUrls(listings, { store, token, baseUrl, selectFields,
     const rehosted = (Array.isArray(l.cloudinaryPhotos) && l.cloudinaryPhotos[0]) || l.cloudinaryPhoto;
     if (typeof rehosted === "string" && rehosted.indexOf("res.cloudinary.com") !== -1) return;
     const cached = await readCachedUrls(store, l.listingId);
-    if (cached && cached.fresh) return;
+    // Fresh is not sufficient: a fresh entry whose cover URL has already been spent
+    // is worse than no entry, because it would hand the next visitor a URL that is
+    // certain to fail. An empty entry (a remembered "no media" verdict) still
+    // counts as warm -- there is nothing to resolve.
+    if (cached && cached.fresh && (!cached.urls.length || usableUrl(cached, 0))) return;
     needed.push(l.listingId);
   }));
 
@@ -273,7 +432,28 @@ const PRESIGNED_QUERY_HINTS = [
   "signature=", "expires=", "sig=", "se=", "st=", "token=", "key-pair-id",
 ];
 
+// 2026-08-17. This read the QUERY STRING only, and returned false when there was
+// none. MLS Grid's media URL format effective 8 September 2026 has no query string
+// at all -- the signature is in the PATH:
+//
+//   https://media.mlsgrid.com/token=...&expires=...&id=.../images/MFR.../....jpeg
+//
+// So every new-format URL was classified as unsigned, which put `auth` first and
+// sent Authorization: Bearer alongside a signature -- the exact two-auth-mechanisms
+// 403 the mode split was written to avoid. The comment above guessed at this ("a
+// path-signed URL would slip past"); MLS Grid's docs confirm it is the format
+// everything is moving to, and the 429s and 404s in evidence are already coming
+// from media.mlsgrid.com.
+//
+// The host is now the primary signal, because MLS Grid documents that EVERY Media
+// URL it issues is signed. The query hints stay for the legacy AWS/CloudFront URLs
+// still in flight until the migration completes.
+const SIGNED_MEDIA_HOSTS = new Set(["media.mlsgrid.com"]);
+
 function looksPresigned(url) {
+  let host = null;
+  try { host = new URL(String(url)).host.toLowerCase(); } catch (err) { host = null; }
+  if (host && SIGNED_MEDIA_HOSTS.has(host)) return true;
   const query = (String(url).split("?")[1] || "").toLowerCase();
   if (!query) return false;
   return PRESIGNED_QUERY_HINTS.some((hint) => query.includes(hint));
@@ -333,15 +513,26 @@ async function fetchMediaResponse(url, token, timeoutMs) {
   // what each said -- the thing that was missing when this 404 first turned up.
   const attempts = [];
   for (const mode of modes) {
-    const headers = mode === "auth"
-      ? {
-        Authorization: `Bearer ${token}`,
-        // Inherited from Listing-Engine, which found MLS Grid wants the token
-        // echoed here too. Only sent alongside the Authorization header.
-        "User-Agent": token,
-        Accept: "image/*,*/*;q=0.8",
-      }
-      : { Accept: "image/*,*/*;q=0.8" };
+    // 2026-08-17: the User-Agent used to be sent ONLY in `auth` mode, described as
+    // something "only sent alongside the Authorization header". MLS Grid's docs are
+    // unambiguous and it is the opposite of optional:
+    //
+    //   "ALL requests to download the expanded media using the Media URL MUST
+    //    include the HTTP header User-Agent. The User-Agent value MUST be the Oauth
+    //    2 access token... Any User-Agent that is not your Oauth 2 access token
+    //    will be blocked by our service."
+    //
+    // So the anonymous mode -- which is the FIRST mode tried for every signed URL,
+    // i.e. most of them -- was going out with the platform's default agent and
+    // being blocked by rule. The 2026-08-15 change was right that an Authorization
+    // header breaks a pre-signed URL, but it dropped the User-Agent along with it
+    // and only one of the two was the problem. A User-Agent is not an
+    // authentication mechanism; it cannot conflict with a signature.
+    const headers = {
+      "User-Agent": token,
+      Accept: "image/*,*/*;q=0.8",
+    };
+    if (mode === "auth") headers.Authorization = `Bearer ${token}`;
     let res;
     try {
       res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
@@ -369,6 +560,10 @@ module.exports = {
   cacheKey,
   readCachedUrls,
   writeCachedUrls,
+  usableUrl,
+  markUrlUsed,
+  ORIGINATING_SYSTEM_NAME,
+  MAX_IDS_PER_BATCH,
   isThrottled,
   setPhotoCooldown,
   setMediaCooldown,

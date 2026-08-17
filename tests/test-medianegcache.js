@@ -141,26 +141,52 @@ const ok = (value) => async () => ({ ok: true, status: 200, json: async () => ({
     check("mixed batch: the empty one cached as empty", c2 && c2.urls.length === 0);
   }
 
-  // -- 7. An empty verdict must expire sooner than a signed URL. ----------
-  // A listing that gets its photos uploaded an hour late should not be stuck
-  // showing a placeholder for the full URL TTL.
+  // -- 7. Both entry kinds age out in MINUTES, and neither is durable. ----
+  //
+  // 2026-08-17: this used to assert that an empty verdict expires SOONER than a URL
+  // list, because the URL list was held for 40 minutes and a listing whose photos
+  // arrived late should not be stuck behind that. The relationship has inverted, on
+  // purpose, because the two are about different things:
+  //
+  //   - A URL entry is perishable in a way a clock cannot express. MLS Grid Media
+  //     URLs are SINGLE-USE ("a second request using the same URL will fail"), so
+  //     what protects us is markUrlUsed, not the TTL. The window is now short and
+  //     exists only to bridge prewarm -> the browser's image requests seconds later.
+  //   - An empty verdict is a fact about the LISTING ("this one has no media"), and
+  //     holding it for a few minutes is the whole anti-drip point of caching it.
+  //
+  // So the invariant worth protecting is no longer an ordering. It is that BOTH stay
+  // in minutes -- nothing here may quietly become a durable store of MLS Grid URLs
+  // again, which is the bug this whole pass exists to remove.
   {
     const store = fakeStore();
     await media.writeCachedUrls(store, "G7", []);
     const entry = store.data.get(media.cacheKey("G7"));
-    entry.cachedAt = Date.now() - (15 * 60 * 1000); // 15 min old
+    entry.cachedAt = Date.now() - (20 * 60 * 1000); // 20 min old
     const cached = await media.readCachedUrls(store, "G7");
     check(
-      "a 15-minute-old empty verdict has expired",
+      "a 20-minute-old empty verdict has expired",
       !!cached && !cached.fresh,
-      "an empty verdict is being held as long as a signed URL"
+      "an empty verdict is being held for too long to notice a late photo upload"
     );
-    // While a real URL list of the same age is still fresh.
+
     await media.writeCachedUrls(store, "G8", ["https://media.test/x.jpg"]);
     const e8 = store.data.get(media.cacheKey("G8"));
-    e8.cachedAt = Date.now() - (15 * 60 * 1000);
+    e8.cachedAt = Date.now() - (20 * 60 * 1000);
     const c8 = await media.readCachedUrls(store, "G8");
-    check("a 15-minute-old real URL list is still fresh", !!c8 && c8.fresh);
+    check(
+      "a 20-minute-old URL list has expired too",
+      !!c8 && !c8.fresh,
+      "single-use URLs must never be treated as durable — this is the 40-minute bug"
+    );
+
+    // And the window has to stay well inside MLS Grid's own one-hour signature life,
+    // with room to spare, or a 'fresh' URL is one we know has already died.
+    check(
+      "the URL window is a small fraction of MLS Grid's one-hour signature life",
+      media.URL_CACHE_TTL_MS <= 10 * 60 * 1000,
+      `URL_CACHE_TTL_MS is ${media.URL_CACHE_TTL_MS}ms`
+    );
   }
 
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);

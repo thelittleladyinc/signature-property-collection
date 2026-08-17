@@ -43,7 +43,9 @@ const {
   SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS,
 } = require("./lib/_mls-shared");
 const { isCloudinaryConfigured, cloudinaryCredentials } = require("./lib/_cloudinary");
-const { resolveMediaFor, fetchMediaResponse, looksPresigned, isThrottled } = require("./lib/_media");
+const {
+  resolveMediaFor, fetchMediaResponse, looksPresigned, isThrottled, markUrlUsed,
+} = require("./lib/_media");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 // Read for the Tour It With Me coverage row below — same file the map reads.
 const LOCAL_SPOTS = require("./lib/_local-spots.json");
@@ -148,6 +150,10 @@ async function probePhotoPipeline(mineListings, token) {
     out.presigned = looksPresigned(urls[0]);
 
     const attempt = await fetchMediaResponse(urls[0], token, 8000);
+    // 2026-08-17: the probe SPENDS this URL. MLS Grid media URLs are single-use, so
+    // leaving it in the cache marked unused would hand the next real visitor a URL
+    // that cannot work -- a diagnostic that creates the fault it is there to find.
+    await markUrlUsed(store, first.listingId, 0);
     if (!attempt || !attempt.res) {
       out.ok = false;
       out.detail = `Resolved ${urls.length} URL(s) from ${out.mediaHost}, but the image fetch threw with no response.`;

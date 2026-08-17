@@ -388,6 +388,12 @@ the shared quota. `docs/MLS-GRID-QUOTA.md` has the full audit; the headlines:
   every request. That is likely why the feed "sometimes ignores a ListingId
   filter and returns an unrelated record".
 
+**All six are now fixed** (see §7 of that document for the table and for how to
+confirm each one in production). `tests/test-mediarules.js` is a new suite pinning
+every one of them to the sentence of MLS Grid documentation it came from; 39 suites
+pass. Deliberately left alone: the refresh sweep, base64 blob storage, and the
+4.4MB function-response ceiling on oversize photos — all reasoned about in §7.
+
 Also: **usage is self-serve** — Manage Subscriptions → Edit Data Subscription
 Details → Usage tab → Usage Logs gives the hourly and 24-hour breakdown without
 emailing anybody. And the subscription types (IDX/VOW/BO/PT) are use-case
