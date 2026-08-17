@@ -65,6 +65,21 @@ const LOFTY_TRIGGER_TAG = "Hot Lead - Website";
 const PHOTO_CHECK_KEY = "photo-pipeline-check.json";
 const CLOUDINARY_CHECK_KEY = "cloudinary-usage-check.json";
 
+// MUST MATCH the cron in netlify.toml's [functions."sync-listings"] block.
+//
+// 2026-08-17: the schedule moved 15 -> 30 minutes and this row did not follow it.
+// It kept telling Christine the sync "should be every 15", and — the part that
+// actually mattered — it went RED at 20 minutes, so a completely healthy sync on
+// the new schedule would report itself broken for a third of every cycle. A health
+// page that cries wolf is worse than no health page, because the next real failure
+// gets read as the same noise.
+//
+// The lateness threshold is derived rather than typed, so changing the interval
+// can't leave a stale number behind again. One full missed run plus a margin: the
+// sync is resumable and a single skipped run is not a fault worth alarming on.
+const SYNC_INTERVAL_MINUTES = 30;
+const SYNC_LATE_AFTER_MINUTES = SYNC_INTERVAL_MINUTES * 2 + 5;
+
 // 2026-08-15: Lofty's own API page (Settings > Integrations > API) documents
 // this exact call as its usage example, which makes it the ideal key test --
 // GET, read-only, and it either recognizes the key or it doesn't:
@@ -552,11 +567,11 @@ exports.handler = async (event) => {
   const checks = [
     {
       name: "Sync running on schedule",
-      ok: !isSuspended && minutesSinceLastRun !== null && minutesSinceLastRun < 20,
+      ok: !isSuspended && minutesSinceLastRun !== null && minutesSinceLastRun < SYNC_LATE_AFTER_MINUTES,
       detail: isSuspended
         ? `MLS Grid rate-limit circuit breaker is OPEN — paused until ${new Date(suspendedUntil).toLocaleString("en-US")}`
         : (lastRunAt != null
-          ? `Last ran ${minutesSinceLastRun} minute(s) ago (should be every 15)`
+          ? `Last ran ${minutesSinceLastRun} minute(s) ago (should be every ${SYNC_INTERVAL_MINUTES})`
           : "Has never run yet"),
     },
     {
