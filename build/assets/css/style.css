@@ -358,6 +358,22 @@ h2.section-title {
    body colour muddies, where a cool grey stays crisp. */
 .lede { font-size: 17px; line-height: 1.8; max-width: 680px; color: var(--slate-soft); }
 
+/* 2026-08-17 (Christine: "spacing is odd pn this page too", on /sellers.html).
+   It was not spacing, it was centring, and the cause is one missing pair of
+   margins. `.lede` is capped at 680px; in a centred section the TEXT centred
+   inside that box while the BOX itself stayed pinned to the left edge of the
+   wrap, so the paragraph sat measurably left of the heading above it. Nothing
+   looks broken — it just reads as slightly wrong, which is worse, because there
+   is nothing to point at.
+
+   Fixed by centring the box rather than by adding margins to the section, and
+   with a real class instead of the inline `style="text-align:center"` these
+   blocks used to carry, so the rule cannot be defeated by specificity later.
+   Affected /sellers.html, /current-listings.html, /expired-listings.html and
+   /listing-video-portfolio.html — pinned by test-centredlede.js. */
+.center { text-align: center; }
+.center .lede { margin-left: auto; margin-right: auto; }
+
 /* 2026-08-14: same subtle rose-glow + dot-texture treatment as .hero above,
    so the site's other full-width dark sections (Success Stories, etc.)
    don't read as a flatter, less-finished version of the hero right above
@@ -1111,6 +1127,28 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
 }
 .poi-icon-marker svg { width: 60%; height: 60%; }
 .leaflet-marker-icon:hover .poi-icon-marker { transform: scale(1.12); }
+
+/* The play badge on pins backed by one of Christine's own films (2026-08-17).
+   position:relative on the parent so the badge hangs off the corner; the parent
+   already carries the pin's own ring, so the badge gets its own to stay legible
+   against a photo-dark basemap. Hidden until the map is zoomed in — at county
+   level the pins overlap and a badge on each is noise. */
+.poi-icon-marker { position: relative; }
+.poi-icon-marker .poi-video-badge {
+  position: absolute; right: -3px; bottom: -3px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--white); color: var(--charcoal, #141415);
+  display: none; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(20,20,21,.5);
+}
+.poi-icon-marker .poi-video-badge svg { width: 8px; height: 8px; }
+#county-map.map-zoomed-in .poi-icon-marker.has-video .poi-video-badge { display: flex; }
+
+/* Respect a reduced-motion preference: the badge is information, the scale is not. */
+@media (prefers-reduced-motion: reduce) {
+  .poi-icon-marker { transition: none; }
+  .leaflet-marker-icon:hover .poi-icon-marker { transform: none; }
+}
 
 /* Sort control, sitting beside the Search button (2026-08-15). */
 .fs-sort { display: inline-flex; align-items: center; gap: 10px; }

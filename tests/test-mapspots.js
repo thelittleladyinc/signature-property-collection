@@ -69,6 +69,45 @@ for (const rel of ["build/assets/js/map.js", null]) {
     !/baseMarkers/.test(src),
     "the catch-all marker list is back; it is what swept up her spots"
   );
+
+  // 2026-08-17: a zoomend handler now exists, to reveal the play badge on pins that
+  // carry one of her films. Zoom on this map has been blamed for vanishing pins
+  // TWICE -- once wrongly (a stale cached script) and once correctly (the county
+  // drill-down hid every base marker). So the rule for anything bound to zoom here
+  // is that it may change how a pin LOOKS and never whether it EXISTS.
+  const zoomAt = src.indexOf("map.on('zoomend'");
+  if (zoomAt !== -1) {
+    // The handler body, resolved by name from the binding.
+    const fnName = (src.slice(zoomAt, zoomAt + 120).match(/map\.on\('zoomend',\s*(\w+)/) || [])[1];
+    const defAt = fnName ? src.indexOf(`function ${fnName}(`) : -1;
+    const body = defAt === -1 ? "" : src.slice(defAt, src.indexOf("\n    }", defAt));
+    check(`${label}: the zoom handler was found`, !!body, `could not resolve ${fnName}`);
+    if (body) {
+      for (const [what, re] of [
+        ["remove a layer", /removeLayer|\.remove\(\)/],
+        ["add a layer", /addLayer|addTo\(/],
+        ["hide anything", /display\s*=\s*['"]none|visibility|\.hide\(/],
+        ["clear a registry", /=\s*\[\]|\.length\s*=\s*0/],
+      ]) {
+        check(
+          `${label}: the zoom handler cannot ${what}`,
+          !re.test(body),
+          "zoom may change how a pin looks, never whether it exists — this is the third-time rule"
+        );
+      }
+    }
+  }
+
+  // And the badge must be additive: a pin without a video still gets its glyph.
+  const iconAt = src.indexOf("function poiIcon");
+  const iconBody = iconAt === -1 ? "" : src.slice(iconAt, src.indexOf("\n  }", iconAt));
+  if (iconBody) {
+    check(
+      `${label}: the video badge is added to the glyph, not swapped for it`,
+      /glyph \+ badge|glyph\s*\+\s*\w*badge/.test(iconBody),
+      "the category glyph must survive — it is what makes the map readable at a glance"
+    );
+  }
 }
 
 // The spots have to still be REACHABLE too — a map that shows them but has

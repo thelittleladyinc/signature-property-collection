@@ -998,6 +998,24 @@ TOWN_LISTING_VIDEOS = {
     ],
     "longmont": [
         ("q-51GPoL4QE", "Backyard Kickball | 12734 Anhawa Ave, Longmont", 191, "12734 anhawa ave"),
+        # 2026-08-17 (Christine: "past listing in longmont that didnt sell but cute
+        # video"). It not selling is no obstacle here: this section deliberately makes
+        # no claim about status -- her call, "we can always just say examples of
+        # marketing in whichever town so they dont have to say sold" -- and what a
+        # seller is judging is the marketing, which is the same either way.
+        #
+        # TWO videos exist of this home and only this one is listed. Both transcripts
+        # carry the identical line "bonus loft, ideal for a home office or guest
+        # space", so they are the same property, read rather than guessed at (the same
+        # method this file used for Kelly Farm and 5112 W 9th). The other, ItePm0a3Bow
+        # "Longmont Living Done : Condo for Sale", is 22 seconds of the kitchen; this
+        # one walks the home and names what is around it -- downtown, parks, trails,
+        # community pool. Listing both would hand the choice to a 21-vs-14 view gap,
+        # which is noise, and it would pick the weaker film.
+        # ONE LINE per entry, always: test-townvideos.js parses this table with a
+        # line-anchored regex, and a wrapped tuple is invisible to it -- the video then
+        # reads as "a tour from the next town over" and fails the suite.
+        ("95V9FjBOPic", "The Easy Kind of Home | Move-In Ready Near Downtown Longmont", 14, "longmont 2bd loft condo"),
     ],
     # 2026-08-16 (Christine: "we need to add in carr and pierce - I have listing videos
     # for them too"). Both towns now have pages, so these tours finally have somewhere to
@@ -2514,7 +2532,7 @@ def _social_follow_section(heading="Follow For More Beautiful Homes"):
     if not links:
         return ""
     return f"""<section class="county-hero" style="padding:60px 0">
-  <div class="wrap" style="text-align:center">
+  <div class="wrap center">
     <span class="eyebrow">Follow Along</span>
     <h2 class="section-title" style="color:var(--white)">{esc(heading)}</h2>
     <p class="lede" style="color:rgba(255,255,255,.85);max-width:560px;margin:0 auto">
@@ -6401,7 +6419,7 @@ def build_sellers():
   </div>
 </section>
 <section class="tight">
-  <div class="wrap" style="text-align:center">
+  <div class="wrap center">
     <span class="eyebrow" style="color:var(--dusty-rose)">Before You Pick An Agent</span>
     <h2 class="section-title">See What Your Neighborhood Is Already Worth To You</h2>
     <p class="lede">Every agent says they will market your home. This shows you, with real numbers,
@@ -9495,7 +9513,7 @@ def build_nav_pages():
 </section>
 {_trust_ribbon_html()}
 <section class="tight">
-  <div class="wrap" style="max-width:640px;text-align:center">
+  <div class="wrap center" style="max-width:640px">
     <span class="eyebrow" style="color:var(--dusty-rose)">The Invitation</span>
     <h2 class="section-title">Discipline Over Drama</h2>
     <p class="lede">Most listings don't fail loudly. They fade quietly over time. A relaunch
