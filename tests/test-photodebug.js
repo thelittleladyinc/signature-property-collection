@@ -256,6 +256,56 @@ function apiThen(imageImpl, api = mediaOk) {
       `${res.headers["Content-Type"]}, ${imgCalls} image request(s)`);
   }
 
+  // ---- A failure's cache lifetime must match WHY it failed --------------------
+  // 2026-08-17. Every placeholder was cached 300s regardless of reason, which put a
+  // permanent floor under our own request rate: a photo that is never coming back
+  // re-asked MLS Grid every five minutes, forever, from every CDN edge. Across the
+  // failing photos on the site that is a steady drip against an account whose
+  // limits are shared with two other apps -- feeding the 429s that then grey out
+  // photos which would otherwise have worked.
+  //
+  // Both directions are a real cost, so both are pinned: too long on a transient
+  // failure freezes a working photo grey, too short on a permanent one is the drip.
+  console.log("\n  placeholder cache lifetime by reason:");
+  {
+    const maxAge = (h) => {
+      const m = /max-age=(\d+)/.exec(h["Cache-Control"] || "");
+      return m ? Number(m[1]) : null;
+    };
+
+    // Transient: must expire fast so photos return the moment the limit clears.
+    let h = load(store({ "mlsgrid-media-cooldown.json": { until: Date.now() + 30_000 } }), apiThen(null));
+    let res = await call(h);
+    check("  a rate-limited photo is cached briefly", maxAge(res.headers) <= 60, String(maxAge(res.headers)));
+
+    // Permanent: must stop asking.
+    h = load(store(), apiThen(null, { value: [{ ListingId: ID, Media: [] }] }));
+    res = await call(h);
+    check("  a listing with no media is cached for an hour", maxAge(res.headers) >= 3600, String(maxAge(res.headers)));
+
+    // A 404 confirmed on BOTH modes is permanent; one unconfirmed try is not.
+    h = load(store(), apiThen(() => ({ ok: false, status: 404, headers: imgHeaders("text/plain") })));
+    res = await call(h);
+    check("  a 404 confirmed on both auth modes is cached for an hour",
+      maxAge(res.headers) >= 3600, String(maxAge(res.headers)));
+
+    // A 403 is usually an expired signature — a fresh resolve may fix it, so it
+    // must NOT be frozen for an hour.
+    h = load(store(), apiThen(() => ({ ok: false, status: 403, headers: imgHeaders("text/plain") })));
+    res = await call(h);
+    check("  a 403 stays short, since a fresh signature may fix it",
+      maxAge(res.headers) <= 300, String(maxAge(res.headers)));
+
+    // A working photo's cache must be untouched by any of this.
+    h = load(store(), apiThen(() => ({
+      ok: true, status: 200, headers: imgHeaders("image/jpeg"),
+      arrayBuffer: async () => new ArrayBuffer(2048),
+    })));
+    res = await call(h);
+    check("  a working photo still caches for a day", maxAge(res.headers) >= 86400,
+      res.headers["Cache-Control"]);
+  }
+
   // The success path must keep working — it was the only one that ever did.
   {
     const h = load(store(), apiThen(() => ({

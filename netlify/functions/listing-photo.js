@@ -53,9 +53,12 @@
 //      The first version set the shared flag, which meant a burst of photo
 //      requests could pause the 15-minute listing sync: photo traffic taking
 //      down data replication.
-//   6. Any failure returns a neutral gray placeholder with a SHORT cache, so a
-//      broken photo self-heals on the next view instead of being frozen into
-//      the CDN for a day.
+//   6. Any failure returns a neutral gray placeholder, cached for a length that
+//      depends on WHY it failed (see PLACEHOLDER_TTL): seconds for a rate limit
+//      so it self-heals, an hour for a photo that is genuinely gone. A flat short
+//      cache on everything is what put a permanent floor under our own request
+//      rate -- a dead photo re-asking MLS Grid every five minutes, forever, from
+//      every CDN edge, feeding the 429s that then grey out photos which work.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore, BASE_URL, SELECT_FIELDS } = require("./lib/_mls-shared");
 const {
@@ -75,7 +78,52 @@ const MAX_INLINE_IMAGE_BYTES = 4_400_000;
 // caching with a week of stale-while-revalidate keeps MLS Grid traffic near
 // zero while still picking changes up.
 const IMAGE_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800";
-const PLACEHOLDER_CACHE_CONTROL = "public, max-age=300";
+// How long the CDN may serve a FAILURE, by reason.
+//
+// 2026-08-17. Every placeholder was cached for 300s regardless of why it failed,
+// which quietly set a permanent floor under our own request rate: a photo that is
+// never coming back re-asked MLS Grid every five minutes, forever, from every
+// visitor's CDN edge. Multiply by the failing photos across the site and that is a
+// steady drip against an account whose limits are shared with Listing-Engine and
+// Expired-Luxury -- feeding the very 429s that then grey out photos which would
+// otherwise have worked. Christine's readings 35 minutes apart both came back 429,
+// so this is a sustained condition, not a burst.
+//
+// The rule: cache a permanent failure long enough to stop asking, and a transient
+// one briefly so it self-heals. Getting this backwards in either direction is a
+// real cost -- too long on a transient failure freezes a working photo grey, too
+// short on a permanent one is the drip above.
+const PLACEHOLDER_TTL = {
+  // Temporary by definition. Short, so photos come back as soon as the limit
+  // clears -- and the cooldown, not the CDN, is what protects the host meanwhile.
+  media_rate_limited: 60,
+  throttled: 60,
+  // A network blip. Worth retrying soon-ish, not instantly.
+  image_fetch_failed: 300,
+  exception: 300,
+  // Not coming back on their own. An hour of not asking.
+  no_media: 3600,
+  index_out_of_range: 3600,
+  not_an_image: 3600,
+  too_large: 3600,
+  bad_id: 86400,
+  not_configured: 60,
+};
+
+// image_http_error splits on the status: a 403 is usually an expired signature and
+// a fresh resolve fixes it, but a 404 confirmed on BOTH auth modes means the file
+// is gone from MLS Grid and re-asking every five minutes is pure waste.
+function placeholderMaxAge(reason, extra) {
+  if (reason === "image_http_error") {
+    const status = extra && extra.httpStatus;
+    const attempts = (extra && extra.attempts) || [];
+    const allTried = attempts.length >= 2;
+    if (status === 404) return allTried ? 3600 : 300;
+    return 300;
+  }
+  const ttl = PLACEHOLDER_TTL[reason];
+  return typeof ttl === "number" ? ttl : 300;
+}
 
 // Matches the onerror fallback the listing cards already use (#eee), so a
 // missing photo looks like a deliberate blank rather than a broken image.
@@ -117,7 +165,9 @@ function placeholder(reason, debug, extra) {
     statusCode: 200,
     headers: {
       "Content-Type": "image/svg+xml",
-      "Cache-Control": PLACEHOLDER_CACHE_CONTROL,
+      // Per-reason, so a permanent failure stops re-asking MLS Grid every five
+      // minutes. See placeholderMaxAge().
+      "Cache-Control": `public, max-age=${placeholderMaxAge(reason, extra)}`,
       // Still sent on the image response, for the network tab and for anything
       // that samples these at scale.
       "X-Photo-Fallback": reason,
