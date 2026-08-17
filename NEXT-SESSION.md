@@ -41,7 +41,10 @@ RESOLVED today:
 
 STILL OPEN and genuinely unresolved — do not report these as done:
 - **Card photos are still served at full MLS resolution** — the fix wrecked her
-  listing cards and was reverted. Diagnosis good, execution wrong. §2.9.
+  listing cards and was reverted. Diagnosis good, execution wrong. §2.9. NOTE: the
+  Cloudinary switch (§1.1, done the same evening) may resolve this on its own as
+  listings re-host — check "photos permanently cached" on /status before rebuilding
+  anything.
 - The two land listings' photos (§2.7b).
 - Whether the shared MLS Grid quota needs splitting (§2.6).
 - Everything in §1, which is still hers.
@@ -52,25 +55,55 @@ STILL OPEN and genuinely unresolved — do not report these as done:
 
 These need her dashboards. Do not spend time trying to work around them.
 
-### 1.1 Cloudinary credentials — LIKELY ALREADY FIXED, VERIFY BEFORE REPEATING
-**2026-08-17: Christine said "i feel like i already did the cloud thing yesterday".
-She had. I read a stale `/status` row and told her it was still broken.** Do not
-repeat that mistake — the row below may be describing a verdict from days ago.
-**Verify with `/status?probe=1` before saying a word about it.** The staleness
-disclosure added the same day (§2.8) now makes an old reading say so out loud.
+### 1.1 Cloudinary — SOLVED 2026-08-17 evening. Christine has TWO accounts.
 
-Original diagnosis, kept because it is still the fix if the row does come back red:
-`/status` reports `cloud_name mismatch`. The three `CLOUDINARY_*` env vars are
-from two different accounts: cloud name from one, API key/secret from another.
+**The answer, so nobody re-derives it:**
 
-**Why it matters more than "photos":** it was starving the listing crawl. Because
-no listing can ever finish caching, the photo priority pass had a permanently
-non-empty queue and consumed the run's start-work window before the bootstrap
-crawl got a page. Guards are now in place (see §2.1) so the crawl proceeds regardless — VERIFIED
-live — but the photos still don't cache, and every run still logs a fresh 403.
+| Account | Cloud name | Product | Uploads? |
+|---|---|---|---|
+| The little lady | `the-little-lady` | Media Optimization | **no upload API at all** |
+| Listing Engine | `listingengine` | Programmable Media | yes — this is the one |
 
-**Fix:** cloudinary.com → Dashboard → copy Cloud name, API Key, API Secret from
-that ONE page → replace all three in Netlify.
+The site was pointed at `the-little-lady`, so every photo upload got a flat 403.
+She switched the three `CLOUDINARY_*` vars to the `listingengine` account and
+redeployed at 21:54. `/status` now prints the cloud name in use, so which account
+is live is a fact on the page rather than something to work out.
+
+**How to recognise them apart in the console:** the Programmable Media one has
+Assets / Image / Video in the sidebar and a Product environment settings → Upload
+section. The Media Optimization one has MediaFlows / Media Optimizer / Moderation
+and none of those.
+
+**I got this wrong twice, and both wrong answers cost her real time. Read these
+before forming a theory about a Cloudinary 403:**
+
+1. **"The three vars are from two different accounts — re-copy them from the
+   Dashboard."** Wrong. The credentials were valid the whole time: the Admin API
+   AUTHENTICATED them and only then said "Media Optimization Customer doesn't
+   have sufficient permissions". A 403 that arrives *after* successful auth is
+   about what the account can DO, not about who you are. Re-copying reproduces it
+   exactly.
+2. **"Product Environments says '1 product environment (limit 1)', so there is no
+   other account — this is unfixable."** Wrong, and worse, because it closed the
+   question. **That page counts environments in the account you are SIGNED INTO.**
+   She said "i think it is another acct" before I checked, and she was right.
+
+The pattern in both: I had a plausible story and stopped looking. She had the
+console open the whole time and kept telling me. **When she says the thing works
+somewhere else, go look at the somewhere else first.**
+
+**Why this mattered more than "photos":** with no listing able to finish caching,
+the photo priority pass had a permanently non-empty queue and ate the run's
+start-work window before the bootstrap crawl got a page. Guards are in place
+(§2.1) so the crawl proceeds regardless — VERIFIED live — but until this switch
+nothing ever cached.
+
+**What to expect now:** her 11 listings re-host over the next few sync runs (every
+30 min; the priority pass does hers first). `/status` → "Christine's own photos
+permanently cached" climbs off `0 of 11`. Once a listing has its Cloudinary copy,
+`photoUrlFor()` in listings-search.js serves `res.cloudinary.com` directly and the
+card never touches MLS Grid's media host — which is what ends the grey 429
+placeholders **and** the full-resolution-photo slowness (§2.9) in one move.
 
 ### 1.2 Lead notification — and the keyless option, since she does not use Resend
 Code is written, tested and deployed (`lib/_notify.js`, `sendLeadAlertEmail`).
