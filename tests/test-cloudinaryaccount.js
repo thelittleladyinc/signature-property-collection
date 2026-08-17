@@ -53,29 +53,29 @@ check(
   !/cloudinary\.com\s*→\s*Dashboard/.test(mediaBranch),
   "this is the one fix guaranteed not to work for this error"
 );
-// 2026-08-17, second correction the same evening. The first version of this row
-// sent her to copy credentials from Render, on my assumption that Listing-Engine
-// used a second, working Cloudinary account. It does not: the console showed
-// "1 product environment (limit 1)". So that advice was another errand that could
-// not succeed, and she would have spent real time on it.
-//
-// The row must now say there is NOTHING to do, because that is the true answer:
-// the plan has no upload API and no amount of configuration adds one.
+// The row must name the account that actually works. Christine has TWO Cloudinary
+// accounts: "the-little-lady" (Media Optimization, delivery-only, no upload API)
+// and "listingengine" (Programmable Media — its console has Assets and an Upload
+// section). This site is on the first; the fix is to point it at the second.
 check(
-  "it tells her to stop rather than sending her somewhere new",
-  /nothing to fix|not a fault/i.test(mediaBranch),
-  "an optional dead end must read as a dead end, not as another task"
+  "it names the working cloud, not just 'the wrong account'",
+  /listingengine/.test(mediaBranch),
+  "without the cloud name she has to go hunting for which account is which"
 );
 check(
-  "it does not send her to Render or a second account",
-  !/Render/.test(mediaBranch) && !/second .{0,20}account/i.test(mediaBranch),
-  "there is only one product environment — that errand cannot succeed"
+  "it says how to tell the two accounts apart",
+  /Assets/.test(mediaBranch) && /Upload/.test(mediaBranch),
+  "the sidebar difference is the fastest way to confirm the right one"
 );
-// The claim needs its evidence attached, or the next person re-opens it.
+
+// The misreading that cost an evening, pinned so it is not repeated. The Product
+// Environments page counts environments in the SIGNED-IN account, not across
+// accounts; I read "1 product environment (limit 1)" as "she has only one
+// environment anywhere" and wrongly declared the whole thing unfixable.
 check(
-  "it records how this was established",
-  /limit 1/.test(mediaBranch) && /404/.test(mediaBranch),
-  "without the evidence this reads as a guess and gets re-litigated"
+  "it warns that the environment count is per-account",
+  /SIGNED INTO|signed into/.test(mediaBranch) && /limit 1/.test(mediaBranch),
+  "this is the exact misreading that produced a wrong 'unfixable' verdict"
 );
 
 // --- The cloud name makes it verifiable ---

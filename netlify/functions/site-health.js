@@ -753,19 +753,25 @@ exports.handler = async (event) => {
             // authenticated them and then named the account type — so re-copying them
             // from that account's Dashboard reproduces the same 403 exactly.
             (/media optimization/i.test(String(cloudCheck.error))
-              ? "NOT A FAULT, AND NOTHING TO FIX HERE — STOP CHASING THIS. Christine's " +
-                "Cloudinary account is a Media Optimization plan, which is delivery-only " +
-                "and has no upload API at all, so the permanent-copy feature cannot work " +
-                "on it no matter what is configured. Verified 2026-08-17, three ways: the " +
-                "Admin API AUTHENTICATED these keys and then named the account type (so the " +
-                "credentials are valid and re-copying them changes nothing); Account " +
-                "settings → Product Environments shows \"1 product environment (limit 1)\", " +
-                "so there is no other environment to point at; and a res.cloudinary.com " +
-                "fetch URL against this cloud name returns 404, so the standard delivery " +
-                "host does not serve this plan either. The photo work this was meant to do " +
-                "— card-sized, cached images that stop repeat views hitting MLS Grid — is " +
-                "handled by Netlify's own Image CDN instead, which needs no third party. " +
-                "Ignore this row; it is optional and it is expected to stay this way."
+              ? "FIX: this site is pointed at the wrong one of Christine's TWO Cloudinary " +
+                "accounts. The credentials are valid — Cloudinary authenticated them and " +
+                "then named the account type — so re-copying them from THIS account's " +
+                "Dashboard cannot help. Media Optimization is delivery-only and has no " +
+                "upload API, which is exactly why photo uploads get a flat 403 and why a " +
+                "res.cloudinary.com fetch URL for this cloud name 404s. " +
+                "The other account is the one to use: cloud name \"listingengine\" " +
+                "(console.cloudinary.com → account switcher, top left → \"Listing Engine\"). " +
+                "It is a Programmable Media account — its sidebar has Assets, Image, Video " +
+                "and a Product environment settings → Upload section, none of which exist " +
+                "on the Media Optimization one. Open its Settings → API Keys and copy the " +
+                "cloud name, an API key and that key's secret into Netlify → Site " +
+                "configuration → Environment variables, replacing all three CLOUDINARY_* " +
+                "values here. Generating a key named for this site, rather than reusing " +
+                "Listing-Engine's, keeps the two revocable independently. " +
+                "NOTE FOR WHOEVER READS THIS NEXT: \"1 product environment (limit 1)\" on " +
+                "the Product Environments page counts environments in the account you are " +
+                "SIGNED INTO, not across accounts. Misreading that as \"she only has one\" " +
+                "is what made me wrongly declare this unfixable on 2026-08-17."
               : /cloud_name mismatch/i.test(String(cloudCheck.error))
                 ? "FIX: the three CLOUDINARY_* variables in Netlify are not all from the same " +
                   "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
