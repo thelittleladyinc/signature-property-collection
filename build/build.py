@@ -11109,8 +11109,28 @@ def build_redirects_and_meta():
                "Perplexity-User", "Google-Extended", "ClaudeBot", "anthropic-ai",
                "CCBot", "Bytespider", "Applebot-Extended"]
     ai_bot_rules = "\n".join(f"User-agent: {bot}\nAllow: /" for bot in ai_bots)
+    # 2026-08-17 (Search Console: "Server error (5xx)" on 7 URLs, on a static site
+    # that cannot 5xx). The XHR endpoints are the only thing here that runs code.
+    # /.netlify/functions/listings-search and nearby-places are referenced in the
+    # JavaScript of 108 pages (147 and 145 references), and Googlebot follows URLs
+    # it finds in JS — so it has been calling the site's API without the query
+    # parameters the browser always sends, which is not a request either function
+    # is written to answer.
+    #
+    # Disallowing them is what robots.txt is actually for. It costs nothing: fetch()
+    # and XHR do not consult robots.txt, so every widget on the site keeps working
+    # exactly as before. What it buys is two things — Search Console stops reporting
+    # errors for endpoints that were never pages, and crawl budget stops being spent
+    # on them, which matters on a site where 66 real pages are sitting in
+    # "crawled — currently not indexed".
+    #
+    # /status and /site-health stay crawlable on purpose: they are deliberate,
+    # bookmarkable routes (see the redirects below), and they return 200.
     robots = (
-        f"User-agent: *\nAllow: /\n\n{ai_bot_rules}\n\n"
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /.netlify/functions/\n"
+        f"\n{ai_bot_rules}\n\n"
         f"Sitemap: {SITE['domain']}/sitemap.xml\n"
     )
     with open(os.path.join(OUT, "robots.txt"), "w") as f:
