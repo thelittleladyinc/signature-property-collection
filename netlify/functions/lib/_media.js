@@ -231,7 +231,24 @@ function looksPresigned(url) {
 }
 
 // Returns { res, mode } for the attempt that succeeded, or the last failure.
-// Never throws on an HTTP error -- the caller decides what a bad status means.
+// Never throws -- neither on an HTTP error (the caller decides what a bad status
+// means) nor on a transport error, which is returned as { res: null, mode, error }.
+//
+// 2026-08-17: it DID throw on a transport error. The comment said "never throws
+// on an HTTP error", which was true and beside the point -- a timeout or a socket
+// reset propagated out of here, past listing-photo.js's `if (!imgRes) return
+// placeholder("image_fetch_failed")`, and into its outer catch, where it became
+// the generic "exception" reason. So a self-healing network blip on one photo was
+// reported as "the function threw, go read the Netlify logs", which sends you
+// looking in the wrong place -- and `image_fetch_failed` was unreachable.
+//
+// All three callers (listing-photo.js, site-health.js, _cloudinary.js) were
+// already written for this shape and check `attempt && attempt.res`; site-health
+// even has a branch reading "the image fetch threw with no response" that could
+// never fire. Catching here is what they were all waiting for.
+//
+// A transport failure on one mode still tries the other -- a dropped connection
+// says nothing about which auth mode is right.
 async function fetchMediaResponse(url, token, timeoutMs) {
   const modes = looksPresigned(url) ? ["anon", "auth"] : ["auth", "anon"];
   let last = null;
@@ -245,7 +262,14 @@ async function fetchMediaResponse(url, token, timeoutMs) {
         Accept: "image/*,*/*;q=0.8",
       }
       : { Accept: "image/*,*/*;q=0.8" };
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
+    let res;
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
+    } catch (err) {
+      // Keep the first transport error, but let the other mode have a go.
+      last = last || { res: null, mode, error: (err && err.message) || String(err) };
+      continue;
+    }
     if (res.ok) return { res, mode };
     last = { res, mode };
     // Only an auth-shaped rejection is worth retrying the other way. A 404 or a
