@@ -2755,6 +2755,26 @@ def _real_estate_agent_schema():
         # $600K+ in Loveland/Greeley; "$$$$" states the tier without
         # asserting a specific figure that would go stale.
         "priceRange": "$$$$",
+        # 2026-08-17 (Christine, asked directly for her hours: "i work 8am - 8:00pm").
+        # This is the one property on this node that Google still renders for real —
+        # opening hours show in the local panel and feed "open now" filtering, which
+        # is exactly the surface a "luxury real estate agent near me" search hits.
+        # It was the only field the findability audit flagged that could not be filled
+        # from anything already in the repo, because inventing a business's hours is
+        # not a judgement call, it is a false statement about when a person answers
+        # the phone.
+        #
+        # ASSUMPTION, stated so it is easy to correct: seven days. She gave the hours
+        # without naming days, and a solo agent working 08:00-20:00 is not keeping
+        # weekdays only. If that is wrong, narrow `dayOfWeek` here — nothing else
+        # needs to change.
+        "openingHoursSpecification": [{
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday",
+                          "Friday", "Saturday", "Sunday"],
+            "opens": "08:00",
+            "closes": "20:00",
+        }],
         "worksFor": {"@type": "Organization", "name": SITE["brokerage"]},
         "areaServed": [{"@type": "AdministrativeArea", "name": n} for n in area_served],
         "sameAs": _same_as_urls(),
