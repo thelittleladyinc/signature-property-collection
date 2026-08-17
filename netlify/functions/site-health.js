@@ -1,10 +1,28 @@
 // Human-readable "is everything actually working" status page — one URL
 // Christine can bookmark and check herself instead of both of us running
 // ad-hoc ?debug=true fetches back and forth every time something seems
-// off. Read-only by default: it never talks to MLS Grid or Cloudinary itself,
-// it only reads what sync-listings.js already wrote to Blobs on its last
-// scheduled run — so loading this page is free and can never cost API
-// quota, trigger a request, or interfere with the suspension breaker.
+// off.
+//
+// 2026-08-17 — THIS HEADER USED TO PROMISE "read-only by default: it never talks
+// to MLS Grid or Cloudinary itself ... loading this page is free and can never
+// cost API quota, trigger a request, or interfere with the suspension breaker."
+// That promise made the page cheap and also made it untrustworthy: the five
+// probe-backed rows rendered whatever the last ?probe=1 run concluded, at any age,
+// three of them without even printing a date. Christine had fixed her Cloudinary
+// credentials the day before and the page still said "cloud_name mismatch"; I read
+// it and repeated it to her as current. Her reply set the standard: confirm it is
+// valid and live, or there is no reason for the page to exist.
+//
+// The promise is KEPT — a plain page load still makes no outbound calls and still
+// cannot spend API quota or touch the suspension breaker. What changed is that the
+// page no longer hides the cost of that choice. Every probe row prints when it was
+// checked, a reading older than the TTL is flagged and stops counting as a pass or
+// a fail, and a summary row at the top names everything that needs re-checking with
+// the one-click way to do it. Honest by default, live in one click.
+//
+// (I first made the probes refresh themselves. That broke three suites, each
+// guarding a lesson already paid for here. Probing was never the missing piece —
+// disclosure was. See the note above freshen().)
 //
 // ONE EXCEPTION, added 2026-08-15 (Christine: "can you confirm that google maps
 // is correct api set correct for me?"). Nobody can answer that by reading code:
@@ -286,6 +304,115 @@ async function probeLoftyLead(apiKey, leadId, triggerTag) {
 const GOOGLE_CHECK_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_PROBE_TIMEOUT_MS = 6000;
 
+// "3 days" reads instantly; an ISO timestamp needs subtracting from today, which
+// is the arithmetic that lets a stale verdict pass for a current one.
+function describeAge(ms) {
+  const mins = Math.round(ms / 60000);
+  if (mins < 1) return "less than a minute";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"}`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"}`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+// ---------------------------------------------------------------------------
+// 2026-08-17 -- WHY THIS PAGE COULD NOT BE BELIEVED, AND WHAT CHANGED.
+//
+// Five of these checks are live probes whose results are cached in Blobs:
+// Google, the photo pipeline, Cloudinary, the Lofty key, the Lofty lead. All five
+// were gated behind ?probe=1. Without it, the page rendered whatever the last
+// probe concluded -- with NO cap on how old that was, and, for three of the five,
+// no date shown at all.
+//
+// Christine said "I feel like I already did the cloud thing yesterday". She had.
+// The page was still reporting the pre-fix verdict, I read it as current, and told
+// her it was still broken. Her response is the right standard: confirm it is valid
+// and live, or there is no reason for the page to exist.
+//
+// Three changes make that true:
+//
+//   1. EVERY probe row now prints when it was checked, in absolute time and in
+//      words ("2 days ago"), so an old reading can never again pass for a current
+//      one. Three of the five printed no date at all.
+//   2. A verdict older than the TTL is flagged loudly AND stops counting as a
+//      pass or a fail, because it is neither -- it is a reading about the past. A
+//      stale failure that keeps a row red is how I came to tell Christine her
+//      Cloudinary credentials were still broken after she had fixed them.
+//   3. A summary row at the top of the page names every check whose reading is
+//      old or missing, with the one-click way to refresh them. So the page is
+//      honest by default and live in one click.
+//
+//   WHAT THIS DELIBERATELY DOES NOT DO: probe on its own. I tried that first and
+//   it broke three suites, each guarding a lesson already paid for -- a page load
+//   makes no outbound calls, rows must not go red for things that are not broken
+//   ("the crying-wolf mistake the Cloudinary row already taught us"), and a
+//   considered cached verdict must not be silently overwritten. Probing was never
+//   the missing piece; disclosure was.
+//   2. The probes run in PARALLEL. They were sequential awaits; five of them at
+//      6-8s of timeout each is 30-40s, well past a function's budget. In parallel
+//      the worst case is the slowest single probe, and the whole group is bounded
+//      by PROBE_BUDGET_MS so the page always renders.
+//   3. Every probe row prints when it was checked, and says so loudly if that is
+//      older than the TTL. This is the backstop: a probe can still fail or time
+//      out, and then the page falls back to the cached value -- which must never
+//      again be presented as if it were current.
+const PROBE_BUDGET_MS = 6500;
+
+function verdictAgeMs(v) {
+  return v && v.checkedAt ? Date.now() - Date.parse(v.checkedAt) : null;
+}
+
+// The one place that decides whether a cached verdict may be trusted, and
+// refreshes it when it may not. Never throws and never returns nothing: on any
+// probe failure the previous value is kept, and its age is what tells the reader
+// not to trust it.
+async function freshen(cached, { enabled, force, probe, key, store }) {
+  // Probes stay OPT-IN. I first made them refresh themselves, which broke three
+  // suites that each encode a lesson this codebase has already paid for:
+  //
+  //   - test-leadprobe.js: a plain page load makes no outbound calls at all.
+  //   - test-optional.js:  "the crying-wolf mistake the Cloudinary row already
+  //                        taught us" -- rows must not go red for things that are
+  //                        not actually broken. A probe firing in an environment
+  //                        where the call fails produces exactly that.
+  //   - test-tagsnotreturned.js: a considered cached verdict, overwritten.
+  //
+  // Christine's problem was never that the page failed to probe. It was that a
+  // verdict from the previous day was indistinguishable from one from this second.
+  // That is fixed by SAYING SO -- see ageNote() and the summary row -- which costs
+  // no quota, raises no false alarms, and leaves the page one click from live.
+  if (!enabled || !force) return cached;
+  const age = verdictAgeMs(cached);
+  if (age !== null && age < GOOGLE_CHECK_TTL_MS) return cached;
+  try {
+    const next = await probe();
+    if (next) {
+      await store.setJSON(key, next).catch(() => {});
+      return next;
+    }
+  } catch (err) {
+    console.warn(`site-health: probe for ${key} failed: ${err && err.message}`);
+  }
+  return cached;
+}
+
+// Renders the age of a probe verdict, plus a loud warning when it is old enough
+// that acting on it means possibly re-doing work already done.
+function ageNote(v) {
+  const age = verdictAgeMs(v);
+  const stale = age !== null && age > GOOGLE_CHECK_TTL_MS;
+  return {
+    age,
+    stale,
+    when: age !== null ? `Checked ${v.checkedAt} (${describeAge(age)} ago). ` : "",
+    warning: stale
+      ? "THIS READING IS OLD and may predate a fix you have already made — the live " +
+        "re-check did not complete, so reload with ?probe=1 before acting on it. "
+      : "",
+  };
+}
+
 // Christine's own business address (SITE['address'] in build.py) and a point in
 // Loveland — real inputs, so a success genuinely proves the API works rather
 // than proving a placeholder round-trips.
@@ -364,50 +491,51 @@ exports.handler = async (event) => {
   const wantsProbe = params.probe === "1" || params.probe === "true" ||
     params.google === "1" || params.google === "true" ||
     params.lofty === "1" || params.lofty === "true";
-  const wantsGoogle = wantsProbe;
-  let google = cachedGoogle;
-  const googleFresh = google && google.checkedAt &&
-    Date.now() - Date.parse(google.checkedAt) < GOOGLE_CHECK_TTL_MS;
-  if (wantsGoogle && googleKey && !googleFresh) {
-    google = await probeGoogle(googleKey);
-    await store.setJSON(GOOGLE_CHECK_KEY, google).catch(() => {});
-  }
-
-  let photoCheck = cachedPhotoCheck;
-  const photoFresh = photoCheck && photoCheck.checkedAt &&
-    Date.now() - Date.parse(photoCheck.checkedAt) < GOOGLE_CHECK_TTL_MS;
-  if (wantsProbe && !photoFresh) {
-    photoCheck = await probePhotoPipeline(mine, process.env.MLSGRID_API_TOKEN);
-    await store.setJSON(PHOTO_CHECK_KEY, photoCheck).catch(() => {});
-  }
-
-  let cloudCheck = cachedCloudCheck;
-  const cloudFresh = cloudCheck && cloudCheck.checkedAt &&
-    Date.now() - Date.parse(cloudCheck.checkedAt) < GOOGLE_CHECK_TTL_MS;
-  if (wantsProbe && isCloudinaryConfigured() && !cloudFresh) {
-    cloudCheck = await probeCloudinaryUsage();
-    await store.setJSON(CLOUDINARY_CHECK_KEY, cloudCheck).catch(() => {});
-  }
-
   const loftyApiKey = process.env.LOFTY_API_KEY;
-  let loftyKeyCheck = cachedLoftyKey;
-  const loftyKeyFresh = loftyKeyCheck && loftyKeyCheck.checkedAt &&
-    Date.now() - Date.parse(loftyKeyCheck.checkedAt) < GOOGLE_CHECK_TTL_MS;
-  if (wantsProbe && loftyApiKey && !loftyKeyFresh) {
-    loftyKeyCheck = await probeLoftyKey(loftyApiKey);
-    await store.setJSON(LOFTY_CHECK_KEY, loftyKeyCheck).catch(() => {});
-  }
 
-  // Reads the last lead back out of Lofty. Cached like the others so refreshing
-  // the page doesn't hammer the API, and only ever a GET.
-  let loftyLeadCheck = cachedLoftyLead;
-  const loftyLeadFresh = loftyLeadCheck && loftyLeadCheck.checkedAt &&
-    Date.now() - Date.parse(loftyLeadCheck.checkedAt) < GOOGLE_CHECK_TTL_MS;
-  if (wantsProbe && loftyApiKey && !loftyLeadFresh) {
-    loftyLeadCheck = await probeLoftyLead(
-      loftyApiKey, loftyLast && loftyLast.leadId, LOFTY_TRIGGER_TAG);
-    await store.setJSON(LOFTY_LEAD_CHECK_KEY, loftyLeadCheck).catch(() => {});
-  }
+  // All five probes at once, each refreshing itself if its cached verdict has
+  // aged past the TTL, and the whole group bounded so the page always renders.
+  // See the note above freshen() for why this is no longer opt-in.
+  //
+  // Order here is the order of the destructure below; nothing depends on another's
+  // result, which is exactly why running them sequentially only ever cost time.
+  const probeGroup = Promise.all([
+    freshen(cachedGoogle, {
+      enabled: !!googleKey, force: wantsProbe, store, key: GOOGLE_CHECK_KEY,
+      probe: () => probeGoogle(googleKey),
+    }),
+    freshen(cachedPhotoCheck, {
+      enabled: true, force: wantsProbe, store, key: PHOTO_CHECK_KEY,
+      probe: () => probePhotoPipeline(mine, process.env.MLSGRID_API_TOKEN),
+    }),
+    freshen(cachedCloudCheck, {
+      enabled: isCloudinaryConfigured(), force: wantsProbe, store, key: CLOUDINARY_CHECK_KEY,
+      probe: () => probeCloudinaryUsage(),
+    }),
+    freshen(cachedLoftyKey, {
+      enabled: !!loftyApiKey, force: wantsProbe, store, key: LOFTY_CHECK_KEY,
+      probe: () => probeLoftyKey(loftyApiKey),
+    }),
+    // Reads the last lead back out of Lofty. Only ever a GET.
+    freshen(cachedLoftyLead, {
+      enabled: !!loftyApiKey, force: wantsProbe, store, key: LOFTY_LEAD_CHECK_KEY,
+      probe: () => probeLoftyLead(loftyApiKey, loftyLast && loftyLast.leadId, LOFTY_TRIGGER_TAG),
+    }),
+  ]);
+
+  // If the group overruns, fall back to the cached verdicts and let each row's
+  // age note say they are old. A slow third party must never turn this page into
+  // a timeout -- an unreachable health page is the least useful kind.
+  let probeTimer;
+  const [google, photoCheck, cloudCheck, loftyKeyCheck, loftyLeadCheck] = await Promise.race([
+    probeGroup,
+    new Promise((resolve) => {
+      probeTimer = setTimeout(() => resolve([
+        cachedGoogle, cachedPhotoCheck, cachedCloudCheck, cachedLoftyKey, cachedLoftyLead,
+      ]), PROBE_BUDGET_MS);
+    }),
+  ]);
+  clearTimeout(probeTimer);
 
   const now = Date.now();
   const lastRunAt = state && state.lastRunAt ? Date.parse(state.lastRunAt) : null;
@@ -502,15 +630,18 @@ exports.handler = async (event) => {
 
   // Google Maps: three separate rows, because "the key is set" and "the two
   // APIs it needs are enabled" fail independently and have different fixes.
+  const googleAge = ageNote(google);
   const googleDetail = (which) => {
     if (!googleKey) return "GOOGLE_MAPS_API_KEY isn't set in Netlify.";
     if (!google || !google[which]) {
-      return "Not tested yet — add ?google=1 to this page's URL to run a live check.";
+      return "Not tested yet — add ?probe=1 to this page's URL to ask Cloudinary about the account directly.";
     }
     const r = google[which];
-    const when = google.checkedAt ? ` (checked ${google.checkedAt})` : "";
-    if (r.ok) return `Working — Google returned ${r.status}${when}.`;
-    return `Google says ${r.status}${r.message ? `: ${r.message}` : ""}${when}`;
+    // This row always printed its date, but never said whether that date was old
+    // enough to disbelieve. The age note supplies the part that was missing.
+    const head = googleAge.warning + googleAge.when;
+    if (r.ok) return `${head}Working — Google returned ${r.status}.`;
+    return `${head}Google says ${r.status}${r.message ? `: ${r.message}` : ""}.`;
   };
   checks.push({
     name: "Google Maps key set",
@@ -522,7 +653,7 @@ exports.handler = async (event) => {
   checks.push({
     name: "Geocoding API enabled",
     // An untested probe isn't a failure, so it doesn't turn the page red.
-    ok: !googleKey ? false : (!google || !google.geocoding ? true : google.geocoding.ok),
+    ok: !googleKey ? false : (!google || !google.geocoding || googleAge.stale ? true : google.geocoding.ok),
     detail: googleDetail("geocoding") +
       (google && google.geocoding && !google.geocoding.ok
         ? " → enable it at console.cloud.google.com/apis/library/geocoding-backend.googleapis.com"
@@ -530,7 +661,7 @@ exports.handler = async (event) => {
   });
   checks.push({
     name: "Places API enabled",
-    ok: !googleKey ? false : (!google || !google.places ? true : google.places.ok),
+    ok: !googleKey ? false : (!google || !google.places || googleAge.stale ? true : google.places.ok),
     detail: googleDetail("places") +
       (google && google.places && !google.places.ok
         ? " → enable it at console.cloud.google.com/apis/library/places-backend.googleapis.com"
@@ -538,28 +669,53 @@ exports.handler = async (event) => {
   });
 
   // ---- The photo chain, end to end ----
+  const photoAge = ageNote(photoCheck);
   checks.push({
     name: "Listing photos load end to end",
-    ok: !photoCheck ? true : !!photoCheck.ok,
+    // Same rule as the other probe rows: a stale FAILURE is not evidence about
+    // now, so it must not keep the page red on its own.
+    ok: !photoCheck || photoAge.stale ? true : !!photoCheck.ok,
     detail: photoCheck
-      ? photoCheck.detail
+      ? photoAge.warning + photoAge.when + photoCheck.detail
       : "Not tested yet — add ?probe=1 to this page's URL to walk the whole photo chain " +
-        "(resolve the MLS media URLs, then actually fetch one) and see which step fails.",
+        "(resolve the MLS media URLs, then actually fetch one) and see which step fails. " +
+        "Note this one spends the MLS Grid quota shared with your other two apps.",
   });
+  // 2026-08-17. This row read as a live verdict and was not one. cloudCheck comes
+  // out of Blobs and is only re-probed when ?probe=1 is passed AND the cached copy
+  // is over GOOGLE_CHECK_TTL_MS old -- but the DISPLAY has never had a staleness
+  // cap, so a plain /status visit renders whatever the last probe concluded, for
+  // as long as nobody probes again. Fix the credentials and this row keeps
+  // reporting "cloud_name mismatch" forever.
+  //
+  // It also printed no timestamp, while the Lofty row immediately below has always
+  // printed "checked <date>". So the one row most likely to be out of date was the
+  // one giving no way to tell. Christine said "I feel like I already did the cloud
+  // thing yesterday" -- she was reading a verdict that may well predate her fix,
+  // and so was I when I repeated it back to her as current.
+  //
+  // Every branch now states when it was checked, and a reading older than the TTL
+  // says so in its first clause rather than burying it.
+  const cloudAge = ageNote(cloudCheck);
+
   checks.push({
     optional: true,
     name: "Cloudinary account healthy (optional)",
-    ok: !isCloudinaryConfigured() ? false : (!cloudCheck ? true : !!cloudCheck.ok),
+    // A stale FAILURE must not keep the page red: it is not evidence about now.
+    // A stale success is equally uninformative, but the honest reading of "we
+    // don't know" is the same as the never-tested case, which is already green
+    // with a "not tested yet" detail.
+    ok: !isCloudinaryConfigured() ? false : (!cloudCheck || cloudAge.stale ? true : !!cloudCheck.ok),
     detail: !isCloudinaryConfigured()
       ? "Cloudinary env vars aren't all set."
       : (!cloudCheck
-        ? "Not tested yet — add ?probe=1 to ask Cloudinary about the account directly."
-        : (cloudCheck.ok
+        ? "Not tested yet — add ?probe=1 to this page's URL to ask Cloudinary about the account directly."
+        : cloudAge.warning + cloudAge.when + (cloudCheck.ok
           ? `Cloudinary answered: plan "${cloudCheck.plan}"` +
             `${cloudCheck.creditsUsed ? `, credits ${cloudCheck.creditsUsed}` : ""}.` +
             " If credits are at or near 100%, that is what the upload 403 means."
           : `Cloudinary refused the account check${cloudCheck.httpCode ? ` (HTTP ${cloudCheck.httpCode})` : ""}: ` +
-            `${cloudCheck.error}. Same credentials the photo uploads use, so this IS the 403's cause. ` +
+            `${cloudCheck.error}. Same credentials the photo uploads use. ` +
             (/cloud_name mismatch/i.test(String(cloudCheck.error))
               ? "FIX: the three CLOUDINARY_* variables in Netlify are not all from the same " +
                 "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
@@ -569,15 +725,18 @@ exports.handler = async (event) => {
   });
 
   // ---- Lofty API key valid? ----
+  const loftyKeyAge = ageNote(loftyKeyCheck);
   checks.push({
     name: "Lofty API key valid",
-    ok: !process.env.LOFTY_API_KEY ? false : (!loftyKeyCheck ? true : loftyKeyCheck.ok),
+    ok: !process.env.LOFTY_API_KEY
+      ? false
+      : (!loftyKeyCheck || loftyKeyAge.stale ? true : loftyKeyCheck.ok),
     detail: !process.env.LOFTY_API_KEY
       ? "LOFTY_API_KEY isn't set in Netlify."
       : (!loftyKeyCheck
-        ? "Not tested yet — add ?probe=1 to this page's URL to test the key against Lofty's /v1.0/me endpoint."
-        : (loftyKeyCheck.ok
-          ? `Lofty accepted the key (HTTP ${loftyKeyCheck.httpStatus}, checked ${loftyKeyCheck.checkedAt}).`
+        ? "Not tested yet — add ?probe=1 to this page's URL to ask Cloudinary about the account directly."
+        : loftyKeyAge.warning + loftyKeyAge.when + (loftyKeyCheck.ok
+          ? `Lofty accepted the key (HTTP ${loftyKeyCheck.httpStatus}).`
           : `Lofty REJECTED the key: HTTP ${loftyKeyCheck.httpStatus}. ${loftyKeyCheck.body || ""} ` +
             "Create a key for this website in Lofty → Settings → Integrations → API, " +
             "then replace LOFTY_API_KEY in Netlify with it.")),
@@ -708,7 +867,14 @@ exports.handler = async (event) => {
           : `"${LOFTY_TRIGGER_TAG}" is NOT on the lead ✗ — Lofty accepted the lead but dropped the ` +
             `tag, which is the reason a tag-triggered Smart Plan wouldn't fire.`));
   }
-  checks.push({ name: "What Lofty says about your last lead", ok: leadRowOk, detail: leadRowDetail });
+  // Same staleness contract as every other probe row: say when it was checked,
+  // and don't let an old failure stand as a current one.
+  const leadAge = ageNote(loftyLeadCheck);
+  checks.push({
+    name: "What Lofty says about your last lead",
+    ok: leadAge.stale ? true : leadRowOk,
+    detail: loftyLeadCheck ? leadAge.warning + leadAge.when + leadRowDetail : leadRowDetail,
+  });
 
   // ---- "Tour It With Me" coverage, ranked -----------------------------------
   // 2026-08-15 (Christine: "how do i view the highest count for tour it with me?
@@ -879,6 +1045,53 @@ exports.handler = async (event) => {
   // told Christine the site was broken when it wasn't -- and a status page that
   // cries wolf is worse than no status page, because the real red rows stop
   // standing out.
+  // ---- Are the live readings on this page current? --------------------------
+  // 2026-08-17, and the whole point of the change. Five rows above are live
+  // probes whose results are cached, and they only re-run under ?probe=1. That is
+  // deliberate and stays -- but it means this page can be showing readings from
+  // days ago, and until now nothing said so. Christine fixed her Cloudinary
+  // credentials, the page kept reporting the old failure, and I relayed it to her
+  // as current. She said: confirm it is valid and live, or there is no reason for
+  // it. This row is that confirmation, stated once at the top instead of left for
+  // the reader to work out per row.
+  //
+  // Placed FIRST via unshift, because a note about the trustworthiness of the
+  // other rows is worthless below them. Marked optional so it can never turn the
+  // page red on its own -- "these readings are old" is not a site fault, and the
+  // crying-wolf lesson above applies to this row as much as to any other.
+  const probeRows = [
+    ["Google Maps APIs", google, !!googleKey],
+    ["Cloudinary account", cloudCheck, isCloudinaryConfigured()],
+    ["photo chain", photoCheck, true],
+    ["Lofty key", loftyKeyCheck, !!loftyApiKey],
+    ["last lead in Lofty", loftyLeadCheck, !!loftyApiKey],
+  ].filter(([, , applicable]) => applicable);
+
+  const staleRows = probeRows.filter(([, v]) => ageNote(v).stale).map(([n]) => n);
+  const neverRun = probeRows.filter(([, v]) => !v).map(([n]) => n);
+  const freshest = probeRows
+    .map(([, v]) => verdictAgeMs(v))
+    .filter((a) => a !== null)
+    .sort((a, b) => a - b)[0];
+
+  checks.unshift({
+    optional: true,
+    name: "Live checks are current",
+    ok: staleRows.length === 0 && neverRun.length === 0,
+    detail: (staleRows.length === 0 && neverRun.length === 0)
+      ? `All live checks on this page were run within the last ` +
+        `${Math.round(GOOGLE_CHECK_TTL_MS / 60000)} minutes` +
+        `${freshest !== undefined ? ` (most recent: ${describeAge(freshest)} ago)` : ""}. ` +
+        "Everything below reflects right now."
+      : "Some rows below are showing SAVED readings, not live ones — " +
+        (neverRun.length ? `never run: ${neverRun.join(", ")}. ` : "") +
+        (staleRows.length ? `older than ${Math.round(GOOGLE_CHECK_TTL_MS / 60000)} minutes: ${staleRows.join(", ")}. ` : "") +
+        "Add ?probe=1 to this page's URL to re-run them all against the real services " +
+        "before acting on anything they say. This page does not probe on its own, so " +
+        "loading it never spends API quota — the trade is that a reading can be old, " +
+        "and this row is here so that is never a surprise.",
+  });
+
   const allOk = checks.every((c) => c.ok || c.optional);
   const optionalIssues = checks.filter((c) => !c.ok && c.optional).length;
 

@@ -90,15 +90,29 @@ const cases = [
     check("result cached so refreshes don't hammer Lofty", !!written["lofty-lead-check.json"]);
   }
 
+  // 2026-08-17: I briefly made these probes refresh themselves, and rewrote this
+  // block to match. That was wrong -- the no-outbound-calls-by-default promise is
+  // load-bearing (see test-optional.js on the crying-wolf lesson), so it stands,
+  // and these assertions are restored. What was actually broken was that a saved
+  // reading was indistinguishable from a live one; that is fixed by disclosure,
+  // pinned in test-healthlive.js, not by probing harder.
   console.log("\nno probe requested => no Lofty call at all");
   const seen2 = [];
   global.fetch = async (url) => { seen2.push(String(url)); return { ok: false, status: 503, text: async () => "{}", headers: { get: () => null } }; };
   for (const k of Object.keys(require.cache)) { if (k.startsWith(FN_DIR) && k !== blobsPath) delete require.cache[k]; }
   const res2 = await require(`${FN_DIR}/site-health.js`).handler({ queryStringParameters: { format: "json" } });
   check("nothing was fetched", seen2.length === 0, JSON.stringify(seen2));
-  const row2 = JSON.parse(res2.body).checks.find((c) => c.name === "What Lofty says about your last lead");
+  const parsed2 = JSON.parse(res2.body);
+  const row2 = parsed2.checks.find((c) => c.name === "What Lofty says about your last lead");
   check("row tells her how to run it", /add \?probe=1/.test(row2.detail), row2.detail);
   check("not-yet-run does not read as broken", row2.ok === true);
+  // And the new summary row must say plainly that nothing here has been run yet,
+  // rather than leaving the page looking like a set of current readings.
+  const summary = parsed2.checks.find((c) => c.name === "Live checks are current");
+  check("a summary row reports the readings are not live", !!summary && summary.ok === false, JSON.stringify(summary));
+  check("it names what needs running", summary && /never run:/.test(summary.detail), summary && summary.detail);
+  check("it says how to make them live", summary && /\?probe=1/.test(summary.detail));
+  check("and it cannot turn the page red by itself", summary && summary.optional === true);
 
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
   process.exit(failures ? 1 : 0);

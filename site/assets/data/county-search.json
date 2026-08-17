@@ -15,7 +15,63 @@
         "Laporte",
         "Red Feather Lakes"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": [
+        {
+          "name": "Berthoud",
+          "url": "/communities/larimer/berthoud.html",
+          "lat": 40.30832,
+          "lng": -105.08109
+        },
+        {
+          "name": "Estes Park",
+          "url": "/communities/larimer/estes-park.html",
+          "lat": 40.37721,
+          "lng": -105.52167
+        },
+        {
+          "name": "Fort Collins",
+          "url": "/communities/larimer/fort-collins.html",
+          "lat": 40.58526,
+          "lng": -105.08442
+        },
+        {
+          "name": "Loveland",
+          "url": "/communities/larimer/loveland.html",
+          "lat": 40.39545,
+          "lng": -105.07458
+        },
+        {
+          "name": "Masonville",
+          "url": "/communities/larimer/masonville.html",
+          "lat": 40.48748,
+          "lng": -105.21082
+        },
+        {
+          "name": "Red Feather Lakes",
+          "url": "/communities/larimer/red-feather-lakes.html",
+          "lat": 40.80248,
+          "lng": -105.59166
+        },
+        {
+          "name": "Timnath",
+          "url": "/communities/larimer/timnath.html",
+          "lat": 40.52915,
+          "lng": -104.98525
+        },
+        {
+          "name": "Wellington",
+          "url": "/communities/larimer/wellington.html",
+          "lat": 40.70387,
+          "lng": -105.00859
+        },
+        {
+          "name": "Windsor",
+          "url": "/communities/larimer/windsor.html",
+          "lat": 40.47748,
+          "lng": -104.90136
+        }
+      ]
     },
     "Weld": {
       "slug": "weld",
@@ -48,7 +104,105 @@
         "Grover",
         "New Raymer"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": [
+        {
+          "name": "Ault",
+          "url": "/communities/weld/ault.html",
+          "lat": 40.58248,
+          "lng": -104.73191
+        },
+        {
+          "name": "Carr",
+          "url": "/communities/weld/carr.html",
+          "lat": 40.89322,
+          "lng": -104.87834
+        },
+        {
+          "name": "Dacono",
+          "url": "/communities/weld/dacono.html",
+          "lat": 40.08471,
+          "lng": -104.93942
+        },
+        {
+          "name": "Eaton",
+          "url": "/communities/weld/eaton.html",
+          "lat": 40.5194,
+          "lng": -104.70252
+        },
+        {
+          "name": "Erie",
+          "url": "/communities/weld/erie.html",
+          "lat": 40.05026,
+          "lng": -105.04998
+        },
+        {
+          "name": "Firestone",
+          "url": "/communities/weld/firestone.html",
+          "lat": 40.11248,
+          "lng": -104.93664
+        },
+        {
+          "name": "Fort Lupton",
+          "url": "/communities/weld/fort-lupton.html",
+          "lat": 40.08471,
+          "lng": -104.81303
+        },
+        {
+          "name": "Frederick",
+          "url": "/communities/weld/frederick.html",
+          "lat": 40.09915,
+          "lng": -104.9372
+        },
+        {
+          "name": "Greeley",
+          "url": "/communities/weld/greeley.html",
+          "lat": 40.42331,
+          "lng": -104.70913
+        },
+        {
+          "name": "Johnstown",
+          "url": "/communities/weld/johnstown.html",
+          "lat": 40.33693,
+          "lng": -104.9122
+        },
+        {
+          "name": "Mead",
+          "url": "/communities/weld/mead.html",
+          "lat": 40.23332,
+          "lng": -104.99859
+        },
+        {
+          "name": "Milliken",
+          "url": "/communities/weld/milliken.html",
+          "lat": 40.32943,
+          "lng": -104.85525
+        },
+        {
+          "name": "Nunn",
+          "url": "/communities/weld/nunn.html",
+          "lat": 40.70359,
+          "lng": -104.7808
+        },
+        {
+          "name": "Pierce",
+          "url": "/communities/weld/pierce.html",
+          "lat": 40.63554,
+          "lng": -104.75525
+        },
+        {
+          "name": "Severance",
+          "url": "/communities/weld/severance.html",
+          "lat": 40.52415,
+          "lng": -104.85108
+        },
+        {
+          "name": "Windsor",
+          "url": "/communities/weld/windsor.html",
+          "lat": 40.47748,
+          "lng": -104.90136
+        }
+      ]
     },
     "Boulder": {
       "slug": "boulder",
@@ -63,14 +217,60 @@
         "Jamestown",
         "Ward"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": [
+        {
+          "name": "Boulder",
+          "url": "/communities/boulder/boulder.html",
+          "lat": 40.01897,
+          "lng": -105.27474
+        },
+        {
+          "name": "Lafayette",
+          "url": "/communities/boulder/lafayette.html",
+          "lat": 39.9936,
+          "lng": -105.08971
+        },
+        {
+          "name": "Longmont",
+          "url": "/communities/boulder/longmont.html",
+          "lat": 40.16721,
+          "lng": -105.10193
+        },
+        {
+          "name": "Louisville",
+          "url": "/communities/boulder/louisville.html",
+          "lat": 39.97776,
+          "lng": -105.13193
+        },
+        {
+          "name": "Lyons",
+          "url": "/communities/boulder/lyons.html",
+          "lat": 40.22471,
+          "lng": -105.27138
+        },
+        {
+          "name": "Nederland",
+          "url": "/communities/boulder/nederland.html",
+          "lat": 39.96138,
+          "lng": -105.51083
+        }
+      ]
     },
     "Broomfield": {
       "slug": "broomfield",
       "cities": [
         "Broomfield"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": [
+        {
+          "name": "Broomfield",
+          "url": "/communities/broomfield/broomfield.html",
+          "lat": 39.92054,
+          "lng": -105.08665
+        }
+      ]
     },
     "Jefferson": {
       "slug": "jefferson",
@@ -88,14 +288,23 @@
         "Lakeside",
         "Mountain View"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": []
     },
     "Denver": {
       "slug": "denver",
       "cities": [
         "Denver"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": [
+        {
+          "name": "Denver",
+          "url": "/communities/denver/denver.html",
+          "lat": 39.73924,
+          "lng": -104.99025
+        }
+      ]
     },
     "Arapahoe": {
       "slug": "arapahoe",
@@ -109,7 +318,8 @@
         "Glendale",
         "Sheridan"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": []
     },
     "Morgan": {
       "slug": "morgan",
@@ -119,7 +329,33 @@
         "Wiggins",
         "Log Lane Village"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": [
+        {
+          "name": "Brush",
+          "url": "/communities/morgan/brush.html",
+          "lat": 40.25887,
+          "lng": -103.62384
+        },
+        {
+          "name": "Fort Morgan",
+          "url": "/communities/morgan/fort-morgan.html",
+          "lat": 40.25026,
+          "lng": -103.79995
+        },
+        {
+          "name": "Log Lane Village",
+          "url": "/communities/morgan/log-lane-village.html",
+          "lat": 40.27054,
+          "lng": -103.82967
+        },
+        {
+          "name": "Wiggins",
+          "url": "/communities/morgan/wiggins.html",
+          "lat": 40.23054,
+          "lng": -104.07273
+        }
+      ]
     },
     "Adams": {
       "slug": "adams",
@@ -132,7 +368,8 @@
         "Westminster",
         "Bennett"
       ],
-      "liveSearch": true
+      "liveSearch": true,
+      "towns": []
     }
   }
 }
