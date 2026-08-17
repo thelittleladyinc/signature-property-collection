@@ -53,10 +53,29 @@ check(
   !/cloudinary\.com\s*→\s*Dashboard/.test(mediaBranch),
   "this is the one fix guaranteed not to work for this error"
 );
+// 2026-08-17, second correction the same evening. The first version of this row
+// sent her to copy credentials from Render, on my assumption that Listing-Engine
+// used a second, working Cloudinary account. It does not: the console showed
+// "1 product environment (limit 1)". So that advice was another errand that could
+// not succeed, and she would have spent real time on it.
+//
+// The row must now say there is NOTHING to do, because that is the true answer:
+// the plan has no upload API and no amount of configuration adds one.
 check(
-  "it points at the account that already works instead",
-  /Render/.test(mediaBranch) && /Listing-Engine/.test(mediaBranch),
-  "it should name the working source of credentials, not just say 'wrong account'"
+  "it tells her to stop rather than sending her somewhere new",
+  /nothing to fix|not a fault/i.test(mediaBranch),
+  "an optional dead end must read as a dead end, not as another task"
+);
+check(
+  "it does not send her to Render or a second account",
+  !/Render/.test(mediaBranch) && !/second .{0,20}account/i.test(mediaBranch),
+  "there is only one product environment — that errand cannot succeed"
+);
+// The claim needs its evidence attached, or the next person re-opens it.
+check(
+  "it records how this was established",
+  /limit 1/.test(mediaBranch) && /404/.test(mediaBranch),
+  "without the evidence this reads as a guess and gets re-litigated"
 );
 
 // --- The cloud name makes it verifiable ---

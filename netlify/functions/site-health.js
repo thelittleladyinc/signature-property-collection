@@ -753,16 +753,19 @@ exports.handler = async (event) => {
             // authenticated them and then named the account type — so re-copying them
             // from that account's Dashboard reproduces the same 403 exactly.
             (/media optimization/i.test(String(cloudCheck.error))
-              ? "FIX: this is the wrong Cloudinary ACCOUNT, not a wrong credential. " +
-                "Cloudinary authenticated these keys and then said the account is a Media " +
-                "Optimization customer — a delivery-only product with no upload API, which " +
-                "is exactly why photo uploads get a flat 403. Re-copying these same values " +
-                "from that account's Dashboard cannot fix it. Christine has a SECOND " +
-                "Cloudinary account that uploads fine from Listing-Engine: open Render → " +
-                "the Listing-Engine service → Environment, and copy its CLOUDINARY_CLOUD_NAME, " +
-                "CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET into Netlify → Environment " +
-                "variables here. The row above prints the cloud name this site is currently " +
-                "using, so it is easy to see which account is which, and to confirm the swap."
+              ? "NOT A FAULT, AND NOTHING TO FIX HERE — STOP CHASING THIS. Christine's " +
+                "Cloudinary account is a Media Optimization plan, which is delivery-only " +
+                "and has no upload API at all, so the permanent-copy feature cannot work " +
+                "on it no matter what is configured. Verified 2026-08-17, three ways: the " +
+                "Admin API AUTHENTICATED these keys and then named the account type (so the " +
+                "credentials are valid and re-copying them changes nothing); Account " +
+                "settings → Product Environments shows \"1 product environment (limit 1)\", " +
+                "so there is no other environment to point at; and a res.cloudinary.com " +
+                "fetch URL against this cloud name returns 404, so the standard delivery " +
+                "host does not serve this plan either. The photo work this was meant to do " +
+                "— card-sized, cached images that stop repeat views hitting MLS Grid — is " +
+                "handled by Netlify's own Image CDN instead, which needs no third party. " +
+                "Ignore this row; it is optional and it is expected to stay this way."
               : /cloud_name mismatch/i.test(String(cloudCheck.error))
                 ? "FIX: the three CLOUDINARY_* variables in Netlify are not all from the same " +
                   "Cloudinary account — the cloud name belongs to one account and the API key/secret " +
