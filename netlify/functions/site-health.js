@@ -603,25 +603,30 @@ exports.handler = async (event) => {
       name: "Cloudinary env vars set (optional)",
       ok: isCloudinaryConfigured(),
       // 2026-08-17: this row said "all three are present" and stopped there, which
-      // could not answer the question that actually mattered. Christine has TWO
-      // Cloudinary accounts -- Listing-Engine (on Render) uploads to one happily,
-      // while this site's uploads 403 against the other. Knowing WHICH account this
-      // site points at is the whole diagnosis, and the row was silent about it.
+      // could not answer the question that actually mattered -- WHICH of Christine's
+      // two Cloudinary accounts the site points at. Printing the cloud name is what
+      // turned that from a guess into a fact, and it immediately caught a real
+      // mistake: the variable had been set to the API key's NAME ("Signature Property
+      // Collection") rather than the cloud name. "All three are present" was true of
+      // that too, which is exactly why it was a useless thing to report.
       //
       // The cloud name is safe to print: it is the first path segment of every
-      // res.cloudinary.com delivery URL, so it is already public wherever an image
-      // is served. The key and secret are never shown, only whether they are set.
-      // This also confirms a credential swap actually took effect, which "present"
-      // never could -- the old and new values are both "present".
+      // res.cloudinary.com delivery URL, so it is already public wherever an image is
+      // served. The key and secret are never shown, only whether they are set.
+      //
+      // The correct value lives at Cloudinary → the "Listing Engine" account →
+      // Settings → API Keys, in the "Cloud name:" pill beside the heading. Deliberately
+      // NOT repeated here as a literal: a value hardcoded into a health check is a
+      // value that silently goes stale, and this row exists to report reality.
       detail: isCloudinaryConfigured()
         ? `All three env vars are present, on cloud name "${process.env.CLOUDINARY_CLOUD_NAME}". ` +
           "PRESENT is not the same as WORKING — the \"Cloudinary account healthy\" row " +
-          "below is what actually tests them. If that row reports a Media Optimization " +
-          "account, this site is pointed at the wrong one of your two Cloudinary " +
-          "accounts: Media Optimization is delivery-only and has no upload API, which " +
-          "is why photo uploads 403. Compare this cloud name against the working one " +
-          "in Render → Listing-Engine → Environment, and copy all three values across " +
-          "if they differ."
+          "below is what actually tests them, and it names the specific problem when " +
+          "there is one. Two things to check against that row: the cloud name above " +
+          "should be the environment's identifier (lowercase, no spaces), NOT the name " +
+          "you gave an API key; and the key and secret must be a matched pair from the " +
+          "same key, since mixing one key's id with another key's secret reports as an " +
+          "api_secret mismatch."
         : "CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET — one or more isn't set",
     },
     {

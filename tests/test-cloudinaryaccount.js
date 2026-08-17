@@ -85,6 +85,42 @@ check(
   "without it there is no way to tell the two accounts apart, or confirm a swap took"
 );
 
+// The two mistakes actually made while switching accounts, both of which look
+// identical to "all three env vars are present":
+//   - CLOUDINARY_CLOUD_NAME set to the API key's NAME ("Signature Property
+//     Collection") instead of the environment's cloud name.
+//   - a key id paired with a different key's secret, which Cloudinary reports as
+//     "api_secret mismatch".
+// Naming them costs one sentence and saves a deploy cycle each.
+check(
+  "it warns that the cloud name is not the API key's name",
+  /NOT the name[\s\S]{0,60}API key|not the name you gave an API key/i.test(src),
+  "this exact mix-up happened 2026-08-17 and cost a deploy round-trip"
+);
+check(
+  "it warns that key and secret must be a matched pair",
+  /matched pair/i.test(src) && /api_secret mismatch/i.test(src),
+  "the second mix-up of the same evening"
+);
+
+// Naming the right cloud in ADVICE is good. COMPARING against it in code is not:
+// the row exists to report what is actually configured, and a hardcoded expectation
+// would keep asserting an answer that was true one evening in August.
+//
+// Distinguishing these by quote style would be an accident of escaping, so this
+// looks for the shapes a real comparison takes.
+const compares = [
+  /[=!]==?\s*["'`]listingengine/,          // === "listingengine"
+  /["'`]listingengine["'`]\s*[=!]==?/,     // "listingengine" ===
+  /\.(includes|indexOf|startsWith|endsWith|match|test)\(\s*["'`]?listingengine/,
+  /listingengine[^"'`\n]*["'`]\s*\)\s*\?/, // ternary on the literal
+];
+check(
+  "the expected cloud name is reported, never compared against",
+  !compares.some((re) => re.test(src)),
+  "a hardcoded expected value turns a live reading into a stale assumption"
+);
+
 // --- But never the credentials themselves ---
 // The cloud name is public (first path segment of every delivery URL). The key
 // and secret are not, and a health page is a page she opens in front of people.
