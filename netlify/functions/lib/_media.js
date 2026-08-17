@@ -249,9 +249,40 @@ function looksPresigned(url) {
 //
 // A transport failure on one mode still tries the other -- a dropped connection
 // says nothing about which auth mode is right.
+// 2026-08-17, from Christine's debug output on a land listing that renders grey:
+//
+//   {"reason":"image_http_error","httpStatus":404,"authMode":"auth",
+//    "mediaHost":"media.mlsgrid.com","urlCount":4}
+//
+// MLS Grid resolved 4 photo URLs for that listing, and fetching photo 0 came back
+// 404. Note authMode "auth": looksPresigned() said the URL carried no signature, so
+// the Bearer token went out -- and the retry below only ever fired on 401/403, so
+// the OTHER mode was never tried. That listing has only ever been fetched one way.
+//
+// 404 is now retried too. Two readings of that 404 are open, and this settles it
+// without another round trip:
+//
+//   - The photos genuinely no longer exist. These are legacy records (sequential
+//     low ids IRE1000029/31), so a purge is entirely plausible, and the second
+//     attempt will 404 as well. Nothing lost but one request.
+//   - The Bearer header IS the problem and 404 is a masked auth failure. S3 and
+//     CloudFront answer 404 rather than 403 for objects a caller may not know
+//     exists, and looksPresigned() is a heuristic over query-string hints that a
+//     path-signed URL would slip past. Then the anonymous attempt just works, and
+//     the photos come back on their own.
+//
+// This is the same principle the auth-mode split was built on in the first place:
+// be right under either regime rather than be right about my diagnosis. Cost is
+// bounded at two requests per failing photo, exactly as the 401/403 path already
+// was, and only ever on failure.
+const RETRY_OTHER_MODE_ON = new Set([401, 403, 404]);
+
 async function fetchMediaResponse(url, token, timeoutMs) {
   const modes = looksPresigned(url) ? ["anon", "auth"] : ["auth", "anon"];
   let last = null;
+  // Every attempt, so a caller in debug mode can show which modes were tried and
+  // what each said -- the thing that was missing when this 404 first turned up.
+  const attempts = [];
   for (const mode of modes) {
     const headers = mode === "auth"
       ? {
@@ -266,17 +297,19 @@ async function fetchMediaResponse(url, token, timeoutMs) {
     try {
       res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
     } catch (err) {
+      var msg = (err && err.message) || String(err);
+      attempts.push({ mode, error: msg });
       // Keep the first transport error, but let the other mode have a go.
-      last = last || { res: null, mode, error: (err && err.message) || String(err) };
+      last = last || { res: null, mode, error: msg };
       continue;
     }
-    if (res.ok) return { res, mode };
+    attempts.push({ mode, status: res.status });
+    if (res.ok) return { res, mode, attempts };
     last = { res, mode };
-    // Only an auth-shaped rejection is worth retrying the other way. A 404 or a
-    // 500 means something else entirely.
-    if (res.status !== 401 && res.status !== 403) break;
+    // A 500 still means something else entirely and is not worth a second request.
+    if (!RETRY_OTHER_MODE_ON.has(res.status)) break;
   }
-  return last;
+  return last ? Object.assign(last, { attempts }) : { res: null, mode: null, attempts };
 }
 
 module.exports = {

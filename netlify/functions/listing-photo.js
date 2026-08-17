@@ -139,8 +139,11 @@ const EXPLANATIONS = {
   image_fetch_failed: "The photo URL resolved, but fetching the image itself failed outright " +
     "(timeout or network error) rather than returning an HTTP error.",
   not_an_image: "The photo URL returned something that isn't an image.",
-  image_http_error: "MLS Grid's media host refused the image. A 403 usually means the signed URL " +
-    "expired or was fetched with the wrong auth mode; a 404 means the photo is gone.",
+  image_http_error: "MLS Grid's media host refused the image. Read `attempts` below: it lists " +
+    "every auth mode tried and what each returned. A 403 usually means an expired signed URL. " +
+    "A 404 from BOTH modes means the photo is genuinely gone from MLS Grid even though the " +
+    "listing still advertises it — nothing on this site can bring it back, and the card falls " +
+    "back to a neutral grey tile.",
   too_large: "The photo downloaded fine but is too big to return through a Netlify function. " +
     "A function response is capped at 6 MB and base64 encoding inflates it by a third, so the real " +
     "ceiling is about 4.4 MB. Full-resolution aerials and scanned plat maps — common on land " +
@@ -212,6 +215,7 @@ exports.handler = async (event) => {
       return placeholder("image_fetch_failed", debug, {
         listingId, index, urlCount: urls.length, mediaHost,
         authMode: attempt && attempt.mode, error: attempt && attempt.error,
+        attempts: attempt && attempt.attempts,
       });
     }
     if (!imgRes.ok) {
@@ -219,7 +223,11 @@ exports.handler = async (event) => {
       // The status is a field now rather than part of the reason string, so
       // callers can group these without parsing a code they have to guess at.
       return placeholder("image_http_error", debug, {
-        listingId, index, httpStatus: imgRes.status, authMode: attempt.mode, mediaHost, urlCount: urls.length,
+        listingId, index, httpStatus: imgRes.status, authMode: attempt.mode, mediaHost,
+        urlCount: urls.length,
+        // Both auth modes, so a 404 can be read as "the photo is gone" rather than
+        // "we only ever asked one way". See RETRY_OTHER_MODE_ON in _media.js.
+        attempts: attempt.attempts,
       });
     }
 
