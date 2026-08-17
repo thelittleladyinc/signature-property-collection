@@ -74,6 +74,131 @@ LOCAL_SPOTS_DATA = _load_json("local_spots.json")
 # (signaturepropertycollection.com/expiredlisting/ — confirmed via
 # notes/page_urls.txt, captured from the live site). Add more entries here
 # as the AgentFire audit turns up other URLs that need to keep working.
+# The previous AgentFire/WordPress site's URL structure, mapped to where each page
+# lives now.
+#
+# 2026-08-17. Source: Christine's own Search Console "Crawled - currently not
+# indexed" export (66 URLs). Reading it rather than theorising about it is the
+# whole point -- 59 of those 66 turned out to be OLD site URLs, last crawled
+# between February and July 2026, i.e. while WordPress was still serving them.
+# Google holds that verdict until it re-crawls, and a re-crawl that 404s throws
+# away whatever authority the URL had accumulated.
+#
+# 56 of them have a real equivalent on this site, so they get a 301 instead. That
+# is the difference between inheriting the old site's equity and starting from
+# zero -- and this repo has a documented reason to care: the README records that a
+# 2023 change to thelittleladysellshomes.com "destroyed years of organic traffic"
+# with no root cause ever found.
+#
+# Three shape changes account for nearly all of it:
+#   /communities/explore-weld-county/windsor/  ->  /communities/weld/windsor.html
+#   /explore-boulder-county/                   ->  /communities/boulder.html
+#   /5-myths-that-scare-buyers-but-shouldnt/   ->  /blog/<same-slug>.html
+#
+# Every destination below was verified to exist on disk at build time by the guard
+# under this dict -- a redirect to a 404 is worse than the 404 it replaced, because
+# it looks deliberate.
+#
+# Deliberately NOT redirected, because no honest equivalent exists:
+#   /sitemap/  -- WordPress's HTML sitemap page. The XML sitemap is not a
+#                 user-facing page, and sending a person to the homepage instead
+#                 is a soft 404. Let it 404.
+LEGACY_AGENTFIRE_REDIRECTS = {
+    # County hubs, both the /communities/ prefixed and bare forms the old site used
+    "/communities/explore-larimer-county/": "/communities/larimer.html",
+    "/communities/explore-weld-county/": "/communities/weld.html",
+    "/communities/explore-boulder-county/": "/communities/boulder.html",
+    "/communities/explore-denver-county/": "/communities/denver.html",
+    "/communities/explore-adams-county/": "/communities/adams.html",
+    "/explore-larimer-county/": "/communities/larimer.html",
+    "/explore-weld-county/": "/communities/weld.html",
+    "/explore-boulder-county/": "/communities/boulder.html",
+    "/explore-denver-county/": "/communities/denver.html",
+    "/explore-adams-county/": "/communities/adams.html",
+    "/explore-arapahoe-county/": "/communities/arapahoe.html",
+    # Towns
+    "/communities/explore-weld-county/windsor/": "/communities/weld/windsor.html",
+    "/communities/explore-weld-county/severance/": "/communities/weld/severance.html",
+    "/communities/explore-weld-county/johnstown/": "/communities/weld/johnstown.html",
+    "/communities/explore-weld-county/greeley/": "/communities/weld/greeley.html",
+    "/communities/explore-weld-county/milliken/": "/communities/weld/milliken.html",
+    "/communities/explore-weld-county/firestone/": "/communities/weld/firestone.html",
+    "/communities/explore-weld-county/dacono/": "/communities/weld/dacono.html",
+    "/communities/explore-weld-county/mead/": "/communities/weld/mead.html",
+    "/communities/explore-weld-county/erie/": "/communities/weld/erie.html",
+    "/communities/explore-weld-county/eaton/": "/communities/weld/eaton.html",
+    "/communities/explore-larimer-county/berthoud/": "/communities/larimer/berthoud.html",
+    "/communities/explore-larimer-county/wellington/": "/communities/larimer/wellington.html",
+    "/communities/explore-larimer-county/red-feather-lakes/":
+        "/communities/larimer/red-feather-lakes.html",
+    "/communities/explore-boulder-county/louisville/": "/communities/boulder/louisville.html",
+    "/communities/explore-boulder-county/lafayette/": "/communities/boulder/lafayette.html",
+    "/communities/explore-broomfield-county/broomfield/":
+        "/communities/broomfield/broomfield.html",
+    "/communities/nederland/": "/communities/boulder/nederland.html",
+    # Blog posts, which the old site published at the root
+    "/the-truth-about-appraisals-what-buyers-sellers-should-expect/":
+        "/blog/the-truth-about-appraisals-what-buyers-sellers-should-expect.html",
+    "/why-your-home-didnt-sell-the-first-time-and-how-to-fix-it/":
+        "/blog/why-your-home-didnt-sell-the-first-time-and-how-to-fix-it.html",
+    "/what-to-look-for-in-a-real-estate-team-vs-solo-agent/":
+        "/blog/what-to-look-for-in-a-real-estate-team-vs-solo-agent.html",
+    "/how-to-avoid-buyers-remorse-after-closing/":
+        "/blog/how-to-avoid-buyers-remorse-after-closing.html",
+    "/the-emotional-rollercoaster-of-real-estate-and-how-to-manage-it/":
+        "/blog/the-emotional-rollercoaster-of-real-estate-and-how-to-manage-it.html",
+    "/buying-with-a-partner-avoiding-financial-emotional-pitfalls/":
+        "/blog/buying-with-a-partner-avoiding-financial-emotional-pitfalls.html",
+    "/the-smart-way-to-renovate-when-you-plan-to-sell-in-3-years/":
+        "/blog/the-smart-way-to-renovate-when-you-plan-to-sell-in-3-years.html",
+    "/how-interest-rates-actually-affect-your-buying-power/":
+        "/blog/how-interest-rates-actually-affect-your-buying-power.html",
+    "/the-silent-deal-killers-small-issues-that-stop-sales-cold/":
+        "/blog/the-silent-deal-killers-small-issues-that-stop-sales-cold.html",
+    "/how-to-read-between-the-lines-in-real-estate-contracts/":
+        "/blog/how-to-read-between-the-lines-in-real-estate-contracts.html",
+    "/when-to-walk-away-red-flags-buyers-sellers-shouldnt-ignore/":
+        "/blog/when-to-walk-away-red-flags-buyers-sellers-shouldnt-ignore.html",
+    "/how-to-sell-a-home-with-tenants-in-place/":
+        "/blog/how-to-sell-a-home-with-tenants-in-place.html",
+    "/why-timing-the-market-rarely-works-and-what-to-focus-on-instead/":
+        "/blog/why-timing-the-market-rarely-works-and-what-to-focus-on-instead.html",
+    "/understanding-buyer-love-letters-and-why-they-can-be-risky/":
+        "/blog/understanding-buyer-love-letters-and-why-they-can-be-risky.html",
+    "/understanding-earnest-money-protecting-your-deposit/":
+        "/blog/understanding-earnest-money-protecting-your-deposit.html",
+    "/the-future-proof-home-what-buyers-should-look-for-today/":
+        "/blog/the-future-proof-home-what-buyers-should-look-for-today.html",
+    "/navigating-the-contingency-maze-what-buyers-sellers-should-know/":
+        "/blog/navigating-the-contingency-maze-what-buyers-sellers-should-know.html",
+    "/5-myths-that-scare-buyers-but-shouldnt/":
+        "/blog/5-myths-that-scare-buyers-but-shouldnt.html",
+    "/the-art-of-negotiating-repairs-without-losing-the-deal/":
+        "/blog/the-art-of-negotiating-repairs-without-losing-the-deal.html",
+    "/the-power-of-pre-listing-inspections-for-sellers/":
+        "/blog/the-power-of-pre-listing-inspections-for-sellers.html",
+    "/why-its-important-to-work-with-a-realtor/":
+        "/blog/why-its-important-to-work-with-a-realtor.html",
+    # Guides, whose slugs changed
+    "/the-definitive-guide-on-how-to-upsize-into-a-new-home/":
+        "/guides/upsizing-into-a-new-home.html",
+    "/sell-your-home-fast/": "/guides/sell-your-home-fast.html",
+    # WordPress archives -> the blog index, which is what a category or author
+    # archive actually was: a list of her posts.
+    "/category/buying/": "/blog/index.html",
+    "/author/thelittleladyincgmail-com/": "/blog/index.html",
+    "/author/thelittleladyincgmail-com/page/3/": "/blog/index.html",
+    # AgentFire's "Dream Home Finder" lead tool. /lifestyle-search.html is the same
+    # promise on this site -- describe the home you want, get matched against real
+    # inventory -- so this is the honest destination rather than the homepage.
+    "/dream-home-finder/": "/lifestyle-search.html",
+    # Legal/utility pages that only changed shape
+    "/accessibility/": "/accessibility.html",
+    "/privacy-policy/": "/privacy-policy.html",
+    "/thank-you/": "/thank-you.html",
+}
+
+
 LEGACY_URL_REDIRECTS = {
     # 2026-08-17, from Search Console's actual "Not found (404)" list rather than
     # from guessing which old URLs might exist. Five URLs were reported; these are
@@ -143,6 +268,16 @@ LEGACY_URL_REDIRECTS = {
     "/windsor-co-lifestyle-guide": "/communities/weld/windsor.html",
     "/windsor-co-lifestyle-guide/": "/communities/weld/windsor.html",
 }
+
+
+# Fold the AgentFire map in, generating both the trailing-slash and bare form of
+# every old path. The old site linked and printed them inconsistently, and Google
+# has crawled both, so declaring one and hoping is not good enough.
+for _old, _new in LEGACY_AGENTFIRE_REDIRECTS.items():
+    _bare = _old.rstrip("/")
+    LEGACY_URL_REDIRECTS.setdefault(_old, _new)          # with slash
+    if _bare:
+        LEGACY_URL_REDIRECTS.setdefault(_bare, _new)     # without
 
 # Display name (as used in COUNTIES[]["cities"]) -> CITY_CONTENT data key.
 # Only cities with real captured content get a linked sub-page; the rest
@@ -11178,6 +11313,26 @@ def build_redirects_and_meta():
     # resolve, because the fix for "the human typed the other obvious name" is an
     # alias, not a reminder to type it correctly.
     redirect_lines += ["/site-health  /.netlify/functions/site-health  200"]
+    # 2026-08-17: a redirect pointing at a page that does not exist is worse than
+    # the 404 it replaced -- it looks deliberate, and Google reports it as a soft
+    # 404 rather than as a missing page. Every destination is checked against the
+    # tree that was just written, and a bad one fails the build instead of shipping.
+    # Anchors and query strings are stripped before checking; external targets and
+    # function rewrites are skipped, since they are not files on disk.
+    _bad_targets = []
+    for _old, _new in LEGACY_URL_REDIRECTS.items():
+        if _new.startswith(("http://", "https://", "/.netlify/")):
+            continue
+        _path = _new.split("#")[0].split("?")[0]
+        if not os.path.exists(os.path.join(OUT, _path.lstrip("/"))):
+            _bad_targets.append(f"{_old} -> {_new}")
+    if _bad_targets:
+        raise SystemExit(
+            "!! LEGACY_URL_REDIRECTS points at pages that do not exist:\n   "
+            + "\n   ".join(sorted(_bad_targets))
+            + "\n!! Fix the destination or drop the rule. A redirect to a missing "
+              "page is a soft 404 wearing a 301."
+        )
     redirect_lines += [f"{old}  {new}  301" for old, new in LEGACY_URL_REDIRECTS.items()]
 
     # ---- Legacy AgentFire/WordPress URL reclamation (2026-08-14) ----
