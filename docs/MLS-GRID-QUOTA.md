@@ -378,8 +378,9 @@ quota is downstream of them.
 
 ## 6. The email to MLS Grid support
 
-Shorter than it would have been, because the Usage tab answers two of the old
-questions. To `support@mlsgrid.com`, copying the IRES data-feed contact.
+Shorter than it would have been: the Usage tab answers two of the old questions,
+and the 1 August suspension notice already answered the one about limits. To
+`support@mlsgrid.com`, copying the IRES data-feed contact.
 
 > **Subject: Media CDN migration + per-application IDX subscriptions — The Bold Collective Homes IDX Subscription (IRES)**
 >
@@ -388,7 +389,7 @@ questions. To `support@mlsgrid.com`, copying the IRES data-feed contact.
 > I'm an IRES MLS subscriber in Northern Colorado with one IDX subscription
 > ("The Bold Collective Homes IDX Subscription"). Its token is currently used by
 > three of my own applications: my public IDX website
-> (signaturepropertycollection.com) and two internal tools. Four questions:
+> (signaturepropertycollection.com) and two internal tools. Five questions:
 >
 > 1. **The 8 September media migration.** My integration downloads media directly
 >    from the URLs in the Media resource. Your notice asks CloudFront users to
@@ -406,8 +407,12 @@ questions. To `support@mlsgrid.com`, copying the IRES data-feed contact.
 > 4. **Backfill pacing.** I'm correcting my integration to download each image
 >    exactly once and serve it from my own storage, per your media rules. That
 >    means a one-off backfill of roughly 15,000 cover photos. I'll pace it inside
->    2 rps — is there a rate or a window you'd prefer, so it doesn't read as
->    concerning behaviour on my token?
+>    the limits your 1 August notice set out — 2 rps sustained, 3,072 MB/hour — but
+>    is there a rate or a window you'd prefer, so it doesn't read as concerning
+>    behaviour on my token?
+> 5. **Confirmation.** Are the limits in that 1 August suspension notice still the
+>    ones on my subscription, or has anything been adjusted since? I've encoded
+>    them and I'd rather not be working from a stale copy.
 >
 > Thank you,
 > Christine Gwinnup
@@ -616,8 +621,17 @@ be paying rent on a defect. Fix the defects, watch the usage tab, then decide.
 
 External:
 
-- [ ] Read the Usage tab and record what the three apps actually consume (do this
-      AFTER the fixes have been live for a day, so the number means something)
+- [ ] Read the Usage tab (`app.mlsgrid.com/subs/view/usage/`) and record what the
+      three apps actually consume — AFTER the fixes have been live for a day, so
+      the number means something
+- [ ] Consider a per-call log + usage view for this site, modelled on
+      Expired-Luxury's `mls_api_call_log` / `/api/admin/mls-usage` (§7c). Biggest
+      remaining gap: this site cannot see its own consumption at all.
+- [ ] Expired-Luxury (read only, not touched): Media URL cache is 7 days against a
+      1-hour single-use URL, and it renders raw MLS Grid URLs in `<img src>`. Both
+      are rules this site fixed today. Worth its own session.
+- [ ] Listing-Engine (read only, not touched): browser User-Agent where the token
+      is required, and no `OriginatingSystemName` (§7b).
 - [ ] Support: CDN migration before 8 September 2026
 - [ ] Support: per-token vs per-account budgets; cost of a second IDX subscription
 - [ ] IRES: setup fee and approval for an additional feed
