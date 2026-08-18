@@ -583,6 +583,7 @@
           statusEl.textContent = (skip + listings.length) + ' current listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
         }
         resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) { return listingCardHtml(l, true); }).join(''));
+        pacePhotos(resultsEl);
         skip += listings.length;
         loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
         if (fetchedAtEl) {

@@ -431,6 +431,7 @@
       var listings = (data && data.listings) || [];
       if (!listings.length) return;
       document.getElementById('listing-spotlight').innerHTML = listingCardHtml(listings[0], false);
+      pacePhotos(document.getElementById('listing-spotlight'));
       document.getElementById('listing-spotlight-section').style.display = '';
     })
     .catch(function () {});

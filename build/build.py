@@ -8355,6 +8355,7 @@ def build_blog():
       var listings = (data && data.listings) || [];
       if (!listings.length) return;
       document.getElementById('listing-spotlight').innerHTML = listingCardHtml(listings[0], false);
+      pacePhotos(document.getElementById('listing-spotlight'));
       document.getElementById('listing-spotlight-section').style.display = '';
     }})
     .catch(function () {{}});
@@ -10891,6 +10892,7 @@ def build_current_listings():
           statusEl.textContent = (skip + listings.length) + ' current listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
         }
         resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) { return listingCardHtml(l, true); }).join(''));
+        pacePhotos(resultsEl);
         skip += listings.length;
         loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
         if (fetchedAtEl) {

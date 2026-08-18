@@ -78,6 +78,36 @@ check(
   feedsMissingPacer.slice(0, 3).map((f) => path.relative(ROOT, f)).join(", ")
 );
 
+// ---- every page that renders a queued image must also START the queue -----
+// 2026-08-18, caught live by Christine ("im so confused! The photos arent
+// showing again"): current-listings.html and 58 blog pages defined the pacer
+// but never called it — build.py has THREE card-insertion sites (search page,
+// current-listings, blog spotlight) and the first patch wired only one. An
+// image with data-src and no pacePhotos() call is not lazy, it is permanently
+// blank. This sweep is the regression net: no page may render a data-src
+// image without at least one pacePhotos(...) call.
+{
+  const offenders = [];
+  (function walk(dir) {
+    for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, f.name);
+      if (f.isDirectory()) walk(full);
+      else if (f.name.endsWith(".html")) {
+        const h = fs.readFileSync(full, "utf8");
+        if (!h.includes("<img data-src=")) continue;
+        const calls = (h.match(/pacePhotos\(/g) || []).length -
+                      (h.match(/function pacePhotos\(/g) || []).length;
+        if (calls < 1) offenders.push(path.relative(ROOT, full));
+      }
+    }
+  })(path.join(ROOT, "site"));
+  check(
+    "every built page that renders data-src images also starts the queue",
+    offenders.length === 0,
+    offenders.slice(0, 4).join(", ") + (offenders.length > 4 ? ` (+${offenders.length - 4} more)` : "")
+  );
+}
+
 // ---- the listing detail page ----------------------------------------------
 check(
   "the detail gallery's FIRST photo keeps a real src (it is the page's main image)",
