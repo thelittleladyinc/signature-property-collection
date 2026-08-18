@@ -235,5 +235,54 @@ check("the api_secret-mismatch advice points at CLOUDINARY_URL",
     .forEach((k, i) => { if (trio[i] !== undefined) process.env[k] = trio[i]; });
 }
 
+// ---- 2026-08-18: a bad env var must not be able to CRASH a function --------
+// From a live crash on Christine's /site-health, minutes after she pasted the
+// value Cloudinary's console told her to copy:
+//
+//   Error: Invalid CLOUDINARY_URL protocol. URL should begin with 'cloudinary://'
+//       at module.exports (node_modules/cloudinary/lib/config.js:110:13)
+//       at Module._compile (node:internal/modules/cjs/loader:1871:14)
+//
+// The SDK reads the variable and throws while being REQUIRED — before any code in
+// _cloudinary.js runs. The tolerant parser added hours earlier was therefore
+// useless in the exact case it was written for, and every function importing this
+// module went down: the health page that would have explained it, and the sync
+// that keeps the listings current. Only listing-photo survived, by the accident of
+// having a lazy import.
+//
+// These run in child processes because the failure mode being tested is at import
+// time, and this suite has already imported the module.
+{
+  const { execFileSync } = require("child_process");
+  const libPath = path.join(ROOT, "netlify", "functions", "lib", "_cloudinary.js");
+  const run = (value, expr) => execFileSync(process.execPath,
+    ["-e", `process.env.CLOUDINARY_URL=${JSON.stringify(value)};` +
+           `const l=require(${JSON.stringify(libPath)});console.log(${expr});`],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+
+  let crashed = false;
+  let out = "";
+  try {
+    out = run("CLOUDINARY_URL=cloudinary://11:22@dcim65cok", "l.cloudinaryCredentials().cloud_name");
+  } catch (e) { crashed = true; }
+  check("the value Cloudinary's console hands you does not crash the function",
+    !crashed && out === "dcim65cok",
+    crashed ? "still throws at import — this is the live crash" : `got ${out}`);
+
+  crashed = false;
+  try {
+    out = run("total garbage", "l.isCloudinaryConfigured()");
+  } catch (e) { crashed = true; }
+  check("and neither does an outright malformed one",
+    !crashed && out === "false",
+    crashed ? "a typo in one env var takes down every function importing this" : `got ${out}`);
+
+  crashed = false;
+  try {
+    out = run("cloudinary://11:22@dcim65cok", "l.cloudinaryCredentials().cloud_name");
+  } catch (e) { crashed = true; }
+  check("a correct value still works exactly as before", !crashed && out === "dcim65cok");
+}
+
 console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

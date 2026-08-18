@@ -37,6 +37,54 @@
 // back to serving a raw MLS Grid photo URL straight to a visitor's
 // browser — it's out of spec and it will only ever work for the first
 // visitor to load it.
+// ---- THIS MUST RUN BEFORE require("cloudinary") -------------------------
+// 2026-08-18, from a live crash on Christine's /site-health:
+//
+//   Error: Invalid CLOUDINARY_URL protocol. URL should begin with 'cloudinary://'
+//       at module.exports (/var/task/node_modules/cloudinary/lib/config.js:110:13)
+//       at Module._compile (node:internal/modules/cjs/loader:1871:14)
+//
+// The Cloudinary SDK reads process.env.CLOUDINARY_URL and THROWS while it is being
+// required — at import time, before a single line of this file's own code runs.
+// So the tolerant parser added earlier today was useless in the one case it was
+// written for: Cloudinary's console shows the value as
+// "CLOUDINARY_URL=cloudinary://..." and its copy button includes the prefix, and
+// pasting that into Netlify took down every function that imports this module.
+//
+// listing-photo.js survived only because its Cloudinary import is lazy, which is
+// the accident that kept photos on the page. site-health and sync-listings both
+// went down — the health page that would have explained it, and the job that keeps
+// the listings current.
+//
+// A misconfigured environment variable must never be able to crash a function.
+// The value is normalised here, in place, before the SDK can see it; and if it is
+// still not a connection string, it is removed from the environment entirely so
+// the SDK loads unconfigured instead of throwing. Unconfigured is a state this
+// codebase already handles everywhere — isCloudinaryConfigured() exists precisely
+// for it, and the health page reports it in plain words.
+(function normaliseCloudinaryUrlEnv() {
+  const raw = (process.env.CLOUDINARY_URL || "").trim();
+  if (!raw) return;
+  const cleaned = raw
+    .replace(/^CLOUDINARY_URL\s*=\s*/i, "")
+    .replace(/^["']|["']$/g, "")
+    .trim();
+  if (/^cloudinary:\/\//i.test(cleaned)) {
+    if (cleaned !== raw) {
+      console.warn("_cloudinary: CLOUDINARY_URL had a `CLOUDINARY_URL=` prefix or " +
+        "surrounding quotes — that is exactly what Cloudinary's own console gives you " +
+        "when you copy it. Using the connection string inside it.");
+    }
+    process.env.CLOUDINARY_URL = cleaned;
+    return;
+  }
+  console.error("_cloudinary: CLOUDINARY_URL is set but is not a " +
+    "cloudinary://<api_key>:<api_secret>@<cloud_name> string. Removing it from the " +
+    "environment so the Cloudinary SDK does not throw on import — Cloudinary will " +
+    "read as NOT CONFIGURED until the value is corrected.");
+  delete process.env.CLOUDINARY_URL;
+})();
+
 const cloudinary = require("cloudinary").v2;
 const { fetchMediaResponse } = require("./_media");
 
