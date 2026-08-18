@@ -36,20 +36,28 @@ catch (err) { check("listing-photo.js loads", false, err && err.message); }
 //
 // So the bound must be exactly what a page renders. Below it, the difference is
 // handed straight back to MLS Grid; above it, we store photos nobody is shown.
+// 2026-08-18: the bound now lives in lib/_media.js, because three files need to
+// agree about it and a comment is not a mechanism.
+const mediaLib = require(path.join(ROOT, "netlify", "functions", "lib", "_media.js"));
 check(
   "the cache covers exactly the photos a listing page renders",
-  /PHOTO_CACHE_MAX_INDEX\s*=\s*11/.test(src),
-  "the bound has to match listing-page.js's Math.min(count, 12)"
+  mediaLib.PHOTO_CACHE_MAX_INDEX === 11,
+  `bound is ${mediaLib.PHOTO_CACHE_MAX_INDEX}`
 );
-// The two really do have to move together, so read the other file rather than
-// trusting a comment about it.
+check(
+  "listing-photo.js reads that bound rather than declaring its own",
+  !/const PHOTO_CACHE_MAX_INDEX\s*=/.test(src) && /PHOTO_CACHE_MAX_INDEX/.test(src),
+  "two copies of this number is how the renderer and the cache drift apart"
+);
+// And the renderer derives its count from the same constant, so the two cannot
+// disagree even if someone changes one of them.
 {
   const pageSrc = fs.readFileSync(path.join(ROOT, "netlify", "functions", "listing-page.js"), "utf8");
-  const m = pageSrc.match(/Math\.min\(count,\s*(\d+)\)/);
   check(
-    "and that is still what listing-page.js renders",
-    !!m && Number(m[1]) === 12,
-    m ? `listing-page renders ${m[1]} photos but the cache bound is 12` : "listing-page's photo count is unreadable"
+    "listing-page.js derives its gallery size from the same constant",
+    /GALLERY_PHOTOS\s*=\s*PHOTO_CACHE_MAX_INDEX \+ 1/.test(pageSrc) &&
+      /Math\.min\(count, GALLERY_PHOTOS\)/.test(pageSrc),
+    "a hardcoded 12 here is a photo re-downloaded from MLS Grid on every view"
   );
 }
 // 2026-08-17, revised the same evening. This used to require the cache to be
@@ -235,6 +243,36 @@ function fakeStore(opts) {
     const normal = __test.cachedPhotoResponse(await __test.readCachedPhoto(store2, MINE, 0), "stored");
     check("behaviour: an ordinary stored photo is still returned inline",
       normal.statusCode === 200 && normal.isBase64Encoded === true);
+  }
+
+  // ---- INVALIDATION. The cache is keyed by INDEX; MLS Grid keys media by
+  // MediaKey. A listing that gains or loses photos would otherwise serve whatever
+  // this site stored at that index forever -- possibly a photo the seller removed.
+  // Nothing in the photo path can notice, because it never re-fetches what it
+  // holds. Only the sync sees the new record, so the sync has to do the dropping.
+  {
+    const media = require(path.join(ROOT, "netlify", "functions", "lib", "_media.js"));
+    const store3 = fakeStore();
+    store3.delete = async (k) => { delete store3.written[k]; };
+    const buf3 = Buffer.from("bytes");
+    for (let i = 0; i < 4; i += 1) await __test.writeCachedPhoto(store3, NOT_MINE, i, buf3, "image/jpeg");
+    const dropped = await media.invalidatePhotoCache(store3, NOT_MINE);
+    check("behaviour: invalidation drops every stored photo for that listing",
+      dropped === 4 && (await __test.readCachedPhoto(store3, NOT_MINE, 0)) === null);
+    check("behaviour: and leaves other listings alone",
+      (await media.invalidatePhotoCache(store3, "IRE0000001")) === 0);
+
+    let threw = false;
+    try {
+      await media.invalidatePhotoCache({ async get() { throw new Error("down"); } }, NOT_MINE);
+    } catch (e) { threw = true; }
+    check("behaviour: a store that throws cannot break the sync run", !threw);
+
+    const syncSrc = fs.readFileSync(path.join(ROOT, "netlify", "functions", "sync-listings.js"), "utf8");
+    check("the sync drops stored photos when a listing's photo count changes",
+      /async function invalidatePhotosIfChanged/.test(syncSrc) &&
+        (syncSrc.match(/await invalidatePhotosIfChanged\(/g) || []).length >= 2,
+      "both the refresh path and the crawl path see changed listings");
   }
 
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);

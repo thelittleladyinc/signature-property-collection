@@ -35,6 +35,46 @@ const { recordMlsCall, checkMlsQuota, bytesFromResponse } = require("./_mls-usag
 
 const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
 
+// ---- WHERE THIS SITE'S OWN COPY OF A PHOTO LIVES ------------------------
+// 2026-08-18: these three moved here from listing-photo.js because three separate
+// files now need to agree about them, and "agree" was previously enforced by a
+// comment. listing-photo.js writes the cache, sync-listings.js invalidates it when
+// a listing's photos change, and listing-page.js decides how many photos to render
+// -- and rendering more than are cached hands the difference straight back to MLS
+// Grid, one live download per view, forever.
+const PHOTO_CACHE_PREFIX = "photo-cache/";
+
+// The last photo index this site both renders and stores. MLS Grid's rule is
+// "There is NEVER a reason to download the same media more than once", so the only
+// defensible bound is exactly what a page shows: 12 photos, indexes 0-11.
+const PHOTO_CACHE_MAX_INDEX = 11;
+
+function photoCacheKey(listingId, index) {
+  return `${PHOTO_CACHE_PREFIX}${listingId}-${index}.json`;
+}
+
+// Drops this site's stored copies of a listing's photos. Called when the photo set
+// has demonstrably changed, because the cache is keyed by INDEX and MLS Grid keys
+// media by MediaKey -- so a listing that gains, loses or re-orders photos would
+// otherwise serve yesterday's picture at that index for as long as the listing
+// lives. Best-effort: a failed delete costs a stale photo, never a request.
+async function invalidatePhotoCache(store, listingId, maxIndex) {
+  const upTo = typeof maxIndex === "number" ? maxIndex : PHOTO_CACHE_MAX_INDEX;
+  let dropped = 0;
+  for (let i = 0; i <= upTo; i += 1) {
+    try {
+      const key = photoCacheKey(listingId, i);
+      const existing = await store.get(key, { type: "json" });
+      if (!existing) continue;
+      await store.delete(key);
+      dropped += 1;
+    } catch (err) {
+      console.warn(`invalidatePhotoCache ${listingId}/${i} failed:`, err && err.message);
+    }
+  }
+  return dropped;
+}
+
 // 2026-08-17. This was 40 minutes, on the reasoning that it sat "comfortably
 // inside MLS Grid's ~1-2 hour signature life". Lifetime was never the binding
 // constraint. From MLS Grid's Media documentation:
@@ -585,6 +625,10 @@ async function fetchMediaResponse(url, token, timeoutMs, store) {
 
 module.exports = {
   PHOTO_URL_CACHE_PREFIX,
+  PHOTO_CACHE_PREFIX,
+  PHOTO_CACHE_MAX_INDEX,
+  photoCacheKey,
+  invalidatePhotoCache,
   URL_CACHE_TTL_MS,
   PHOTO_COOLDOWN_MS,
   SINGLE_TIMEOUT_MS,

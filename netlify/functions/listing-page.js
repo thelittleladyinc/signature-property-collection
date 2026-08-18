@@ -35,6 +35,12 @@ const path = require("path");
 const {
   LISTINGS_KEY, SYNC_STATE_KEY, getBlobStore, AGENT_SURNAME,
 } = require("./lib/_mls-shared");
+// How many photos this page may render is not a design choice on its own: every
+// photo shown beyond what listing-photo.js stores is re-downloaded from MLS Grid
+// on every view that misses a CDN edge, forever. The two numbers have to be the
+// same number, so they are literally the same number. See lib/_media.js.
+const { PHOTO_CACHE_MAX_INDEX } = require("./lib/_media");
+const GALLERY_PHOTOS = PHOTO_CACHE_MAX_INDEX + 1;
 
 const SHELL_PATH = path.join(__dirname, "lib", "_listing-page-shell.html");
 const SITE_DOMAIN = "https://signaturepropertycollection.com";
@@ -165,10 +171,10 @@ function listingBody(l, fetchedAt) {
 
   const gallery = count > 1
     ? `<div class="listing-detail-thumbs">` +
-      Array.from({ length: Math.min(count, 12) }, (_, i) =>
+      Array.from({ length: Math.min(count, GALLERY_PHOTOS) }, (_, i) =>
         `<img src="${esc(photoUrl(l, i))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}" loading="lazy">`
       ).join("") +
-      (count > 12 ? `<p class="fs-advanced-note">Showing 12 of ${count} photos &mdash;
+      (count > GALLERY_PHOTOS ? `<p class="fs-advanced-note">Showing ${GALLERY_PHOTOS} of ${count} photos &mdash;
        <a href="/contact.html" style="text-decoration:underline">ask for the full set</a>.</p>` : "") +
       `</div>`
     : "";

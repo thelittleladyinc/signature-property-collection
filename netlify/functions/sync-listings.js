@@ -72,6 +72,7 @@ const {
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
 const { recordMlsCall, checkMlsQuota, pruneUsage, bytesFromResponse } = require("./lib/_mls-usage");
+const { invalidatePhotoCache } = require("./lib/_media");
 const { drainFailedPushes } = require("./lib/_lofty");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
@@ -485,6 +486,7 @@ async function refreshOneListing(listingId, listingsById, store, token, startedA
     return { removed: true };
   }
   const previouslyStored = listingsById[mapped.listingId];
+  await invalidatePhotosIfChanged(store, previouslyStored, mapped);
   const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, photoDeadlineMs, store);
   mapped.photosRefreshedAt = new Date().toISOString();
   listingsById[mapped.listingId] = slimForStorage(mapped);
@@ -653,6 +655,40 @@ function hasEquestrianKeywords(remarksLower) {
     return EQUESTRIAN_WEAK_PARTNER.some((k) => remarksLower.includes(k));
   }
   return false;
+}
+
+// 2026-08-18. listing-photo.js now keeps this site's own permanent copy of every
+// photo a page renders, which is what MLS Grid's documentation asks for ("You must
+// maintain your own copy of all media files", "There is NEVER a reason to download
+// the same media more than once"). That store is keyed by listing id and INDEX.
+//
+// MLS Grid keys media by MediaKey, not by position. So a listing that gains, loses
+// or re-orders photos keeps serving whatever this site stored at that index --
+// potentially a photo the seller has since removed. Nothing in the photo path can
+// notice, because it never re-fetches a photo it already holds; only the sync sees
+// the new record at all.
+//
+// The signal used here is the PHOTO COUNT, deliberately, because it is free: it is
+// already computed from data already fetched. It catches added, removed and
+// truncated photo sets. It does NOT catch a replacement that keeps the count the
+// same -- for that MLS Grid offers PhotosChangeTimestamp and MediaModificationTimestamp,
+// which would have to go into $select, and this feed has a documented history of
+// 400ing standard RESO field names (see SELECT_FIELDS in _mls-shared.js) where a
+// 400 breaks the entire crawl. Worth probing in an isolated try/catch the way
+// discoverHerOfficeMlsId() does; not worth risking the sync for today.
+async function invalidatePhotosIfChanged(store, previouslyStored, mapped) {
+  if (!store || !previouslyStored || !mapped || !mapped.listingId) return 0;
+  const before = typeof previouslyStored.photoCount === "number"
+    ? previouslyStored.photoCount
+    : (Array.isArray(previouslyStored.photos) ? previouslyStored.photos.length : null);
+  const after = Array.isArray(mapped.photos) ? mapped.photos.length : null;
+  if (before == null || after == null || before === after) return 0;
+  const dropped = await invalidatePhotoCache(store, mapped.listingId);
+  if (dropped) {
+    console.log(`sync-listings: ${mapped.listingId} photo count ${before} -> ${after}, ` +
+      `dropped ${dropped} stored photo(s) so they are fetched fresh`);
+  }
+  return dropped;
 }
 
 function slimForStorage(mapped) {
@@ -1055,6 +1091,7 @@ exports.handler = async () => {
           if (mapped.listingId) {
             const previouslyStored = listingsById[mapped.listingId];
             if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
+              await invalidatePhotosIfChanged(store, previouslyStored, mapped);
               const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, null, store);
               coverPhotosCached += photosCached;
             }

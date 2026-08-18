@@ -64,6 +64,7 @@ const { getBlobStore, BASE_URL, SELECT_FIELDS, MINE_LISTINGS_KEY } = require("./
 const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
   isMediaThrottled, setMediaCooldown, usableUrl, markUrlUsed,
+  PHOTO_CACHE_MAX_INDEX, photoCacheKey,
 } = require("./lib/_media");
 const { checkMlsQuota } = require("./lib/_mls-usage");
 const { uploadBufferToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
@@ -101,32 +102,10 @@ const IMAGE_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=60480
 // BOUNDED to the photos a page actually renders -- see shouldCachePhoto for why that
 // is the bound that matters and why the original "her listings only" bound was
 // dropped.
-const PHOTO_CACHE_PREFIX = "photo-cache/";
-
-// 2026-08-17, raised from 0 to 11. MLS Grid's Media documentation, in two places:
-//
-//   "You must maintain your own copy of all media files."
-//   "There is NEVER a reason to download the same media more than once."
-//
-// The cover-only bound met neither. listing-page.js renders up to TWELVE photos
-// (Math.min(count, 12) in listingBody), and indexes 1-11 were re-downloaded from
-// MLS Grid on every view that missed a CDN edge -- eleven parallel requests per
-// visit, from an account limited to two per second, recurring for as long as the
-// page keeps getting traffic. That was the largest consumer on this site's side of
-// the shared token, and no amount of extra quota would have stopped it growing.
-//
-// 11 is not a guess: it is exactly what listing-page.js displays. Keep the two in
-// step -- caching fewer than are rendered puts the difference back on MLS Grid,
-// caching more stores photos nobody is shown.
-//
-// Growth is still bounded by TRAFFIC, not catalogue size: a photo is only stored
-// after somebody opens that listing. ~12 photos x ~300KB x 1.33 (base64) is about
-// 4.8MB per listing anyone actually looks at.
-const PHOTO_CACHE_MAX_INDEX = 11;
-
-function photoCacheKey(listingId, index) {
-  return `${PHOTO_CACHE_PREFIX}${listingId}-${index}.json`;
-}
+// PHOTO_CACHE_PREFIX / PHOTO_CACHE_MAX_INDEX / photoCacheKey moved to lib/_media.js
+// on 2026-08-18: sync-listings.js needs them to invalidate this cache when a
+// listing's photos change, and listing-page.js needs the bound to decide how many
+// photos to render. Three files agreeing by comment is how they drift.
 
 // Her own listing ids. No longer gates the photo cache (see shouldCachePhoto), kept
 // because it is the cheap way to tell her listings apart from the catalogue and the
