@@ -181,6 +181,13 @@ a { color: inherit; text-decoration: none; }
 
 nav.primary-nav { display: flex; gap: 28px; }
 nav.primary-nav a {
+  /* 2026-08-18 (WCAG, desktop-only finding): these links inherited white from
+     .site-header, and 13px white on the rose header is 3.75:1 — the one
+     contrast failure mobile audits never see, because the nav collapses
+     behind the hamburger below 900px. Charcoal on rose is 4.90:1, and matches
+     .brand-sub's fix, the monogram's natural two-tone, and the mobile menu
+     (same override there, where links sit on the same rose panel). */
+  color: var(--charcoal);
   font-size: 13px;
   letter-spacing: .08em;
   text-transform: uppercase;

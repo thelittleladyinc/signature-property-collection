@@ -8248,10 +8248,29 @@ def _blog_body_html(paragraphs):
             parts.append(f'<h2 class="article-subhead" style="margin-top:28px">{esc(p)}</h2>')
         elif p == pull_quote_text and not quoted_once:
             quoted_once = True
-            parts.append(f'<p class="blog-pull-quote">{esc(p)}</p>')
+            parts.append(f'<p class="blog-pull-quote">{_blog_para_html(p)}</p>')
         else:
-            parts.append(f"<p>{esc(p)}</p>")
+            parts.append(f"<p>{_blog_para_html(p)}</p>")
     return "\n      ".join(parts)
+
+
+# 2026-08-18: blog paragraphs were fully escaped, so posts could not link to
+# the town pages, the search page, or each other -- and internal links between
+# the local "pillar" posts and the pages they support are half the point of
+# writing them. This renders ONLY [text](url) where url starts with "/" or
+# "https://", escaping both halves; everything else in the paragraph is
+# escaped exactly as before, so no other HTML can ride in through blog.json.
+_BLOG_LINK_RE = re.compile(r"\[([^\]]+)\]\((/[^)\s]*|https://[^)\s]+)\)")
+
+
+def _blog_para_html(p):
+    out, last = [], 0
+    for m in _BLOG_LINK_RE.finditer(p):
+        out.append(esc(p[last:m.start()]))
+        out.append(f'<a href="{esc(m.group(2))}" style="text-decoration:underline">{esc(m.group(1))}</a>')
+        last = m.end()
+    out.append(esc(p[last:]))
+    return "".join(out)
 
 
 def _blog_posting_schema(post):
