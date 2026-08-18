@@ -173,6 +173,98 @@ const CO_CITY_COUNTY = {
   "sterling": "logan", "limon": "lincoln", "burlington": "kit carson",
   "akron": "washington", "holyoke": "phillips", "julesburg": "sedgwick",
   "wray": "yuma", "yuma": "yuma",
+
+  // ---- 2026-08-18: the two halves of the same gap ------------------------
+  // Christine sent a screenshot of her luxury search with 1315 Co-131, McCoy —
+  // three hours away, not in any county she serves. The filter had not failed;
+  // McCoy simply was not in this table, and an unplaceable city is KEPT by
+  // design (see the note above) so a real listing in an unincorporated corner of
+  // Larimer is never thrown away over a missing entry.
+  //
+  // The trap is that the same screenshot's $18M Cherry Hills Village home was
+  // showing for exactly the same reason — Arapahoe County, squarely in her
+  // service area, and equally absent from this table. So "drop what we cannot
+  // place" would have deleted an eighteen-million-dollar listing to remove a
+  // wrong one. The only safe fix is to name more towns, in BOTH directions.
+  //
+  // IN AREA — municipalities inside her nine counties that were unplaceable.
+  // Naming them makes their inclusion deliberate rather than accidental, and
+  // means the operating filter still behaves if she ever narrows the counties.
+  "cherry hills village": "arapahoe", "greenwood village": "arapahoe",
+  "glendale": "arapahoe", "sheridan": "arapahoe", "columbine valley": "arapahoe",
+  "foxfield": "arapahoe", "bow mar": "arapahoe",
+  "northglenn": "adams", "federal heights": "adams", "henderson": "adams",
+  "todd creek": "adams",
+  "evergreen": "jefferson", "conifer": "jefferson", "morrison": "jefferson",
+  "edgewater": "jefferson", "lakeside": "jefferson", "mountain view": "jefferson",
+  "genesee": "jefferson", "indian hills": "jefferson", "kittredge": "jefferson",
+  "idledale": "jefferson", "pine": "jefferson", "buffalo creek": "jefferson",
+  "nederland": "boulder", "lyons": "boulder", "niwot": "boulder",
+  "ward": "boulder", "jamestown": "boulder", "eldorado springs": "boulder",
+  "hygiene": "boulder", "allenspark": "boulder", "gold hill": "boulder",
+  "gunbarrel": "boulder",
+  "campion": "larimer", "rustic": "larimer", "virginia dale": "larimer",
+  "garden city": "weld", "lucerne": "weld", "new raymer": "weld",
+  "raymer": "weld", "stoneham": "weld", "hereford": "weld",
+  "weldona": "morgan", "orchard": "morgan", "snyder": "morgan",
+  "goodrich": "morgan", "hillrose": "morgan",
+
+  // OUT OF AREA — the towns a Northern Colorado feed with reciprocal listings
+  // actually surfaces. McCoy is the one that prompted this; the rest are its
+  // neighbours, added so the next one does not need its own screenshot.
+  "mccoy": "eagle", "gypsum": "eagle", "minturn": "eagle", "red cliff": "eagle",
+  "wolcott": "eagle", "beaver creek": "eagle", "bond": "eagle", "burns": "eagle",
+  "basalt": "eagle", "el jebel": "eagle",
+  "oak creek": "routt", "phippsburg": "routt", "yampa": "routt",
+  "hayden": "routt", "clark": "routt", "toponas": "routt", "milner": "routt",
+  "glenwood springs": "garfield", "carbondale": "garfield", "rifle": "garfield",
+  "silt": "garfield", "new castle": "garfield", "parachute": "garfield",
+  "battlement mesa": "garfield",
+  "craig": "moffat", "maybell": "moffat", "dinosaur": "moffat",
+  "walden": "jackson",
+  "idaho springs": "clear creek", "georgetown": "clear creek",
+  "empire": "clear creek", "silver plume": "clear creek", "dumont": "clear creek",
+  "black hawk": "gilpin", "central city": "gilpin", "rollinsville": "gilpin",
+  "woodland park": "teller", "divide": "teller", "florissant": "teller",
+  "cripple creek": "teller", "victor": "teller",
+  "castle pines": "douglas", "sedalia": "douglas", "franktown": "douglas",
+  "larkspur": "douglas", "roxborough park": "douglas",
+  "elizabeth": "elbert", "kiowa": "elbert", "elbert": "elbert", "simla": "elbert",
+  "fountain": "el paso", "falcon": "el paso", "peyton": "el paso",
+  "calhan": "el paso", "black forest": "el paso", "manitou springs": "el paso",
+  "grand junction": "mesa", "fruita": "mesa", "palisade": "mesa", "clifton": "mesa",
+  "montrose": "montrose", "olathe": "montrose",
+  "delta": "delta", "cedaredge": "delta", "paonia": "delta", "hotchkiss": "delta",
+  "gunnison": "gunnison", "crested butte": "gunnison",
+  "mount crested butte": "gunnison",
+  "telluride": "san miguel", "mountain village": "san miguel",
+  "norwood": "san miguel",
+  "ouray": "ouray", "ridgway": "ouray",
+  "durango": "la plata", "bayfield": "la plata", "ignacio": "la plata",
+  "pagosa springs": "archuleta",
+  "cortez": "montezuma", "mancos": "montezuma", "dolores": "montezuma",
+  "meeker": "rio blanco", "rangely": "rio blanco",
+  "canon city": "fremont", "florence": "fremont", "penrose": "fremont",
+  "westcliffe": "custer", "silver cliff": "custer",
+  "poncha springs": "chaffee", "nathrop": "chaffee",
+  "twin lakes": "lake",
+  "como": "park", "hartsel": "park", "shawnee": "park", "grant": "park",
+  "guffey": "park",
+  "pueblo": "pueblo", "pueblo west": "pueblo", "rye": "pueblo",
+  "colorado city": "pueblo",
+  "walsenburg": "huerfano", "la veta": "huerfano",
+  "trinidad": "las animas", "aguilar": "las animas",
+  "la junta": "otero", "rocky ford": "otero", "fowler": "otero", "swink": "otero",
+  "lamar": "prowers", "holly": "prowers", "granada": "prowers", "wiley": "prowers",
+  "springfield": "baca", "walsh": "baca",
+  "eads": "kiowa county", "ordway": "crowley", "sugar city": "crowley",
+  "cheyenne wells": "cheyenne",
+  "hugo": "lincoln", "genoa": "lincoln", "arriba": "lincoln",
+  "otis": "washington",
+  "merino": "logan", "iliff": "logan", "fleming": "logan", "peetz": "logan",
+  "ovid": "sedgwick", "haxtun": "phillips", "eckley": "yuma",
+  "stratton": "kit carson", "flagler": "kit carson", "seibert": "kit carson",
+  "bethune": "kit carson", "vona": "kit carson",
 };
 
 function inferCountyFromCity(cityLower) {
