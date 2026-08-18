@@ -35,7 +35,12 @@ check(
 
 // It must be tested BEFORE the generic advice, or the fallthrough wins again.
 const mediaAt = src.search(/\/media optimization\/i\.test/);
-const genericAt = src.search(/Check the three CLOUDINARY_\* variables/);
+// 2026-08-18: the anchor was the words "Check the three CLOUDINARY_* variables",
+// which were removed when that advice became actively wrong — Christine had just
+// deleted those three variables on purpose, and the row sent her back to look at
+// them. The final fallback is now the unknown-api_key branch; anchoring on it
+// keeps the ordering guarantee this test exists for.
+const genericAt = src.search(/Cloudinary does not recognise this api_key/);
 check(
   "it is checked before the generic 'check your variables' fallback",
   mediaAt !== -1 && genericAt !== -1 && mediaAt < genericAt,

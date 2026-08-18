@@ -47,6 +47,7 @@ const {
   resolveMediaFor, fetchMediaResponse, looksPresigned, isThrottled, markUrlUsed,
 } = require("./lib/_media");
 const { checkMlsQuota } = require("./lib/_mls-usage");
+const { cloudinaryDiagnostics } = require("./lib/_cloudinary");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 // Read for the Tour It With Me coverage row below — same file the map reads.
 const LOCAL_SPOTS = require("./lib/_local-spots.json");
@@ -591,6 +592,36 @@ exports.handler = async (event) => {
     try { return !!(l.photo && new URL(l.photo).host.indexOf("cloudinary") !== -1); } catch (e) { return false; }
   }).length;
 
+  // Prints what is actually configured, in the words someone comparing it against
+  // Cloudinary's console would need. Never prints the secret.
+  function describeCloudinaryConfig() {
+    let d;
+    try { d = cloudinaryDiagnostics(); } catch (err) { return ""; }
+    if (!d || !d.configured) return "";
+    const flags = [];
+    const bad = (name, c) => {
+      if (!c) return;
+      if (c.hasLeadingOrTrailingSpace) flags.push(`the ${name} has a leading or trailing space`);
+      if (c.hasWhitespaceInside) flags.push(`the ${name} contains a space or newline inside it`);
+      if (c.hasSmartQuoteOrNbsp) flags.push(`the ${name} contains a curly quote or non-breaking space from a copy-paste`);
+      else if (c.hasNonAscii) flags.push(`the ${name} contains an unusual character`);
+    };
+    bad("api_key", d.apiKeyChecks);
+    bad("secret", d.apiSecretChecks);
+    if (!d.apiKeyLooksNumeric) flags.push("the api_key is not the long number Cloudinary issues");
+    if (d.apiSecretLength && (d.apiSecretLength < 20 || d.apiSecretLength > 40)) {
+      flags.push(`the secret is ${d.apiSecretLength} characters, and Cloudinary's are about 27 — ` +
+        "so this looks truncated or partly pasted");
+    }
+    return `WHAT IS ACTUALLY SET (read from ${d.source}): api_key ${d.apiKey}, ` +
+      `cloud "${d.cloudName}", secret ${d.apiSecretLength} characters long. ` +
+      "An api_key is not secret — Cloudinary prints it in its own table — so compare that " +
+      `number against the API Keys page of cloud "${d.cloudName}". If it is not listed there, ` +
+      "the key belongs to a different Cloudinary account. " +
+      (flags.length ? `ALSO WORTH FIXING: ${flags.join("; ")}. ` : "") +
+      "Full detail at /site-health?format=json under cloudinaryConfig. ";
+  }
+
   // Read before the rows are built: one blob sweep for the whole page rather than
   // one per row. Never fatal -- a health page that cannot render because its own
   // instrumentation failed is worse than one honest red row.
@@ -855,7 +886,33 @@ exports.handler = async (event) => {
                     "Netlify as a single variable named CLOUDINARY_URL and redeploy. " +
                     "This site prefers it over the three separate variables, so they " +
                     "can be left alone or deleted, and a mismatch becomes impossible."
-                  : "Check the three CLOUDINARY_* variables in Netlify against cloudinary.com → Dashboard."))),
+                  // 2026-08-18. This said "check the three CLOUDINARY_* variables"
+                  // — advice that was already obsolete and, on the day Christine
+                  // moved the site to its own Cloudinary account, actively wrong:
+                  // she had just deleted those three on purpose, and the row sent
+                  // her back to look at variables that no longer exist.
+                  //
+                  // "unknown api_key" has one overwhelmingly common cause and it is
+                  // worth naming instead of describing a place to go: an API key
+                  // copied from one Cloudinary account pasted next to a DIFFERENT
+                  // account's cloud name. Both halves look right on their own.
+                  : `Cloudinary does not recognise this api_key on cloud ` +
+                    `"${(cloudinaryCredentials() || {}).cloud_name || "?"}". ` +
+                    // 2026-08-18: the facts, not another guess. Christine checked the
+                    // credentials and reported them correct, which is exactly when
+                    // advice stops helping and evidence starts. An api_key is the
+                    // PUBLIC half of the pair — Cloudinary prints it in its own table —
+                    // so it can be shown and compared by eye. The secret never is, but
+                    // its length is, because the failures that survive "I checked it"
+                    // are the invisible ones: a truncated paste, a trailing newline the
+                    // Netlify field does not render, a smart quote from a copy.
+                    describeCloudinaryConfig() +
+                    "The usual cause is a key from ONE Cloudinary account paired with " +
+                    "ANOTHER account's cloud name — each half looks correct by itself. " +
+                    "Open the API Keys page of that exact cloud, pick ONE row, and take " +
+                    "both the key and its revealed secret from that same row: " +
+                    "CLOUDINARY_URL = cloudinary://<api_key>:<api_secret>@<cloud_name>. " +
+                    "Then redeploy — environment changes do not reach functions until you do."))),
   });
 
   // ---- Lofty API key valid? ----
@@ -1270,7 +1327,16 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-      body: JSON.stringify({ allOk, checks, raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed, loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck } }, null, 2),
+      // cloudinaryConfig describes what is CONFIGURED, which is a different
+      // question from cloudCheck's "what did Cloudinary say about it" — and when
+      // the two disagree, the difference between them is the whole diagnosis.
+      // Contains no secret: the api_key is the public half of the pair, and the
+      // secret appears only as a length and a set of character-class flags.
+      body: JSON.stringify({
+        allOk, checks,
+        cloudinaryConfig: (() => { try { return cloudinaryDiagnostics(); } catch (e) { return { error: String(e && e.message) }; } })(),
+        raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed, loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck },
+      }, null, 2),
     };
   }
 

@@ -365,8 +365,58 @@ function isOnCurrentCloud(url) {
   return !on || on === cloud;
 }
 
+// What is ACTUALLY configured, described without revealing anything secret.
+//
+// 2026-08-18. Christine moved the site to its own Cloudinary account, the cloud
+// name resolved correctly, and Cloudinary still answered "unknown api_key". She
+// checked the credentials and reported they were right — at which point guessing
+// from the outside had run out, and so had my three attempts at guessing for her.
+//
+// An api_key is not a secret: it is the public half of the pair and Cloudinary
+// prints it in a table. So it can simply be shown, and compared against the
+// console by eye. The secret is never shown — but its LENGTH is, because the
+// failures that survive "I checked it" are almost always invisible ones: a
+// truncated paste, a trailing newline the Netlify field does not render, a smart
+// quote, a zero-width character. A length and a character-class check catch all
+// of those, and none of them can be seen by looking harder at the value.
+function cloudinaryDiagnostics() {
+  const rawUrl = process.env.CLOUDINARY_URL || "";
+  const creds = cloudinaryCredentials();
+  const suspicious = (v) => {
+    const str = String(v == null ? "" : v);
+    return {
+      length: str.length,
+      hasLeadingOrTrailingSpace: str !== str.trim(),
+      hasWhitespaceInside: /\s/.test(str.trim()),
+      hasNonAscii: /[^\x20-\x7E]/.test(str),
+      // Curly quotes and non-breaking spaces survive a copy-paste and look normal.
+      hasSmartQuoteOrNbsp: /[\u2018\u2019\u201C\u201D\u00A0\u200B]/.test(str),
+    };
+  };
+  return {
+    source: rawUrl
+      ? "CLOUDINARY_URL"
+      : (process.env.CLOUDINARY_CLOUD_NAME ? "the three separate CLOUDINARY_* variables" : "nothing is set"),
+    configured: !!creds,
+    // Safe to print: this is the public half of the pair, shown in Cloudinary's
+    // own table. Compare it against the API Keys page of the cloud below.
+    cloudName: (creds && creds.cloud_name) || null,
+    apiKey: (creds && creds.api_key) || null,
+    apiKeyLooksNumeric: !!(creds && /^\d{10,}$/.test(String(creds.api_key || ""))),
+    apiKeyChecks: suspicious(creds && creds.api_key),
+    // Never the value. Cloudinary secrets are ~27 characters; anything far from
+    // that is a truncated or partial paste.
+    apiSecretLength: creds && creds.api_secret ? String(creds.api_secret).length : 0,
+    apiSecretChecks: suspicious(creds && creds.api_secret),
+    urlStartsWithScheme: /^cloudinary:\/\//i.test(rawUrl),
+    urlLength: rawUrl.length,
+    urlChecks: suspicious(rawUrl),
+  };
+}
+
 module.exports = {
   cachePhotoToCloudinary, isCloudinaryConfigured, MIN_IMAGE_SIZE_BYTES,
+  cloudinaryDiagnostics,
   currentCloudName, cloudNameOfUrl, isOnCurrentCloud,
   uploadBufferToCloudinary, deliveryUrl,
   // Exported so site-health can report WHICH cloud is in use, and so the parsing
