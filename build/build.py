@@ -4421,17 +4421,41 @@ def _district_short(text):
 # has the same shape. Appending the brand here instead produced titles that were
 # sometimes 30 characters and sometimes 57, because _fit_title strips the brand only
 # when the whole thing runs past 60.
+# 2026-08-18 (brand separation, at Christine's direction): she runs a second,
+# non-luxury site — thelittleladysellshomes.com — and bare "Homes For Sale" is
+# THE generic entry-level phrase that site exists to win. This site should not
+# bid against it. The four towns below that said plain "Homes For Sale" now say
+# what this site's inventory in those towns actually is — country property and
+# acreage — which is both truer to the luxury/acreage brand and leaves the
+# generic intent to the sister site on purpose.
 ACREAGE_TOWN_TITLES = {
     "nunn":              "Homes & Acreage For Sale",
     "carr":              "Land & Acreage For Sale",
-    "pierce":            "Homes For Sale",
+    "pierce":            "Homes & Acreage For Sale",
     "grover":            "Homes & Land For Sale",
     "masonville":        "Homes & Acreage For Sale",
     "red-feather-lakes": "Cabins For Sale",   # "Cabins & Homes" ran the title to 66 chars
-    "log-lane-village":  "Homes For Sale",
+    "log-lane-village":  "Country Homes For Sale",
     "wiggins":           "Homes & Acreage For Sale",
-    "brush":             "Homes For Sale",
-    "fort-morgan":       "Homes For Sale",
+    "brush":             "Country Homes & Acreage",
+    "fort-morgan":       "Country Homes & Acreage",
+}
+
+# 2026-08-18: per-town title overrides where the measured demand does not fit
+# the standard relocation template. Verified with search-volume data:
+# - Windsor is the one town paged under two counties, and the county name was
+#   the only differentiator — dead words nobody searches. Both variants now
+#   carry a REAL query each: "cost of living in windsor colorado" measures
+#   ~4,400/mo and "moving to windsor colorado" ~9,000/mo, so the pair stays
+#   distinguishable using phrases people actually type.
+# - Estes Park's demand is visiting and second homes, not relocation ("things
+#   to do in estes park", Rocky Mountain National Park ~11k/mo; "living in
+#   estes park" does not measure). Its title sells what buyers there seek:
+#   a mountain home near the park.
+TOWN_TITLE_OVERRIDES = {
+    ("windsor", "Larimer County"): "Living In Windsor, CO | Cost Of Living & Luxury Homes",
+    ("windsor", "Weld County"):    "Moving To Windsor, CO | Moving Guide & Luxury Homes",
+    ("estes-park", None):          "Estes Park, CO Mountain Homes | Near Rocky Mountain National Park",
 }
 
 
@@ -4458,6 +4482,10 @@ def _town_title(city, data_slug, county_name, disambiguate=False):
     wins, so long names (Red Feather Lakes, Fort Morgan) degrade to a shorter
     real title instead of being truncated mid-phrase by _fit_title.
     """
+    override = (TOWN_TITLE_OVERRIDES.get((data_slug or "", county_name))
+                or TOWN_TITLE_OVERRIDES.get((data_slug or "", None)))
+    if override:
+        return override
     full = ACREAGE_TOWN_TITLES.get(data_slug or "") or "Luxury Homes For Sale"
     short = full[: -len(" For Sale")] if full.endswith(" For Sale") else full
     # 2026-08-16 (caught by a sitewide duplicate-title audit right after the change
