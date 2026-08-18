@@ -67,7 +67,11 @@ const {
   PHOTO_CACHE_MAX_INDEX, photoCacheKey,
 } = require("./lib/_media");
 const { checkMlsQuota } = require("./lib/_mls-usage");
-const { uploadBufferToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
+// NOT required at module load. lib/_cloudinary.js pulls in the Cloudinary SDK, and
+// this is the hottest function on the site -- every photo on every page. Paying
+// that import on every cold start, for a branch that only fires on photos too big
+// to return inline, is the wrong trade. Required lazily where it is used instead.
+
 
 const BLOB_STORE_NAME = "mls-listings";
 const IMAGE_FETCH_TIMEOUT_MS = 8000;
@@ -620,9 +624,12 @@ exports.handler = async (event) => {
       // MLS Grid nothing extra -- and re-hosting is what its docs ask for anyway.
       // The redirect is cached like any other stored photo, so the next visitor
       // goes to Cloudinary without touching MLS Grid or this ceiling again.
-      if (!debug && isCloudinaryConfigured()) {
+      if (!debug) {
         try {
-          const url = await uploadBufferToCloudinary(buf, `spc-oversize/${listingId}/photo-${index}`, contentType);
+          const { uploadBufferToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
+          const url = isCloudinaryConfigured()
+            ? await uploadBufferToCloudinary(buf, `spc-oversize/${listingId}/photo-${index}`, contentType)
+            : null;
           if (url) {
             await store.setJSON(photoCacheKey(listingId, index), {
               redirectUrl: url, bytes: buf.length, contentType,

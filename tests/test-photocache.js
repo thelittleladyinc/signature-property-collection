@@ -77,6 +77,21 @@ check(
   "an unbounded read invites an unbounded write later"
 );
 
+// The Cloudinary SDK must not be imported at module load here. This is the hottest
+// function on the site -- every photo on every page -- and the only thing that needs
+// Cloudinary is the branch for photos too big to return inline. Paying that import
+// on every cold start for a rare branch is the wrong trade.
+check(
+  "the Cloudinary SDK is not pulled in at module load",
+  !/^const \{[^}]*\} = require\("\.\/lib\/_cloudinary"\);/m.test(src),
+  "a top-level require here costs every photo request a heavier cold start"
+);
+check(
+  "but the oversize path can still reach it",
+  /require\("\.\/lib\/_cloudinary"\)/.test(src),
+  "without this, oversize photos stay permanently grey"
+);
+
 // ---- 2. NEVER MAKES THINGS WORSE. A cache miss, a malformed entry or a dead blob
 // store must not turn a photo that WOULD have worked into an error.
 for (const [what, fn] of [["read", "readCachedPhoto"], ["write", "writeCachedPhoto"]]) {
