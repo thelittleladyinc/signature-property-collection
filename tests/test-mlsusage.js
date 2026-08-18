@@ -260,6 +260,46 @@ function fakeStore(opts) {
       /checkMlsQuota\(store, \{ full: true \}\)/.test(sync));
   }
 
+  // ---- 11. BYTES MUST ACTUALLY BE COUNTED --------------------------------
+  // Christine's live health page, an hour after deploy: "2 request(s) and 0 MB
+  // this hour ... 3 API + 1 photo". A photo download is never zero bytes. MLS Grid
+  // gzips its API responses and streams media, so neither carries a
+  // Content-Length — which meant the MB half of the budget could never move and
+  // the bandwidth guard was decorative.
+  {
+    const m = loadFresh({});
+    const store = fakeStore();
+    m._resetGuardCache();
+    await m.recordMlsCall(store, { kind: "media", status: 200, bytes: 0 });
+    await m.recordMlsBytes(store, 286081); // the real size, known after the body is read
+    const bucket = store.data.get(m.hourKeyFor());
+    check("bytes can be added once the body has been read", bucket.bytes === 286081);
+    check("and topping up bytes does NOT count another request",
+      bucket.requests === 1,
+      "otherwise every photo would inflate the request count as well");
+
+    m._resetGuardCache();
+    const q = await m.checkMlsQuota(store);
+    check("the guard sees those bytes", q.hourMB > 0.2 && q.hourMB < 0.3, `hourMB=${q.hourMB}`);
+
+    let threw = false;
+    try { await m.recordMlsBytes(fakeStore({ throwOnSet: true }), 100); } catch (e) { threw = true; }
+    check("and a dead store still cannot break a download", !threw);
+    await m.recordMlsBytes(store, 0);
+    await m.recordMlsBytes(store, -5);
+    check("zero and nonsense byte counts are ignored",
+      store.data.get(m.hourKeyFor()).bytes === 286081);
+
+    // The call sites that actually know the size.
+    const photo = fs.readFileSync(path.join(ROOT, "netlify", "functions", "listing-photo.js"), "utf8");
+    check("the photo handler records the real download size",
+      /await recordMlsBytes\(store, buf\.length\)/.test(photo),
+      "Content-Length is absent on media.mlsgrid.com — the buffer is the only truth");
+    const media = fs.readFileSync(path.join(ROOT, "netlify", "functions", "lib", "_media.js"), "utf8");
+    check("and the API resolve measures its own payload",
+      /await recordMlsBytes\(store, text\.length\)/.test(media));
+  }
+
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
   process.exit(failures === 0 ? 0 : 1);
 })();

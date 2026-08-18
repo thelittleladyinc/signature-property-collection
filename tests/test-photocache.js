@@ -283,6 +283,20 @@ function fakeStore(opts) {
     } catch (e) { threw = true; }
     check("behaviour: a store that throws cannot break the sync run", !threw);
 
+    // The crawl walks ~29,000 listings inside an 11-second budget. Twelve blob
+    // reads per listing to discover that nothing was stored is how a measurement
+    // eats the job it is measuring.
+    {
+      let reads = 0;
+      const counting = {
+        async get(k) { reads += 1; return null; },
+        async delete() {},
+      };
+      const n = await media.invalidatePhotoCache(counting, "IRE0000002");
+      check("behaviour: a listing with nothing stored costs ONE blob read, not twelve",
+        n === 0 && reads === 1, `${reads} read(s)`);
+    }
+
     const syncSrc = fs.readFileSync(path.join(ROOT, "netlify", "functions", "sync-listings.js"), "utf8");
     check("the sync drops stored photos when a listing's photo count changes",
       /async function invalidatePhotosIfChanged/.test(syncSrc) &&

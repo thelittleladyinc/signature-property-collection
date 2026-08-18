@@ -150,6 +150,14 @@ async function fetchMlsPhotoBuffer(mediaUrl, token, store) {
   }
   const arrayBuffer = await res.arrayBuffer();
   const buf = Buffer.from(arrayBuffer);
+  // Same reason as listing-photo.js: no Content-Length on media downloads, so the
+  // size is only knowable once the body is read. The sync's Cloudinary re-hosting
+  // pulls full-resolution originals, which are the largest single downloads this
+  // site makes -- exactly the thing a bandwidth budget needs to see.
+  try {
+    const { recordMlsBytes } = require("./_mls-usage");
+    await recordMlsBytes(store, buf.length);
+  } catch (err) { /* measurement must never break a download */ }
   if (buf.length < MIN_IMAGE_SIZE_BYTES) {
     throw new Error(`Response too small (${buf.length} bytes) — likely an error page, not an image`);
   }

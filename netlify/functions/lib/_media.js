@@ -31,7 +31,7 @@
 //      15-minute listing sync -- photo traffic taking down data replication.
 //      Photo requests now respect that flag but never set it; they set their
 //      own, shorter cooldown instead.
-const { recordMlsCall, checkMlsQuota, bytesFromResponse } = require("./_mls-usage");
+const { recordMlsCall, recordMlsBytes, checkMlsQuota, bytesFromResponse } = require("./_mls-usage");
 
 const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
 
@@ -61,6 +61,25 @@ function photoCacheKey(listingId, index) {
 async function invalidatePhotoCache(store, listingId, maxIndex) {
   const upTo = typeof maxIndex === "number" ? maxIndex : PHOTO_CACHE_MAX_INDEX;
   let dropped = 0;
+
+  // 2026-08-18: cheap exit first. The catalogue crawl is walking ~29,000 listings
+  // and calls this for every one whose photo count moved; at twelve blob reads
+  // each that is hundreds of reads inside an eleven-second budget, spent almost
+  // entirely on listings nobody has ever viewed and which therefore have nothing
+  // stored at all.
+  //
+  // Index 0 is the tell. Every path that stores photos stores the cover -- a card
+  // stores only the cover, a detail page stores 0 through 11 together -- so no
+  // cover means nothing to drop, and one read settles it for the overwhelming
+  // majority of listings.
+  try {
+    const cover = await store.get(photoCacheKey(listingId, 0), { type: "json" });
+    if (!cover) return 0;
+  } catch (err) {
+    console.warn(`invalidatePhotoCache ${listingId} cover probe failed:`, err && err.message);
+    return 0;
+  }
+
   for (let i = 0; i <= upTo; i += 1) {
     try {
       const key = photoCacheKey(listingId, i);
@@ -398,7 +417,24 @@ async function resolveOneBatch(wanted, { store, token, baseUrl, selectFields, ti
       return out;
     }
     if (!res.ok) return null;
-    const json = await res.json();
+    // Read as text so the payload can be measured. MLS Grid gzips these and sends
+    // no Content-Length, so this is the only place the real size is knowable --
+    // and without it the MB budget never moves. Deliberately the UNCOMPRESSED
+    // size, which over-counts against a cap metered on the wire: a guard that
+    // errs strict is the right direction of error.
+    //
+    // Falls back to .json() when a response has no .text(): real Responses have
+    // both, test doubles often have only one, and measurement must never be the
+    // reason a photo fails. This is the second time an instrumentation helper
+    // assumed more of a Response than a double provides -- hence the belt.
+    let json;
+    if (typeof res.text === "function") {
+      const text = await res.text();
+      await recordMlsBytes(store, text.length);
+      json = JSON.parse(text);
+    } else {
+      json = await res.json();
+    }
     const out = {};
     // This feed is documented to sometimes ignore a ListingId filter and return
     // an unrelated record, so only ids we actually asked for are accepted.

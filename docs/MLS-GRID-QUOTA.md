@@ -335,12 +335,17 @@ to cover the displayed set and stop replaying spent URLs. Free, no approval, and
 it removes the largest recurring source of media requests. ~4.8 MB per listing
 anyone opens.
 
-**Option B — pre-host every cover in the catalogue.** 15,471 covers × ~300 KB ≈
-**4.6 GB**, ~15,471 downloads. At MLS Grid's own 2 rps that is ~2.2 hours of wall
-clock; a `-background` Netlify function gets 15 minutes per run (~1,800 photos),
-so the catalogue is ~9 runs — a couple of nights. The refresh sweep's machinery
-(throttled, resumable, time-budgeted) is what this needs; repoint it rather than
-writing a new job.
+**Option B — pre-host every cover in the catalogue.** ~29,000 covers × ~300 KB ≈
+**8.7 GB**, ~29,000 downloads. Two things follow from the corrected number:
+
+- **It cannot be done in one sitting.** 8.7 GB is nearly three times the real
+  3,072 MB/hour cap, so the backfill must span at least three hours and honestly
+  more like a week of nightly runs. At 2 rps it is ~4 hours of pure wall clock
+  regardless.
+- **It cannot go to Cloudinary on the free tier.** The health page shows credits
+  already at **36% of 25**, and 8.7 GB of storage is ~9 more credits before any
+  delivery traffic. Netlify Blobs is the right store for a backfill this size;
+  Cloudinary stays for her own 11 listings and the oversize rescues.
 
 **Cloudinary vs Blobs.** Cloudinary's free tier is 25 credits/month, where 1
 credit = 1 GB storage *or* 1 GB delivery *or* 1,000 transformations. Cover-only is

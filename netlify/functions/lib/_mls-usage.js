@@ -134,6 +134,32 @@ async function recordMlsCall(store, { kind, status, bytes } = {}) {
   }
 }
 
+// Adds bytes to this hour WITHOUT counting another request.
+//
+// 2026-08-18, found on Christine's live health page an hour after deploy: it read
+// "2 request(s) and 0 MB this hour ... 3 API + 1 photo". A photo download is never
+// zero bytes. MLS Grid gzips its API responses and streams media, so neither sends
+// a Content-Length header, and bytesFromResponse() had nothing to read — which
+// meant the MB half of the budget could never register and the bandwidth guard was
+// inert. Only the request-count half was doing any work.
+//
+// The bytes are known slightly later, once the caller has actually read the body,
+// so they are added in a second step rather than guessed at the header. Splitting
+// it this way is what keeps the request count honest: topping up bytes must never
+// look like another request.
+async function recordMlsBytes(store, bytes) {
+  const n = Number(bytes);
+  if (!store || !isFinite(n) || n <= 0) return;
+  const key = hourKeyFor();
+  try {
+    const current = (await store.get(key, { type: "json" })) || emptyBucket();
+    await store.setJSON(key, { ...current, bytes: (current.bytes || 0) + n });
+    if (_guardCache) _guardCache.usage.hourBytes += n;
+  } catch (err) {
+    console.warn("recordMlsBytes failed:", err && err.message);
+  }
+}
+
 // Reads the current hour only -- one blob get, which is what a per-request guard
 // can afford. The hourly limits are the binding ones anyway: 7,200/hr IS the 2 rps
 // sustained average that suspends tokens.
@@ -312,6 +338,7 @@ module.exports = {
   SAFETY_FRACTION,
   hourKeyFor,
   recordMlsCall,
+  recordMlsBytes,
   readHourUsage,
   readFullUsage,
   checkMlsQuota,

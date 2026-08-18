@@ -66,7 +66,7 @@ const {
   isMediaThrottled, setMediaCooldown, usableUrl, markUrlUsed,
   PHOTO_CACHE_MAX_INDEX, photoCacheKey,
 } = require("./lib/_media");
-const { checkMlsQuota } = require("./lib/_mls-usage");
+const { checkMlsQuota, recordMlsBytes } = require("./lib/_mls-usage");
 // NOT required at module load. lib/_cloudinary.js pulls in the Cloudinary SDK, and
 // this is the hottest function on the site -- every photo on every page. Paying
 // that import on every cold start, for a branch that only fires on photos too big
@@ -593,6 +593,11 @@ exports.handler = async (event) => {
     }
 
     const buf = Buffer.from(await imgRes.arrayBuffer());
+    // The real size of the download, recorded now that the body has been read.
+    // media.mlsgrid.com sends no Content-Length, so this is the only point at which
+    // photo bandwidth is knowable -- and photo bandwidth is the bulk of what this
+    // site spends against MLS Grid's 3,072 MB/hour cap.
+    await recordMlsBytes(store, buf.length);
 
     // 2026-08-15: Content-Length used to be set here from buf.length. That's a
     // bug in a base64 function response -- the platform decodes the body and
