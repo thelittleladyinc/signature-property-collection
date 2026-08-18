@@ -153,5 +153,44 @@ check("the api_secret-mismatch advice points at CLOUDINARY_URL",
     "this line was a ReferenceError waiting for whoever removed the return above it");
 }
 
+// ---- 2026-08-18: the paste Cloudinary's own UI gives you --------------------
+// Its API Keys page displays the value as "CLOUDINARY_URL=cloudinary://..." and
+// the copy button includes the prefix. Pasting that into Netlify produced a value
+// the parser rejected, and the rejection fell back SILENTLY to the three separate
+// variables — which still pointed at the OLD cloud. Switching accounts would have
+// appeared to work and changed nothing.
+{
+  const lib = require(path.join(ROOT, "netlify", "functions", "lib", "_cloudinary.js"));
+  const saved = process.env.CLOUDINARY_URL;
+  const savedTrio = [process.env.CLOUDINARY_CLOUD_NAME, process.env.CLOUDINARY_API_KEY, process.env.CLOUDINARY_API_SECRET];
+  delete process.env.CLOUDINARY_CLOUD_NAME;
+  delete process.env.CLOUDINARY_API_KEY;
+  delete process.env.CLOUDINARY_API_SECRET;
+
+  for (const [label, value] of [
+    ["the bare connection string", "cloudinary://123:abc@dcim65cok"],
+    ["the vendor's copied line, prefix and all", "CLOUDINARY_URL=cloudinary://123:abc@dcim65cok"],
+    ["a lowercase prefix", "cloudinary_url=cloudinary://123:abc@dcim65cok"],
+    ["a prefix with spaces around the equals", "CLOUDINARY_URL = cloudinary://123:abc@dcim65cok"],
+    ["a value someone quoted", '"cloudinary://123:abc@dcim65cok"'],
+  ]) {
+    process.env.CLOUDINARY_URL = value;
+    const c = lib.cloudinaryCredentials();
+    check(`${label} resolves to the right cloud`,
+      !!c && c.cloud_name === "dcim65cok" && c.api_key === "123" && c.api_secret === "abc",
+      c ? JSON.stringify(c) : "parsed to nothing — this is the silent switch-that-does-nothing bug");
+  }
+
+  // Still strict about the thing that actually matters.
+  process.env.CLOUDINARY_URL = "CLOUDINARY_URL=not-a-connection-string";
+  check("but genuine nonsense is still refused rather than half-parsed",
+    lib.cloudinaryCredentials() === null,
+    "a half-parsed string configures the SDK with something wrong");
+
+  if (saved === undefined) delete process.env.CLOUDINARY_URL; else process.env.CLOUDINARY_URL = saved;
+  const keys = ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"];
+  keys.forEach((k, i) => { if (savedTrio[i] !== undefined) process.env[k] = savedTrio[i]; });
+}
+
 console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

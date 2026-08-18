@@ -62,8 +62,24 @@ const { fetchMediaResponse } = require("./_media");
 // The three separate vars still work and are still read when CLOUDINARY_URL is
 // absent, so nothing that is already configured breaks.
 function cloudinaryUrlParts() {
-  const raw = (process.env.CLOUDINARY_URL || "").trim();
+  let raw = (process.env.CLOUDINARY_URL || "").trim();
   if (!raw) return null;
+  // 2026-08-18. Cloudinary's own API Keys page shows the value as
+  //     CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
+  // and its copy button hands you that whole line, prefix included. Pasting it
+  // straight into Netlify — the obvious thing to do — produced a value this
+  // parser rejected, at which point it fell back SILENTLY to the three separate
+  // variables, which on this site still pointed at the previous cloud. The
+  // result would have been Christine switching Cloudinary accounts, seeing no
+  // error anywhere, and every photo still going to the old one.
+  //
+  // Tolerating the vendor's own copy format is not looseness. Strictness is still
+  // enforced on the part that matters — the connection string itself — and the
+  // failure this removes was invisible, which is the only kind worth this much
+  // comment.
+  raw = raw.replace(/^CLOUDINARY_URL\s*=\s*/i, "").trim();
+  // Some consoles wrap the value in quotes when copied.
+  raw = raw.replace(/^["']|["']$/g, "").trim();
   // Deliberately strict. A half-parsed connection string would configure the SDK
   // with something wrong and produce a confusing auth error two layers away --
   // which is the exact class of problem this exists to remove.
