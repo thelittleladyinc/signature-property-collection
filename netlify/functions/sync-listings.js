@@ -287,17 +287,21 @@ const ORIGINATING_SYSTEM_CLAUSE = "OriginatingSystemName eq 'ires'";
 // paced itself carefully and then had no idea what it had spent -- which is the
 // gap that made §2.6 a guess rather than a measurement.
 //
-// The guard uses the FULL 24-hour picture rather than just this hour: the sync is
-// the site's bulk consumer and runs on a schedule, so it can afford the extra blob
-// reads, and it is the path where a runaway crawl would actually threaten the
-// daily cap. Photo requests use the cheap one-hour check instead.
+// The per-call guard reads THIS HOUR only -- one blob get, memoised for 30 seconds.
+// The full 24-hour picture (up to 24 gets) is checked once at the top of the run
+// instead: doing it per call meant ~168 blob reads inside an 11-second time budget,
+// which would have spent the run's headroom on measuring the run.
+//
+// That split is safe because the hourly limits bind first. 7,200 requests/hour IS
+// the 2 rps sustained average MLS Grid suspends tokens for, and this job makes
+// about seven calls a run.
 //
 // Returns the Response. Throws MlsQuotaError when the budget says no, so a caller
 // that does not handle it stops rather than continuing blind.
 class MlsQuotaError extends Error {}
 
 async function mlsFetch(url, token, store, { full } = {}) {
-  const quota = await checkMlsQuota(store, { full: full !== false });
+  const quota = await checkMlsQuota(store, { full: full === true });
   if (quota.blocked) {
     throw new MlsQuotaError(`quota guard refused the request — ${quota.reason}`);
   }

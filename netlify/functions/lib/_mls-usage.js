@@ -241,7 +241,14 @@ async function checkMlsQuota(store, opts) {
       hourRequests: 0, hourMB: 0,
     };
   }
-  if (!full) _guardCache = { at: Date.now(), usage: { ...usage } };
+  // A full read is a superset of the hourly one, so it primes the memo too --
+  // otherwise sync-listings' top-of-run full check would be immediately followed by
+  // per-call checks that each re-read the same bucket. Only the hour fields are
+  // kept, so what is cached always means the same thing.
+  _guardCache = {
+    at: Date.now(),
+    usage: { hourRequests: usage.hourRequests || 0, hourBytes: usage.hourBytes || 0 },
+  };
   return verdict(base, usage);
 }
 

@@ -222,6 +222,44 @@ function fakeStore(opts) {
       "an ungated call site is the one that will be running when the account is suspended");
   }
 
+  // ---- 10. THE GUARD MUST NOT COST MORE THAN IT SAVES --------------------
+  // The full 24-hour read is up to 24 blob gets. Doing that per call put ~168 of
+  // them inside sync-listings' 11-second budget — spending the run's headroom on
+  // measuring the run. Per call is the one-hour read; the full picture is checked
+  // once at the top.
+  {
+    const m = loadFresh({});
+    const store = fakeStore();
+    let gets = 0;
+    const counting = {
+      ...store,
+      async get(k) { gets += 1; return store.get(k); },
+      async setJSON(k, v) { return store.setJSON(k, v); },
+    };
+    m._resetGuardCache();
+    await m.checkMlsQuota(counting);
+    check("the per-request guard reads exactly one bucket", gets === 1, `${gets} blob reads`);
+
+    gets = 0;
+    m._resetGuardCache();
+    await m.checkMlsQuota(counting, { full: true });
+    check("the full picture reads a day's worth, and is therefore not per-request",
+      gets === 24, `${gets} blob reads`);
+
+    gets = 0;
+    await m.checkMlsQuota(counting);
+    check("and repeat guard checks inside the memo window cost nothing",
+      gets === 0, `${gets} blob reads`);
+
+    const sync = fs.readFileSync(path.join(ROOT, "netlify", "functions", "sync-listings.js"), "utf8");
+    const helper = sync.slice(sync.indexOf("async function mlsFetch("));
+    check("the sync's per-call helper does NOT ask for the full picture",
+      /full: full === true/.test(helper.slice(0, 400)),
+      "a 24-blob read per call spends an 11-second budget on measuring itself");
+    check("but the run as a whole still checks the daily caps once",
+      /checkMlsQuota\(store, \{ full: true \}\)/.test(sync));
+  }
+
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
   process.exit(failures === 0 ? 0 : 1);
 })();
