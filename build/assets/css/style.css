@@ -16,7 +16,12 @@
    Google Fonts link — kept for small script eyebrow text only.
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap');
+/* Fonts intentionally NOT imported here. An @import inside a stylesheet
+   serializes three render-blocking round trips (this file -> the import is
+   discovered -> Google's font CSS -> the font files), which held first paint
+   hostage to Google Fonts' latency on every page. The fonts now load from a
+   non-blocking <link> emitted in the <head> by build.py (search for
+   FONT_CSS_URL there) — same families, same weights, same display=swap. */
 
 :root {
   --charcoal: #141415;
