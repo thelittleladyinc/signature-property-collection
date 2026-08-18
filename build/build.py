@@ -8193,6 +8193,7 @@ MONEY_PAGES = [
     ("/fort-collins-luxury-homes.html", "Fort Collins Luxury Homes"),
     ("/windsor-luxury-homes.html", "Windsor Luxury Homes"),
     ("/northern-colorado-horse-property.html", "Horse Property & Acreage"),
+    ("/northern-colorado-riverfront-homes.html", "Riverfront & Waterfront"),
 ]
 
 
@@ -8516,6 +8517,67 @@ def build_money_pages():
                  "never described as equestrian won't appear, no matter how good its horse setup is. Christine "
                  "searches beyond the filter for her buyers — including pocket listings that are not on any "
                  "website."),
+            ],
+        },
+        {
+            # 2026-08-18, Christine: "or riverfront property that i live on?"
+            # The one money page where her authority is literal — she lives on
+            # riverfront property herself, which is the kind of first-hand
+            # experience Google's quality guidelines explicitly reward and no
+            # competitor page can copy. The waterfront filter existed only as
+            # a search parameter; this gives it a rankable home.
+            "path": "/northern-colorado-riverfront-homes.html",
+            "title": "Northern Colorado Riverfront & Waterfront Homes For Sale",
+            "meta": "Live riverfront and waterfront listings across Northern Colorado — from an agent who "
+                    "lives on riverfront property herself and knows what river ownership actually involves: "
+                    "the water rights, the floodplain questions, and the mornings that make it worth it.",
+            "h1": "Riverfront & Waterfront Homes In Northern Colorado",
+            "eyebrow": "Big Thompson &middot; Poudre &middot; Lakes &amp; Water Frontage",
+            "intro": "I live on riverfront property myself — so this page isn't theory. Riverfront ownership "
+                     "in Colorado is a specific kind of wonderful with a specific set of homework, and both "
+                     "halves belong in the open. Below: every live waterfront and riverfront listing across "
+                     "Northern Colorado, and the questions I'd ask before buying on the water.",
+            "feed_id": "riverfront_feed",
+            "feed_params": {"waterfront": "true", "noFloor": "true"},
+            "feed_heading": "Live Riverfront & Waterfront Listings Right Now",
+            "paragraphs": [
+                "What Living On The River Is Actually Like",
+                "The honest version, from someone who does it: mornings on the water change how a house feels "
+                "to live in, and no photo captures it. The Big Thompson west of Loveland, the Poudre corridor "
+                "toward Fort Collins, and the lake communities in between each offer a different version — "
+                "canyon-mouth river frontage, cottonwood-lined stretches in town, or [true lakefront at Boyd "
+                "Lake](/communities/loveland/waterfront-at-boyd-lake-loveland.html). The Big Thompson's "
+                "quieter west side has its own guide: [West Loveland & Big Thompson river frontage]"
+                "(/communities/loveland/west-loveland-riverfront-homes.html).",
+                "The Homework Water Demands",
+                "Three things to settle before you fall in love. Floodplain status: river parcels often carry "
+                "flood-zone designations that shape insurance costs and what you can build — the FEMA map for "
+                "the specific parcel is a five-minute check that changes offers. Water rights: owning land "
+                "along a river does not mean owning rights to its water — in Colorado those convey separately, "
+                "and the contract has to name them. And the riverbank itself: maintenance, erosion, and what "
+                "the county allows you to do at the water's edge vary by parcel. The broader rural checklist "
+                "is in [the acreage guide](/blog/buying-acreage-in-northern-colorado-wells-water-septic.html).",
+                "How The Search On This Page Works",
+                "The waterfront filter reads each listing's own MLS description and features — a property the "
+                "listing agent never described as riverfront won't appear here, and 'waterfront' in a listing "
+                "can mean anything from true river frontage to a seasonal ditch view. I read these listings "
+                "differently because I live this — tell me what you actually want from the water, and I'll "
+                "tell you which listings deliver it and which just photographed well.",
+            ],
+            "faq": [
+                ("What should I check before buying riverfront property in Colorado?",
+                 "Three things: the parcel's FEMA floodplain status (it shapes insurance and building rules), "
+                 "the water rights (in Colorado they convey separately from the land — riverfront ownership "
+                 "does not automatically include rights to the water), and the practical riverbank questions: "
+                 "erosion, maintenance, and what the county permits at the water's edge."),
+                ("Where are the riverfront homes in Northern Colorado?",
+                 "The Big Thompson River corridor west of Loveland and up the canyon toward Estes Park, the "
+                 "Cache la Poudre corridor through and west of Fort Collins, and the lake communities — Boyd "
+                 "Lake in east Loveland, Water Valley and Pelican Lakes in Windsor — for true lakefront."),
+                ("Does 'waterfront' in a listing always mean river frontage?",
+                 "No — in MLS listings it can mean anything from genuine river frontage to a pond view or "
+                 "irrigation ditch. Christine lives on riverfront property herself and reads these listings "
+                 "accordingly; ask her which ones deliver the real thing."),
             ],
         },
     ]
