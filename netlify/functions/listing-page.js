@@ -552,8 +552,20 @@ exports.handler = async (event) => {
     if (!l) {
       return notFound("This listing isn’t in our current feed — it may have sold or been withdrawn.", 404);
     }
-    // Active only, and mlgCanView re-checked rather than trusted from storage.
-    if (String(l.status || "").toLowerCase() !== "active" || l.mlgCanView === false) {
+    // 2026-08-18 (full endpoint audit): /listing/IRE1054310 — Christine's own
+    // Nunn listing — 404'd, because this gate was "Active only" and her listing
+    // went UNDER CONTRACT. But current-listings proudly renders her pending
+    // listings with "View This Listing & Share It" links pointing here: the
+    // exact link a seller texts to family was dead for every one of her
+    // under-contract homes. Her OWN listings get a page in active and
+    // under-contract/pending states (that page is marketing she is entitled
+    // to); everyone else's stay active-only, as before. mlgCanView re-checked
+    // rather than trusted from storage, unchanged.
+    const status = String(l.status || "").toLowerCase();
+    const hers = String(l.agentName || "").toLowerCase().includes(String(AGENT_SURNAME || "").toLowerCase());
+    const showable = status === "active" ||
+      (hers && (status.includes("pending") || status.includes("contract")));
+    if (!showable || l.mlgCanView === false) {
       return notFound("This home is no longer on the market as an active listing.", 404);
     }
 

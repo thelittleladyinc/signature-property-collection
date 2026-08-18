@@ -40,6 +40,13 @@ const WALK_STORE_NAME = "walkability-cache";
 // This is Google's ceiling, not a tuning choice -- see the note above.
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+
+// 2026-08-18 (Christine's Loveland page review): the "Schools" row listed
+// Willow River Music and Truth Sound Studios — Google tags music schools,
+// dance studios, and driving schools with type=school, and a relocating
+// parent notices that instantly. A name filter is inelegant but effective;
+// the misfits announce themselves in their names.
+const NOT_A_K12_SCHOOL = /\b(music|dance|studio|driving|pilates|yoga|karate|martial|gymnastics|art|cooking|barber|beauty|massage|dog training|preschool of rock)\b/i;
 const PLACES_TIMEOUT_MS = 4000;
 const PLACES_CONCURRENCY = 5;
 
@@ -62,7 +69,7 @@ const MAX_PLACE_DRIFT_MILES = 12;
 const CATEGORIES = [
   { key: "grocery",    type: "grocery_or_supermarket", label: "Grocery",     weight: 15 },
   { key: "restaurant", type: "restaurant",             label: "Restaurants", weight: 12 },
-  { key: "school",     type: "school",                 label: "Schools",     weight: 12 },
+  { key: "school",     type: "primary_school",         label: "Schools",     weight: 12 },
   { key: "cafe",       type: "cafe",                   label: "Coffee",      weight: 10 },
   { key: "park",       type: "park",                   label: "Parks",       weight: 10 },
   { key: "pharmacy",   type: "pharmacy",               label: "Pharmacy",    weight: 10 },
@@ -161,6 +168,7 @@ async function nearestInCategory(origin, cat, apiKey) {
   }
   const places = (json.results || [])
     .filter((r) => r.geometry && r.geometry.location)
+    .filter((r) => cat.key !== "school" || !NOT_A_K12_SCHOOL.test(String(r.name || "")))
     .map((r) => ({
       name: r.name,
       // Carried so the page can link the amenity straight to Google Maps --

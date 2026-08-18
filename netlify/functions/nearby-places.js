@@ -59,7 +59,7 @@ const CATEGORY_TYPES = {
   coffee: "cafe",
   dining: "restaurant",
   gas: "gas_station",
-  school: "school",
+  school: "primary_school",
   park: "park",
 };
 const RESULTS_PER_CATEGORY = 3;

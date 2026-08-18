@@ -29,6 +29,12 @@ const fakeStore = {
   async setJSON(k, v) { blobs[k] = JSON.stringify(v); return lat(); },
   async delete() {}, async list() { return { blobs: [] }; },
 };
+// Deterministic jitter for the test: real Math.random occasionally deals a
+// hand where 5 callers land in one second and the assertion flakes. A
+// stratified sequence (0.05, 0.15, ...) exercises the same mechanism —
+// de-synchronized reads against the shared bucket — reproducibly.
+let _seed = 0;
+Math.random = () => ((_seed++ % 10) + 0.5) / 10;
 const { paceMlsCall } = require(path.join(ROOT, "netlify", "functions", "lib", "_mls-usage"));
 
 (async () => {
