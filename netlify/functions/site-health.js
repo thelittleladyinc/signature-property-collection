@@ -730,9 +730,28 @@ exports.handler = async (event) => {
       // resolves a fresh URL per request. A Cloudinary copy is now purely an
       // optimization, so the row says that instead of implying the photos are down.
       detail: `${mineCloudinaryCount} of ${mineCount} listing(s) have a permanent Cloudinary copy. ` +
-        `This is an optimization, not a fault: every listing photo is already served ` +
-        `from this site's own domain, so photos work either way. A Cloudinary copy just ` +
-        `saves an MLS Grid lookup per photo.`,
+        // 2026-08-18: the old wording ("every listing photo is already served from
+        // this site's own domain, so photos work either way") read as "everything
+        // is backfilled" — Christine quoted it back believing exactly that. Served
+        // THROUGH this domain and STORED on it are different claims; a health page
+        // exists so nobody has to guess, so it must never blur them.
+        `This is an optimization, not a fault, and it covers ONLY her own listings' ` +
+        `Cloudinary copies. The wider catalogue's photos are stored on this site the ` +
+        `first time each is viewed, plus a slow rolling backfill (next row) — a photo ` +
+        `not yet stored is fetched from MLS Grid on demand, which is slower but works.`,
+    },
+    {
+      name: "Cover photo backfill (highest-priced first)",
+      ok: true,
+      optional: true,
+      detail: (state && typeof state.backfillCursor === "number")
+        ? `Cursor at listing ${state.backfillCursor.toLocaleString()} of ` +
+          `${Number(state.totalBackfillCandidates || 0).toLocaleString()} (price-descending); ` +
+          `${Number(state.lastRunCoversBackfilled || 0)} cover(s) stored last run. ` +
+          `~6 per 30-minute sync — 0.17% of the MLS Grid hourly budget — so the ` +
+          `listings people actually see become permanently fast first. First-ever ` +
+          `views still store photos on demand on top of this.`
+        : `Not started yet — begins on the first sync after the 2026-08-18 deploy.`,
     },
     {
       optional: true,

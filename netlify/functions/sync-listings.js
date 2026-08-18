@@ -1237,6 +1237,7 @@ exports.handler = async () => {
           lastRunStaleListingsRefreshed: staleListingsRefreshed,
           lastRunCoversBackfilled: 0,
           backfillCursor: state.backfillCursor || 0,
+          totalBackfillCandidates: state.totalBackfillCandidates || 0,
           lastRunError: null,
           lastCloudinaryError: _lastCloudinaryError,
           herOfficeMlsId: state.herOfficeMlsId || null,
@@ -1355,6 +1356,7 @@ exports.handler = async () => {
           }
         }
         state.backfillCursor = cursor;
+        state.totalBackfillCandidates = candidates.length;
         if (coversBackfilled || checks) {
           console.log(`sync-listings: cover backfill — ${coversBackfilled} stored, cursor at ${cursor}/${candidates.length}.`);
         }
@@ -1405,6 +1407,7 @@ exports.handler = async () => {
     lastRunStaleListingsRefreshed: staleListingsRefreshed,
     lastRunCoversBackfilled: coversBackfilled,
     backfillCursor: state.backfillCursor || 0,
+    totalBackfillCandidates: state.totalBackfillCandidates || 0,
     lastRunError,
     lastCloudinaryError: _lastCloudinaryError,
     herOfficeMlsId: state.herOfficeMlsId || null,
