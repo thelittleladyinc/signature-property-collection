@@ -173,6 +173,14 @@ check("the api_secret-mismatch advice points at CLOUDINARY_URL",
     ["a lowercase prefix", "cloudinary_url=cloudinary://123:abc@dcim65cok"],
     ["a prefix with spaces around the equals", "CLOUDINARY_URL = cloudinary://123:abc@dcim65cok"],
     ["a value someone quoted", '"cloudinary://123:abc@dcim65cok"'],
+    // The one that actually happened. Cloudinary's console shows
+    //   cloudinary://<your_api_key>:<your_api_secret>@dcim65cok
+    // so the obvious action is to replace the words and leave the brackets. It
+    // parsed, it configured, the cloud name was right, and Cloudinary answered
+    // "unknown api_key" — a message pointing at the account rather than at two
+    // stray characters. It cost an hour and three wrong guesses from me.
+    ["the placeholder brackets left in", "cloudinary://<123>:<abc>@dcim65cok"],
+    ["brackets AND the prefix", "CLOUDINARY_URL=cloudinary://<123>:<abc>@<dcim65cok>"],
   ]) {
     process.env.CLOUDINARY_URL = value;
     const c = lib.cloudinaryCredentials();

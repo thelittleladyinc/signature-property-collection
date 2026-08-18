@@ -68,6 +68,18 @@
   const cleaned = raw
     .replace(/^CLOUDINARY_URL\s*=\s*/i, "")
     .replace(/^["']|["']$/g, "")
+    // 2026-08-18, and this is the one that actually got her. Cloudinary's console
+    // shows the value as
+    //     cloudinary://<your_api_key>:<your_api_secret>@dcim65cok
+    // so the obvious action is to replace the WORDS and leave the brackets, which
+    // is exactly what happened: api_key came through as "<681436826781583>" and the
+    // secret measured 29 characters — Cloudinary's 27, plus two brackets.
+    //
+    // It parsed, it configured, the cloud name was right, and Cloudinary answered
+    // "unknown api_key" — a message that points at the account rather than at two
+    // stray characters. Angle brackets are never valid in a key, a secret or a
+    // cloud name, so they are simply removed.
+    .replace(/[<>]/g, "")
     .trim();
   if (/^cloudinary:\/\//i.test(cleaned)) {
     if (cleaned !== raw) {
@@ -128,6 +140,11 @@ function cloudinaryUrlParts() {
   raw = raw.replace(/^CLOUDINARY_URL\s*=\s*/i, "").trim();
   // Some consoles wrap the value in quotes when copied.
   raw = raw.replace(/^["']|["']$/g, "").trim();
+  // And the placeholder brackets from Cloudinary's own template — see the note in
+  // normaliseCloudinaryUrlEnv above. Stripped here as well as at import time,
+  // because this parser is what every runtime read goes through and the two must
+  // never disagree about what a value means.
+  raw = raw.replace(/[<>]/g, "").trim();
   // Deliberately strict. A half-parsed connection string would configure the SDK
   // with something wrong and produce a confusing auth error two layers away --
   // which is the exact class of problem this exists to remove.
