@@ -206,19 +206,40 @@ the sync, the pre-warm, and photo downloads — and photo downloads dwarf the re
 
 ---
 
-## 1. The limits — and the usage numbers you can read yourself
+## 1. The limits — which you already have in writing
 
-| Limit | Value |
-|---|---|
-| Request rate | **2 requests/second**, at all times |
-| Hourly requests | **7,200 per hour** |
-| Hourly volume | **4 GB downloaded per hour** |
-| Daily requests | **40,000 per 24 hours** |
+**Correction, from Expired-Luxury's `MLS_REINSTATEMENT.md`: this account was
+SUSPENDED on 2026-08-01, and the suspension email listed the enforced limits.**
+They are not identical to the public documentation, and two of the differences
+matter. These are the numbers to encode, not the published ones:
+
+| # | Limit (from the 2026-08-01 suspension notice) | vs public docs |
+|---|---|---|
+| 1 | **7,200 requests** in any hour | same |
+| 2 | **3,072 MB downloaded** in any hour | public docs say 4 GB — **the real limit is 25% lower** |
+| 3 | **4 requests/second** at all times | public docs say 2 rps |
+| 4 | **40,000 requests** per rolling 24 hours | same |
+| 5 | **40 GB downloaded** per 24 hours | **not in the public docs at all** |
+
+And the sentence the suspension actually fired on:
+
+> *"Your hourly 6.0 requests per second exceeded the 2 requests per second limit."*
+
+So both are true and they are different things: **4 rps is the instantaneous
+ceiling, 2 rps is the sustained hourly average.** A burst is survivable; an hour
+that averages above 2 rps is what gets the token suspended.
+
+**The documented cause of that suspension was not any of the three apps' normal
+traffic.** It was *"ad-hoc diagnostic scripts run by hand against the live API
+from Render Shell, with no rate limiting — they bypassed the app's limiter
+entirely."* Which is worth carrying into every future debugging session: **never
+probe the live API with a bare `curl` or `node -e` loop.** Use a throttled
+endpoint.
 
 Media downloads spend the same budget as API calls, and the binding constraint is
-the **2 rps**, not the totals — a detail page's 11 parallel image requests
-already breaches it from a single visitor, in an hour that may otherwise be
-almost empty.
+the sustained **2 rps**, not the totals — a detail page's 11 parallel image
+requests breaches even the 4 rps instantaneous ceiling from a single visitor, and
+a page getting steady traffic is what turns that into an hourly average.
 
 Enforcement is at the **token**: *"the access token will be suspended and a
 shut-off message sent to the Primary email address"*, reinstated automatically
@@ -412,7 +433,10 @@ pass. What changed:
 | 6 — 24-vs-12 pre-warm | Batch cap raised to 24 to match the largest page `listings-search.js` will serve, and an over-cap batch logs instead of truncating silently. |
 | also | `site-health.js`'s `?probe=1` marks the URL it spends, so the diagnostic stops creating the fault it exists to find. |
 
-**How to confirm it worked, in order:**
+**How to confirm it worked, in order** — all of these are single requests through
+throttled endpoints. Do **not** verify with a bare `curl` or `node -e` loop against
+the live API: that is exactly what suspended this account on 2026-08-01 (§1).
+
 
 1. **`?debug=1` on a photo that was grey.** `/.netlify/functions/listing-photo?id=IRE…&i=0&debug=1`
    should return `"ok": true`. If it fails, `reason` now distinguishes
@@ -508,6 +532,85 @@ never replay a URL, serve everything afterwards from our own storage.
 **And it is the strongest evidence yet against buying more quota.** Listing-Engine
 takes 429s while deliberately running at a third of the documented rate. Whatever
 is producing those, it is not volume.
+
+## 7c. What Expired-Luxury does, and what to steal from it
+
+Read at `thelittleladyinc/expired-luxury` (`lib/mlsClient.ts`,
+`MLS_REINSTATEMENT.md`, `components/DetailsDrawer.tsx`). **Nothing changed there
+— read only.**
+
+This is by a distance the most disciplined MLS Grid integration of the three, and
+it is that way because it is the one that got the account suspended and had to
+write a reinstatement plan. It is worth treating as the reference implementation:
+
+| Guard | What it does |
+|---|---|
+| `MLS_DISABLED` kill switch | One env var stops every MLS code path without removing credentials |
+| Token bucket + **hard ceiling** | `MLS_GRID_RPS_CEILING = 2`; `MLS_GRID_RPS` can tune **down** but not up, so a well-meant "make it faster" cannot cost days of downtime |
+| **Quota budget read before every call** | `getMLSQuotaUsage()` aggregates `mls_api_call_log` and refuses any request past **50%** of any published limit — hourly and daily, requests and megabytes |
+| Fails **closed** | If the call log is unreadable it blocks, because "zero usage" is the most permissive answer the function could give and would silently turn the guard into a no-op |
+| Circuit breaker | 5 consecutive 429/5xx → 15 minutes closed, mirrored to `system_settings` so a cold start doesn't reopen it against a still-suspended account |
+| `Retry-After` honoured | On 429/503, backs off by the server's own hint |
+| Replication checkpoint | Highest `ModificationTimestamp` per `OriginatingSystemName`, so pulls are deltas, not a rolling 7-day window |
+| `$select` on every query | 5–10× smaller responses, straight off the bandwidth quota |
+| Per-call log + `/api/admin/mls-usage` | It can see its own burn **before MLS Grid does** |
+| Truncation is an error | A partial index cannot be reported as a verified check, so nobody is tempted to raise the page cap |
+
+**The two worth stealing for this site, in order:**
+
+1. **A per-call log and a usage view.** This site has *no* visibility of its own
+   consumption — which is the single reason §2.6 ended in a guess and this
+   document had to be written at all. Expired-Luxury can answer "what did we
+   spend in the last hour" from its own database. That is the highest-value thing
+   missing here.
+2. **A budget guard that fails closed.** Cooldowns react to a 429 that has already
+   happened; a budget refuses the request that would cause one. Their QUOTA-2
+   note — that an unreadable log must block rather than report zero — is a
+   genuinely good piece of reasoning and the kind of thing that is only ever
+   learned the hard way.
+
+A kill switch and an rps ceiling that env vars can only lower are both cheap and
+both worth having.
+
+**But it has two problems of its own, and one is the same bug this site just
+fixed:**
+
+- **It caches Media URLs for a WEEK.** `getPropertyMedia()` sets
+  `MLS_MEDIA_MAX_AGE_HOURS = 24 * 7`, reasoning that "off-market photos don't
+  change". The photos don't; the URLs do. MLS Grid Media URLs are single-use and
+  expire in **one hour**, so a URL cached for a week is dead within about an hour
+  of being stored — the same Finding 1 as this site had, at 168 hours instead of
+  40 minutes.
+- **It renders raw MLS Grid URLs straight into the browser.**
+  `DetailsDrawer.tsx` and `UploadSection.tsx` both do `<img src={m.MediaURL}>`.
+  That is hot-linking, which MLS Grid prohibits in bold — *"DO NOT use these URLs
+  on your website or in your application"* — and it is also why those photos can
+  only ever work for the first viewer within the first hour. It is an internal
+  admin tool, so the audience is small, but MLS Grid runs quarterly compliance
+  audits of "the websites where listings are displayed", and this is the kind of
+  thing they are looking for.
+
+It does not download media bytes at all, so it spends none of the megabyte
+budget on photos — which is why its quota trouble was always request-count, never
+bandwidth.
+
+### The three apps side by side
+
+| | This site (now) | Listing-Engine | Expired-Luxury |
+|---|---|---|---|
+| Single-use URLs respected | **yes** — marked spent on use | yes — used immediately | **no** — cached 7 days |
+| Raw MLS URLs in a browser | never | never (Cloudinary) | **yes** |
+| Media stored permanently | yes (Blobs, on first view) | yes (Cloudinary, on import) | n/a — doesn't download |
+| `OriginatingSystemName` | **yes** (fixed) | **no** | yes, everywhere |
+| `User-Agent` = token | **yes** (fixed) | **no** — browser UA | n/a — no media downloads |
+| Rate discipline | per-host cooldowns in Blobs | one 1500ms process gate | token bucket + hard ceiling + quota budget + breaker + kill switch |
+| Can see its own usage | **no** | no | **yes** |
+
+**What this settles about buying more quota.** Both documented incidents on this
+account have a named cause and neither is legitimate demand: the 2026-08-01
+suspension was hand-run scripts bypassing the limiter, and the 4-rps warning was
+Listing-Engine's pre-fix code. Buying a second subscription to cover that would
+be paying rent on a defect. Fix the defects, watch the usage tab, then decide.
 
 ## 8. Open items
 

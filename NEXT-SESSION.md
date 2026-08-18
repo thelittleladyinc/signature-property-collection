@@ -406,6 +406,26 @@ too, with its own comments describing the documented silently-ignored-ListingId
 symptom. It also confirms the path-signed media URL format is live NOW, and that the
 account has already had an "API Access Warning" email citing 4 RPS.
 
+**Expired-Luxury was read too** (§7c), and it corrects the limits. That account was
+**suspended on 2026-08-01**, and the suspension email gave the enforced numbers,
+which are not the published ones: 7,200 requests/hour, **3,072 MB/hour** (not 4GB),
+**4 rps instantaneous** but a **2 rps sustained hourly average** — the suspension
+fired on "your hourly 6.0 requests per second exceeded the 2 requests per second
+limit" — 40,000 requests/24h, and a **40 GB/24h** cap that appears nowhere in the
+public docs. The documented cause was ad-hoc diagnostic scripts run by hand from
+Render Shell with no rate limiting, bypassing the app's own limiter: never probe
+the live API with a bare curl or node -e loop.
+
+Expired-Luxury is also the reference implementation to copy from — kill switch, an
+rps ceiling env vars can only lower, a quota budget read from a per-call log before
+EVERY request that fails closed if the log is unreadable, a circuit breaker mirrored
+to the database, and an admin usage view. The last one is the biggest thing this
+site lacks: it cannot see its own consumption at all, which is the only reason §2.6
+ended in a guess. It has two faults of its own, both the rules this site just fixed:
+it caches Media URLs for a WEEK against a one-hour single-use URL, and it renders
+raw MLS Grid URLs straight into `<img src>`, which is the hot-linking their docs
+prohibit in bold.
+
 Also: **usage is self-serve** — Manage Subscriptions → Edit Data Subscription
 Details → Usage tab → Usage Logs gives the hourly and 24-hour breakdown without
 emailing anybody. And the subscription types (IDX/VOW/BO/PT) are use-case
