@@ -8194,6 +8194,7 @@ MONEY_PAGES = [
     ("/windsor-luxury-homes.html", "Windsor Luxury Homes"),
     ("/northern-colorado-horse-property.html", "Horse Property & Acreage"),
     ("/northern-colorado-riverfront-homes.html", "Riverfront & Waterfront"),
+    ("/northern-colorado-golf-course-homes.html", "Golf Course Homes"),
 ]
 
 
@@ -8517,6 +8518,84 @@ def build_money_pages():
                  "never described as equestrian won't appear, no matter how good its horse setup is. Christine "
                  "searches beyond the filter for her buyers — including pocket listings that are not on any "
                  "website."),
+            ],
+        },
+        {
+            # 2026-08-18, Christine: "Go ahead and do the golf course one I have
+            # videos on erie and old course." Northern Colorado has an unusual
+            # concentration of real golf communities — TPC Colorado in Berthoud
+            # is nationally known and no local money page owns it. Honesty
+            # note: this site's MLS filters have no golf-frontage flag (the
+            # equestrian flag was built from remarks at sync time; remarks for
+            # the existing 24k listings are already discarded, and re-crawling
+            # for one flag is not worth MLS quota). So instead of pretending,
+            # the page tours the actual courses and links each one's real area
+            # page and feed, with a regional luxury feed across the golf towns.
+            "path": "/northern-colorado-golf-course-homes.html",
+            "title": "Northern Colorado Golf Course Homes For Sale | TPC To Olde Course",
+            "meta": "Golf community living across Northern Colorado — TPC Colorado in Berthoud, RainDance and "
+                    "Pelican Lakes in Windsor, Mariana Butte and the Olde Course in Loveland, Harmony Club in "
+                    "Timnath, Colorado National in Erie — with live luxury listings and real video tours.",
+            "h1": "Golf Course Homes In Northern Colorado",
+            "eyebrow": "TPC Colorado &middot; RainDance &middot; Mariana Butte &middot; The Olde Course",
+            "intro": "Northern Colorado quietly holds one of the state's best collections of golf communities — "
+                     "from TPC Colorado's tournament pedigree in Berthoud to Loveland's beloved municipal "
+                     "courses with real neighborhoods wrapped around them. Here's the course-by-course tour, "
+                     "with live luxury listings across the golf towns below.",
+            "feed_id": "golf_towns_feed",
+            "feed_params": {"cities": "loveland,windsor,berthoud,timnath,erie,fort collins"},
+            "feed_heading": "Live Luxury Listings Across The Golf Towns",
+            "videos": [
+                ("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland Colorado",
+                 "Christine tours a home on The Olde Course — what golf-course living in Loveland actually "
+                 "looks like from the back patio."),
+                ("Jz4kQHtpfzM", "Why Loveland Buyers Love The Olde Course",
+                 "The Olde Course at Loveland and the neighborhood around it, in under a minute."),
+                ("JFfx8G9OxP0", "Why Everyone Loves Living in Erie Colorado",
+                 "Erie — home of Colorado National Golf Club — and why buyers keep landing there."),
+            ],
+            "paragraphs": [
+                "The Course-By-Course Tour",
+                "Berthoud: TPC Colorado is the region's marquee name — a tournament course with newer custom "
+                "and semi-custom neighborhoods around it, in a small town that kept its main street. Start with "
+                "[living in Berthoud](/communities/larimer/berthoud.html). Windsor: RainDance National and "
+                "Pelican Lakes at Water Valley anchor two master-planned communities where the golf, the lakes, "
+                "and the newest construction come as a package — the full picture is on the "
+                "[Windsor luxury page](/windsor-luxury-homes.html), including the metro-district homework newer "
+                "builds deserve. Timnath: Harmony Club wraps a private course with custom homes minutes from "
+                "Fort Collins — see [living in Timnath](/communities/larimer/timnath.html).",
+                "Loveland's Two Courses, And Why Locals Love Them",
+                "Loveland's golf living is municipal and proud of it. [Mariana Butte]"
+                "(/communities/loveland/mariana-butte-loveland.html) wraps homes, patio homes, and condos "
+                "around the city-owned course above the Big Thompson on the west side. The Olde Course in "
+                "northwest Loveland is the mature-trees classic, with a neighborhood that holds its value — "
+                "Christine's video tours of it are below. Fort Collins adds Ptarmigan's championship course on "
+                "the city's south side, and Erie rounds out the region with Colorado National — "
+                "[living in Erie](/communities/weld/erie.html) covers the town.",
+                "How To Shop Golf Property Here",
+                "One honest note about searching: MLS listings describe golf frontage in their remarks, not in "
+                "a clean filter — so no website's 'golf homes' feed is truly complete, including this one. The "
+                "live feed below carries every luxury listing across the golf towns; for course-specific "
+                "inventory — fairway frontage versus a course community versus a view of the green — tell "
+                "Christine which course and which side of it, and she'll pull the real list, including homes "
+                "whose listings never mention the course at all.",
+            ],
+            "faq": [
+                ("Which golf communities are in Northern Colorado?",
+                 "TPC Colorado in Berthoud, RainDance National and Pelican Lakes at Water Valley in Windsor, "
+                 "Harmony Club in Timnath, Mariana Butte and The Olde Course in Loveland, Ptarmigan in south "
+                 "Fort Collins, and Colorado National in Erie — each with residential neighborhoods around or "
+                 "beside the course."),
+                ("Do golf course homes cost more in Northern Colorado?",
+                 "Course frontage generally carries a premium over the same floor plan off the course, and the "
+                 "newer master-planned golf communities often sit inside metro districts that affect the real "
+                 "property-tax bill. Christine checks both — the premium and the parcel's taxing authorities — "
+                 "before her buyers write an offer."),
+                ("Can I search golf course homes directly on this site?",
+                 "Partially — MLS listings describe golf frontage in their remarks rather than a filterable "
+                 "field, so no automated feed is complete. The feed on this page covers the golf towns' luxury "
+                 "inventory; for true course-specific inventory, contact Christine and she'll pull it "
+                 "directly."),
             ],
         },
         {
