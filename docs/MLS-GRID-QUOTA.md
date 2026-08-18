@@ -674,6 +674,33 @@ Beyond the instrumentation in §7d:
 | **Cloudinary downloads are measured** | The sync's Cloudinary path downloaded from MLS Grid without recording it, so §7d's usage endpoint could not see one of the site's real consumers. |
 | **Dead code removed** | `uploadDataUri()` carried an unreachable duplicate of the delivery-URL block after its own `return`, reading a `result` variable never declared in that scope. Harmless only because it could not run — a `ReferenceError` waiting for whoever tidied the return above it. |
 
+## 7f. Self-review findings, and what was deliberately left alone
+
+Reviewing the day's own diff turned up three faults in it. Recorded because a
+repair pass that only reports its successes is not a repair pass.
+
+- **The quota guard was spending the sync's time budget on measuring the sync.**
+  The per-call check asked for the full 24-hour picture — up to 24 blob reads,
+  ~168 of them inside an 11-second budget for a job that makes seven requests.
+  Per call is now the one-hour read; the full picture is checked once at the top,
+  and it primes the memo so later checks are free.
+- **The Cloudinary SDK was being imported on the hottest path.** `listing-photo.js`
+  runs for every photo on every page; requiring `_cloudinary.js` at module load
+  pulled the SDK into every cold start to serve the rare oversize branch. Lazy now.
+- **The byte-measurement helper assumed `res.headers` exists.** True of the
+  platform, false of every test double in the repo — so the first wiring made the
+  whole suite look like an MLS Grid outage. It tolerates a headerless response now,
+  and that tolerance is tested by name.
+
+**Deliberately not done, with reasons:**
+
+| Not done | Why |
+|---|---|
+| **The catalogue cover backfill** (Option B, §4) | Still the right next step, and still gated on the support reply about pacing (§6 q4). Running ~15,000 paced downloads from an account with a suspension on its record, without telling them first, is the one move on this list that could cost days. |
+| **Retiring the refresh sweep** | Its photo-freshness purpose is now genuinely dead — nothing serves stored MLS URLs, and photos are permanently stored and invalidated on change. What remains is status freshness, which the incremental replication checkpoint arguably covers already. That would reclaim ~240 calls/day, but it is a behaviour change I cannot verify from here. **Let the data decide:** check `/.netlify/functions/mls-usage` after a day. If sync API calls dominate the daily total, cut the sweep. |
+| **Raw-byte blob storage** (~33% saving over base64) | The proven path is worth more than the saving; storage is the cheap axis. |
+| **`PhotosChangeTimestamp` in `$select`** | The correct signal for a same-count photo replacement, but this feed has a documented history of 400ing standard RESO field names, and a 400 in the crawl's `$select` breaks the whole sync. Probe it in isolation, the way `discoverHerOfficeMlsId()` does. |
+
 ## 8. Open items
 
 External:
