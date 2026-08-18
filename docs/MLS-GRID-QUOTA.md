@@ -661,6 +661,19 @@ approximate number that exists beats an exact number that does not.
 counting and the api/media split, failing closed, the kill switch, pruning, and
 that the guard runs *before* the request in all three call paths. 40 suites pass.
 
+## 7e. Further repairs, 2026-08-18
+
+Beyond the instrumentation in §7d:
+
+| Repair | Why it mattered |
+|---|---|
+| **Oversize photos re-hosted instead of going grey** | A photo over ~4.4 MB could never be returned by `listing-photo.js` — Netlify caps a function response at 6 MB and base64 inflates by a third. That ceiling is the platform's, not MLS Grid's, so those listings were **permanently** grey and immune to every cache, cooldown and quota fix. Land listings with full-res aerials and scanned plats hit it routinely. They now go to Cloudinary using the bytes already in hand (no second download) and are served as a cached redirect. |
+| **Stale photos on a changed listing** | The photo store is keyed by index; MLS Grid keys media by MediaKey. A listing that gains, loses or re-orders photos would serve whatever was stored at that index forever — at worst a photo the seller removed. The sync now drops the stored copies when a listing's photo count changes. Caveat written into the code: a same-count *replacement* needs `PhotosChangeTimestamp` in `$select`, which this feed has a history of 400ing, so it's flagged for isolated probing rather than risked in the crawl. |
+| **One constant for "how many photos"** | `listing-page.js` rendered 12, the cache stored 12, and they agreed only by comment. Every photo rendered beyond what is stored is a live MLS Grid download per view, forever. Both now derive from `PHOTO_CACHE_MAX_INDEX` in `lib/_media.js`. |
+| **A warm page now costs nothing** | The pre-warm resolved URLs even for listings whose cover this site already holds — a request spent on a fetch that never happens, once per page render. It now skips them, so a page of already-browsed listings makes **zero** MLS Grid requests. That is the steady state the whole photo store exists to reach. |
+| **Cloudinary downloads are measured** | The sync's Cloudinary path downloaded from MLS Grid without recording it, so §7d's usage endpoint could not see one of the site's real consumers. |
+| **Dead code removed** | `uploadDataUri()` carried an unreachable duplicate of the delivery-URL block after its own `return`, reading a `result` variable never declared in that scope. Harmless only because it could not run — a `ReferenceError` waiting for whoever tidied the return above it. |
+
 ## 8. Open items
 
 External:

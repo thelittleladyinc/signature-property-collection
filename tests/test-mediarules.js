@@ -261,6 +261,37 @@ const RESOLVE_OPTS = {
       "retrying into a rate limit is what kept the limit alive");
   }
 
+  // ---- THE PREWARM MUST NOT RESOLVE WHAT WE ALREADY HOLD -----------------
+  // A page of listings people have already browsed should cost MLS Grid nothing.
+  // Resolving a URL for a photo that will be served from our own store is a
+  // request spent on a fetch that never happens -- once per page render, forever.
+  {
+    const store = fakeStore();
+    const listings = [{ listingId: "IRE500001" }, { listingId: "IRE500002" }];
+    // One of the two already has its cover stored.
+    await store.setJSON(media.photoCacheKey("IRE500001", 0), { b64: "x", contentType: "image/jpeg" });
+
+    const f = stubFetch(() => jsonResponse({ value: [] }));
+    await media.prewarmPhotoUrls(listings, { store, ...RESOLVE_OPTS });
+    f.restore();
+
+    check("the prewarm still runs for a listing we have never fetched",
+      f.calls.length === 1, `made ${f.calls.length} call(s)`);
+    const asked = readable(f.calls[0] ? f.calls[0].url : "");
+    check("but the already-stored listing is left out of it",
+      asked.indexOf("IRE500001") === -1 && asked.indexOf("IRE500002") !== -1,
+      "resolving a URL for a photo served from our own store is a wasted request");
+
+    // And with everything stored, the page costs nothing at all.
+    await store.setJSON(media.photoCacheKey("IRE500002", 0), { b64: "x", contentType: "image/jpeg" });
+    const f2 = stubFetch(() => jsonResponse({ value: [] }));
+    const warmed = await media.prewarmPhotoUrls(listings, { store, ...RESOLVE_OPTS });
+    f2.restore();
+    check("a fully warm page makes NO MLS Grid request at all",
+      f2.calls.length === 0 && warmed === 0,
+      "this is the steady state the whole photo store exists to reach");
+  }
+
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
   process.exit(failures === 0 ? 0 : 1);
 })();

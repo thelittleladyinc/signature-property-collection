@@ -455,6 +455,19 @@ async function prewarmPhotoUrls(listings, { store, token, baseUrl, selectFields,
     // certain to fail. An empty entry (a remembered "no media" verdict) still
     // counts as warm -- there is nothing to resolve.
     if (cached && cached.fresh && (!cached.urls.length || usableUrl(cached, 0))) return;
+
+    // 2026-08-18: a listing whose cover this site already HOLDS needs no URL at
+    // all -- listing-photo.js will serve the stored bytes and never reach MLS Grid.
+    // Resolving one anyway is a request spent on a photo nobody is going to fetch,
+    // once per page render, forever. On a page of listings people have already
+    // browsed that is the difference between one API call and none.
+    //
+    // Checked only for listings that would otherwise trigger a resolve, so the
+    // common warm path still costs exactly one blob read per listing.
+    const storedCover = await store.get(photoCacheKey(l.listingId, 0), { type: "json" })
+      .catch(() => null);
+    if (storedCover) return;
+
     needed.push(l.listingId);
   }));
 
