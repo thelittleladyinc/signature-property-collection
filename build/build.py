@@ -8187,6 +8187,35 @@ def _subdivision_photo(sub):
 
 
 
+
+MONEY_PAGES = [
+    ("/loveland-luxury-homes.html", "Loveland Luxury Homes"),
+    ("/fort-collins-luxury-homes.html", "Fort Collins Luxury Homes"),
+    ("/windsor-luxury-homes.html", "Windsor Luxury Homes"),
+    ("/northern-colorado-horse-property.html", "Horse Property & Acreage"),
+]
+
+
+def _money_pages_row(current_path):
+    """Cross-links between the dedicated money pages, so authority pools
+    instead of fragmenting — the one part of kennarealestate.com's link mesh
+    worth borrowing, at four links instead of forty-five."""
+    pills = "\n      ".join(
+        f'<a class="city-pill" href="{path}">{esc(label)}</a>'
+        for path, label in MONEY_PAGES if path != current_path
+    )
+    return f"""
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">More Signature Markets</span>
+    <div class="city-pills" style="margin-top:14px">
+      {pills}
+    </div>
+  </div>
+</section>
+"""
+
+
 def build_loveland_luxury_page():
     """/loveland-luxury-homes.html — the dedicated money page for the query
     this site had no answer to.
@@ -8296,6 +8325,7 @@ def build_loveland_luxury_page():
     </div>
   </div>
 </section>
+{_money_pages_row("/loveland-luxury-homes.html")}
 {faq_html}
 """
     page(
@@ -8305,6 +8335,247 @@ def build_loveland_luxury_page():
         "/loveland-luxury-homes.html", None, body,
         schema_extra=[faq_schema],
     )
+
+
+
+def build_money_pages():
+    """The Fort Collins, Windsor, and horse-property money pages — stamped from
+    the Loveland-luxury pattern the day after it shipped, at Christine's "lets
+    do all of them."
+
+    Targeting is data-backed, not guessed: "fort collins real estate" measures
+    ~4,700/mo at competition 11, Windsor's relocation cluster ~9,000/mo, and
+    "horse property" ~5,200/mo — bigger than any single Loveland term, and it
+    is HER declared specialty (the homepage sells Investment & Acreage
+    Advisory) with an equestrian search filter already built. The horse page
+    also carries her two real ag/acreage videos, per her: "I also have an ag
+    video that would work well." No hand-typed market stats anywhere — the
+    live feeds ARE the current market."""
+    pages = [
+        {
+            "path": "/fort-collins-luxury-homes.html",
+            "title": "Fort Collins CO Luxury Homes For Sale | Old Town To The Foothills",
+            "meta": "Every active $950K+ Fort Collins listing, live from IRES — Old Town's historic blocks, "
+                    "the west-side foothills near Horsetooth, and the Harmony corridor, with a local luxury specialist.",
+            "h1": "Fort Collins CO Luxury Homes For Sale",
+            "eyebrow": "Old Town Historic &middot; Foothills &amp; Horsetooth &middot; Harmony Corridor",
+            "intro": "Fort Collins luxury splits into distinct personalities: meticulously kept historic homes "
+                     "in and around Old Town, foothills properties out west toward Horsetooth with the views that "
+                     "justify the drive, and newer executive homes along the Harmony corridor on the south side. "
+                     "Every active $950K+ listing in the city is live on this page, straight from IRES.",
+            "feed_id": "fort_collins_luxury_feed",
+            "feed_params": {"cities": "fort collins"},
+            "feed_heading": "Every Active Luxury Listing In Fort Collins Right Now",
+            "paragraphs": [
+                "Where Fort Collins Luxury Actually Lives",
+                "Old Town first: the historic blocks near downtown carry homes a century old that have been "
+                "brought to modern standards, and they trade on scarcity — there is a fixed supply of them and "
+                "no way to build more. West of town, the foothills toward Horsetooth Reservoir are where acreage, "
+                "elevation, and views live; these properties often come with wells and rural considerations, so "
+                "read [the acreage homework guide](/blog/buying-acreage-in-northern-colorado-wells-water-septic.html) "
+                "before you fall for one. South, the Harmony corridor's newer executive neighborhoods put you "
+                "close to the tech employers and the airport run.",
+                "Weighing Fort Collins Against Its Neighbors",
+                "Plenty of buyers at this level are deciding between Fort Collins and somewhere quieter — "
+                "[Windsor's newer construction](/windsor-luxury-homes.html), [Loveland's lakes and foothills]"
+                "(/loveland-luxury-homes.html), or Timnath a few minutes east. The honest comparison is in "
+                "[the town-by-town guide](/blog/moving-to-northern-colorado-which-town-actually-fits.html), and "
+                "the full picture of daily life is on the [living in Fort Collins page]"
+                "(/communities/larimer/fort-collins.html).",
+                "Buying At This Level While Selling Your Current Home",
+                "Most luxury buyers here are moving up, and the sequencing question — buy first or sell first — "
+                "matters more than any single house. The honest options are laid out in [Bridge Loans, HELOCs & "
+                "Creative Ways To Buy Before You Sell](/blog/bridge-loans-helocs-more-creative-ways-to-buy-before-you-sell.html), "
+                "and a real valuation of your current home is the place to start.",
+            ],
+            "faq": [
+                ("What price range counts as a luxury home in Fort Collins?",
+                 "The luxury tier in Fort Collins generally begins around $950,000 — the floor this page's live "
+                 "feed uses. What that buys varies sharply by area: a restored historic home near Old Town, "
+                 "acreage with views in the west-side foothills, or a large newer executive home along the "
+                 "Harmony corridor."),
+                ("Which Fort Collins areas have luxury homes?",
+                 "The historic blocks in and around Old Town, the foothills west of town toward Horsetooth "
+                 "Reservoir, and the newer executive neighborhoods along the Harmony corridor in south Fort "
+                 "Collins. Acreage properties sit mainly on the west and north edges."),
+                ("Does Christine Gwinnup work in Fort Collins?",
+                 "Yes — Christine represents buyers and sellers across Larimer County, including Fort Collins, "
+                 "with 150+ homes sold personally across Northern Colorado's Front Range."),
+            ],
+        },
+        {
+            "path": "/windsor-luxury-homes.html",
+            "title": "Windsor CO Luxury Homes For Sale | Lakes, Golf & New Construction",
+            "meta": "Every active $950K+ Windsor listing, live from IRES — lake communities, golf-course homes, "
+                    "and Northern Colorado's newest luxury construction, with the metro-district homework included.",
+            "h1": "Windsor CO Luxury Homes For Sale",
+            "eyebrow": "Lake Communities &middot; Golf Course Living &middot; New Construction",
+            "intro": "Windsor is where Northern Colorado's newest luxury construction lives — master-planned "
+                     "lake and golf communities like Water Valley and RainDance, custom builds, and modern "
+                     "floor plans you simply can't find in the older towns. Every active $950K+ Windsor listing "
+                     "is live on this page, straight from IRES.",
+            "feed_id": "windsor_luxury_feed",
+            "feed_params": {"cities": "windsor"},
+            "feed_heading": "Every Active Luxury Listing In Windsor Right Now",
+            "paragraphs": [
+                "Why Luxury Buyers Keep Choosing Windsor",
+                "The honest answer: newness and water. Windsor's master-planned communities — Water Valley and "
+                "Pelican Lakes around the golf course and lakes, RainDance with its own national golf course — "
+                "deliver the modern-build experience at prices that surprise buyers arriving from Denver or "
+                "either coast. Add the I-25 position splitting the Fort Collins and Greeley commutes, and the "
+                "town's growth story explains itself. The full daily-life picture is on the "
+                "[living in Windsor page](/communities/larimer/windsor.html).",
+                "The One Thing To Check Before You Offer On A Newer Build",
+                "Most of Windsor's newer neighborhoods sit inside metro districts, which change the real "
+                "property-tax math — the figure on the listing is often years out of date, and the real bill "
+                "can differ by thousands. Read [the metro-district guide](/blog/colorado-metro-districts-what-your-property-tax-bill-wont-tell-you.html) "
+                "before you write an offer; it takes fifteen minutes and it is the single most valuable "
+                "homework in this market.",
+                "Weighing Windsor Against Its Neighbors",
+                "Windsor versus [Fort Collins](/fort-collins-luxury-homes.html) is the classic comparison — "
+                "newer and quieter versus established and walkable. [Loveland](/loveland-luxury-homes.html) "
+                "adds lakes and foothills to the mix, and Timnath sits between. The town-by-town honest "
+                "version is in [the comparison guide](/blog/moving-to-northern-colorado-which-town-actually-fits.html).",
+            ],
+            "faq": [
+                ("What price range counts as a luxury home in Windsor?",
+                 "The luxury tier in Windsor generally begins around $950,000 — the floor this page's live feed "
+                 "uses — and runs well past $2 million for custom lakefront and golf-course homes in the "
+                 "master-planned communities."),
+                ("Which Windsor neighborhoods have luxury homes?",
+                 "Water Valley and Pelican Lakes around the lakes and golf course, RainDance with its national "
+                 "golf course, and the custom and semi-custom builds throughout Windsor's newer master-planned "
+                 "areas. Many sit inside metro districts, which affects the real tax bill — worth checking "
+                 "before you offer."),
+                ("Do Windsor's new-construction homes have extra taxes?",
+                 "Many newer Windsor neighborhoods sit inside metro districts — special taxing districts that "
+                 "repay infrastructure bonds through an additional property-tax levy, often for 20-30 years. "
+                 "The listing's tax figure frequently predates the full levy. Christine checks the parcel's "
+                 "actual taxing authorities for every buyer before an offer is written."),
+            ],
+        },
+        {
+            "path": "/northern-colorado-horse-property.html",
+            "title": "Northern Colorado Horse Property For Sale | Equestrian & Acreage",
+            "meta": "Live equestrian and acreage listings across Northern Colorado — plus the well, water, and "
+                    "zoning homework that decides whether a horse property actually works, from an agent who "
+                    "specializes in exactly this.",
+            "h1": "Northern Colorado Horse Property For Sale",
+            "eyebrow": "Equestrian &middot; Acreage &middot; Barns, Shops &amp; Water",
+            "intro": "Horse property is its own market with its own rules — the land, the water, the zoning, "
+                     "and the outbuildings matter as much as the house. This page carries live equestrian and "
+                     "acreage listings across Northern Colorado, and the homework that separates a working "
+                     "horse setup from an expensive disappointment.",
+            "feed_id": "horse_property_feed",
+            "feed_params": {"equestrian": "true", "noFloor": "true"},
+            "feed_heading": "Live Equestrian & Horse-Ready Listings Right Now",
+            "feed_note_extra": True,
+            "videos": [
+                ("NBR-GFs9y8c", "Livestock & Business Land in Colorado: Not What It Seems",
+                 "Christine on why livestock and business-use land is never quite what the listing suggests — "
+                 "the zoning and use questions to ask first."),
+                ("N57_J3llZCQ", "45 Acres + 40x60 Heated Shop | Custom Colorado Ranch (No HOA)",
+                 "How Christine markets an acreage listing — a real tour she filmed for a 45-acre ranch with a "
+                 "heated shop and no HOA."),
+            ],
+            "paragraphs": [
+                "The Three Questions That Decide Every Horse Property",
+                "First, the well: nearly every rural well operates under a state permit that says exactly what "
+                "it may legally be used for, and two identical wells can carry completely different rights — one "
+                "allowing livestock watering, the other restricted to household use only. Second, the water: "
+                "irrigation rights convey separately from the land, and a ditch crossing the property proves "
+                "nothing. Third, the zoning: what the county allows decides whether you can board horses, build "
+                "the arena, or add the second dwelling — not the listing description. The full homework is in "
+                "[the acreage guide: wells, water, and septic](/blog/buying-acreage-in-northern-colorado-wells-water-septic.html).",
+                "Where The Horse Properties Are",
+                "West of the towns: the Masonville and [Buckhorn corridor](/communities/loveland/buckhorn-subdivisions-loveland.html) "
+                "foothills carry acreage with views minutes from Loveland. North and east: [Berthoud]"
+                "(/communities/larimer/berthoud.html) quietly holds some of the region's best equestrian "
+                "inventory, Wellington and north Fort Collins offer working acreage, and Weld County — Eaton, "
+                "Ault, Nunn, Pierce — is where the serious land is, at prices Larimer can't match.",
+                "How The Search On This Page Works",
+                "The equestrian filter reads each listing's own MLS description and features — so a property "
+                "the listing agent never described as horse-ready won't appear here even if it is. That cuts "
+                "both ways, and it is why the best horse properties often come through an agent who knows what "
+                "a listing actually is, not just what it says. Tell Christine what you're after — arena, "
+                "boarding income, pasture for two horses — and she'll search it directly, including properties "
+                "that never show up under the filter.",
+            ],
+            "faq": [
+                ("What should I check before buying horse property in Colorado?",
+                 "Three things decide most rural deals: the well permit (its permitted uses are a legal matter "
+                 "of record — livestock watering is not automatic), the water rights (they convey separately "
+                 "from the land and must be named in the contract), and county zoning (which decides boarding, "
+                 "arenas, and outbuildings). A septic inspection at transfer is part of closing in this region."),
+                ("Where is the best horse property in Northern Colorado?",
+                 "The foothills west of Loveland (Masonville, the Buckhorn corridor), Berthoud's acreage "
+                 "properties, Wellington and north Fort Collins, and the Weld County towns — Eaton, Ault, Nunn, "
+                 "and Pierce — where larger parcels trade at prices Larimer County can't match."),
+                ("Why don't all horse properties show in the equestrian search?",
+                 "The filter reads each listing's own MLS description and features. A property the listing agent "
+                 "never described as equestrian won't appear, no matter how good its horse setup is. Christine "
+                 "searches beyond the filter for her buyers — including pocket listings that are not on any "
+                 "website."),
+            ],
+        },
+    ]
+
+    for pg in pages:
+        body_html = "\n      ".join(
+            f'<h2 class="article-subhead" style="margin-top:32px">{esc(x)}</h2>'
+            if len(x) < 70 and not x.endswith((".", "!", "?", ":", ","))
+            else f"<p>{_blog_para_html(x)}</p>"
+            for x in pg["paragraphs"]
+        )
+        faq_html, faq_schema = _faq_block(pg["faq"])
+        feed_html = _live_feed_widget(pg["feed_id"], pg["feed_params"],
+                                      empty_note="this market moves quickly,")
+        videos_html = ""
+        if pg.get("videos"):
+            cards = "\n      ".join(
+                f'<div>{_yt_embed(vid, vtitle)}<p class="video-embed-caption">{esc(vcap)}</p></div>'
+                for vid, vtitle, vcap in pg["videos"]
+            )
+            videos_html = f"""
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">From Christine's Channel</span>
+    <h2 class="section-title">Ag &amp; Acreage, Straight Talk On Video</h2>
+    <div class="video-grid" style="grid-template-columns:repeat(2,1fr)">
+      {cards}
+    </div>
+  </div>
+</section>
+"""
+        body = f"""
+<section class="hero" style="padding:90px 0 60px">
+  <div class="wrap">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">{pg["eyebrow"]}</span>
+    <h1>{esc(pg["h1"])}</h1>
+    <p class="lede">{esc(pg["intro"])}</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live, Active IRES MLS Listings</span>
+    <h2 class="section-title">{pg["feed_heading"]}</h2>
+    {feed_html}
+  </div>
+</section>
+{videos_html}
+<section>
+  <div class="wrap" style="max-width:780px">
+    {body_html}
+    <div class="btn-row" style="justify-content:flex-start;margin-top:40px">
+      <a class="btn btn-dark" href="/contact.html">Talk To {esc(SITE['agent'].split()[0])}</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/search-homes.html">Search All Listings</a>
+    </div>
+  </div>
+</section>
+{_money_pages_row(pg["path"])}
+{faq_html}
+"""
+        page(pg["title"], pg["meta"], pg["path"], None, body, schema_extra=[faq_schema])
 
 
 def build_subdivision_pages():
@@ -11456,6 +11727,7 @@ def build_redirects_and_meta():
     paths += [f"/guides/{t['slug']}.html" for t in MARKET_TOPIC_PAGES]
     paths += [f"/communities/loveland/{s['slug']}.html" for s in SUBDIVISION_PAGES]
     paths += ["/loveland-luxury-homes.html"]
+    paths += [p for p, _ in MONEY_PAGES if p != "/loveland-luxury-homes.html"]
     paths += ["/blog/index.html"] + [f"/blog/{p['slug']}.html" for p in BLOG]
     paths += ["/relocation.html", "/expired-listings.html", "/free-home-valuation.html",
               "/lifestyle-search.html", "/listing-video-portfolio.html",
@@ -12199,6 +12471,7 @@ if __name__ == "__main__":
     build_market_topic_pages()
     build_subdivision_pages()
     build_loveland_luxury_page()
+    build_money_pages()
     build_blog()
     build_rss_feed()
     build_luxury_market()
