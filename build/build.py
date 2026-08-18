@@ -3471,10 +3471,10 @@ def header_html(active=None):
         <img class="brand-monogram" src="/assets/img/logo-monogram.svg" alt="">
       </span>
       <a href="/index.html" class="brand-wordmark">
-        <img class="brand-logo" src="/assets/img/logo-mark.png" alt="{SITE['name']}">
+        <img class="brand-logo" src="/assets/img/logo-mark.png" alt="{SITE['name']}" width="209" height="78">
         <span class="brand-sub">Property Collection</span>
       </a>
-      <img class="brokerage-logo" src="/assets/img/lpt-logo.png" alt="{SITE['brokerage']}">
+      <img class="brokerage-logo" src="/assets/img/lpt-logo.png" alt="{SITE['brokerage']}" width="78" height="78">
     </div>
     <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
       <span></span><span></span><span></span>
