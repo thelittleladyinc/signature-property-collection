@@ -438,7 +438,28 @@ exports.__test = {
   resetMineCache: () => { _mineIds = null; },
 };
 
+// Same reasoning as listings-search.js: a photo that "feels slow" has several
+// possible causes with different fixes, and Server-Timing separates them in
+// Chrome's own Network panel. `served` is the one that matters most — it says
+// whether this photo came from our own store (fast, no MLS Grid) or was fetched
+// live (slow, and counted against the shared rate limit).
+function photoTimer() {
+  const started = Date.now();
+  const marks = [];
+  let last = started;
+  return {
+    mark(name) { const n = Date.now(); marks.push(`${name};dur=${n - last}`); last = n; },
+    header(outcome) {
+      return marks.concat([
+        `total;dur=${Date.now() - started}`,
+        `served;desc="${outcome}"`,
+      ]).join(", ");
+    },
+  };
+}
+
 exports.handler = async (event) => {
+  const timing = photoTimer();
   const params = (event && event.queryStringParameters) || {};
   // Read FIRST, and OUTSIDE the try, so every return below honours it -- the
   // exception handler included, which is the one place a caller most needs an
@@ -469,7 +490,13 @@ exports.handler = async (event) => {
     // live fetch.
     if (!debug) {
       const stored = await readCachedPhoto(store, listingId, index);
-      if (stored) return cachedPhotoResponse(stored, "stored");
+      timing.mark("ourStore");
+      if (stored) {
+        const res = cachedPhotoResponse(stored, "stored");
+        res.headers["Server-Timing"] = timing.header(
+          stored.redirectUrl ? "redirect to Cloudinary" : "our own stored copy");
+        return res;
+      }
     }
 
     const token = process.env.MLSGRID_API_TOKEN;
@@ -528,7 +555,9 @@ exports.handler = async (event) => {
     // rides along, which is what was blanking some cards. See fetchMediaResponse.
     const hostOf = (u) => { try { return new URL(u).host; } catch (e) { return null; } };
     let mediaHost = hostOf(resolved.url);
+    timing.mark("resolveUrl");
     let attempt = await fetchMediaResponse(resolved.url, token, IMAGE_FETCH_TIMEOUT_MS, store);
+    timing.mark("mlsGridDownload");
     // Spent, whatever came back. A URL that has reached MLS Grid is single-use and
     // gone; handing it to the next visitor would guarantee them a failure that looks
     // exactly like a rate limit. Marked before the response is even inspected, so no
@@ -686,6 +715,8 @@ exports.handler = async (event) => {
         // Handy in the network tab when a card still looks wrong.
         "X-Photo-Bytes": String(buf.length),
         "X-Photo-Auth-Mode": attempt.mode,
+        // The slow path, and it says so: this one went to MLS Grid.
+        "Server-Timing": timing.header("fetched live from MLS Grid"),
       },
       body: buf.toString("base64"),
       isBase64Encoded: true,

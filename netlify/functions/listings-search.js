@@ -167,7 +167,48 @@ function galleryUrlsFor(listing) {
   return urls;
 }
 
+// ---- WHERE THE TIME ACTUALLY GOES ---------------------------------------
+// 2026-08-18 (Christine: "how can we test what to do to make the mls stuff load
+// faster? Sites being slow loses people"). She is right, and until now every
+// answer to it — including mine — has been a theory. Server-Timing turns it into
+// a measurement: Chrome shows these phases natively in DevTools → Network → click
+// the request → Timing, with no tooling to install and nothing to interpret.
+//
+// The phases are chosen to separate the candidate causes, because "the search is
+// slow" has at least four different fixes depending on which of these dominates:
+//   state     - reading sync-state.json (tiny; should be single-digit ms)
+//   catalogue - fetching and parsing ~29,000 listings, or reusing the memo
+//   filter    - matchesQuery + sort over all of them
+//   prewarm   - resolving photo URLs at MLS Grid before responding
+function timer() {
+  const marks = [];
+  let last = Date.now();
+  const started = last;
+  return {
+    mark(name, desc) {
+      const now = Date.now();
+      marks.push({ name, dur: now - last, desc });
+      last = now;
+    },
+    header() {
+      const total = Date.now() - started;
+      return marks
+        .concat([{ name: "total", dur: total }])
+        .map((m) => `${m.name};dur=${m.dur}` + (m.desc ? `;desc="${m.desc}"` : ""))
+        .join(", ");
+    },
+    summary() {
+      const total = Date.now() - started;
+      const out = {};
+      marks.forEach((m) => { out[m.name] = m.desc ? `${m.dur}ms (${m.desc})` : `${m.dur}ms`; });
+      out.total = `${total}ms`;
+      return out;
+    },
+  };
+}
+
 exports.handler = async (event) => {
+  const timing = timer();
   const store = getBlobStore(getStore);
   const params = event.queryStringParameters || {};
   const top = Math.min(parseInt(params.top, 10) || 12, 24);
@@ -197,15 +238,20 @@ exports.handler = async (event) => {
     // The state blob first and on its own: it is small, and it decides whether the
     // catalogue needs reading at all.
     const state = await store.get(SYNC_STATE_KEY, { type: "json" });
+    timing.mark("state");
     if (!allListings) {
       const stamp = state && state.lastRunAt ? String(state.lastRunAt) : null;
       const memo = catalogueFromMemo(stamp);
       if (memo) {
         allListings = memo;
+        timing.mark("catalogue", "memo");
       } else {
         allListings = await store.get(LISTINGS_KEY, { type: "json" });
         if (allListings) rememberCatalogue(allListings, stamp);
+        timing.mark("catalogue", "blob read + parse");
       }
+    } else {
+      timing.mark("catalogue", "mine-only copy");
     }
 
     if (!state) {
@@ -300,6 +346,8 @@ exports.handler = async (event) => {
         return sortFn(a, b);
       });
 
+    timing.mark("filter", `${Object.keys(listingsById).length} listing(s) scanned`);
+
     const page = matched.slice(skip, skip + top).map((l) => {
       // Strip internal-only fields before they reach the browser. photos[]
       // is trimmed to just the cover photo here — see the listingId block
@@ -345,6 +393,8 @@ exports.handler = async (event) => {
       timeoutMs: 3500,
     });
 
+    timing.mark("prewarm");
+
     const response = {
       listings: page,
       totalCount: matched.length,
@@ -373,12 +423,18 @@ exports.handler = async (event) => {
         // but the actual Cloudinary/MLS Grid call is failing.
         lastRunCoverPhotosCached: state.lastRunCoverPhotosCached ?? null,
         lastCloudinaryError: state.lastCloudinaryError || null,
+        // The same numbers as the Server-Timing header, for anyone reading JSON
+        // rather than DevTools.
+        timing: timing.summary(),
       };
     }
     return {
       statusCode: 200,
       headers: {
         "Content-Type": "application/json",
+        // Chrome shows this natively: DevTools → Network → click the request →
+        // Timing. No tooling, no interpretation — it says which phase is slow.
+        "Server-Timing": timing.header(),
         // 2026-08-13 (performance fix): the underlying data only changes
         // every 15 minutes (sync-listings.js's schedule), so there's no
         // reason every page load re-runs this function from scratch.
