@@ -742,6 +742,23 @@ function slimForStorage(mapped) {
     slim.photo = slim.photo || slim.photos[0] || null;
     delete slim.photos;
   }
+  // 2026-08-18, found while auditing why a search costs 1,768ms to read the
+  // catalogue. `photo` here is an MLS Grid signed media URL — about 180
+  // characters of token, expiry and object id — and photoUrlFor() in
+  // listings-search.js will only ever RETURN a stored URL when isRehosted() says
+  // it is a Cloudinary one. So for every listing that is not Christine's, this
+  // field is written, stored, downloaded and parsed on every cold search, and can
+  // never be used: it expires within the hour and nothing is allowed to serve it.
+  //
+  // At ~180 bytes across 29,150 listings that is roughly 5 MB of the catalogue
+  // blob — plausibly its single largest field — spent on dead URLs. photoCount
+  // above is what the card actually reads, and it survives.
+  //
+  // Kept when it IS a Cloudinary URL, because then it is the permanent re-hosted
+  // copy and photoUrlFor serves it directly, which is the fast path.
+  if (typeof slim.photo === "string" && slim.photo.indexOf("res.cloudinary.com") === -1) {
+    delete slim.photo;
+  }
   // Always null on this IRES feed (see SELECT_FIELDS' history in
   // _mls-shared.js) -- storing 19k nulls costs bytes for nothing.
   delete slim.officeName;

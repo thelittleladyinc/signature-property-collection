@@ -292,7 +292,10 @@ exports.handler = async (event) => {
         statusCode: 200,
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+          // Same reasoning as the main search response below: this returns a
+          // gallery's photo URLs, which are either stable /listing-photo paths or
+          // permanent Cloudinary ones, against data that changes every 30 minutes.
+          "Cache-Control": "public, max-age=300, stale-while-revalidate=1800",
         },
         // 2026-08-15: the gallery used to hand the browser stored MLS Grid
         // URLs, which are expired for anything the sync hasn't touched in the
@@ -473,7 +476,22 @@ exports.handler = async (event) => {
         // while it refreshes in the background, instead of visitors ever
         // waiting on a cold function invocation.
         ...(params.debug === "true" ? {} : {
-          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+          // 2026-08-18: was 60 seconds, against data that only changes every 30
+          // minutes (netlify.toml's sync schedule). Sixty seconds was far more
+          // conservative than the data warranted, and it meant the default page
+          // view — the one most visitors see — paid the full cold cost several
+          // times an hour for nothing.
+          //
+          // Five minutes fresh, thirty stale-while-revalidate: a visitor never
+          // waits for a revalidation, and the worst case is a listing appearing
+          // five minutes later than it otherwise would, on a feed that is itself
+          // half an hour behind.
+          //
+          // Note this cannot fix everything: Netlify keys the cache by query
+          // string (netlify-vary: query), so every filter or sort change is a
+          // different entry and lands on the origin cold. That is why the origin
+          // itself still has to be fast.
+          "Cache-Control": "public, max-age=300, stale-while-revalidate=1800",
         }),
       },
       body: JSON.stringify(response),
