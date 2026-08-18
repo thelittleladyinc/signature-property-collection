@@ -394,6 +394,18 @@ every one of them to the sentence of MLS Grid documentation it came from; 39 sui
 pass. Deliberately left alone: the refresh sweep, base64 blob storage, and the
 4.4MB function-response ceiling on oversize photos — all reasoned about in §7.
 
+**Listing-Engine was read for comparison** (§7b of that document) and it corrects
+the premise that its photos work: its own docs record the same 429s from the same
+`media.mlsgrid.com/token=...` URLs as an open production issue after six PRs, plus
+a silent 25-photo cap. What differs is visibility — a failed import is a log line,
+a failed page fetch is a grey card in front of a buyer. Two findings travel back the
+other way: Listing-Engine sends a browser User-Agent where MLS Grid requires the
+token ("will be blocked by our service"), which is the only explanation on offer for
+429s hitting a job deliberately paced at 0.67 rps; and it omits OriginatingSystemName
+too, with its own comments describing the documented silently-ignored-ListingId
+symptom. It also confirms the path-signed media URL format is live NOW, and that the
+account has already had an "API Access Warning" email citing 4 RPS.
+
 Also: **usage is self-serve** — Manage Subscriptions → Edit Data Subscription
 Details → Usage tab → Usage Logs gives the hourly and 24-hour breakdown without
 emailing anybody. And the subscription types (IDX/VOW/BO/PT) are use-case

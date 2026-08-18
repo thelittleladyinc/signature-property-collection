@@ -438,6 +438,77 @@ pass. What changed:
   one wasted API call per search page render, bounded and harmless, but it would
   need cross-module knowledge of the photo store to avoid.
 
+## 7b. What Listing-Engine does, and what it proves
+
+Read at `thelittleladyinc/listing-engine` (`api/routes/photos.js`,
+`api/routes/mls.js`, plus its own status docs).
+
+**First, the premise: Listing-Engine's photos do not reliably work either.** Its
+own documentation, in three separate files:
+
+- `CONTRACTOR-START-HERE.md`: *"`[Photo import] Result: 0 uploaded, 3 failed —
+  429 Too Many Requests` from `https://media.mlsgrid.com/token=...`"*
+- `VALTS-PRIORITIES.md`: PR #729's shared rate budget *"was meant to fix 429s from
+  media.mlsgrid.com… **but the bug is still reproducing in production**."*
+- `STATE-OF-PLATFORM.md` lists it as open production issue #2, after six prior PRs.
+
+It also silently drops everything past photo 25 (`photos.js`: `urls.slice(0, 25)`)
+on listings with 50-80 photos. So "it brings in photos" is half true: when a run
+succeeds the result is permanent, and when it fails it fails into a log rather than
+onto a page a buyer is looking at. **That visibility difference is most of the
+apparent gap between the two apps.**
+
+**What it genuinely does better, and why:**
+
+| Listing-Engine | Why the website could not just copy it |
+|---|---|
+| Downloads each photo once, hands Cloudinary a Buffer, never touches the URL again | The site is serverless: no import step, photos are demanded by browsers |
+| ONE global gate (`mlsGridRateGate`, 1500ms) shared by **both** the OData API and media downloads, in one long-lived Render process | Netlify Functions are many separate containers; a module-level `_lastRequestTime` cannot coordinate them. The site's blob-based cooldowns are the equivalent, and now cover media separately from the API. |
+| A media 429 suspends the OData path too, persisted to a DB table so it survives restarts | The site does this in Blobs, and deliberately keeps photo cooldowns from pausing the sync |
+
+The important part: **its architecture is the one MLS Grid's docs describe, and the
+fixes in §7 move the website to the same shape** — fetch once, store the bytes,
+never replay a URL, serve everything afterwards from our own storage.
+
+**What Listing-Engine does WORSE, and should be fixed there too:**
+
+1. **It sends a browser User-Agent.** `photos.js` sends
+   `'User-Agent': 'Mozilla/5.0 (compatible; ListingEngine/1.0)'`, where MLS Grid's
+   docs say the value **MUST** be the OAuth token and *"Any User-Agent that is not
+   your Oauth 2 access token will be blocked by our service."*
+
+   This is the most interesting thing in the whole comparison. **A job hard-gated
+   to one request per 1500ms — 0.67 rps, a third of the allowance — should never
+   see a rate limit at all.** Six PRs have chased pacing, cooldowns and Redis;
+   nobody has checked the header. If "blocked" surfaces as a 429, that is a
+   complete explanation for 429s the pacing theory cannot account for. It is a
+   hypothesis, not a proven cause — but it is one line to test and it has never
+   been tested.
+
+2. **No `OriginatingSystemName` on any query.** `mls.js` sends
+   `$filter=ListingId eq '…'` — and its own comments describe the documented
+   consequence: *"MLS Grid may silently ignore $filter on ListingId"*, *"where
+   $filter=ListingId is silently ignored and a random listing"* is returned. Two
+   independent codebases, the same omission, the same bug, each written up as a
+   quirk of the feed. It is a missing required parameter (Finding 5).
+
+3. **The rate budget is in-memory only**, wiped by every Render restart — its own
+   notes name this as the probable reason the shared-gate fix didn't hold.
+
+**Two things this settles for the questions in this document:**
+
+- **The new path-signed URL format is already live, not a September problem.** That
+  production log line is `https://media.mlsgrid.com/token=...` — exactly the format
+  §0 Finding 3 is about. The fix is load-bearing today.
+- **The account has already been warned.** `mls.js`'s own comment: the gap was
+  *"bumped from 600ms → 1500ms after MLS Grid sent an 'API Access Warning' email
+  reporting we hit 4 RPS"*. So the Usage tab and the primary contact's inbox have
+  real history, and the support conversation in §6 should acknowledge it.
+
+**And it is the strongest evidence yet against buying more quota.** Listing-Engine
+takes 429s while deliberately running at a third of the documented rate. Whatever
+is producing those, it is not volume.
+
 ## 8. Open items
 
 External:
