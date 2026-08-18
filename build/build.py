@@ -1356,6 +1356,7 @@ def _listing_showcase_js_helpers():
     }});
   }}
 {_nearby_places_js_helpers()}
+{_paced_photo_js()}
   function fmtPrice(n) {{
     if (n == null) return 'Price N/A';
     return '$' + Number(n).toLocaleString('en-US');
@@ -1400,7 +1401,8 @@ def _listing_showcase_js_helpers():
         'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
         'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
     }} else if (cover) {{
-      top = '<img src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+      top = '<img data-src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" ' +
+        'style="aspect-ratio:4/3;background:#eee;width:100%;object-fit:cover" ' +
         'onerror="this.onerror=null;this.style.background=\\'#eee\\';this.style.aspectRatio=\\'4/3\\';this.removeAttribute(\\'src\\')">';
     }} else {{
       top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
@@ -1479,6 +1481,77 @@ def _listing_showcase_js_helpers():
 """
 
 
+
+def _paced_photo_js():
+    """The queue that keeps listing-card photos under MLS Grid's speed limit.
+
+    2026-08-18: MLS Grid sent two API Access Warnings in one afternoon, both
+    reading "your hourly 5.0 requests per second exceeded the 2 requests per
+    second limit" -- and both stamped with the exact hours Christine was
+    testing the search page. The burst was the page itself: 12 listing cards
+    share one HTTP/2 connection, so the browser fires every /listing-photo
+    request in the same instant, and every first-ever photo becomes a live
+    MLS Grid fetch. loading="lazy" does not stagger images that are already
+    near the viewport, so 12-at-once read as 5+ rps against a 2 rps
+    account-wide ceiling shared with her other two apps. Warnings escalate to
+    suspension at 6 rps (suspended 2026-08-01 and again 2026-08-12), so this
+    is the difference between a warning email and a dead site.
+
+    The fix: card images carry data-src instead of src, an
+    IntersectionObserver enqueues each one only as it approaches the viewport
+    (off-screen cards still cost nothing, same as lazy loading), and the
+    queue lets at most 2 images load at once. Photos already in our own
+    store return in ~100ms so the queue drains almost invisibly; only
+    first-ever photos are slow, and 2-in-flight is a pace the shared limit
+    can absorb. A failed image -- usually listing-photo.js's deliberate 1-2
+    minute cooldown after MLS Grid says "too fast" -- retries once after 80s
+    with a cache-busting param, so grey squares heal without a reload.
+
+    Raw JS with single braces: callers interpolate this into f-string
+    templates the same way _nearby_places_js_helpers() is."""
+    return """
+      var _pq = [], _pqActive = 0;
+      function _pqPump() {
+        while (_pqActive < 2 && _pq.length) {
+          (function (im) {
+            _pqActive++;
+            var done = function () { _pqActive--; _pqPump(); };
+            im.addEventListener('load', done, { once: true });
+            im.addEventListener('error', function () {
+              done();
+              if (!im.getAttribute('data-retried')) {
+                im.setAttribute('data-retried', '1');
+                setTimeout(function () {
+                  var u = im.getAttribute('data-src');
+                  im.src = u + (u.indexOf('?') === -1 ? '?' : '&') + 'r=1';
+                }, 80000);
+              }
+            }, { once: true });
+            im.src = im.getAttribute('data-src');
+          })(_pq.shift());
+        }
+      }
+      function _pqEnqueue(im) {
+        if (im.getAttribute('data-queued')) return;
+        im.setAttribute('data-queued', '1');
+        _pq.push(im); _pqPump();
+      }
+      var _pqIO = ('IntersectionObserver' in window)
+        ? new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) {
+              if (e.isIntersecting) { _pqIO.unobserve(e.target); _pqEnqueue(e.target); }
+            });
+          }, { rootMargin: '300px' })
+        : null;
+      function pacePhotos(root) {
+        var imgs = root.querySelectorAll('img[data-src]:not([data-queued])');
+        for (var i = 0; i < imgs.length; i++) {
+          if (_pqIO) _pqIO.observe(imgs[i]); else _pqEnqueue(imgs[i]);
+        }
+      }
+"""
+
+
 def _mls_disclaimer_html(fetched_at_id="mls-fetched-at"):
     """The MLS Grid IDX Rule 26 disclaimer block, shared by every page that
     displays live MLS Grid data (search-homes.html and current-listings.html)
@@ -1542,9 +1615,11 @@ def _live_feed_widget(anchor_id, api_params, empty_note=None):
         return '$' + Number(n).toLocaleString('en-US');
       }}
 {_nearby_places_js_helpers()}
+{_paced_photo_js()}
       function cardHtml(l) {{
         var img = l.photo
-          ? '<img src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+          ? '<img data-src="' + esc(l.photo) + '" alt="' + esc(l.address || 'Listing photo') + '" ' +
+            'style="aspect-ratio:4/3;background:#eee;width:100%;object-fit:cover" ' +
             'onerror="this.onerror=null;this.style.background=\\'#eee\\';this.style.aspectRatio=\\'4/3\\';this.removeAttribute(\\'src\\')">'
           : '<div style="aspect-ratio:4/3;background:#eee"></div>';
         var addr = esc([l.address, l.city, l.state, l.zip].filter(Boolean).join(', '));
@@ -1585,6 +1660,7 @@ def _live_feed_widget(anchor_id, api_params, empty_note=None):
           }}
           statusEl.textContent = listings.length + ' active listing(s) right now.';
           resultsEl.innerHTML = listings.map(cardHtml).join('');
+          pacePhotos(resultsEl);
           if (fetchedAtEl) {{
             fetchedAtEl.textContent = new Date().toLocaleString('en-US', {{ dateStyle: 'medium', timeStyle: 'short' }});
           }}
@@ -2361,6 +2437,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
           statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
         }}
         resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) {{ return listingCardHtml(l, true); }}).join(''));
+        pacePhotos(resultsEl);
         skip += listings.length;
         loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
         if (fetchedAtEl) {{

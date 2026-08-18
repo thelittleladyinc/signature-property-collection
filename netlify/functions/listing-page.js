@@ -171,8 +171,16 @@ function listingBody(l, fetchedAt) {
 
   const gallery = count > 1
     ? `<div class="listing-detail-thumbs">` +
+      // 2026-08-18: MLS Grid warned twice in one day about request-per-second
+      // bursts. This gallery was one of the two sources: up to 12 <img> tags
+      // on one HTTP/2 connection all fire at once, and every not-yet-stored
+      // photo is a live MLS Grid fetch. Photo 0 keeps a real src (it is the
+      // page's main image); the rest carry data-src and are drained two at a
+      // time by the pacer in the script block below.
       Array.from({ length: Math.min(count, GALLERY_PHOTOS) }, (_, i) =>
-        `<img src="${esc(photoUrl(l, i))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}" loading="lazy">`
+        i === 0
+          ? `<img src="${esc(photoUrl(l, i))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}">`
+          : `<img data-src="${esc(photoUrl(l, i))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}" style="background:#eee">`
       ).join("") +
       (count > GALLERY_PHOTOS ? `<p class="fs-advanced-note">Showing ${GALLERY_PHOTOS} of ${count} photos &mdash;
        <a href="/contact.html" style="text-decoration:underline">ask for the full set</a>.</p>` : "") +
@@ -331,6 +339,48 @@ function localSpotsBlock(l) {
 function nearbyScript() {
   return `<script>
 (function () {
+  // Paced photo loading — same queue as the search page (see _paced_photo_js
+  // in build/build.py for the full story): at most 2 gallery photos load at
+  // once so a cold listing page cannot burst past MLS Grid's shared 2 rps
+  // account limit. A failed photo (their 1-2 minute cooldown) retries once
+  // after 80s, so grey tiles heal without a reload.
+  var _pq = [], _pqActive = 0;
+  function _pqPump() {
+    while (_pqActive < 2 && _pq.length) {
+      (function (im) {
+        _pqActive++;
+        var done = function () { _pqActive--; _pqPump(); };
+        im.addEventListener('load', done, { once: true });
+        im.addEventListener('error', function () {
+          done();
+          if (!im.getAttribute('data-retried')) {
+            im.setAttribute('data-retried', '1');
+            setTimeout(function () {
+              var u = im.getAttribute('data-src');
+              im.src = u + (u.indexOf('?') === -1 ? '?' : '&') + 'r=1';
+            }, 80000);
+          }
+        }, { once: true });
+        im.src = im.getAttribute('data-src');
+      })(_pq.shift());
+    }
+  }
+  function _pqEnqueue(im) {
+    if (im.getAttribute('data-queued')) return;
+    im.setAttribute('data-queued', '1');
+    _pq.push(im); _pqPump();
+  }
+  var _pqIO = ('IntersectionObserver' in window)
+    ? new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { _pqIO.unobserve(e.target); _pqEnqueue(e.target); }
+        });
+      }, { rootMargin: '300px' })
+    : null;
+  var _pqImgs = document.querySelectorAll('img[data-src]');
+  for (var _pi = 0; _pi < _pqImgs.length; _pi++) {
+    if (_pqIO) _pqIO.observe(_pqImgs[_pi]); else _pqEnqueue(_pqImgs[_pi]);
+  }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];

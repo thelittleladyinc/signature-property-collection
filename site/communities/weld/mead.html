@@ -470,6 +470,47 @@
       'distance. Places data from <strong>Google Maps</strong>.</p>';
   }
 
+
+      var _pq = [], _pqActive = 0;
+      function _pqPump() {
+        while (_pqActive < 2 && _pq.length) {
+          (function (im) {
+            _pqActive++;
+            var done = function () { _pqActive--; _pqPump(); };
+            im.addEventListener('load', done, { once: true });
+            im.addEventListener('error', function () {
+              done();
+              if (!im.getAttribute('data-retried')) {
+                im.setAttribute('data-retried', '1');
+                setTimeout(function () {
+                  var u = im.getAttribute('data-src');
+                  im.src = u + (u.indexOf('?') === -1 ? '?' : '&') + 'r=1';
+                }, 80000);
+              }
+            }, { once: true });
+            im.src = im.getAttribute('data-src');
+          })(_pq.shift());
+        }
+      }
+      function _pqEnqueue(im) {
+        if (im.getAttribute('data-queued')) return;
+        im.setAttribute('data-queued', '1');
+        _pq.push(im); _pqPump();
+      }
+      var _pqIO = ('IntersectionObserver' in window)
+        ? new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) {
+              if (e.isIntersecting) { _pqIO.unobserve(e.target); _pqEnqueue(e.target); }
+            });
+          }, { rootMargin: '300px' })
+        : null;
+      function pacePhotos(root) {
+        var imgs = root.querySelectorAll('img[data-src]:not([data-queued])');
+        for (var i = 0; i < imgs.length; i++) {
+          if (_pqIO) _pqIO.observe(imgs[i]); else _pqEnqueue(imgs[i]);
+        }
+      }
+
   function fmtPrice(n) {
     if (n == null) return 'Price N/A';
     return '$' + Number(n).toLocaleString('en-US');
@@ -514,7 +555,8 @@
         'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
         'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
     } else if (cover) {
-      top = '<img src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" loading="lazy" ' +
+      top = '<img data-src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" ' +
+        'style="aspect-ratio:4/3;background:#eee;width:100%;object-fit:cover" ' +
         'onerror="this.onerror=null;this.style.background=\'#eee\';this.style.aspectRatio=\'4/3\';this.removeAttribute(\'src\')">';
     } else {
       top = '<div style="aspect-ratio:4/3;background:#eee"></div>';
@@ -948,6 +990,7 @@
           statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
         }
         resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) { return listingCardHtml(l, true); }).join(''));
+        pacePhotos(resultsEl);
         skip += listings.length;
         loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
         if (fetchedAtEl) {
