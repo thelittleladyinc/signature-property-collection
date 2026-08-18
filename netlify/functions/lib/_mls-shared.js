@@ -242,6 +242,23 @@ const CO_CITY_COUNTY = {
   "ouray": "ouray", "ridgway": "ouray",
   "durango": "la plata", "bayfield": "la plata", "ignacio": "la plata",
   "pagosa springs": "archuleta",
+  // 2026-08-18: a $16.9M Creede listing survived the out-of-area cleanup on
+  // Christine's live results because the whole San Luis Valley was missing
+  // from this table — an unknown town infers no county, and a null county is
+  // deliberately kept rather than guessed at. Filled in the valley and the
+  // remaining southwest counties so the pruner can finally see them.
+  "creede": "mineral",
+  "south fork": "rio grande", "del norte": "rio grande", "monte vista": "rio grande",
+  "alamosa": "alamosa", "hooper": "alamosa", "mosca": "alamosa",
+  "saguache": "saguache", "center": "saguache", "crestone": "saguache",
+  "villa grove": "saguache",
+  "antonito": "conejos", "la jara": "conejos", "manassa": "conejos",
+  "sanford": "conejos",
+  "san luis": "costilla", "blanca": "costilla", "fort garland": "costilla",
+  "lake city": "hinsdale",
+  "silverton": "san juan",
+  "rico": "dolores county", "dove creek": "dolores county",
+  "naturita": "montrose", "nucla": "montrose",
   "cortez": "montezuma", "mancos": "montezuma", "dolores": "montezuma",
   "meeker": "rio blanco", "rangely": "rio blanco",
   "canon city": "fremont", "florence": "fremont", "penrose": "fremont",
