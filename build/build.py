@@ -11402,7 +11402,17 @@ def build_redirects_and_meta():
     ai_bots = ["GPTBot", "ChatGPT-User", "OAI-SearchBot", "PerplexityBot",
                "Perplexity-User", "Google-Extended", "ClaudeBot", "anthropic-ai",
                "CCBot", "Bytespider", "Applebot-Extended"]
-    ai_bot_rules = "\n".join(f"User-agent: {bot}\nAllow: /" for bot in ai_bots)
+    # 2026-08-18: a user-agent-specific group REPLACES the * group entirely —
+    # it does not inherit from it. So these AI bots were getting "Allow: /"
+    # with NO functions disallow, and Bytespider/CCBot (which crawl from
+    # Singapore data centers — the "26 active users in Singapore" in
+    # Christine's Analytics) were free to call the raw API endpoints, each
+    # such hit spending function invocations and, on cold photos, MLS Grid
+    # quota. Every group now carries the same disallow the * group has: the
+    # CONTENT stays fully open to AI answer engines, the machinery does not.
+    ai_bot_rules = "\n".join(
+        f"User-agent: {bot}\nAllow: /\nDisallow: /.netlify/functions/"
+        for bot in ai_bots)
     # 2026-08-17 (Search Console: "Server error (5xx)" on 7 URLs, on a static site
     # that cannot 5xx). The XHR endpoints are the only thing here that runs code.
     # /.netlify/functions/listings-search and nearby-places are referenced in the

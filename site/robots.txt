@@ -4,25 +4,36 @@ Disallow: /.netlify/functions/
 
 User-agent: GPTBot
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: ChatGPT-User
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: OAI-SearchBot
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: PerplexityBot
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: Perplexity-User
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: Google-Extended
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: ClaudeBot
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: anthropic-ai
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: CCBot
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: Bytespider
 Allow: /
+Disallow: /.netlify/functions/
 User-agent: Applebot-Extended
 Allow: /
+Disallow: /.netlify/functions/
 
 Sitemap: https://signaturepropertycollection.com/sitemap.xml
