@@ -31,6 +31,8 @@
 //      15-minute listing sync -- photo traffic taking down data replication.
 //      Photo requests now respect that flag but never set it; they set their
 //      own, shorter cooldown instead.
+const { recordMlsCall, checkMlsQuota, bytesFromResponse } = require("./_mls-usage");
+
 const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
 
 // 2026-08-17. This was 40 minutes, on the reasoning that it sat "comfortably
@@ -316,10 +318,24 @@ async function resolveOneBatch(wanted, { store, token, baseUrl, selectFields, ti
     "$expand": "Media",
     "$top": String(wanted.length),
   });
+  // Before the request, not after the 429. A cooldown reacts to a limit we have
+  // already hit; this refuses the request that would hit it. See _mls-usage.js.
+  const quota = await checkMlsQuota(store);
+  if (quota.blocked) {
+    console.warn(`resolveMediaFor: quota guard refused the request — ${quota.reason}`);
+    return null;
+  }
   try {
     const res = await fetch(`${baseUrl}?${qs.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(timeoutMs || BATCH_TIMEOUT_MS),
+    });
+    // Measured before anything is decided about the response, so a 429 counts as
+    // the request it was. Content-Length is the compressed size on the wire, which
+    // is what MLS Grid's MB cap actually meters.
+    await recordMlsCall(store, {
+      kind: "api", status: res.status,
+      bytes: bytesFromResponse(res),
     });
     if (res.status === 429) {
       // Our own cooldown, NOT the sync's suspension flag.
@@ -366,6 +382,10 @@ async function resolveOneBatch(wanted, { store, token, baseUrl, selectFields, ti
     }
     return out;
   } catch (err) {
+    // A timeout still consumed a request slot at MLS Grid's end, so it is logged
+    // rather than forgotten -- an hour of timeouts is exactly the shape of usage
+    // that would otherwise look like no usage at all.
+    await recordMlsCall(store, { kind: "api", status: 0, bytes: 0 });
     console.error("resolveMediaFor failed:", err && err.message);
     return null;
   }
@@ -506,7 +526,11 @@ function looksPresigned(url) {
 // was, and only ever on failure.
 const RETRY_OTHER_MODE_ON = new Set([401, 403, 404]);
 
-async function fetchMediaResponse(url, token, timeoutMs) {
+// `store` is optional and only used to record the call. It is a fourth argument
+// rather than part of an options object because three callers already pass three
+// positional arguments; those that cannot supply a store still work, they just
+// go unmeasured.
+async function fetchMediaResponse(url, token, timeoutMs, store) {
   const modes = looksPresigned(url) ? ["anon", "auth"] : ["auth", "anon"];
   let last = null;
   // Every attempt, so a caller in debug mode can show which modes were tried and
@@ -538,11 +562,18 @@ async function fetchMediaResponse(url, token, timeoutMs) {
       res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
     } catch (err) {
       var msg = (err && err.message) || String(err);
+      await recordMlsCall(store, { kind: "media", status: 0, bytes: 0 });
       attempts.push({ mode, error: msg });
       // Keep the first transport error, but let the other mode have a go.
       last = last || { res: null, mode, error: msg };
       continue;
     }
+    // Every attempt counts, including the retry in the other auth mode -- two
+    // attempts on one photo really are two requests against the account.
+    await recordMlsCall(store, {
+      kind: "media", status: res.status,
+      bytes: bytesFromResponse(res),
+    });
     attempts.push({ mode, status: res.status });
     if (res.ok) return { res, mode, attempts };
     last = { res, mode };

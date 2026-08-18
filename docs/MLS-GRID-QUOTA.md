@@ -617,6 +617,50 @@ suspension was hand-run scripts bypassing the limiter, and the 4-rps warning was
 Listing-Engine's pre-fix code. Buying a second subscription to cover that would
 be paying rent on a defect. Fix the defects, watch the usage tab, then decide.
 
+## 7d. Instrumentation, built 2026-08-18
+
+The §7c conclusion was that the biggest thing this site lacked was any view of its
+own consumption. That is now built: `netlify/functions/lib/_mls-usage.js`, plus
+`/.netlify/functions/mls-usage` and a row on `/site-health`. It is Expired-Luxury's
+guard rebuilt for a runtime with no shared process memory.
+
+**What it does**
+
+| Piece | Behaviour |
+|---|---|
+| **Per-call log** | Every MLS Grid request from this site — API *and* media — records kind, status and bytes into an hourly bucket in Blobs. The api-vs-media split is the number nobody could see, and the one that mattered: the 429s were always on media while every fix aimed at the API. |
+| **Budget guard** | Checked **before** each request, not after a 429. Refuses at **50%** of the real limits. A cooldown reacts to a limit already hit; a budget refuses the request that would hit it. |
+| **Fails closed** | If the log can't be read, it blocks and says so. Expired-Luxury's QUOTA-2 lesson: "zero usage" is the most permissive answer an unreadable log can give, so reporting it turns the guard into a silent no-op. Safe here because `listing-photo.js` serves its own stored copy *before* the guard runs — a block costs a placeholder on a photo nobody has loaded, never a page of holes. |
+| **Ceilings tune down only** | `MLS_QUOTA_*` env vars can lower a limit but never raise it past what MLS Grid enforces. Straight from Expired-Luxury's `MLS_GRID_RPS_CEILING`, for the reason its comment gives: a well-meant "make it faster" must not be able to cost days of downtime. |
+| **Kill switch** | `MLS_DISABLED=true` stops every MLS Grid path on the site without touching credentials. |
+| **Retention** | 48 hours of hourly buckets, pruned by the sync job. |
+
+**The limits it encodes are the enforced ones** (§1) — 7,200 requests/hour,
+**3,072 MB/hour**, 40,000/day, **40 GB/day** — not the published figures. The
+public docs' 4 GB/hour would have been 33% too generous on the cap that photo
+traffic actually spends.
+
+**Where to look:**
+
+- `/.netlify/functions/mls-usage` — this hour and the last 24, API vs media,
+  errors, percentage of budget, in a sentence at the top. Add `?hours=1` for the
+  hour-by-hour breakdown.
+- `/site-health` — one row, "MLS Grid usage inside our own budget".
+- `app.mlsgrid.com/subs/view/usage/` — the **account** total across all three
+  apps. Comparing that against this site's own number is how consumption gets
+  attributed while one token serves three applications — which is half of what the
+  support email in §6 is asking for, answerable now without waiting for a reply.
+
+**A limitation, stated rather than discovered later:** Netlify Functions are many
+separate containers and Blobs has no atomic increment, so two invocations writing
+the same hour bucket in the same instant can lose one count. The response is to
+budget at half the real limit, which absorbs that error many times over. An
+approximate number that exists beats an exact number that does not.
+
+`tests/test-mlsusage.js` covers it: the right limits, ceilings that only tune down,
+counting and the api/media split, failing closed, the kill switch, pruning, and
+that the guard runs *before* the request in all three call paths. 40 suites pass.
+
 ## 8. Open items
 
 External:
@@ -624,9 +668,7 @@ External:
 - [ ] Read the Usage tab (`app.mlsgrid.com/subs/view/usage/`) and record what the
       three apps actually consume — AFTER the fixes have been live for a day, so
       the number means something
-- [ ] Consider a per-call log + usage view for this site, modelled on
-      Expired-Luxury's `mls_api_call_log` / `/api/admin/mls-usage` (§7c). Biggest
-      remaining gap: this site cannot see its own consumption at all.
+- [x] ~~Per-call log + usage view for this site~~ — built 2026-08-18, see §7d
 - [ ] Expired-Luxury (read only, not touched): Media URL cache is 7 days against a
       1-hour single-use URL, and it renders raw MLS Grid URLs in `<img src>`. Both
       are rules this site fixed today. Worth its own session.

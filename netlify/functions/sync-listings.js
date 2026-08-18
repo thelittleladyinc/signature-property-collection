@@ -71,6 +71,7 @@ const {
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
 } = require("./lib/_mls-shared");
 const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
+const { recordMlsCall, checkMlsQuota, pruneUsage, bytesFromResponse } = require("./lib/_mls-usage");
 const { drainFailedPushes } = require("./lib/_lofty");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
@@ -280,6 +281,43 @@ function statusClause() {
 // query looks like from the outside.
 const ORIGINATING_SYSTEM_CLAUSE = "OriginatingSystemName eq 'ires'";
 
+// 2026-08-18: every MLS Grid request from this job now goes through one function,
+// so all four call sites are measured and gated identically. Before this, the job
+// paced itself carefully and then had no idea what it had spent -- which is the
+// gap that made §2.6 a guess rather than a measurement.
+//
+// The guard uses the FULL 24-hour picture rather than just this hour: the sync is
+// the site's bulk consumer and runs on a schedule, so it can afford the extra blob
+// reads, and it is the path where a runaway crawl would actually threaten the
+// daily cap. Photo requests use the cheap one-hour check instead.
+//
+// Returns the Response. Throws MlsQuotaError when the budget says no, so a caller
+// that does not handle it stops rather than continuing blind.
+class MlsQuotaError extends Error {}
+
+async function mlsFetch(url, token, store, { full } = {}) {
+  const quota = await checkMlsQuota(store, { full: full !== false });
+  if (quota.blocked) {
+    throw new MlsQuotaError(`quota guard refused the request — ${quota.reason}`);
+  }
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
+    });
+    await recordMlsCall(store, {
+      kind: "api", status: res.status,
+      bytes: bytesFromResponse(res),
+    });
+    return res;
+  } catch (err) {
+    // A timeout still spent a request. Counting it is the difference between
+    // "we were quiet" and "we were failing", which look identical otherwise.
+    await recordMlsCall(store, { kind: "api", status: 0, bytes: 0 });
+    throw err;
+  }
+}
+
 function baseFilter(sinceTimestamp) {
   const clauses = [ORIGINATING_SYSTEM_CLAUSE];
   if (sinceTimestamp) {
@@ -431,10 +469,7 @@ async function refreshOneListing(listingId, listingsById, store, token, startedA
     "$expand": "Media",
     "$top": "1",
   });
-  const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
-  });
+  const res = await mlsFetch(`${BASE_URL}?${qs.toString()}`, token, store);
   if (res.status === 429) {
     await markSuspended(store, SUSPENSION_COOLDOWN_MS);
     return { suspended: true };
@@ -484,7 +519,7 @@ async function refreshOneListing(listingId, listingsById, store, token, startedA
 // `if (!state.herOfficeMlsId)` guard around the call site below -- so a
 // rejection costs one extra request per run, forever, which is negligible
 // next to REQUEST_DELAY_MS pacing.
-async function discoverHerOfficeMlsId(listingsById, token) {
+async function discoverHerOfficeMlsId(listingsById, token, store) {
   const known = Object.values(listingsById).find((l) => l.listingId && isHerListing(l));
   if (!known) return null; // nothing to look up from yet -- try again once bootstrap finds at least one
   try {
@@ -493,10 +528,7 @@ async function discoverHerOfficeMlsId(listingsById, token) {
       "$select": "ListingId,ListOfficeMlsId",
       "$top": "1",
     });
-    const res = await fetch(`${BASE_URL}?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
-    });
+    const res = await mlsFetch(`${BASE_URL}?${qs.toString()}`, token, store);
     if (!res.ok) return null; // includes a 400 if this feed rejects the field -- fails silently, retried next run
     const json = await res.json();
     const officeMlsId = (json.value || [])[0] && (json.value || [])[0].ListOfficeMlsId;
@@ -533,10 +565,7 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
     while (url && pages < OFFICE_DISCOVERY_MAX_PAGES) {
       if (Date.now() - startedAt > TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) break;
       await throttle();
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
-      });
+      const res = await mlsFetch(url, token, store);
       if (res.status === 429) {
         await markSuspended(store, SUSPENSION_COOLDOWN_MS);
         return { suspended: true, found };
@@ -766,6 +795,19 @@ exports.handler = async () => {
   const startedAt = Date.now();
   _lastCloudinaryError = null; // see the 2026-08-13 diagnostics note above
 
+  // Our own budget, before MLS Grid's. Checked once at the top so a blocked run
+  // ends cleanly with a reason on record, rather than throwing out of the middle
+  // of a pass -- and so the kill switch (MLS_DISABLED) has somewhere obvious to
+  // take effect. Old usage buckets are pruned here because this is the only code
+  // path on the site that runs on a schedule and already budgets its own time.
+  const quota = await checkMlsQuota(store, { full: true });
+  if (quota.blocked) {
+    console.warn(`sync-listings: skipping this run — ${quota.reason}`);
+    await pruneUsage(store);
+    return { statusCode: 200, body: `quota guard: ${quota.reason}` };
+  }
+  await pruneUsage(store);
+
   const suspendedUntil = await readSuspension(store);
   if (suspendedUntil) {
     const waitSec = Math.ceil((suspendedUntil - Date.now()) / 1000);
@@ -829,7 +871,7 @@ exports.handler = async () => {
   // the priority pass below. Entirely best-effort: if either step fails or
   // is never able to run, nothing else in this file changes behavior. ----
   if (!state.herOfficeMlsId) {
-    const discovered = await discoverHerOfficeMlsId(listingsById, token);
+    const discovered = await discoverHerOfficeMlsId(listingsById, token, store);
     if (discovered) {
       state = { ...state, herOfficeMlsId: discovered };
       console.log(`sync-listings: discovered ListOfficeMlsId=${discovered} for Christine's office -- office-wide fast discovery is now active.`);
@@ -969,10 +1011,7 @@ exports.handler = async () => {
 
         await throttle();
 
-        const res = await fetch(requestUrl, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
-        });
+        const res = await mlsFetch(requestUrl, token, store);
         if (res.status === 429) {
           // Same account-wide suspension Listing-Engine's mls.js guards
           // against — open the circuit breaker so neither this run's
@@ -1101,8 +1140,16 @@ exports.handler = async () => {
       }
     }
   } catch (err) {
-    lastRunError = `exception: ${err && err.message}`;
-    console.error("sync-listings: exception during sync", err);
+    // The budget tripping mid-run is a deliberate stop, not a fault. Recording it
+    // as "exception: ..." would put a red row on site-health for the guard doing
+    // exactly its job, and the next person would go looking for a bug.
+    if (err instanceof MlsQuotaError) {
+      lastRunError = `quota guard: ${err.message}`;
+      console.warn(`sync-listings: ${lastRunError}`);
+    } else {
+      lastRunError = `exception: ${err && err.message}`;
+      console.error("sync-listings: exception during sync", err);
+    }
     // Save whatever progress we made before the error, same as a
     // time-budget break — next run resumes from the cursor.
   }

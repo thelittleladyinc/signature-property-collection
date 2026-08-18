@@ -65,6 +65,7 @@ const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
   isMediaThrottled, setMediaCooldown, usableUrl, markUrlUsed,
 } = require("./lib/_media");
+const { checkMlsQuota } = require("./lib/_mls-usage");
 
 const BLOB_STORE_NAME = "mls-listings";
 const IMAGE_FETCH_TIMEOUT_MS = 8000;
@@ -251,6 +252,9 @@ const PLACEHOLDER_TTL = {
   // The URL we held was single-use and already spent, and re-resolving didn't
   // produce another. Self-healing on the next resolve, so treat it like a limit.
   url_unavailable: 60,
+  // Our own budget said no. Clears at the top of the hour at the latest, and a
+  // short TTL means the photo returns as soon as it does.
+  quota_guard: 120,
   // A network blip. Worth retrying soon-ish, not instantly.
   image_fetch_failed: 300,
   exception: 300,
@@ -340,6 +344,11 @@ const EXPLANATIONS = {
   index_out_of_range: "This listing has fewer photos than the requested index.",
   throttled: "MLS Grid rate-limited us recently and the photo cooldown is still active, so no request " +
     "was made. This one is temporary — the same URL should work within a minute.",
+  quota_guard: "This site's own quota guard refused the request — not MLS Grid. We log every " +
+    "call we make and stop at half of MLS Grid's published limits, because a suspension costs days " +
+    "(this account was suspended on 2026-08-01) and a placeholder costs minutes. `quotaReason` says " +
+    "which budget was hit. If this fires in normal traffic, something is looping: check " +
+    "/.netlify/functions/mls-usage for the hour-by-hour breakdown.",
   url_unavailable: "The listing has this photo, but we couldn't get a usable download URL for it. " +
     "MLS Grid's media URLs are SINGLE-USE — once one has been spent on a download it can never be " +
     "replayed — and the attempt to resolve a fresh one either failed or was throttled. Temporary: " +
@@ -498,12 +507,26 @@ exports.handler = async (event) => {
       });
     }
 
+    // The budget, checked before the download rather than after a 429. A photo we
+    // already hold never reaches here -- the stored copy is served at the top of
+    // this handler -- so the cost of the guard being wrong is a placeholder on a
+    // photo nobody has loaded yet, never a page of holes. See _mls-usage.js.
+    const quota = await checkMlsQuota(store);
+    if (quota.blocked) {
+      console.warn(`listing-photo: ${listingId}/${index} refused by the quota guard — ${quota.reason}`);
+      return await servedOrPlaceholder(store, listingId, index, "quota_guard", debug, {
+        listingId, index, urlCount, quotaReason: quota.reason,
+        hourRequests: quota.hourRequests, hourMB: quota.hourMB,
+        hourRequestBudget: quota.hourRequestBudget, hourMBBudget: quota.hourMBBudget,
+      });
+    }
+
     // 2026-08-15: the Authorization header is chosen per URL rather than always
     // sent -- MLS Grid's pre-signed media URLs 403 when a second auth mechanism
     // rides along, which is what was blanking some cards. See fetchMediaResponse.
     const hostOf = (u) => { try { return new URL(u).host; } catch (e) { return null; } };
     let mediaHost = hostOf(resolved.url);
-    let attempt = await fetchMediaResponse(resolved.url, token, IMAGE_FETCH_TIMEOUT_MS);
+    let attempt = await fetchMediaResponse(resolved.url, token, IMAGE_FETCH_TIMEOUT_MS, store);
     // Spent, whatever came back. A URL that has reached MLS Grid is single-use and
     // gone; handing it to the next visitor would guarantee them a failure that looks
     // exactly like a rate limit. Marked before the response is even inspected, so no
@@ -524,7 +547,7 @@ exports.handler = async (event) => {
           `(${(attempt && attempt.res && attempt.res.status) || "no response"}); retrying with a freshly resolved one`);
         resolved = fresh;
         mediaHost = hostOf(fresh.url);
-        attempt = await fetchMediaResponse(fresh.url, token, IMAGE_FETCH_TIMEOUT_MS);
+        attempt = await fetchMediaResponse(fresh.url, token, IMAGE_FETCH_TIMEOUT_MS, store);
         await markUrlUsed(store, listingId, index);
       }
     }

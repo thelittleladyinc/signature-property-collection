@@ -46,6 +46,7 @@ const { isCloudinaryConfigured, cloudinaryCredentials } = require("./lib/_cloudi
 const {
   resolveMediaFor, fetchMediaResponse, looksPresigned, isThrottled, markUrlUsed,
 } = require("./lib/_media");
+const { checkMlsQuota } = require("./lib/_mls-usage");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 // Read for the Tour It With Me coverage row below — same file the map reads.
 const LOCAL_SPOTS = require("./lib/_local-spots.json");
@@ -572,6 +573,20 @@ exports.handler = async (event) => {
     try { return !!(l.photo && new URL(l.photo).host.indexOf("cloudinary") !== -1); } catch (e) { return false; }
   }).length;
 
+  // Read before the rows are built: one blob sweep for the whole page rather than
+  // one per row. Never fatal -- a health page that cannot render because its own
+  // instrumentation failed is worse than one honest red row.
+  let mlsQuota;
+  try {
+    mlsQuota = await checkMlsQuota(store, { full: true });
+  } catch (err) {
+    mlsQuota = {
+      blocked: true, disabled: false,
+      reason: `usage log unreadable (${err && err.message})`,
+      hourRequests: 0, hourMB: 0, hourRequestBudget: 0, hourMBBudget: 0,
+    };
+  }
+
   const checks = [
     {
       name: "Sync running on schedule",
@@ -586,6 +601,24 @@ exports.handler = async (event) => {
       name: "No MLS Grid errors on last run",
       ok: !state || !state.lastRunError,
       detail: (state && state.lastRunError) || "none",
+    },
+    // 2026-08-18. The row that was missing for two days. Everything else on this
+    // page reports whether something WORKED; this reports what it COST, which is
+    // the question nobody could answer while three apps shared one token and the
+    // photos kept going grey. Full numbers at /.netlify/functions/mls-usage.
+    {
+      name: "MLS Grid usage inside our own budget",
+      ok: !mlsQuota.blocked,
+      detail: mlsQuota.disabled
+        ? "MLS Grid is switched OFF here (MLS_DISABLED is set) — no requests are being made at all"
+        : mlsQuota.blocked
+          ? `Requests are being REFUSED by our own guard: ${mlsQuota.reason}`
+          : `${mlsQuota.hourRequests} request(s) and ${mlsQuota.hourMB} MB this hour ` +
+            `(our budget: ${mlsQuota.hourRequestBudget} and ${mlsQuota.hourMBBudget} MB, ` +
+            `which is half of MLS Grid's real limit). ` +
+            `Last 24h: ${mlsQuota.dayRequests ?? "?"} request(s), ` +
+            `${mlsQuota.dayApi ?? "?"} API + ${mlsQuota.dayMedia ?? "?"} photo. ` +
+            `This site only — the account total across all three apps is on MLS Grid's usage tab.`,
     },
     {
       optional: true,

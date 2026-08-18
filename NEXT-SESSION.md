@@ -426,6 +426,16 @@ it caches Media URLs for a WEEK against a one-hour single-use URL, and it render
 raw MLS Grid URLs straight into `<img src>`, which is the hot-linking their docs
 prohibit in bold.
 
+**Built 2026-08-18 in response:** `lib/_mls-usage.js`, `/.netlify/functions/mls-usage`
+and a `/site-health` row. Every MLS Grid call this site makes — API and media,
+split apart for the first time — is logged into hourly buckets in Blobs, and a
+budget guard reads that log BEFORE each request and refuses at half of the real
+limits. It fails closed, its ceilings can be tuned down but never up, and
+`MLS_DISABLED=true` stops everything without touching credentials. The encoded
+limits are the suspension-notice ones, not the published ones. §7d of the doc has
+the details, including the honest limitation: concurrent invocations can lose a
+count, which is why the budget is half.
+
 Also: **usage is self-serve** — Manage Subscriptions → Edit Data Subscription
 Details → Usage tab → Usage Logs gives the hourly and 24-hour breakdown without
 emailing anybody. And the subscription types (IDX/VOW/BO/PT) are use-case
