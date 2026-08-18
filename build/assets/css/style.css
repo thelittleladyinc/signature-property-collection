@@ -67,7 +67,13 @@
 
   /* legacy aliases so nothing silently breaks if referenced elsewhere */
   --dusty-rose: var(--rose);
-  --deep-mauve: var(--mauve);
+  /* 2026-08-18 (WCAG): --deep-mauve was aliased to --mauve (#BA8C84), which is
+     LIGHTER than the rose — 2.92:1 against white, failing contrast both as a
+     button background under white text and as label text on white, i.e. every
+     one of its ~14 uses. Now a genuinely deep rose: 5.78:1 on white, 5.19:1
+     on the cream tint, computed to clear WCAG AA at both. The --mauve token
+     itself is untouched (still used for the map marker fill). */
+  --deep-mauve: #8f5560;
 
   --font-script: 'Corinthia', cursive;
   --font-serif: 'Libre Baskerville', Georgia, serif;
@@ -163,7 +169,7 @@ a { color: inherit; text-decoration: none; }
 .brand-wordmark { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
 .brand-logo { height: 26px; width: auto; display: block; filter: brightness(0) invert(1); }
 .brand-mark { font-family: var(--font-script); font-size: 30px; line-height: 1; color: var(--white); }
-.brand-sub { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; opacity: .9; white-space: nowrap; color: var(--white); }
+.brand-sub { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; color: var(--charcoal); }
 .brokerage { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; border-left: 1px solid rgba(255,255,255,.5); padding-left: 14px; margin-left: 4px; opacity: .95; }
 /* 2026-08-13: replaced the plain-text "LPT Realty" brokerage label in the
    header with the real LPT Realty logo (transparent PNG, any-color source
@@ -291,8 +297,8 @@ nav.primary-nav a:hover { text-decoration: underline; text-decoration-color: cur
   cursor: pointer;
   transition: background .2s ease, color .2s ease, border-color .2s ease;
 }
-.btn-primary { background: var(--dusty-rose); color: var(--white); }
-.btn-primary:hover { background: var(--deep-mauve); }
+.btn-primary { background: var(--deep-mauve); color: var(--white); }
+.btn-primary:hover { background: #7a4650; }
 .btn-outline { border-color: var(--white); color: var(--white); background: transparent; }
 .btn-outline:hover { background: var(--white); color: var(--charcoal); }
 .btn-dark { background: var(--charcoal); color: var(--white); }
@@ -1268,6 +1274,13 @@ a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--deep-mauve);
+}
+/* 2026-08-18: the closing brace above was missing. Under native CSS nesting
+   that is not a syntax error — every rule from here to the end of the file
+   quietly became a NESTED child of .spot-proof, matching nothing. The mobile
+   contact bar rendered as four unstyled 17px links instead of the fixed
+   56px-tall tap bar, and the keyboard skip-link below was dead too. Found by
+   Lighthouse's touch-target audit refusing to agree with what this file says. */
 /* 2026-08-14 (a11y): skip link paired with the new <main id="main">
    landmark in build.py's page(). Visually hidden until keyboard-focused,
    so it costs sighted users nothing and gives keyboard/screen-reader
@@ -1361,7 +1374,7 @@ h2.widget-title {
   }
   .contact-bar .cbar-item:first-child { border-left: 0; }
   .contact-bar .cbar-ico { font-size: 17px; line-height: 1; }
-  .contact-bar .cbar-item-primary { background: var(--dusty-rose, #B86F7A); color: #fff; }
+  .contact-bar .cbar-item-primary { background: var(--deep-mauve, #8f5560); color: #fff; }
   .contact-bar .cbar-item:active { background: rgba(184,111,122,.14); }
   .contact-bar .cbar-item-primary:active { background: var(--deep-mauve, #8f5560); }
   body { padding-bottom: 62px; }
