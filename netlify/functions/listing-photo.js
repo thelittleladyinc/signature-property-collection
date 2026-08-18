@@ -66,6 +66,7 @@ const {
   isMediaThrottled, setMediaCooldown, usableUrl, markUrlUsed,
 } = require("./lib/_media");
 const { checkMlsQuota } = require("./lib/_mls-usage");
+const { uploadBufferToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
 
 const BLOB_STORE_NAME = "mls-listings";
 const IMAGE_FETCH_TIMEOUT_MS = 8000;
@@ -172,6 +173,9 @@ async function readCachedPhoto(store, listingId, index) {
   if (index > PHOTO_CACHE_MAX_INDEX) return null;
   try {
     const hit = await store.get(photoCacheKey(listingId, index), { type: "json" });
+    // A photo too large to return inline lives on Cloudinary instead and the
+    // entry holds a URL rather than bytes. See the too_large path below.
+    if (hit && typeof hit.redirectUrl === "string" && hit.redirectUrl) return hit;
     if (hit && typeof hit.b64 === "string" && hit.b64.length) return hit;
   } catch (err) {
     console.warn(`listing-photo: cache read failed for ${listingId}/${index}:`, err && err.message);
@@ -213,6 +217,19 @@ async function servedOrPlaceholder(store, listingId, index, reason, debug, extra
 // Serve the stored copy. Deliberately NOT marked as a fallback in any way a visitor
 // can see: it is the same image, fetched from the same source, just earlier.
 function cachedPhotoResponse(hit, reason) {
+  if (hit && hit.redirectUrl) {
+    return {
+      statusCode: 302,
+      headers: {
+        Location: hit.redirectUrl,
+        "Cache-Control": IMAGE_CACHE_CONTROL,
+        "X-Photo-Cache": "hit",
+        "X-Photo-Cache-Reason": "oversize-rehosted",
+        "X-Photo-Cache-Stored": String(hit.storedAt || ""),
+      },
+      body: "",
+    };
+  }
   return {
     statusCode: 200,
     headers: {
@@ -367,7 +384,9 @@ const EXPLANATIONS = {
     "happens instead of continuing to hammer the host, which is what used to keep the limit alive. " +
     "Reload after `retryAfterSeconds`. If it recurs constantly, the MLS Grid quota shared with " +
     "Listing-Engine and Expired-Luxury is the thing to look at, not this site.",
-  too_large: "The photo downloaded fine but is too big to return through a Netlify function. " +
+  too_large: "The photo downloaded fine but is too big to return through a Netlify function, AND " +
+    "re-hosting it to Cloudinary either isn't configured or failed — with Cloudinary configured this " +
+    "case resolves itself by redirecting to a permanently re-hosted copy. " +
     "A function response is capped at 6 MB and base64 encoding inflates it by a third, so the real " +
     "ceiling is about 4.4 MB. Full-resolution aerials and scanned plat maps — common on land " +
     "listings — routinely exceed it while ordinary house photos don't.",
@@ -432,7 +451,7 @@ async function resolvePhotoUrl(listingId, index, store, token, force) {
 // only greps this file for strings proves none of them. tests/test-photocache.js
 // drives these against a fake store.
 exports.__test = {
-  photoCacheKey, shouldCachePhoto, readCachedPhoto, writeCachedPhoto,
+  photoCacheKey, shouldCachePhoto, readCachedPhoto, writeCachedPhoto, cachedPhotoResponse,
   resetMineCache: () => { _mineIds = null; },
 };
 
@@ -610,6 +629,35 @@ exports.handler = async (event) => {
     if (buf.length > MAX_INLINE_IMAGE_BYTES) {
       console.error(`listing-photo: ${listingId} photo ${index} is ${buf.length} bytes — ` +
         `over the ${MAX_INLINE_IMAGE_BYTES}-byte inline ceiling.`);
+
+      // 2026-08-18: this used to be the end of the road, and it is the ONLY
+      // failure on this endpoint that no cache, cooldown or quota fix could ever
+      // help -- the 6 MB cap is Netlify's, not MLS Grid's, so those photos were
+      // permanently grey. Land listings with full-resolution aerials and scanned
+      // plat maps hit it routinely.
+      //
+      // Cloudinary is the way out: its URLs go straight to the browser and never
+      // pass through a function response. We already hold the bytes, so this costs
+      // MLS Grid nothing extra -- and re-hosting is what its docs ask for anyway.
+      // The redirect is cached like any other stored photo, so the next visitor
+      // goes to Cloudinary without touching MLS Grid or this ceiling again.
+      if (!debug && isCloudinaryConfigured()) {
+        try {
+          const url = await uploadBufferToCloudinary(buf, `spc-oversize/${listingId}/photo-${index}`, contentType);
+          if (url) {
+            await store.setJSON(photoCacheKey(listingId, index), {
+              redirectUrl: url, bytes: buf.length, contentType,
+              storedAt: new Date().toISOString(),
+            }).catch(() => {});
+            console.warn(`listing-photo: ${listingId}/${index} was ${buf.length} bytes — ` +
+              `re-hosted to Cloudinary and redirected instead of going grey.`);
+            return cachedPhotoResponse({ redirectUrl: url, storedAt: new Date().toISOString() }, "oversize");
+          }
+        } catch (err) {
+          // Falls through to the placeholder below, which is where it was before.
+          console.error(`listing-photo: oversize re-host failed for ${listingId}/${index}:`, err && err.message);
+        }
+      }
       return await servedOrPlaceholder(store, listingId, index, "too_large", debug, {
         listingId, index, bytes: buf.length, limitBytes: MAX_INLINE_IMAGE_BYTES,
         overBy: buf.length - MAX_INLINE_IMAGE_BYTES, contentType, mediaHost, urlCount,

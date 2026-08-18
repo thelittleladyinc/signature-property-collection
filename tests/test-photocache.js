@@ -204,6 +204,39 @@ function fakeStore(opts) {
   check("behaviour: and still refuses an index past what any page renders",
     await __test.shouldCachePhoto(fakeStore({ throwOnGet: true }), MINE, 40) === false);
 
+  // ---- OVERSIZE PHOTOS. The one failure no cache or quota fix could reach: a
+  // Netlify function response is capped at 6MB and base64 inflates by a third, so
+  // anything over ~4.4MB was permanently grey no matter what MLS Grid did. Those
+  // are now re-hosted to Cloudinary and served as a redirect, which means the
+  // cache has to carry a URL as well as bytes.
+  {
+    const store2 = fakeStore();
+    await store2.setJSON(__test.photoCacheKey(NOT_MINE, 0), {
+      redirectUrl: "https://res.cloudinary.com/listingengine/image/upload/x.jpg",
+      bytes: 7_000_000, storedAt: "2026-08-18T00:00:00.000Z",
+    });
+    const hit = await __test.readCachedPhoto(store2, NOT_MINE, 0);
+    check("behaviour: a re-hosted oversize photo reads back from the cache",
+      !!hit && hit.redirectUrl.indexOf("res.cloudinary.com") !== -1,
+      "otherwise the next visitor re-downloads a photo we already know is too big");
+
+    const res = __test.cachedPhotoResponse(hit, "oversize");
+    check("behaviour: and is served as a redirect, not as bytes",
+      res.statusCode === 302 && res.headers.Location === hit.redirectUrl,
+      "returning it inline is the exact thing that cannot work");
+    check("behaviour: the redirect is cached as hard as a real photo",
+      /max-age=86400/.test(res.headers["Cache-Control"] || ""));
+    check("behaviour: and is identifiable in a network tab",
+      res.headers["X-Photo-Cache-Reason"] === "oversize-rehosted");
+
+    // A normal stored photo must still come back as bytes.
+    const buf2 = Buffer.from("fake-jpeg-bytes");
+    await __test.writeCachedPhoto(store2, MINE, 0, buf2, "image/jpeg");
+    const normal = __test.cachedPhotoResponse(await __test.readCachedPhoto(store2, MINE, 0), "stored");
+    check("behaviour: an ordinary stored photo is still returned inline",
+      normal.statusCode === 200 && normal.isBase64Encoded === true);
+  }
+
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
   process.exit(failures === 0 ? 0 : 1);
 })();

@@ -399,7 +399,7 @@ const CLOUDINARY_PHOTOS_PER_LISTING_PER_RUN = 4;
 // larger budget. Without this parameter the pass was pointless -- it ran first,
 // then hit this same 2000ms window from the inside and broke immediately, which
 // is the second half of why 0 of 11 photos were ever cached.
-async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, deadlineMs) {
+async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, deadlineMs, store) {
   if (!mapped.photos || !mapped.photos.length || !isHerListing(mapped)) return 0;
   if (!isCloudinaryConfigured()) {
     _lastCloudinaryError = "not_configured: one or more of CLOUDINARY_CLOUD_NAME/" +
@@ -427,7 +427,7 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt,
     if (throttle) await throttle();
     try {
       const publicId = `spc-listings/${mapped.listingId}/photo-${i}`;
-      const secureUrl = await cachePhotoToCloudinary(mapped.photos[i], token, publicId);
+      const secureUrl = await cachePhotoToCloudinary(mapped.photos[i], token, publicId, store);
       if (secureUrl) {
         cloudinaryPhotos[i] = secureUrl;
         uploadedThisCall += 1;
@@ -485,7 +485,7 @@ async function refreshOneListing(listingId, listingsById, store, token, startedA
     return { removed: true };
   }
   const previouslyStored = listingsById[mapped.listingId];
-  const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, photoDeadlineMs);
+  const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, photoDeadlineMs, store);
   mapped.photosRefreshedAt = new Date().toISOString();
   listingsById[mapped.listingId] = slimForStorage(mapped);
   return { refreshed: true, cached: photosCached > 0, photosCached };
@@ -587,7 +587,7 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
         const isNew = !listingsById[mapped.listingId];
         const previouslyStored = listingsById[mapped.listingId];
         if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
-          await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle);
+          await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, null, store);
         }
         mapped.photosRefreshedAt = new Date().toISOString();
         listingsById[mapped.listingId] = slimForStorage(mapped);
@@ -1055,7 +1055,7 @@ exports.handler = async () => {
           if (mapped.listingId) {
             const previouslyStored = listingsById[mapped.listingId];
             if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
-              const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle);
+              const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, null, store);
               coverPhotosCached += photosCached;
             }
             mapped.photosRefreshedAt = new Date().toISOString();

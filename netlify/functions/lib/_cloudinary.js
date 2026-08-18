@@ -124,7 +124,11 @@ const MIN_IMAGE_SIZE_BYTES = 2048;
 // durations of 11565ms (502, function crashed) and 14965ms (499, platform
 // gave up waiting) on recent invocations. Tightened to well under the
 // budget so one photo can never eat the whole run by itself.
-async function fetchMlsPhotoBuffer(mediaUrl, token) {
+// `store` is optional and only used to record the download against this site's
+// MLS Grid usage log (lib/_mls-usage.js). Without it these downloads are real
+// traffic the usage endpoint cannot see -- and an unmeasured consumer is exactly
+// the blind spot that made the whole 429 investigation a guess.
+async function fetchMlsPhotoBuffer(mediaUrl, token, store) {
   // 2026-08-15: was an unconditional `Authorization: Bearer` fetch, which is why
   // site-health reported "0 of 11" of Christine's listings cached alongside
   // "IRE1062480 photo 3: Server returned unexpected status code - 403". MLS Grid
@@ -132,7 +136,7 @@ async function fetchMlsPhotoBuffer(mediaUrl, token) {
   // carries an Authorization header is rejected as two auth mechanisms. The
   // shared helper picks the right mode per URL and retries the other way on a
   // 401/403. See fetchMediaResponse in _media.js.
-  const attempt = await fetchMediaResponse(mediaUrl, token, 4000);
+  const attempt = await fetchMediaResponse(mediaUrl, token, 4000, store);
   const res = attempt && attempt.res;
   if (!res) {
     const err = new Error("MLS Grid photo fetch failed with no response");
@@ -183,9 +187,9 @@ function describeCloudinaryError(err, publicId, bytes) {
   return parts.join(" | ");
 }
 
-async function cachePhotoToCloudinary(mediaUrl, token, publicId) {
+async function cachePhotoToCloudinary(mediaUrl, token, publicId, store) {
   if (!configureCloudinary()) return null;
-  const buffer = await fetchMlsPhotoBuffer(mediaUrl, token);
+  const buffer = await fetchMlsPhotoBuffer(mediaUrl, token, store);
   const dataUri = `data:image/jpeg;base64,${buffer.toString("base64")}`;
   let result;
   try {
@@ -196,11 +200,7 @@ async function cachePhotoToCloudinary(mediaUrl, token, publicId) {
     throw detailed;
   }
   if (!result || !result.secure_url) return null;
-  return cloudinary.url(publicId, {
-    secure: true,
-    resource_type: "image",
-    transformation: [{ quality: "auto", fetch_format: "auto", width: 1600, crop: "limit" }],
-  });
+  return deliveryUrl(publicId);
 }
 
 async function uploadDataUri(dataUri, publicId) {
@@ -220,19 +220,19 @@ async function uploadDataUri(dataUri, publicId) {
     // total budget so one slow call can't take the whole run down with it.
     timeout: 4000,
   });
-  if (!result.secure_url) return null;
-  // 2026-08-13 (speed): MLS Grid's original photos are often several
-  // megabytes and always plain JPEG. result.secure_url above points at
-  // that untouched master -- fine to keep as the stored original, but not
-  // what visitors should actually download. Build the delivery URL with
-  // Cloudinary's automatic optimization instead: f_auto serves WebP/AVIF
-  // to browsers that support it (falls back to JPEG otherwise), q_auto
-  // picks the smallest quality level that still looks right, and capping
-  // width at 1600 is plenty for any card or gallery view on this site
-  // (nothing here displays a photo larger than that). Cloudinary generates
-  // this derivative once on first request and caches it at their CDN edge
-  // -- it costs nothing extra per view, it just means every visitor gets a
-  // much lighter image than MLS Grid's original.
+}
+
+// The URL visitors actually load. MLS Grid's originals are often several
+// megabytes of plain JPEG. f_auto serves WebP/AVIF where the browser supports it,
+// q_auto picks the smallest quality that still looks right, and 1600px is wider
+// than anything this site displays. Cloudinary builds the derivative once and
+// serves it from its own CDN, so it costs nothing per view.
+//
+// 2026-08-18: this used to exist TWICE — once here, unreachable, sitting after
+// uploadDataUri's `return` and referencing a `result` variable never declared in
+// that scope. Dead, therefore harmless, and a ReferenceError waiting for whoever
+// tidied the return above it. One copy now, used by both callers.
+function deliveryUrl(publicId) {
   return cloudinary.url(publicId, {
     secure: true,
     resource_type: "image",
@@ -240,8 +240,31 @@ async function uploadDataUri(dataUri, publicId) {
   });
 }
 
+// Uploads bytes we ALREADY have, without going back to MLS Grid for them.
+//
+// 2026-08-18, for the one failure nothing else could fix: a Netlify function
+// response is capped at 6 MB and base64 inflates by a third, so any photo over
+// ~4.4 MB can never be returned by listing-photo.js at all. Those listings —
+// full-resolution aerials and scanned plat maps, i.e. land listings — have been
+// PERMANENTLY grey, immune to every cache, cooldown and quota fix, because the
+// ceiling is the platform's rather than MLS Grid's.
+//
+// Cloudinary is the way out, since a Cloudinary URL is served straight to the
+// browser and never passes through a function response. The photo has already
+// been downloaded by the time we discover it is too big, so this costs MLS Grid
+// nothing extra: it re-uses the buffer in hand, which is also the only shape that
+// respects "there is NEVER a reason to download the same media more than once".
+async function uploadBufferToCloudinary(buffer, publicId, contentType) {
+  if (!configureCloudinary()) return null;
+  const mime = (contentType && String(contentType).startsWith("image/")) ? contentType : "image/jpeg";
+  const result = await uploadDataUri(`data:${mime};base64,${buffer.toString("base64")}`, publicId);
+  if (!result || !result.secure_url) return null;
+  return deliveryUrl(publicId);
+}
+
 module.exports = {
   cachePhotoToCloudinary, isCloudinaryConfigured, MIN_IMAGE_SIZE_BYTES,
+  uploadBufferToCloudinary, deliveryUrl,
   // Exported so site-health can report WHICH cloud is in use, and so the parsing
   // of CLOUDINARY_URL is testable rather than only reachable through an upload.
   cloudinaryCredentials,

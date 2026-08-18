@@ -128,5 +128,30 @@ check("the api_secret-mismatch advice points at CLOUDINARY_URL",
   /api_secret mismatch[\s\S]{0,900}?CLOUDINARY_URL/.test(health),
   "telling her to re-pair two values by hand invites the same mistake again");
 
+// ---- 2026-08-18: the delivery URL, and the dead code that used to hide it ----
+// uploadDataUri() carried an unreachable duplicate of the delivery-URL block after
+// its own `return`, referencing a `result` variable that was never declared in that
+// scope. It could not run, so it was harmless — right up until someone tidied the
+// return above it. One copy now, exported, and tested rather than assumed.
+{
+  const lib = require(path.join(ROOT, "netlify", "functions", "lib", "_cloudinary.js"));
+  check("deliveryUrl is exported rather than inlined twice",
+    typeof lib.deliveryUrl === "function");
+  check("bytes we already hold can be uploaded without re-downloading them",
+    typeof lib.uploadBufferToCloudinary === "function",
+    "an oversize photo is downloaded before we learn it is too big — going back for it again " +
+    "would break 'there is NEVER a reason to download the same media more than once'");
+
+  const src = fs.readFileSync(path.join(ROOT, "netlify", "functions", "lib", "_cloudinary.js"), "utf8");
+  const upload = src.slice(src.indexOf("async function uploadDataUri("));
+  const body = upload.slice(0, upload.indexOf("\n}"));
+  check("uploadDataUri has no unreachable code after its return",
+    !/return cloudinary\.uploader[\s\S]*?\breturn\b/.test(body),
+    "a second return after the first is dead code, and this one referenced an undeclared variable");
+  check("and no undeclared `result` is read anywhere in it",
+    !/if \(!result\.secure_url\)/.test(body),
+    "this line was a ReferenceError waiting for whoever removed the return above it");
+}
+
 console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
