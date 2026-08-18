@@ -34,11 +34,30 @@ const cases = [
       check("says tags are left alone", /leaves them alone/.test(r.detail));
       check("includes a sample to fix the reader with", /"name":"Hot Lead - Website"/.test(r.detail), r.detail);
     }],
-  ["Lofty won't return the lead at all", 404, "not found",
+  // 2026-08-18. Two different 404s, and telling them apart is the whole job of
+  // this row. Christine's page carried a red ❌ reading "GET /leads/{id} isn't
+  // available on this account" — a guess this codebase's own evidence disproves,
+  // since lead 1147802441137106 read back HTTP 200. What actually happened is that
+  // her test used the Lofty account owner's own email, so Lofty MERGED it into the
+  // existing contact and handed back the absorbed record's id, which by definition
+  // no longer resolves. "Your CRM is broken" and "your test merged, as a duplicate
+  // always will" need opposite reactions, and only the second one was true.
+  ["a 404 that IS the merge signature", 404,
+    '{"message":"BaseApplicationException:errorCode=20006,errorMsg=Lead not exist"}',
+    (r) => {
+      check("row is NOT red — a merge is expected behaviour, not a fault",
+        r.ok === true,
+        "a red row for a duplicate submission trains you to ignore the health page");
+      check("names it as a merge", /MERGE signature/.test(r.detail), r.detail);
+      check("says the endpoint itself works", /read back HTTP 200/.test(r.detail));
+      check("explains why every test so far merged", /account\s+owner's own address/.test(r.detail), r.detail);
+      check("says what a real enquirer would do instead", /does\s+not merge/.test(r.detail), r.detail);
+    }],
+  ["a 404 that is NOT a merge", 404, "not found",
     (r) => {
       check("row is red", r.ok === false);
       check("shows Lofty's status", /404/.test(r.detail), r.detail);
-      check("explains what a 404 would mean", /can never be re-fired/.test(r.detail));
+      check("says plainly that this one is not the merge case", /NOT the merge signature/.test(r.detail));
     }],
 ];
 

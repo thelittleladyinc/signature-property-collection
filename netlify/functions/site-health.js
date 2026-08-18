@@ -955,6 +955,17 @@ exports.handler = async (event) => {
   }
   // ---- What Lofty says about the last lead, read straight back ------------
   // The row that exists so nobody has to relay a screenshot to find out.
+  //
+  // 2026-08-18: a merge has to be recognised from the EVIDENCE, not only from a
+  // flag. lib/_notify.js started stamping `leadMissing: true` on 2026-08-16, but
+  // Christine's most recent push predates it, so every record written before that
+  // date reads as an unexplained failure and paints this page red for a condition
+  // that is both expected and harmless. A record that carries the flag and one that
+  // merely carries Lofty's own 404 text are the same event.
+  const LOFTY_OWNER_HINT = "the site owner's own email address";
+  const mergeSignature = (body) => /errorCode=20006|Lead not exist/i.test(String(body || ""));
+  const lookupIsMerge = (r) =>
+    !!(r && r.httpStatus === 404 && mergeSignature(r.body != null ? r.body : r.response));
   let leadRowOk;
   let leadRowDetail;
   if (!loftyApiKey) {
@@ -968,12 +979,33 @@ exports.handler = async (event) => {
   } else if (!loftyLeadCheck.leadId) {
     leadRowOk = true;
     leadRowDetail = loftyLeadCheck.reason || "No lead pushed yet.";
+  } else if (!loftyLeadCheck.ok && lookupIsMerge(loftyLeadCheck)) {
+    // 2026-08-18. This row said: "If this is a 404, then GET /leads/{id} isn't
+    // available on this account." That guess is disproved by this codebase's own
+    // evidence — lead 1147802441137106 read back with HTTP 200 (see addLoftyNote
+    // in lib/_notify.js). The endpoint works. What does NOT work is reading back a
+    // lead that MERGED into an existing contact: Lofty returns the absorbed record's
+    // id from the create call and never discloses the survivor's.
+    //
+    // The distinction is the whole point of this row. "Your CRM integration is
+    // broken" and "your own test used your own account-owner email, so it merged"
+    // demand completely different reactions, and only one of them is true.
+    leadRowOk = true;
+    leadRowDetail = `Lead ${loftyLeadCheck.leadId} does not resolve — 404 "Lead not exist". ` +
+      `That is the MERGE signature, not a broken integration: this submission matched an ` +
+      `existing Lofty contact, so Lofty absorbed it and returned the absorbed record's id ` +
+      `rather than the surviving contact's. The endpoint itself is fine (other leads read ` +
+      `back HTTP 200). ` +
+      `Every lead so far has come from ${LOFTY_OWNER_HINT}, which is the Lofty account ` +
+      `owner's own address and therefore merges every time. A genuinely new enquirer does ` +
+      `not merge, and reads back normally. Worth re-testing from an address that is not ` +
+      `already a contact before treating this as a fault.`;
   } else if (!loftyLeadCheck.ok) {
     leadRowOk = false;
     leadRowDetail = `Lofty would NOT return lead ${loftyLeadCheck.leadId}: ` +
       `${loftyLeadCheck.httpStatus}${loftyLeadCheck.body ? ` — ${String(loftyLeadCheck.body).slice(0, 200)}` : ""}. ` +
-      "If this is a 404, then GET /leads/{id} isn't available on this account and the trigger " +
-      "tag can never be re-fired — which would explain a Smart Plan that never runs.";
+      "This is NOT the merge signature (a merge answers 404 with errorCode=20006 / " +
+      "\"Lead not exist\"), so it is worth looking at properly.";
   } else if (/no 'tags' field/.test(loftyLeadCheck.tagShape || "")) {
     // 2026-08-16: answered, so stop asking. Lofty's GET /leads/{id} returns no
     // tags on this account, which means the tag can never be re-fired for a
@@ -1109,7 +1141,12 @@ exports.handler = async (event) => {
   // pipeline was broken when the only thing that had happened was Lofty
   // deduplicating her own email -- and a status page that overstates is one she
   // stops trusting for the rows that do matter.
-  const leadMerged = !!(note && note.leadMissing);
+  // Same evidence-not-flag rule as the lookup row above: records written before
+  // 2026-08-16 have no leadMissing flag, and rendering those as an outright failure
+  // is what put a red ❌ on this page for a test submission that behaved exactly as
+  // a merge is supposed to.
+  const leadMerged = !!(note && (note.leadMissing ||
+    (note.httpStatus === 404 && mergeSignature(note.response))));
   const parts = [];
   if (!note || !note.attempted) {
     parts.push("Timeline note: not attempted yet.");
