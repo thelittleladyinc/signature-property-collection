@@ -1315,9 +1315,14 @@ exports.handler = async () => {
         !(await isThrottled(store)) && !(await isMediaThrottled(store)) &&
         Date.now() - startedAt < TIME_BUDGET_MS) {
       try {
-        const BACKFILL_PER_RUN = 6;
+        // 2026-08-19: 6 -> 18 at Christine's ok — covers everything in ~2 days
+        // instead of a week. Still under 1% of the hourly request budget, and
+        // the DEADLINE below is the real governor: the run stores as many as
+        // fit before 21s elapsed and stops, so Netlify's 30s ceiling holds
+        // whatever the cap says.
+        const BACKFILL_PER_RUN = 18;
         const BACKFILL_DEADLINE_MS = 21000; // total elapsed; worst case stays under Netlify's 30s
-        const BACKFILL_MAX_CHECKS = 40;     // existence checks are cheap but not free
+        const BACKFILL_MAX_CHECKS = 90;     // existence checks are cheap but not free
         const candidates = Object.values(listingsById)
           .filter((l) => l && l.listingId && (l.photoCount || 0) > 0 && !isHerListing(l))
           .sort((a, b) => (b.price || 0) - (a.price || 0));
