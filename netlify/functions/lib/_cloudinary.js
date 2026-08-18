@@ -286,8 +286,40 @@ async function uploadBufferToCloudinary(buffer, publicId, contentType) {
   return deliveryUrl(publicId);
 }
 
+// The cloud this deploy is configured to write to, or null. Exported because a
+// stored URL is only a cache hit if it lives on the cloud we are still using.
+function currentCloudName() {
+  const c = cloudinaryCredentials();
+  return (c && c.cloud_name) || null;
+}
+
+// The cloud a previously-stored Cloudinary URL actually lives on.
+// Shape: https://res.cloudinary.com/<cloud_name>/image/upload/...
+function cloudNameOfUrl(url) {
+  const m = /^https?:\/\/res\.cloudinary\.com\/([^/]+)\//i.exec(String(url || ""));
+  return m ? m[1] : null;
+}
+
+// 2026-08-18. Christine is moving the website onto its own Cloudinary account so
+// Listing-Engine's photo imports can no longer exhaust the credits her public
+// site depends on. Her eleven listings were already re-hosted — on the OLD cloud —
+// and the sync skips any photo it believes is already cached, so without this they
+// would sit on the old account forever, quietly depending on an account this site
+// no longer controls.
+//
+// A stored URL on a cloud we no longer write to is not a cache hit. Saying so here
+// makes the migration happen by itself on the next few sync runs, and makes any
+// future cloud change self-healing rather than a manual blob edit.
+function isOnCurrentCloud(url) {
+  const cloud = currentCloudName();
+  if (!cloud) return true; // not configured: nothing to compare against, change nothing
+  const on = cloudNameOfUrl(url);
+  return !on || on === cloud;
+}
+
 module.exports = {
   cachePhotoToCloudinary, isCloudinaryConfigured, MIN_IMAGE_SIZE_BYTES,
+  currentCloudName, cloudNameOfUrl, isOnCurrentCloud,
   uploadBufferToCloudinary, deliveryUrl,
   // Exported so site-health can report WHICH cloud is in use, and so the parsing
   // of CLOUDINARY_URL is testable rather than only reachable through an upload.

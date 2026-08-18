@@ -70,7 +70,9 @@ const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES, OPERATING_COUNTIES,
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
 } = require("./lib/_mls-shared");
-const { cachePhotoToCloudinary, isCloudinaryConfigured } = require("./lib/_cloudinary");
+const {
+  cachePhotoToCloudinary, isCloudinaryConfigured, isOnCurrentCloud,
+} = require("./lib/_cloudinary");
 const { recordMlsCall, checkMlsQuota, pruneUsage, bytesFromResponse } = require("./lib/_mls-usage");
 const { invalidatePhotoCache } = require("./lib/_media");
 const { drainFailedPushes } = require("./lib/_lofty");
@@ -413,9 +415,20 @@ async function cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt,
     return 0; // fall back to the raw MLS Grid URLs
   }
 
-  const already = (previouslyStored && Array.isArray(previouslyStored.cloudinaryPhotos))
+  const stored = (previouslyStored && Array.isArray(previouslyStored.cloudinaryPhotos))
     ? previouslyStored.cloudinaryPhotos.slice()
     : (previouslyStored && previouslyStored.cloudinaryPhoto ? [previouslyStored.cloudinaryPhoto] : []);
+  // A copy on a cloud this deploy no longer writes to is not a copy we have. It
+  // belongs to an account we may not control any more, so it is re-hosted rather
+  // than trusted -- which is what makes a Cloudinary account move happen by itself
+  // instead of stranding the listings that were cached before it. See
+  // isOnCurrentCloud in lib/_cloudinary.js.
+  const already = stored.map((u) => (u && !isOnCurrentCloud(u) ? null : u));
+  const strandedCount = stored.filter((u) => u && !isOnCurrentCloud(u)).length;
+  if (strandedCount) {
+    console.log(`sync-listings: ${mapped.listingId} has ${strandedCount} photo(s) on a ` +
+      `previous Cloudinary cloud — re-hosting them to the one configured now.`);
+  }
   const cloudinaryPhotos = mapped.photos.map((_, i) => already[i] || null);
   let uploadedThisCall = 0;
   let attemptsThisCall = 0;

@@ -192,5 +192,48 @@ check("the api_secret-mismatch advice points at CLOUDINARY_URL",
   keys.forEach((k, i) => { if (savedTrio[i] !== undefined) process.env[k] = savedTrio[i]; });
 }
 
+// ---- 2026-08-18: moving the site to its own Cloudinary account ------------
+// Christine's website and Listing-Engine were on the same cloud ("listingengine",
+// confirmed from Render's own env vars), sharing one 25-credit free tier that
+// Listing-Engine drains generating fourteen social variants per photo. She is
+// moving the site to a separate account.
+//
+// Her eleven listings were already re-hosted — on the OLD cloud — and the sync
+// skips any photo it believes is cached. Without this, those eleven would stay on
+// an account the website no longer controls, indefinitely, and nothing would say so.
+{
+  const lib = require(path.join(ROOT, "netlify", "functions", "lib", "_cloudinary.js"));
+  const saved = process.env.CLOUDINARY_URL;
+  process.env.CLOUDINARY_URL = "cloudinary://123:abc@dcim65cok";
+
+  check("the cloud in a stored URL is read correctly",
+    lib.cloudNameOfUrl("https://res.cloudinary.com/listingengine/image/upload/v1/x.jpg") === "listingengine");
+  check("a photo on the cloud we use now still counts as cached",
+    lib.isOnCurrentCloud("https://res.cloudinary.com/dcim65cok/image/upload/v1/x.jpg") === true);
+  check("a photo on the OLD cloud does NOT",
+    lib.isOnCurrentCloud("https://res.cloudinary.com/listingengine/image/upload/v1/x.jpg") === false,
+    "otherwise her eleven listings stay on an account this site no longer controls");
+  check("and the sync re-hosts exactly those",
+    /const already = stored\.map\(\(u\) => \(u && !isOnCurrentCloud\(u\) \? null : u\)\)/
+      .test(require("fs").readFileSync(path.join(ROOT, "netlify", "functions", "sync-listings.js"), "utf8")),
+    "the migration has to happen by itself — nobody is going to hand-edit blobs");
+
+  // Not configured: compare against nothing, change nothing. Re-hosting every
+  // photo because an env var is missing would be a far worse failure than leaving
+  // them where they are.
+  delete process.env.CLOUDINARY_URL;
+  const trio = [process.env.CLOUDINARY_CLOUD_NAME, process.env.CLOUDINARY_API_KEY, process.env.CLOUDINARY_API_SECRET];
+  delete process.env.CLOUDINARY_CLOUD_NAME;
+  check("with no Cloudinary configured, nothing is declared stranded",
+    lib.isOnCurrentCloud("https://res.cloudinary.com/anything/image/upload/v1/x.jpg") === true,
+    "a missing env var must not trigger a mass re-upload");
+  check("a non-Cloudinary URL is left alone too",
+    lib.isOnCurrentCloud("https://media.mlsgrid.com/token=x/images/y.jpg") === true);
+
+  if (saved === undefined) delete process.env.CLOUDINARY_URL; else process.env.CLOUDINARY_URL = saved;
+  ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"]
+    .forEach((k, i) => { if (trio[i] !== undefined) process.env[k] = trio[i]; });
+}
+
 console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
