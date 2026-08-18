@@ -75,7 +75,10 @@ const {
   cachePhotoToCloudinary, isCloudinaryConfigured, isOnCurrentCloud, deliveryUrl,
 } = require("./lib/_cloudinary");
 const { recordMlsCall, checkMlsQuota, pruneUsage, bytesFromResponse } = require("./lib/_mls-usage");
-const { invalidatePhotoCache } = require("./lib/_media");
+const {
+  invalidatePhotoCache, resolveMediaFor, readCachedUrls, usableUrl, markUrlUsed,
+  fetchMediaResponse, writeCachedPhoto, photoCacheKey, isThrottled, isMediaThrottled,
+} = require("./lib/_media");
 const { drainFailedPushes } = require("./lib/_lofty");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
@@ -986,6 +989,7 @@ exports.handler = async () => {
   let httpErrorOccurred = false;
   let coverPhotosCached = 0;
   let staleListingsRefreshed = 0;
+  let coversBackfilled = 0;
   // Tracks whether ANY MLS Grid request has been made yet this run (across
   // the priority pass, the main loop, and the refresh sweep) so exactly one
   // fixed REQUEST_DELAY_MS gap is kept between every consecutive request
@@ -1231,6 +1235,8 @@ exports.handler = async () => {
           lastRunStoreDropped: cleanup.dropped,
           lastRunCoverPhotosCached: coverPhotosCached,
           lastRunStaleListingsRefreshed: staleListingsRefreshed,
+          lastRunCoversBackfilled: 0,
+          backfillCursor: state.backfillCursor || 0,
           lastRunError: null,
           lastCloudinaryError: _lastCloudinaryError,
           herOfficeMlsId: state.herOfficeMlsId || null,
@@ -1282,6 +1288,80 @@ exports.handler = async () => {
         }
       }
     }
+
+    // ---- Cover backfill: pre-store the photos visitors will ask for -------
+    // 2026-08-18 (Christine, after the suspension recovery: "the photos are
+    // not all loading - review the mls api grid paperwork and make sure we
+    // didnt miss anything that could make this faster"). The paperwork's own
+    // answer: "you must maintain your own copy of all media files" and "there
+    // is NEVER a reason to download the same media more than once" — i.e. the
+    // sanctioned fast path is downloading each cover ONCE, proactively,
+    // instead of making the first visitor wait for it. This is the lazy
+    // strategy's missing half.
+    //
+    // Pace math, against the limits in the 08-18 notices: at most
+    // BACKFILL_PER_RUN photos per 30-minute run = ~12 requests/hour including
+    // resolves — 0.17% of the 7,200/hr budget, ~0.003 rps — and every request
+    // still passes the quota guard and the per-second pace gate. Ordered by
+    // price descending within the stored set, because the money pages sort
+    // price-high-to-low: the listings people actually see warm first. The
+    // cursor lives in state so each run continues where the last stopped;
+    // already-stored covers cost one cheap existence check and advance the
+    // cursor. Skips: her own listings (the priority pass owns those),
+    // photo-less listings, and anything oversize (the on-demand path's
+    // Cloudinary re-host handles those better).
+    if (!httpErrorOccurred &&
+        !(await isThrottled(store)) && !(await isMediaThrottled(store)) &&
+        Date.now() - startedAt < TIME_BUDGET_MS) {
+      try {
+        const BACKFILL_PER_RUN = 6;
+        const BACKFILL_DEADLINE_MS = 21000; // total elapsed; worst case stays under Netlify's 30s
+        const BACKFILL_MAX_CHECKS = 40;     // existence checks are cheap but not free
+        const candidates = Object.values(listingsById)
+          .filter((l) => l && l.listingId && (l.photoCount || 0) > 0 && !isHerListing(l))
+          .sort((a, b) => (b.price || 0) - (a.price || 0));
+        let cursor = Number(state.backfillCursor || 0);
+        if (cursor >= candidates.length) cursor = 0; // wrapped: start a fresh pass
+        let checks = 0;
+        while (coversBackfilled < BACKFILL_PER_RUN &&
+               cursor < candidates.length &&
+               checks < BACKFILL_MAX_CHECKS &&
+               Date.now() - startedAt < BACKFILL_DEADLINE_MS) {
+          const cand = candidates[cursor];
+          cursor += 1;
+          checks += 1;
+          const existing = await store.get(photoCacheKey(cand.listingId, 0), { type: "json" })
+            .catch(() => null);
+          if (existing && (existing.b64 || existing.redirectUrl)) continue; // already ours
+          try {
+            const urls = usableUrl(await readCachedUrls(store, cand.listingId), 0)
+              ? await readCachedUrls(store, cand.listingId)
+              : await resolveMediaFor([cand.listingId],
+                  { store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS, timeoutMs: MLS_FETCH_TIMEOUT_MS })
+                  .then(() => readCachedUrls(store, cand.listingId));
+            const url = usableUrl(urls, 0);
+            if (!url) continue;
+            const res = await fetchMediaResponse(url, token, MLS_FETCH_TIMEOUT_MS, store);
+            await markUrlUsed(store, cand.listingId, 0);
+            if (!res || !res.ok) continue;
+            const buf = Buffer.from(await res.arrayBuffer());
+            const ctype = String((res.headers && res.headers.get && res.headers.get("content-type")) || "");
+            if (!ctype.startsWith("image/") || buf.length < 2048) continue;
+            if (buf.length > 4400000) continue; // oversize: leave to the on-demand Cloudinary path
+            await writeCachedPhoto(store, cand.listingId, 0, buf, ctype);
+            coversBackfilled += 1;
+          } catch (err) {
+            console.warn(`sync-listings: backfill failed for ${cand.listingId}: ${err && err.message}`);
+          }
+        }
+        state.backfillCursor = cursor;
+        if (coversBackfilled || checks) {
+          console.log(`sync-listings: cover backfill — ${coversBackfilled} stored, cursor at ${cursor}/${candidates.length}.`);
+        }
+      } catch (err) {
+        console.warn(`sync-listings: cover backfill skipped: ${err && err.message}`);
+      }
+    }
   } catch (err) {
     // The budget tripping mid-run is a deliberate stop, not a fault. Recording it
     // as "exception: ..." would put a red row on site-health for the guard doing
@@ -1323,6 +1403,8 @@ exports.handler = async () => {
     lastRunStoreDropped: cleanup.dropped,
     lastRunCoverPhotosCached: coverPhotosCached,
     lastRunStaleListingsRefreshed: staleListingsRefreshed,
+    lastRunCoversBackfilled: coversBackfilled,
+    backfillCursor: state.backfillCursor || 0,
     lastRunError,
     lastCloudinaryError: _lastCloudinaryError,
     herOfficeMlsId: state.herOfficeMlsId || null,

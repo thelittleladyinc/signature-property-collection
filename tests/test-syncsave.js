@@ -144,6 +144,12 @@ delete process.env.LOFTY_API_KEY;
   // Observability: the run has to be able to say whether the cleanup happened,
   // instead of us inferring it from totalListingsStored not moving.
   const state = JSON.parse(blobs["sync-state.json"] || "{}");
+  check("the cover backfill's progress fields exist in state",
+    "lastRunCoversBackfilled" in state && "backfillCursor" in state,
+    "the backfill (2026-08-18) must be observable, not inferred");
+  check("...and a run where every MLS call fails backfills nothing",
+    (state.lastRunCoversBackfilled || 0) === 0);
+
   check("the run reports how much it cleaned, so this is never guessed again",
     typeof state.lastRunStoreSlimmed === "number" && typeof state.lastRunStoreDropped === "number",
     `slimmed=${state.lastRunStoreSlimmed} dropped=${state.lastRunStoreDropped}`);

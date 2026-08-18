@@ -339,6 +339,23 @@ function chunk(items, size) {
   return out;
 }
 
+// Stores a fetched photo's bytes under the photo-cache key — THE permanent
+// copy MLS Grid's rules require ("you must maintain your own copy of all
+// media files"). Lived in listing-photo.js until 2026-08-18; moved here so
+// the sync's cover backfill and the on-demand path share one implementation.
+async function writeCachedPhoto(store, listingId, index, buf, contentType) {
+  try {
+    await store.setJSON(photoCacheKey(listingId, index), {
+      b64: buf.toString("base64"),
+      contentType,
+      bytes: buf.length,
+      storedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn(`writeCachedPhoto: failed for ${listingId}/${index}:`, err && err.message);
+  }
+}
+
 async function resolveMediaFor(ids, { store, token, baseUrl, selectFields, timeoutMs }) {
   const all = ids.filter(Boolean);
   if (!all.length || !token) return {};
@@ -681,6 +698,7 @@ async function fetchMediaResponse(url, token, timeoutMs, store) {
 }
 
 module.exports = {
+  writeCachedPhoto,
   PHOTO_URL_CACHE_PREFIX,
   PHOTO_CACHE_PREFIX,
   PHOTO_CACHE_MAX_INDEX,

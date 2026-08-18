@@ -64,7 +64,7 @@ const { getBlobStore, BASE_URL, SELECT_FIELDS, MINE_LISTINGS_KEY } = require("./
 const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
   isMediaThrottled, setMediaCooldown, usableUrl, markUrlUsed,
-  PHOTO_CACHE_MAX_INDEX, photoCacheKey,
+  PHOTO_CACHE_MAX_INDEX, photoCacheKey, writeCachedPhoto,
 } = require("./lib/_media");
 const { checkMlsQuota, recordMlsBytes } = require("./lib/_mls-usage");
 // NOT required at module load. lib/_cloudinary.js pulls in the Cloudinary SDK, and
@@ -166,18 +166,7 @@ async function readCachedPhoto(store, listingId, index) {
   return null;
 }
 
-async function writeCachedPhoto(store, listingId, index, buf, contentType) {
-  try {
-    await store.setJSON(photoCacheKey(listingId, index), {
-      b64: buf.toString("base64"),
-      contentType,
-      bytes: buf.length,
-      storedAt: new Date().toISOString(),
-    });
-  } catch (err) {
-    console.warn(`listing-photo: cache write failed for ${listingId}/${index}:`, err && err.message);
-  }
-}
+// writeCachedPhoto moved to lib/_media.js (2026-08-18) — shared with the sync's cover backfill.
 
 // The single door every rescuable failure goes through: try the stored copy, and
 // only fall back to a grey square if there isn't one.

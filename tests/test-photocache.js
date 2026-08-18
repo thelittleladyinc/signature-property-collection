@@ -94,9 +94,12 @@ check(
 
 // ---- 2. NEVER MAKES THINGS WORSE. A cache miss, a malformed entry or a dead blob
 // store must not turn a photo that WOULD have worked into an error.
-for (const [what, fn] of [["read", "readCachedPhoto"], ["write", "writeCachedPhoto"]]) {
-  const at = src.indexOf(`async function ${fn}(`);
-  const body = at === -1 ? "" : src.slice(at, src.indexOf("\n}", at));
+// writeCachedPhoto moved to lib/_media.js on 2026-08-18 (shared with the
+// sync's cover backfill) — check each function in the file it actually lives in.
+const mediaSrc = fs.readFileSync(path.join(ROOT, "netlify", "functions", "lib", "_media.js"), "utf8");
+for (const [what, fn, where] of [["read", "readCachedPhoto", src], ["write", "writeCachedPhoto", mediaSrc]]) {
+  const at = where.indexOf(`async function ${fn}(`);
+  const body = at === -1 ? "" : where.slice(at, where.indexOf("\n}", at));
   check(`the cache ${what} is wrapped in try/catch`, /try\s*\{/.test(body) && /catch/.test(body),
     `${fn} can throw into the request path`);
 }
