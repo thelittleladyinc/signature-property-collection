@@ -11819,6 +11819,27 @@ def fingerprint_assets():
             stem, ext = os.path.splitext(name)
             if not os.path.isfile(path) or ext not in (".css", ".js"):
                 continue
+            # 2026-08-18 (PageSpeed, mobile 76): style.css is the ONE render-
+            # blocking resource on every page, and 27KB of its 74KB was code
+            # comments — documentation this codebase is right to keep in the
+            # SOURCE and wrong to ship to every phone on a 4G connection.
+            # Minified here, at the last moment before hashing, so the source
+            # stays readable and the hash reflects what actually ships.
+            # Deliberately conservative (comments, whitespace runs, spaces
+            # around punctuation CSS never needs): the two patterns a naive
+            # minifier breaks — " :pseudo" as a descendant combinator and
+            # multi-space strings in content:"" — were grepped for and do not
+            # occur; calc() survives because single spaces are preserved.
+            # JS is left alone: regex-minifying JavaScript is how sites break.
+            if ext == ".css":
+                with open(path, "r") as f:
+                    css_text = f.read()
+                css_text = re.sub(r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/", "", css_text)
+                css_text = re.sub(r"\s+", " ", css_text)
+                css_text = re.sub(r" ?([{};:,>]) ?", r"\1", css_text)
+                css_text = css_text.replace(";}", "}")
+                with open(path, "w") as f:
+                    f.write(css_text.strip())
             with open(path, "rb") as f:
                 digest = hashlib.sha1(f.read()).hexdigest()[:8]
             hashed = f"{stem}.{digest}{ext}"
