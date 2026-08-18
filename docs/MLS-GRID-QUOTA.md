@@ -701,6 +701,49 @@ repair pass that only reports its successes is not a repair pass.
 | **Raw-byte blob storage** (~33% saving over base64) | The proven path is worth more than the saving; storage is the cheap axis. |
 | **`PhotosChangeTimestamp` in `$select`** | The correct signal for a same-count photo replacement, but this feed has a documented history of 400ing standard RESO field names, and a 400 in the crawl's `$select` breaks the whole sync. Probe it in isolation, the way `discoverHerOfficeMlsId()` does. |
 
+## 7g. The loaded gun that is still on the table
+
+The 2026-08-01 suspension was not caused by any app's normal traffic. From
+Expired-Luxury's own runbook:
+
+> *"Cause of the 2026-08-01 suspension: ad-hoc diagnostic scripts run by hand
+> against the live API from Render Shell, with no rate limiting — they bypassed
+> the app's limiter entirely. Never probe the live API with a bare `node -e` or
+> `curl` loop."*
+
+**That script still exists, and its own header tells you to run it.**
+`expired-luxury/scripts/proveRelistMismatch.js` has its own `mlsGet()` built on
+bare `fetch` — no token bucket, no quota guard, no `Retry-After`, none of the
+protection `lib/mlsClient.ts` provides — and it loops:
+
+```js
+while (url && pages < 50) {
+  const data = await mlsGet(url, token)   // no delay of any kind
+  url = data['@odata.nextLink']
+  pages++
+}
+```
+
+Up to **50 back-to-back requests with no pacing**, per status tier, per MLS —
+and `RELIST_PROBE_SYSTEMS` multiplies it. Unpaced over a fast link that is
+comfortably 10–25 rps against a 4 rps instantaneous ceiling and a 2 rps
+sustained average. It is the exact shape of *"your hourly 6.0 requests per second
+exceeded the 2 requests per second limit"*.
+
+Its documented usage is *"LIVE MODE (what you should run — needs MLS
+credentials): Render Shell, or your Mac with .env.local values exported"*.
+
+**Nothing in this repo's work protects against it.** The guard built today
+(§7d) only covers this website. A hand-run script on another machine reaches MLS
+Grid directly, and a suspension there takes the token down for all three apps —
+including every photo on the public site.
+
+Not touched (Expired-Luxury is read-only in this work), but it belongs at the top
+of anyone's list: that script needs the same rate limiter as everything else, or
+a refusal to run without one. Until then, **the single most important operational
+rule is the one its own runbook already wrote down: never probe the live API by
+hand.**
+
 ## 8. Open items
 
 External:
