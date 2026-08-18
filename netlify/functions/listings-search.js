@@ -49,6 +49,51 @@ const {
 } = require("./lib/_mls-shared");
 const { prewarmPhotoUrls } = require("./lib/_media");
 
+// ---- THE CATALOGUE, PARSED ONCE PER CONTAINER ---------------------------
+// 2026-08-18 (Christine: "it just runs so slow ... what if we just brought in a
+// few counties"). Her instinct was right and the mechanism was worse than she
+// thought. Every public search did this, per request:
+//
+//   store.get(LISTINGS_KEY, { type: "json" })   // download the WHOLE catalogue
+//   Object.values(...).filter(...).sort(...)    // then walk all of it
+//
+// That is 29,011 listings downloaded and JSON-parsed to return twelve cards, on
+// every single search, every time. The work scales with the catalogue and has
+// nothing to do with what was asked for — which is exactly why it got slower as
+// the crawl grew, and why it felt like "bringing in too many".
+//
+// Netlify keeps a container warm between requests, so the parse can be done once
+// and reused. The memo is invalidated by the SYNC's own clock rather than by a
+// timer alone: sync-state.json carries lastRunAt, it is a tiny read, and it
+// changes exactly when the data changes. The TTL is a backstop for the case
+// where the state blob is unreadable.
+//
+// mine=true traffic never took this path (it reads the small MINE_LISTINGS_KEY
+// copy), which is why her own listings always felt fast and the public search
+// did not.
+const CATALOGUE_MEMO_MS = 60 * 1000;
+let _catalogue = null; // { byId, stamp, at }
+
+function catalogueFromMemo(stamp) {
+  if (!_catalogue) return null;
+  if (Date.now() - _catalogue.at > CATALOGUE_MEMO_MS) return null;
+  // A sync that has written new data since we parsed makes the memo wrong, not
+  // merely old. Compared as strings because that is what the state blob holds.
+  if (stamp && _catalogue.stamp && stamp !== _catalogue.stamp) return null;
+  return _catalogue.byId;
+}
+
+function rememberCatalogue(byId, stamp) {
+  _catalogue = { byId, stamp: stamp || null, at: Date.now() };
+}
+
+// Exported for tests: a memo nobody can reset is a memo nobody can test.
+exports.__test = {
+  catalogueFromMemo, rememberCatalogue,
+  reset: () => { _catalogue = null; },
+  memoTtlMs: CATALOGUE_MEMO_MS,
+};
+
 // ---- Photo URLs the browser can actually load ----------------------------
 // 2026-08-15 (Christine: "still no photos", with a screenshot of a Search
 // Homes page where every card's image was broken). A stored MLS Grid media URL
@@ -149,11 +194,19 @@ exports.handler = async (event) => {
         );
       }
     }
-    const [fullListings, state] = await Promise.all([
-      allListings ? Promise.resolve(null) : store.get(LISTINGS_KEY, { type: "json" }),
-      store.get(SYNC_STATE_KEY, { type: "json" }),
-    ]);
-    if (!allListings) allListings = fullListings;
+    // The state blob first and on its own: it is small, and it decides whether the
+    // catalogue needs reading at all.
+    const state = await store.get(SYNC_STATE_KEY, { type: "json" });
+    if (!allListings) {
+      const stamp = state && state.lastRunAt ? String(state.lastRunAt) : null;
+      const memo = catalogueFromMemo(stamp);
+      if (memo) {
+        allListings = memo;
+      } else {
+        allListings = await store.get(LISTINGS_KEY, { type: "json" });
+        if (allListings) rememberCatalogue(allListings, stamp);
+      }
+    }
 
     if (!state) {
       // sync-listings.js hasn't completed a single run yet (e.g. right
