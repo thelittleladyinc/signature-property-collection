@@ -248,6 +248,16 @@ const OWN_PHOTO_MAX_ATTEMPTS_PER_RUN = 3;
 // same class of bug as the uncapped photo download/upload calls this
 // pairs with. Applied to every MLS Grid request below.
 const MLS_FETCH_TIMEOUT_MS = 5000;
+// 2026-08-18: the crawl's pages are not the same size as the other three
+// queries. refreshOneListing and the office lookups ask for one or a handful of
+// records; the bootstrap loop asks for PAGE_SIZE (50) records WITH $expand=Media,
+// which is the heaviest response this job ever receives. Holding both to the same
+// 5s ceiling is what produced the repeated "The operation was aborted due to
+// timeout" with lastRunPagesFetched 0 -- the small queries fit comfortably and the
+// big one intermittently did not. The loop refuses to START a page once elapsed
+// exceeds TIME_BUDGET_MS (11s), so the worst case is bounded at 11s + this value,
+// well inside the 30s Netlify allows a scheduled function.
+const MLS_PAGE_FETCH_TIMEOUT_MS = 9000;
 
 function statusClause() {
   return "(" + REPLICATED_STATUSES.map((s) => `StandardStatus eq '${s}'`).join(" or ") + ")";
@@ -303,7 +313,7 @@ const ORIGINATING_SYSTEM_CLAUSE = "OriginatingSystemName eq 'ires'";
 // that does not handle it stops rather than continuing blind.
 class MlsQuotaError extends Error {}
 
-async function mlsFetch(url, token, store, { full } = {}) {
+async function mlsFetch(url, token, store, { full, timeoutMs } = {}) {
   const quota = await checkMlsQuota(store, { full: full === true });
   if (quota.blocked) {
     throw new MlsQuotaError(`quota guard refused the request — ${quota.reason}`);
@@ -311,7 +321,7 @@ async function mlsFetch(url, token, store, { full } = {}) {
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(MLS_FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs || MLS_FETCH_TIMEOUT_MS),
     });
     await recordMlsCall(store, {
       kind: "api", status: res.status,
@@ -916,7 +926,27 @@ exports.handler = async () => {
   let listingsById = (await store.get(LISTINGS_KEY, { type: "json" })) || {};
   // Shrink what's already stored before doing anything else -- see
   // pruneAndSlimStore's comment. Cheap (pure in-memory) and idempotent.
-  pruneAndSlimStore(listingsById);
+  const cleanup = pruneAndSlimStore(listingsById);
+
+  // 2026-08-18, and this is why the two cleanups before it measured as doing
+  // nothing. pruneAndSlimStore only mutates memory. The first save used to sit
+  // ~150 lines below, AFTER the own-photo pass, office discovery and the
+  // priority pass -- four separate phases that each talk to MLS Grid over a 5s
+  // timeout. A throw or a platform kill anywhere in that window discarded the
+  // whole cleaned object, and the next run recomputed it and lost it exactly
+  // the same way. With runs failing on "The operation was aborted due to
+  // timeout" that window was being lost repeatedly, so a correct cleanup could
+  // sit in the code across several deploys and never once reach Blobs.
+  //
+  // Saving here makes the cleanup independent of whether MLS Grid answers at
+  // all: it needs no token, no network and no time budget, so it lands on the
+  // very next run whatever else goes wrong. Guarded on having actually changed
+  // something, so a steady-state run still writes the blob only once, below.
+  if (cleanup.slimmed || cleanup.dropped) {
+    await saveListingsCheckpoint(store, listingsById);
+    console.log(`sync-listings: store cleanup saved before any network call — ` +
+      `${cleanup.slimmed} slimmed, ${cleanup.dropped} dropped.`);
+  }
 
   // ---- Retry any website lead that failed to reach Lofty ----------------
   // 2026-08-15 (Christine: "submitted - but still didnt come into lofty"). A
@@ -1103,7 +1133,9 @@ exports.handler = async () => {
 
         await throttle();
 
-        const res = await mlsFetch(requestUrl, token, store);
+        const res = await mlsFetch(requestUrl, token, store, {
+          timeoutMs: MLS_PAGE_FETCH_TIMEOUT_MS,
+        });
         if (res.status === 429) {
           // Same account-wide suspension Listing-Engine's mls.js guards
           // against — open the circuit breaker so neither this run's
@@ -1179,6 +1211,8 @@ exports.handler = async () => {
           lastRunPagesFetched: pagesFetched,
           lastRunRecordsSeen: recordsSeen,
           totalListingsStored: Object.keys(listingsById).length,
+          lastRunStoreSlimmed: cleanup.slimmed,
+          lastRunStoreDropped: cleanup.dropped,
           lastRunCoverPhotosCached: coverPhotosCached,
           lastRunStaleListingsRefreshed: staleListingsRefreshed,
           lastRunError: null,
@@ -1269,6 +1303,8 @@ exports.handler = async () => {
     lastRunPagesFetched: pagesFetched,
     lastRunRecordsSeen: recordsSeen,
     totalListingsStored: Object.keys(listingsById).length,
+    lastRunStoreSlimmed: cleanup.slimmed,
+    lastRunStoreDropped: cleanup.dropped,
     lastRunCoverPhotosCached: coverPhotosCached,
     lastRunStaleListingsRefreshed: staleListingsRefreshed,
     lastRunError,
