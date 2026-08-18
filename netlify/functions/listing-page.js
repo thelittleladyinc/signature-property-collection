@@ -306,10 +306,10 @@ function spotCard(s) {
   // A video embeds; a review-backed spot shows her words instead. Same rule as
   // the map modal and the town pages.
   const media = s.videoId
-    ? `<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${esc(s.videoId)}"
-        title="${esc(s.videoTitle || s.name)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowfullscreen></iframe></div>`
+    ? `<div class="video-embed"><button type="button" class="yt-facade" data-yt="${esc(s.videoId)}"
+        data-yt-title="${esc(s.videoTitle || s.name)}" aria-label="Play video: ${esc(s.videoTitle || s.name)}"
+        onclick="window.__ytPlay(this)"><img src="https://i.ytimg.com/vi/${esc(s.videoId)}/hqdefault.jpg"
+        alt="" loading="lazy" width="480" height="360"></button></div>`
     : (s.reviewQuote ? `<blockquote class="spot-quote">${esc(s.reviewQuote)}</blockquote>` : "");
   return `<article class="spot-card">
     <h3 class="spot-card-title">${esc(s.name)}</h3>

@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap"></noscript>
-<link rel="stylesheet" href="/assets/css/style.a0e937bb.css">
+<link rel="stylesheet" href="/assets/css/style.f311045a.css">
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "@id": "https://signaturepropertycollection.com/#christine-gwinnup", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/", "image": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "thelittleladyinc@gmail.com", "priceRange": "$$$$", "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "08:00", "closes": "20:00"}], "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Morgan County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady", "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390", "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2", "https://christinegwinnup.lpt.com/", "https://www.thelittleladysellshomes.com/"], "knowsAbout": ["Luxury real estate", "Relocation to Northern Colorado", "Acreage and horse property", "Downsizing", "Estate homes", "New construction", "Land development", "Multi-generational homes", "Retirement relocation", "Expired listings", "Home valuation", "Real estate negotiation"], "dateModified": "2026-08-18", "geo": {"@type": "GeoCoordinates", "latitude": 40.3978, "longitude": -105.075}, "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://signaturepropertycollection.com/index.html"}, {"@type": "ListItem", "position": 2, "name": "How To Choose A Real Estate Agent"}]}</script>
@@ -70,6 +70,24 @@
   </div>
 </header>
 <script>
+// 2026-08-18 (PageSpeed desktop TBT 780ms): every YouTube embed pulled ~600KB
+// of player JS on page load whether anyone pressed play or not — the single
+// biggest script cost on the site, and the reason the desktop performance
+// score swung between 92 and 69 depending on when the player landed in the
+// trace. Embeds are now a "facade": the real video thumbnail plus a play
+// button (zero JS), and the actual player loads only on click — with
+// autoplay, so the click feels identical to clicking a normal embed.
+window.__ytPlay = function (b) {
+  var id = b.getAttribute('data-yt');
+  if (!id) return;
+  var f = document.createElement('iframe');
+  f.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1';
+  f.title = b.getAttribute('data-yt-title') || 'Video';
+  f.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+  f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  f.setAttribute('allowfullscreen', '');
+  b.replaceWith(f);
+};
 (function () {
   var btn = document.getElementById('nav-toggle');
   var nav = document.getElementById('primary-nav');
@@ -122,9 +140,9 @@
       <div class="grid-2" style="align-items:start;gap:26px">
         <p>Christine's first question, and the one that decides the other two. Price it over the market and it sits, goes stale, and sells for less than it would have. Price it under and you hand money away. Getting it exactly where it needs to be is what keeps the most money in your pocket, and it is a judgement built from having sold in your town, not from a website estimate.</p>
         <div><div class="video-embed">
-      <iframe src="https://www.youtube-nocookie.com/embed/9Uhl9bAsbLA" title="Can they price it exactly right?"
-      loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <button type="button" class="yt-facade" data-yt="9Uhl9bAsbLA" data-yt-title="Can they price it exactly right?"
+      aria-label="Play video: Can they price it exactly right?" onclick="window.__ytPlay(this)">
+      <img src="https://i.ytimg.com/vi/9Uhl9bAsbLA/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button>
     </div>
     </div>
       </div>
@@ -134,9 +152,9 @@
       <div class="grid-2" style="align-items:start;gap:26px">
         <p>In her words: you may have the most beautiful home in the world, but unless people can find it, it is not going to sell. Ask any agent what they do after the sign goes in. Christine's answer is professional photography and video, postcards, digital ads, social ads, door hangers, and sometimes a billboard — plus a YouTube channel with real footage of the towns she sells in.</p>
         <div><div class="video-embed">
-      <iframe src="https://www.youtube-nocookie.com/embed/nidadH0ZWjU" title="Do they actually market, or just list?"
-      loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <button type="button" class="yt-facade" data-yt="nidadH0ZWjU" data-yt-title="Do they actually market, or just list?"
+      aria-label="Play video: Do they actually market, or just list?" onclick="window.__ytPlay(this)">
+      <img src="https://i.ytimg.com/vi/nidadH0ZWjU/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button>
     </div>
     </div>
       </div>
@@ -146,9 +164,9 @@
       <div class="grid-2" style="align-items:start;gap:26px">
         <p>This is where the money is won or lost, and it is the hardest thing to check before you hire someone. What you are looking for is an agent who will protect you and your money when the inspection objection lands and the other side asks for eight thousand dollars. Ask them to walk you through the last deal they renegotiated and what it saved the seller.</p>
         <div><div class="video-embed">
-      <iframe src="https://www.youtube-nocookie.com/embed/zFJtZuHf4fQ" title="Can they negotiate?"
-      loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <button type="button" class="yt-facade" data-yt="zFJtZuHf4fQ" data-yt-title="Can they negotiate?"
+      aria-label="Play video: Can they negotiate?" onclick="window.__ytPlay(this)">
+      <img src="https://i.ytimg.com/vi/zFJtZuHf4fQ/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button>
     </div>
     </div>
       </div>
@@ -191,15 +209,15 @@
     </div>
     <div>
       <div class="video-embed">
-      <iframe src="https://www.youtube-nocookie.com/embed/BGvBuXzj5FA" title="Best Northern Colorado Real Estate Agent, The Little Lady Sells Homes"
-      loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <button type="button" class="yt-facade" data-yt="BGvBuXzj5FA" data-yt-title="Best Northern Colorado Real Estate Agent, The Little Lady Sells Homes"
+      aria-label="Play video: Best Northern Colorado Real Estate Agent, The Little Lady Sells Homes" onclick="window.__ytPlay(this)">
+      <img src="https://i.ytimg.com/vi/BGvBuXzj5FA/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button>
     </div>
     
       <div style="margin-top:18px"><div class="video-embed">
-      <iframe src="https://www.youtube-nocookie.com/embed/bn3rConMMIM" title="How Accurate Are Home Value Tools Such As Zillow's Zestimate And Homebot?"
-      loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <button type="button" class="yt-facade" data-yt="bn3rConMMIM" data-yt-title="How Accurate Are Home Value Tools Such As Zillow's Zestimate And Homebot?"
+      aria-label="Play video: How Accurate Are Home Value Tools Such As Zillow's Zestimate And Homebot?" onclick="window.__ytPlay(this)">
+      <img src="https://i.ytimg.com/vi/bn3rConMMIM/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button>
     </div>
     </div>
     </div>

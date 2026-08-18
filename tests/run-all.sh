@@ -39,7 +39,7 @@ for f in glob.glob("site/communities/*/*.html"):
     m = re.search(r'<span class="eyebrow">[^<]*Work In [^<]*</span>(.*?)</section>', h, re.S)
     if m:
         tour_pages += 1
-        tours += len(re.findall(r'youtube-nocookie\.com/embed/', m.group(1)))
+        tours += len(re.findall(r'class="yt-facade" data-yt=', m.group(1)))
 print(f"\nCurrent: {html_files} html files on disk · {len(spots)} local spots on "
       f"{town_pages} town pages ({town_names} distinct town names) "
       f"· {views:,} video views + {reviews:,} review views "

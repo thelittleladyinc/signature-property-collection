@@ -106,7 +106,7 @@ for (const paths of Object.values(pagesBySlug)) {
     const m = html.match(HEAD);
     if (!m) continue;
     pageCount++;
-    const ids = [...m[2].matchAll(/<iframe src="https:\/\/www\.youtube-nocookie\.com\/embed\/([\w-]+)"/g)]
+    const ids = [...m[2].matchAll(/class="yt-facade" data-yt="([\w-]+)"/g)]
       .map((x) => x[1]);
     embedded[path.relative(ROOT, p)] = { ids, section: m[2], town: m[1].trim(), html };
     embedCount += ids.length;
@@ -135,7 +135,7 @@ for (const [page, { ids, section, town, html }] of Object.entries(embedded)) {
 
   // And the same rule across the WHOLE page, since the header video and the local
   // spots embed tours too.
-  const pageIds = [...html.matchAll(/<iframe src="https:\/\/www\.youtube-nocookie\.com\/embed\/([\w-]+)"/g)]
+  const pageIds = [...html.matchAll(/class="yt-facade" data-yt="([\w-]+)"/g)]
     .map((x) => x[1]);
   const pageProps = pageIds.map((i) => byId[i]?.prop).filter(Boolean);
   const dupPageProp = pageProps.filter((p, n) => pageProps.indexOf(p) !== n);

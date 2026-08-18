@@ -1464,3 +1464,14 @@ h2.widget-title {
 /* The "as of" line is a credibility statement, not fine print -- it is what separates
    this from a national aggregator's guess, so it stays legible. */
 .mr-asof { font-size: 14px; line-height: 1.7; color: var(--slate-soft); margin-top: 18px; max-width: 70ch; }
+
+
+/* 2026-08-18: YouTube facade — the real thumbnail plus a play button, so the
+   ~600KB player loads only when someone actually clicks (see __ytPlay in
+   build.py's header script). Brand play button: charcoal disc, white glyph. */
+.yt-facade { position: relative; display: block; width: 100%; aspect-ratio: 16/9; padding: 0; border: 0; cursor: pointer; background: var(--charcoal); overflow: hidden; }
+.yt-facade img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .92; transition: opacity .2s ease, transform .3s ease; }
+.yt-facade:hover img, .yt-facade:focus-visible img { opacity: 1; transform: scale(1.02); }
+.yt-facade::before { content: ""; position: absolute; top: 50%; left: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(20,20,21,.82); box-shadow: 0 4px 18px rgba(20,20,21,.35); transition: background .2s ease; }
+.yt-facade:hover::before, .yt-facade:focus-visible::before { background: var(--deep-mauve); }
+.yt-facade::after { content: ""; position: absolute; top: 50%; left: 50%; margin: -11px 0 0 -7px; border-style: solid; border-width: 11px 0 11px 18px; border-color: transparent transparent transparent #fff; }

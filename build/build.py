@@ -1181,9 +1181,9 @@ def _yt_embed(video_id, title, caption=None):
     if video_id and title:
         _EMBED_TITLES.setdefault(video_id, title)
     return f"""<div class="video-embed">
-      <iframe src="https://www.youtube-nocookie.com/embed/{video_id}" title="{esc(title)}"
-      loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <button type="button" class="yt-facade" data-yt="{video_id}" data-yt-title="{esc(title)}"
+      aria-label="Play video: {esc(title)}" onclick="window.__ytPlay(this)">
+      <img src="https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button>
     </div>
     {f'<p class="video-embed-caption">{esc(caption)}</p>' if caption else ''}"""
 
@@ -1396,10 +1396,10 @@ def _listing_showcase_js_helpers():
     var photoCount = typeof l.photoCount === 'number' ? l.photoCount : (cover ? 1 : 0);
     var top;
     if (video) {{
-      top = '<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/' +
-        esc(video.id) + '" title="' + esc(video.title) + '" loading="lazy" allow="accelerometer; autoplay; ' +
-        'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
-        'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
+      top = '<div class="video-embed"><button type="button" class="yt-facade" data-yt="' + esc(video.id) +
+        '" data-yt-title="' + esc(video.title) + '" aria-label="Play video: ' + esc(video.title) +
+        '" onclick="window.__ytPlay(this)"><img src="https://i.ytimg.com/vi/' + esc(video.id) +
+        '/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button></div>';
     }} else if (cover) {{
       top = '<img data-src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" ' +
         'style="aspect-ratio:4/3;background:#eee;width:100%;object-fit:cover" ' +
@@ -3485,6 +3485,24 @@ def header_html(active=None):
   </div>
 </header>
 <script>
+// 2026-08-18 (PageSpeed desktop TBT 780ms): every YouTube embed pulled ~600KB
+// of player JS on page load whether anyone pressed play or not — the single
+// biggest script cost on the site, and the reason the desktop performance
+// score swung between 92 and 69 depending on when the player landed in the
+// trace. Embeds are now a "facade": the real video thumbnail plus a play
+// button (zero JS), and the actual player loads only on click — with
+// autoplay, so the click feels identical to clicking a normal embed.
+window.__ytPlay = function (b) {{
+  var id = b.getAttribute('data-yt');
+  if (!id) return;
+  var f = document.createElement('iframe');
+  f.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1';
+  f.title = b.getAttribute('data-yt-title') || 'Video';
+  f.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+  f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  f.setAttribute('allowfullscreen', '');
+  b.replaceWith(f);
+}};
 (function () {{
   var btn = document.getElementById('nav-toggle');
   var nav = document.getElementById('primary-nav');
@@ -4191,8 +4209,10 @@ def build_seller_local_proof():
     hidden.value = t.town;
     var cards = t.spots.map(function (s) {{
       var media = s.videoId
-        ? '<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(s.videoId) +
-          '" title="' + esc(s.name) + '" loading="lazy" allowfullscreen></iframe></div>'
+        ? '<div class="video-embed"><button type="button" class="yt-facade" data-yt="' + esc(s.videoId) +
+          '" data-yt-title="' + esc(s.name) + '" aria-label="Play video: ' + esc(s.name) +
+          '" onclick="window.__ytPlay(this)"><img src="https://i.ytimg.com/vi/' + esc(s.videoId) +
+          '/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button></div>'
         : '';
       return '<article class="spot-card"><h3 class="spot-card-title">' + esc(s.name) + '</h3>' + media +
         '<p class="spot-proof">' + Number(s.views).toLocaleString() + ' views on ' +

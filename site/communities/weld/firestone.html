@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap"></noscript>
-<link rel="stylesheet" href="/assets/css/style.a0e937bb.css">
+<link rel="stylesheet" href="/assets/css/style.f311045a.css">
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "@id": "https://signaturepropertycollection.com/#christine-gwinnup", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/", "image": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "thelittleladyinc@gmail.com", "priceRange": "$$$$", "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "08:00", "closes": "20:00"}], "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Morgan County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady", "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390", "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2", "https://christinegwinnup.lpt.com/", "https://www.thelittleladysellshomes.com/"], "knowsAbout": ["Luxury real estate", "Relocation to Northern Colorado", "Acreage and horse property", "Downsizing", "Estate homes", "New construction", "Land development", "Multi-generational homes", "Retirement relocation", "Expired listings", "Home valuation", "Real estate negotiation"], "dateModified": "2026-08-18", "geo": {"@type": "GeoCoordinates", "latitude": 40.3978, "longitude": -105.075}, "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://signaturepropertycollection.com/index.html"}, {"@type": "ListItem", "position": 2, "name": "Communities", "item": "https://signaturepropertycollection.com/communities/index.html"}, {"@type": "ListItem", "position": 3, "name": "Weld County", "item": "https://signaturepropertycollection.com/communities/weld.html"}, {"@type": "ListItem", "position": 4, "name": "Firestone"}]}</script>
@@ -66,6 +66,24 @@
   </div>
 </header>
 <script>
+// 2026-08-18 (PageSpeed desktop TBT 780ms): every YouTube embed pulled ~600KB
+// of player JS on page load whether anyone pressed play or not — the single
+// biggest script cost on the site, and the reason the desktop performance
+// score swung between 92 and 69 depending on when the player landed in the
+// trace. Embeds are now a "facade": the real video thumbnail plus a play
+// button (zero JS), and the actual player loads only on click — with
+// autoplay, so the click feels identical to clicking a normal embed.
+window.__ytPlay = function (b) {
+  var id = b.getAttribute('data-yt');
+  if (!id) return;
+  var f = document.createElement('iframe');
+  f.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1';
+  f.title = b.getAttribute('data-yt-title') || 'Video';
+  f.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+  f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  f.setAttribute('allowfullscreen', '');
+  b.replaceWith(f);
+};
 (function () {
   var btn = document.getElementById('nav-toggle');
   var nav = document.getElementById('primary-nav');
@@ -558,10 +576,10 @@
     var photoCount = typeof l.photoCount === 'number' ? l.photoCount : (cover ? 1 : 0);
     var top;
     if (video) {
-      top = '<div class="video-embed"><iframe src="https://www.youtube-nocookie.com/embed/' +
-        esc(video.id) + '" title="' + esc(video.title) + '" loading="lazy" allow="accelerometer; autoplay; ' +
-        'clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
-        'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>';
+      top = '<div class="video-embed"><button type="button" class="yt-facade" data-yt="' + esc(video.id) +
+        '" data-yt-title="' + esc(video.title) + '" aria-label="Play video: ' + esc(video.title) +
+        '" onclick="window.__ytPlay(this)"><img src="https://i.ytimg.com/vi/' + esc(video.id) +
+        '/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"></button></div>';
     } else if (cover) {
       top = '<img data-src="' + esc(cover) + '" alt="' + esc(l.address || 'Listing photo') + '" ' +
         'style="aspect-ratio:4/3;background:#eee;width:100%;object-fit:cover" ' +
