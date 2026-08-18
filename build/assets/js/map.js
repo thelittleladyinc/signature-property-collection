@@ -892,6 +892,83 @@
     });
   }
 
+  // ---- "Search This Area" ------------------------------------------------
+  // 2026-08-18 (Christine: "do a search this area polygon"). What this can and
+  // cannot be, honestly: the stored listings deliberately carry no
+  // coordinates -- the MLS feed rejects queries selecting fields outside its
+  // approved list, so a true draw-a-polygon-over-listings search cannot exist
+  // until MLS Grid confirms a coordinate field (that question is parked with
+  // the open support items). What the data on hand CAN answer: every town on
+  // this map has real geocoded coordinates, so "this area" resolves to the
+  // towns inside the current view and searches those. That is the same scope
+  // the whole site already searches by (cities), so the result page's chips
+  // show exactly what the map searched -- visible and editable, never an
+  // invisible filter.
+  function townsInView(map) {
+    var bounds = map.getBounds();
+    var seen = {};
+    var out = [];
+    function add(name) {
+      var k = String(name || '').toLowerCase();
+      if (!k || seen[k]) return;
+      seen[k] = true;
+      out.push(name);
+    }
+    Object.keys(COUNTY_DATA).forEach(function (n) {
+      ((COUNTY_DATA[n] || {}).towns || []).forEach(function (t) {
+        if (typeof t.lat === 'number' && typeof t.lng === 'number' &&
+            bounds.contains([t.lat, t.lng])) add(t.name);
+      });
+    });
+    // The icon cities carry real coordinates too and include a few towns the
+    // drill-down data may lack; overlap is harmless, the dedupe absorbs it.
+    CITY_ICONS.forEach(function (c) {
+      if (bounds.contains([c.lat, c.lng])) add(c.name);
+    });
+    if (!out.length) {
+      // Zoomed onto rangeland between towns: widen to every county whose
+      // shape touches the view, so the button never answers with nothing.
+      Object.keys(countyView.layer || {}).forEach(function (n) {
+        var lyr = countyView.layer[n];
+        if (lyr && lyr.getBounds && lyr.getBounds().intersects(bounds)) {
+          (COUNTY_CITIES[n] || []).forEach(add);
+        }
+      });
+    }
+    return out;
+  }
+
+  // Built lazily inside init() (never at module scope) because this file can
+  // be parsed before leaflet.js finishes -- init() is the place that already
+  // guards on typeof L.
+  function addSearchAreaControl(map) {
+    var SearchAreaControl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function (map) {
+        var div = L.DomUtil.create('div', 'leaflet-bar search-area-ctrl');
+        var btn = L.DomUtil.create('button', 'search-area-btn', div);
+        btn.type = 'button';
+        btn.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+          'stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/>' +
+          '<line x1="15.5" y1="15.5" x2="21" y2="21"/></svg>Search This Area';
+        btn.setAttribute('aria-label', 'Search homes in the area shown on the map');
+        // Leaflet controls sit on the map surface: without this, pressing the
+        // button would also register as a map click/drag underneath it.
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.on(btn, 'click', function () {
+          openQuickSearch({
+            label: 'This Map Area',
+            cities: townsInView(map),
+            covered: true,
+          });
+        });
+        return div;
+      },
+    });
+    map.addControl(new SearchAreaControl());
+  }
+
   function init() {
     var mapEl = document.getElementById('county-map');
     if (!mapEl || typeof L === 'undefined') return;
@@ -901,6 +978,15 @@
       scrollWheelZoom: true,
       attributionControl: true,
       minZoom: 7,
+      // 2026-08-18 ("make it more rapid"): draw the vector layers -- nine
+      // county polygons plus the river polylines -- to a single <canvas>
+      // instead of hundreds of SVG path nodes. Pan/zoom then repaints one
+      // bitmap rather than re-laying-out an SVG DOM, which is the difference
+      // you can feel on a phone. Markers are unaffected (they're HTML
+      // divIcons, canvas never touches them), and Leaflet still delivers the
+      // same mouseover/click events on canvas paths, so the county hover and
+      // drill-down behave exactly as before.
+      preferCanvas: true,
     }).setView([40.35, -104.85], 8);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -926,12 +1012,25 @@
     map.on('zoomend', syncZoomClass);
     syncZoomClass();
 
-    // County data first: the popup's live-search decision and city list come
-    // from it, and a polygon is clickable the moment it's drawn.
-    loadCountyData()
-      .then(function () { return fetch('/assets/data/noco-counties.geojson'); })
-      .then(function (r) { return r.json(); })
-      .then(function (geojson) {
+    addSearchAreaControl(map);
+
+    // 2026-08-18 ("make it more rapid"): the three startup fetches used to run
+    // as a chain -- county data, THEN the polygons, with local-spots (the
+    // slowest: a Netlify function, not a static file) only starting after the
+    // polygons drew. None of them needs another's bytes to be REQUESTED, so
+    // all three start in the same instant now; only the drawing below waits
+    // for what it actually uses. County data still lands before any polygon is
+    // clickable (Promise.all), so the popup's live-search decision and city
+    // lists are as correct as they were under the old chain.
+    var spotsPromise = fetch('/.netlify/functions/local-spots')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+    Promise.all([
+      loadCountyData(),
+      fetch('/assets/data/noco-counties.geojson').then(function (r) { return r.json(); }),
+    ])
+      .then(function (loaded) {
+        var geojson = loaded[1];
         var layer = L.geoJSON(geojson, {
           style: function () {
             return { fillColor: BASE_FILL, fillOpacity: 0.9, color: BORDER, weight: 1.5 };
@@ -1012,18 +1111,16 @@
         // netlify/functions/local-spots.js). Fetched rather than baked in
         // because coordinates have to come from a real geocode -- guessed
         // coordinates would pin her personal recommendation onto the wrong
-        // building. Failure is silent by design: the counties, cities and
-        // rivers are already drawn by this point, so a spots outage costs
-        // detail, never the map.
-        fetch('/.netlify/functions/local-spots')
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (data) {
-            if (!data || !Array.isArray(data.spots)) return;
-            data.spots.forEach(function (spot) { addPoiMarker(map, spot); });
-            spotsOnMap = spotsOnMap.concat(data.spots);
-            buildSpotFilters();
-          })
-          .catch(function () { /* map already works without them */ });
+        // building. The request started back at init() alongside the other
+        // two fetches (see spotsPromise); the markers are only ADDED here,
+        // after the base map is drawn. Failure stays silent by design: a
+        // spots outage costs detail, never the map.
+        spotsPromise.then(function (data) {
+          if (!data || !Array.isArray(data.spots)) return;
+          data.spots.forEach(function (spot) { addPoiMarker(map, spot); });
+          spotsOnMap = spotsOnMap.concat(data.spots);
+          buildSpotFilters();
+        });
 
         // River lines + script-font labels, matching the original map's
         // "Cache la Poudre River" / "South Platte River" cursive callouts.
@@ -1079,7 +1176,16 @@
     '.county-label-tooltip{background:transparent;border:none;box-shadow:none;' +
     'color:#F9F9EC;font-family:"Poppins",sans-serif;font-weight:700;font-size:13px;' +
     'letter-spacing:.04em;text-shadow:0 1px 4px rgba(0,0,0,.85);}' +
-    '.county-label-tooltip::before{display:none;}';
+    '.county-label-tooltip::before{display:none;}' +
+    // The "Search This Area" map control. Dusty rose so it reads as an action,
+    // not another zoom widget; uppercase Poppins to match the site's buttons.
+    '.search-area-ctrl{border:none!important;box-shadow:0 2px 10px rgba(0,0,0,.45)}' +
+    '.search-area-btn{display:flex;align-items:center;gap:7px;background:#B86F7A;' +
+    'color:#F9F9EC;border:none;font-family:"Poppins",sans-serif;font-weight:600;' +
+    'font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding:10px 14px;' +
+    'cursor:pointer;white-space:nowrap}' +
+    '.search-area-btn:hover{background:#F9F9EC;color:#141415}' +
+    '.search-area-btn svg{width:14px;height:14px;flex:0 0 auto}';
   document.head.appendChild(style);
 
   // 2026-08-13 (performance fix): this script (plus leaflet.css/leaflet.js)

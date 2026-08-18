@@ -781,6 +781,9 @@ window.__ytPlay = function (b) {
         btns.forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         hiddenInput.value = btn.dataset.value || '';
+        // Pills are buttons, not inputs -- they never fire the form's own
+        // 'change' event, so the auto-run has to be asked for here.
+        autoSearch();
       });
     });
   }
@@ -908,6 +911,9 @@ window.__ytPlay = function (b) {
         // the button look broken.
         if (panel === cityPanel) extraCities = [];
         refreshGeoUi();
+        // Programmatic cb.checked = false never fires 'change', so the
+        // delegated form listener can't see a clear -- run it explicitly.
+        autoSearch();
       });
     });
   }
@@ -922,12 +928,16 @@ window.__ytPlay = function (b) {
       if (btn.dataset.kind === 'extra') {
         extraCities = extraCities.filter(function (c) { return c !== btn.dataset.value; });
         refreshGeoUi();
+        autoSearch();
         return;
       }
       var panel = btn.dataset.kind === 'county' ? countyPanel : cityPanel;
       var cb = panel && panel.querySelector('input[value="' + btn.dataset.value.replace(/"/g, '\\"') + '"]');
       if (cb) { cb.checked = false; }
       refreshGeoUi();
+      // Same reason as the clear buttons: unchecking via script is invisible
+      // to the form's 'change' listener.
+      autoSearch();
     });
   }
 
@@ -992,43 +1002,92 @@ window.__ytPlay = function (b) {
     return p;
   }
 
+  // ---- Live search: abortable, cached, self-running ----------------------
+  // 2026-08-18 (Christine: "not having to touch apply when you do search homes
+  // counties and cities - lets autofilter - and make it more rapid"). Three
+  // pieces make it rapid without making it chatty toward the MLS-fed function:
+  //   - AbortController: a newer search cancels the one still on the wire, so
+  //     someone clicking three filters in a row never sees the first search's
+  //     results land on top of the third's.
+  //   - A short in-page result cache: toggling a filter off and back on
+  //     re-renders instantly with zero network. Two minutes on purpose -- the
+  //     store behind listings-search refreshes on a ~15-minute cycle, so a
+  //     2-minute memory can never show meaningfully stale data, and each entry
+  //     remembers when it was really fetched so the "as of" line stays honest.
+  //   - The debounce lives in autoSearch() below: a slider release plus two
+  //     quick checkbox clicks collapse into one request.
+  var inflight = null;
+  var autoTimer = null;
+  var resultCache = {};
+  var resultCacheKeys = [];
+  var CACHE_TTL_MS = 2 * 60 * 1000;
+
+  function renderResults(data, fetchedAt) {
+    if (data.error === 'not_configured') {
+      statusEl.textContent = 'Live search isn\u2019t connected yet \u2014 contact us directly for current listings.';
+      loadMoreBtn.style.display = 'none';
+      return;
+    }
+    if (data.error) {
+      statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
+      loadMoreBtn.style.display = 'none';
+      return;
+    }
+    var listings = data.listings || [];
+    if (skip === 0 && listings.length === 0) {
+      statusEl.textContent = 'No active listings match those filters right now \u2014 try widening your search, or contact us and we\u2019ll help you find it before it hits the market.';
+    } else {
+      statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
+    }
+    resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) { return listingCardHtml(l, true); }).join(''));
+    pacePhotos(resultsEl);
+    skip += listings.length;
+    loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
+    if (fetchedAtEl) {
+      fetchedAtEl.textContent = new Date(fetchedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+  }
+
   function runSearch(reset) {
     if (reset) { skip = 0; resultsEl.innerHTML = ''; }
     var p = paramsFromForm();
     p.top = TOP;
     p.skip = skip;
     var qs = new URLSearchParams(p).toString();
+    if (inflight) { inflight.abort(); inflight = null; }
+    var hit = resultCache[qs];
+    if (hit && (Date.now() - hit.at) < CACHE_TTL_MS) {
+      renderResults(hit.data, hit.at);
+      return;
+    }
     statusEl.textContent = 'Searching live IRES listings\u2026';
-    fetch('/.netlify/functions/listings-search?' + qs)
+    var ctrl = window.AbortController ? new AbortController() : null;
+    inflight = ctrl;
+    fetch('/.netlify/functions/listings-search?' + qs, ctrl ? { signal: ctrl.signal } : {})
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (data.error === 'not_configured') {
-          statusEl.textContent = 'Live search isn\u2019t connected yet \u2014 contact us directly for current listings.';
-          loadMoreBtn.style.display = 'none';
-          return;
+        if (ctrl) {
+          if (ctrl !== inflight) return;   // a newer search superseded this one
+          inflight = null;
         }
-        if (data.error) {
-          statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
-          loadMoreBtn.style.display = 'none';
-          return;
+        if (!data.error) {
+          resultCache[qs] = { data: data, at: Date.now() };
+          resultCacheKeys.push(qs);
+          if (resultCacheKeys.length > 30) delete resultCache[resultCacheKeys.shift()];
         }
-        var listings = data.listings || [];
-        if (reset && listings.length === 0) {
-          statusEl.textContent = 'No active listings match those filters right now \u2014 try widening your search, or contact us and we\u2019ll help you find it before it hits the market.';
-        } else {
-          statusEl.textContent = (skip + listings.length) + ' listing(s) shown' + (data.totalCount ? ' of ' + data.totalCount + ' total' : '') + '.';
-        }
-        resultsEl.insertAdjacentHTML('beforeend', listings.map(function (l) { return listingCardHtml(l, true); }).join(''));
-        pacePhotos(resultsEl);
-        skip += listings.length;
-        loadMoreBtn.style.display = (listings.length === TOP) ? 'inline-block' : 'none';
-        if (fetchedAtEl) {
-          fetchedAtEl.textContent = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-        }
+        renderResults(data, Date.now());
       })
-      .catch(function () {
+      .catch(function (err) {
+        if (err && err.name === 'AbortError') return;   // superseded, not broken
         statusEl.textContent = 'Something went wrong loading listings. Please try again or contact us directly.';
       });
+  }
+
+  // Change a filter and the results just follow -- the Search Homes button
+  // still works, but nobody has to find it.
+  function autoSearch() {
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(function () { runSearch(true); }, 350);
   }
 
   // ---- "Email Me New Matches" ------------------------------------------
@@ -1082,16 +1141,19 @@ window.__ytPlay = function (b) {
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
+    clearTimeout(autoTimer);
     runSearch(true);
   });
-  // Changing the sort re-runs immediately -- having to press Search again after
-  // picking an order is the kind of small friction that makes a search feel
-  // broken.
-  var sortSelect = document.getElementById(wid + '-sort');
-  if (sortSelect) {
-    sortSelect.addEventListener('change', function () { runSearch(true); });
-  }
-  loadMoreBtn.addEventListener('click', function () { runSearch(false); });
+  // 2026-08-18: every control in the form now auto-runs the search on change --
+  // the price sliders ('change' fires on release, not per-pixel while
+  // dragging), the county/town checkboxes, everything under "More filters",
+  // and the sort (which used to have its own listener doing exactly this; one
+  // delegated listener replaces it and covers any control added later too).
+  form.addEventListener('change', function () { autoSearch(); });
+  loadMoreBtn.addEventListener('click', function () {
+    clearTimeout(autoTimer);
+    runSearch(false);
+  });
 
   if (supportDeepLinks) {
     // ?city= and ?cities= now pre-CHECK the pickers instead of setting a
