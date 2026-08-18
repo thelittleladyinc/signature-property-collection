@@ -75,6 +75,13 @@ const seeded = {
   "IRE5": { listingId: "IRE5", city: "Cherry Hills Village", county: null, photo: DEAD, photoCount: 9 },
   "IRE6": { listingId: "IRE6", city: "Greeley", county: "weld", photoCount: 4,
             photo: "https://res.cloudinary.com/x/image/upload/v1/a.jpg" },
+  // 2026-08-18, found by driving the live site in a real browser: covers cached
+  // while CLOUDINARY_URL was malformed were stored as RELATIVE paths —
+  // cloudinary.url() with no cloud_name returns "/spc-listings/…" instead of
+  // throwing — which resolve against the site's own domain and 404 forever.
+  "IRE7": { listingId: "IRE7", city: "Windsor", county: "weld", photoCount: 6,
+            agentName: "Christine Gwinnup",
+            photo: "/spc-listings/IRE7/photo-0?_a=BAMAPqcg0" },
 };
 blobs["listings.json"] = JSON.stringify(seeded);
 blobs["sync-state.json"] = JSON.stringify({ bootstrapped: true, cursor: null, lastModified: null });
@@ -122,6 +129,12 @@ delete process.env.LOFTY_API_KEY;
   check("no dead MLS Grid photo URL survives in the catalogue",
     withDeadUrl.length === 0,
     `${withDeadUrl.length} still stored — these expire within the hour and nothing may serve them`);
+  check("a relative Cloudinary path — the 08-16 credential-window damage — is repaired or removed",
+    !stored.IRE7 || typeof stored.IRE7.photo !== "string" || /^https:\/\//.test(stored.IRE7.photo),
+    stored.IRE7 ? `photo=${JSON.stringify(stored.IRE7.photo)}` : "listing dropped, which is worse");
+  check("...and the listing itself survives the repair",
+    !!stored.IRE7, "repairing a URL must never cost the listing");
+
   check("but a re-hosted Cloudinary URL IS kept, because it is what gets served",
     stored.IRE6 && stored.IRE6.photo && stored.IRE6.photo.indexOf("res.cloudinary.com") !== -1);
   check("and the photo COUNT survives the slimming",

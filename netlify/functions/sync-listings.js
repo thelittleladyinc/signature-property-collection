@@ -72,7 +72,7 @@ const {
   inferCountyFromCity,
 } = require("./lib/_mls-shared");
 const {
-  cachePhotoToCloudinary, isCloudinaryConfigured, isOnCurrentCloud,
+  cachePhotoToCloudinary, isCloudinaryConfigured, isOnCurrentCloud, deliveryUrl,
 } = require("./lib/_cloudinary");
 const { recordMlsCall, checkMlsQuota, pruneUsage, bytesFromResponse } = require("./lib/_mls-usage");
 const { invalidatePhotoCache } = require("./lib/_media");
@@ -808,6 +808,22 @@ function pruneAndSlimStore(listingsById) {
       continue;
     }
     if (county && county !== l.county) l.county = county;
+    // 2026-08-18. Covers cached while CLOUDINARY_URL was malformed were stored
+    // as RELATIVE paths — cloudinary.url() with no cloud_name returns
+    // "/spc-listings/…/photo-0?_a=…" instead of throwing — and a relative URL
+    // resolves against the site's own domain and 404s. The images themselves
+    // uploaded fine, so the repair is to rebuild the delivery URL from the
+    // stored path's public id. If Cloudinary still can't produce an absolute
+    // URL, the field is dropped instead: her covers then serve through
+    // /listing-photo like everyone else's, which works. deliveryUrl() now
+    // refuses to return anything that isn't https, so this can't loop.
+    if (typeof l.photo === "string" && l.photo.charAt(0) === "/") {
+      const publicId = l.photo.split("?")[0].replace(/^\/+/, "");
+      const rebuilt = publicId ? deliveryUrl(publicId) : null;
+      if (rebuilt) l.photo = rebuilt;
+      else delete l.photo;
+      slimmed += 1;
+    }
     // The re-slim test has to name every shape worth shrinking, or the cleanup
     // silently skips the listings it exists for. `photo` was added on 2026-08-18:
     // a dead MLS Grid signed URL, ~180 bytes, on every non-Christine listing, and

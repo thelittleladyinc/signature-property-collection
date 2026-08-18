@@ -322,11 +322,24 @@ async function uploadDataUri(dataUri, publicId) {
 // that scope. Dead, therefore harmless, and a ReferenceError waiting for whoever
 // tidied the return above it. One copy now, used by both callers.
 function deliveryUrl(publicId) {
-  return cloudinary.url(publicId, {
+  // Self-configures so a caller early in a request (pruneAndSlimStore runs
+  // before anything else touches Cloudinary) still gets an absolute URL.
+  if (!configureCloudinary()) return null;
+  const url = cloudinary.url(publicId, {
     secure: true,
     resource_type: "image",
     transformation: [{ quality: "auto", fetch_format: "auto", width: 1600, crop: "limit" }],
   });
+  // 2026-08-18, found by loading the live site in a real browser: when the SDK
+  // has no cloud_name at call time, cloudinary.url() does not throw — it
+  // returns a RELATIVE path ("/spc-listings/IRE…/photo-0?_a=…"). Stored, that
+  // resolves against Christine's own domain and 404s forever, which is exactly
+  // what happened to covers cached during the 08-16 credential mix-up window:
+  // the uploads succeeded, the stored links were garbage. A null tells every
+  // caller "not cached" (their existing failure path); a relative URL tells
+  // them "cached" and then breaks in the browser, so null is strictly better.
+  if (!/^https:\/\//.test(String(url || ""))) return null;
+  return url;
 }
 
 // Uploads bytes we ALREADY have, without going back to MLS Grid for them.
