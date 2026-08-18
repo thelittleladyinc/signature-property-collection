@@ -3377,7 +3377,12 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
     # version of itself -- used for towns that straddle two counties and so
     # legitimately have two URLs built from the same source facts.
     canonical = SITE["domain"] + (canonical_path or path)
-    og_image = SITE["domain"] + "/assets/img/logo-full.png"
+    # 2026-08-18: was logo-full.png — a 1400x523 wide logo on TRANSPARENT
+    # ground, which share platforms crop unpredictably and render on whatever
+    # background they like (black in iMessage dark mode). og-card.png is a
+    # designed 1200x630 (the og standard): the logo on the site's cream with
+    # the rose keyline. Regenerate with build/tools/make-og-card.py.
+    og_image = SITE["domain"] + "/assets/img/og-card.png"
     return f"""<!doctype html>
 <html lang="en-US">
 <head>
@@ -3392,7 +3397,7 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
 <meta property="og:url" content="{canonical}">
 <meta property="og:image" content="{og_image}">
 <meta property="og:updated_time" content="{BUILD_DATE}">
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{esc(title)}">
 <meta name="twitter:description" content="{esc(description)}">
 <meta name="last-modified" content="{BUILD_DATE}">
@@ -8181,6 +8186,127 @@ def _subdivision_photo(sub):
 </section>"""
 
 
+
+def build_loveland_luxury_page():
+    """/loveland-luxury-homes.html — the dedicated money page for the query
+    this site had no answer to.
+
+    2026-08-18. Persona test (a $2.3M Loveland buyer): Google's results for
+    "luxury homes for sale loveland colorado" are the portals plus exactly one
+    brokerage — kennarealestate.com's /loveland/loveland-luxury-homes/ page —
+    proving an agent site CAN rank for the money query with a dedicated page.
+    Ours targeted "living in Loveland" (relocation intent, correctly) and
+    nothing targeted the ready-to-buy phrase. Christine pasted Kenna's page:
+    a three-sentence intro, an IDX feed, and a link farm. This page beats it
+    on substance — named micro-markets that link to real neighborhood guides,
+    the move-up path (this persona has a home to sell), and the live feed —
+    without the farm.
+
+    Every claim here is checkable: the micro-markets are the site's own
+    subdivision guides plus lake/golf geography, and no market statistics are
+    asserted (the live feed shows the real count and prices; a hand-typed
+    "Avg DOM" goes stale the day it ships — that is Kenna's weakness, not a
+    feature to copy)."""
+    intro = ("Luxury in Loveland doesn't mean one neighborhood — it means lakefront on Boyd Lake and "
+             "Horseshoe Lake, golf-course homes at Mariana Butte, foothills acreage out west toward "
+             "Masonville, custom builds in Dakota Glen, and modern estates on the Centerra side. "
+             "Every active $950K+ listing in the city is live on this page, straight from IRES.")
+    paragraphs = [
+        "What Luxury Actually Means In Loveland",
+        "Loveland's top of the market runs differently than Denver's or Boulder's. Here, the luxury tier "
+        "generally starts around $950K and runs past $2.5M — and what that buys is the interesting part: "
+        "real lakefront, real acreage, real custom construction, at prices that would get a nice townhouse "
+        "closer to Denver. That's exactly why so many of my luxury buyers are arriving from somewhere more "
+        "expensive.",
+        "The Micro-Markets That Matter",
+        "The lakes first: homes on and around [Boyd Lake](/communities/loveland/boyd-lake-north-loveland.html) "
+        "and Horseshoe Lake are the closest thing Northern Colorado has to true waterfront living, and they "
+        "trade accordingly. West of town, the [Buckhorn corridor](/communities/loveland/buckhorn-subdivisions-loveland.html) "
+        "and the foothills subdivisions — Bonnell West, Sedona Hills, up toward Masonville — are where acreage, "
+        "views, and horse setups live. Mariana Butte wraps the golf course on the west side. "
+        "[Downtown](/communities/loveland/downtown-loveland-real-estate.html) has quietly added genuine "
+        "high-end condos above the galleries and restaurants. And on the east side, "
+        "[Kinston and the Centerra area](/communities/loveland/kinston-centerra-loveland.html) carry the newest "
+        "construction — beautiful homes, and the part of town where you should read my "
+        "[metro-district tax guide](/blog/colorado-metro-districts-what-your-property-tax-bill-wont-tell-you.html) "
+        "before you write an offer, because the real tax bill on a newer build can differ sharply from the listing's.",
+        "Buying At This Level While Selling Your Current Home",
+        "Most of my luxury buyers aren't first-timers — they're moving up, and the real puzzle isn't finding "
+        "the next house, it's sequencing the sale of the current one. There are more ways to solve that than "
+        "most people think: contingent offers done credibly, bridge financing, HELOC strategies — I wrote out "
+        "the honest pros and cons in [Bridge Loans, HELOCs & Creative Ways To Buy Before You Sell]"
+        "(/blog/bridge-loans-helocs-more-creative-ways-to-buy-before-you-sell.html). If you want to know what "
+        "your current home would actually bring, ask me for a real valuation — not an algorithm's guess — and "
+        "we'll build the sequence from there.",
+        "Why Work With A Loveland Luxury Specialist",
+        "I live here, I list here, and I've sold over 150 homes personally — 250+ as a team — across exactly "
+        "these neighborhoods. At this price point, the difference between a good outcome and a great one is "
+        "made in preparation, positioning, and negotiation, not in luck. If you're weighing Loveland against "
+        "the other towns first, start with [the honest town-by-town comparison](/blog/moving-to-northern-colorado-which-town-actually-fits.html) "
+        "or the full guide to [living in Loveland](/communities/larimer/loveland.html).",
+    ]
+    body_html = "\n      ".join(
+        f'<h2 class="article-subhead" style="margin-top:32px">{esc(x)}</h2>'
+        if len(x) < 70 and not x.endswith((".", "!", "?", ":", ","))
+        else f"<p>{_blog_para_html(x)}</p>"
+        for x in paragraphs
+    )
+    faq_html, faq_schema = _faq_block([
+        ("What price range counts as a luxury home in Loveland?",
+         "The luxury tier in Loveland generally begins around $950,000 — which is the floor this page's "
+         "live feed uses — and the top of the current market reaches past $2.5 million. What distinguishes "
+         "the tier here is less the number than what it buys: lakefront, acreage, golf-course frontage, or "
+         "true custom construction."),
+        ("Which Loveland neighborhoods have luxury homes?",
+         "The lakefront streets around Boyd Lake and Horseshoe Lake, the Mariana Butte golf community, the "
+         "foothills and acreage subdivisions west of town (Bonnell West, the Buckhorn corridor, toward "
+         "Masonville), Dakota Glen, downtown Loveland's newer high-end condos, and the newest construction "
+         "in Kinston and the Centerra area on the east side."),
+        ("Can I buy a Loveland luxury home before selling my current house?",
+         "Often, yes — through a credible contingent offer, bridge financing, or a HELOC strategy, depending "
+         "on your equity and timeline. Christine walks move-up buyers through the honest pros and cons of "
+         "each and helps sequence the sale and purchase so neither transaction holds the other hostage."),
+    ])
+    feed_html = _live_feed_widget(
+        "loveland_luxury_feed",
+        {"cities": "loveland"},
+        empty_note="the luxury market here moves quickly,",
+    )
+    body = f"""
+<section class="hero" style="padding:90px 0 60px">
+  <div class="wrap">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Lakefront &middot; Golf &middot; Foothills Acreage &middot; Custom Builds</span>
+    <h1>Loveland CO Luxury Homes For Sale</h1>
+    <p class="lede">{esc(intro)}</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live, Active IRES MLS Listings</span>
+    <h2 class="section-title">Every Active Luxury Listing In Loveland Right Now</h2>
+    {feed_html}
+  </div>
+</section>
+<section>
+  <div class="wrap" style="max-width:780px">
+    {body_html}
+    <div class="btn-row" style="justify-content:flex-start;margin-top:40px">
+      <a class="btn btn-dark" href="/contact.html">Talk To {esc(SITE['agent'].split()[0])} About Loveland Luxury</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/search-homes.html?cities=loveland">Refine This Search</a>
+    </div>
+  </div>
+</section>
+{faq_html}
+"""
+    page(
+        "Loveland CO Luxury Homes For Sale | Lakefront & Foothills Estates",
+        "Every active $950K+ listing in Loveland, live from IRES — lakefront on Boyd Lake, Mariana Butte "
+        "golf homes, foothills acreage, and Centerra custom builds, with a local luxury specialist.",
+        "/loveland-luxury-homes.html", None, body,
+        schema_extra=[faq_schema],
+    )
+
+
 def build_subdivision_pages():
     """One page per Loveland subdivision/area guide — see SUBDIVISION_PAGES
     above for the sourcing note. Modeled on build_market_topic_pages()'s
@@ -11329,6 +11455,7 @@ def build_redirects_and_meta():
     paths += [p for _, p, _, _ in GUIDE_PAGES]
     paths += [f"/guides/{t['slug']}.html" for t in MARKET_TOPIC_PAGES]
     paths += [f"/communities/loveland/{s['slug']}.html" for s in SUBDIVISION_PAGES]
+    paths += ["/loveland-luxury-homes.html"]
     paths += ["/blog/index.html"] + [f"/blog/{p['slug']}.html" for p in BLOG]
     paths += ["/relocation.html", "/expired-listings.html", "/free-home-valuation.html",
               "/lifestyle-search.html", "/listing-video-portfolio.html",
@@ -11821,13 +11948,10 @@ def write_listing_page_shell():
         f'<meta property="og:url" content="{SITE["domain"]}/listing/">',
         '<meta property="og:url" content="{{CANONICAL}}">',
     ).replace(
-        f'<meta property="og:image" content="{SITE["domain"]}/assets/img/logo-full.png">',
+        f'<meta property="og:image" content="{SITE["domain"]}/assets/img/og-card.png">',
         # The listing's own cover photo, so texting the link shows the house.
         '<meta property="og:image" content="{{OG_IMAGE}}">\n'
         '<meta name="twitter:image" content="{{OG_IMAGE}}">',
-    ).replace(
-        '<meta name="twitter:card" content="summary">',
-        '<meta name="twitter:card" content="summary_large_image">',
     )
     shell = f"""{shell_head}
 <body>
@@ -12074,6 +12198,7 @@ if __name__ == "__main__":
     build_guides()
     build_market_topic_pages()
     build_subdivision_pages()
+    build_loveland_luxury_page()
     build_blog()
     build_rss_feed()
     build_luxury_market()

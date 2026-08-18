@@ -338,8 +338,35 @@ exports.handler = async (event) => {
         String(b.modificationTimestamp || "").localeCompare(String(a.modificationTimestamp || "")),
     };
     const sortFn = SORTS[params.sort] || SORTS["price-desc"];
-    const matched = Object.values(listingsById)
-      .filter((l) => matchesQuery(l, params))
+    // 2026-08-18 (persona test at the $2.3M tier): the same property showed
+    // twice — "9126 Gold Mine Rd" and "9126 Goldmine Rd", and two identical
+    // "4163 Rainbow View Ln" entries — because a relist or co-list gives one
+    // house two IRES numbers, and the store keeps both faithfully. Correct
+    // data, sloppy shelf. Deduped here at serve time by normalized
+    // address+city (spaces and punctuation stripped, so the Gold Mine /
+    // Goldmine spelling variants collide on purpose); listings without a
+    // street address (bare land) can't be safely matched and are never
+    // deduped. When two collide, the one that survives is Active over
+    // under-contract, then the higher MLS number (the newer listing).
+    const dedupeListings = (list) => {
+      const byKey = new Map();
+      const keyless = [];
+      for (const l of list) {
+        const addr = String(l.address || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (!addr) { keyless.push(l); continue; }
+        const key = addr + "|" + String(l.city || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const prev = byKey.get(key);
+        if (!prev) { byKey.set(key, l); continue; }
+        const rank = (x) => (String(x.status || "").toLowerCase() === "active" ? 1 : 0);
+        const better =
+          rank(l) !== rank(prev) ? (rank(l) > rank(prev) ? l : prev)
+          : (String(l.listingId || "") > String(prev.listingId || "") ? l : prev);
+        byKey.set(key, better);
+      }
+      return [...byKey.values(), ...keyless];
+    };
+    const matched = dedupeListings(Object.values(listingsById)
+      .filter((l) => matchesQuery(l, params)))
       .sort((a, b) => {
         if (mine) {
           const aFirst = isUnderContractOrPending(a) ? 1 : 0;
