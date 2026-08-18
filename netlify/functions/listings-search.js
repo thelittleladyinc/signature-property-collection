@@ -385,15 +385,44 @@ exports.handler = async (event) => {
     // function -- but bounded, best-effort, and skipped entirely when the cache
     // is already warm, so search results are never held up for long and a
     // failure here costs a placeholder, not a broken page.
-    await prewarmPhotoUrls(page, {
-      store,
-      token: process.env.MLSGRID_API_TOKEN,
-      baseUrl: BASE_URL,
-      selectFields: SELECT_FIELDS,
-      timeoutMs: 3500,
-    });
+    // 2026-08-18, measured on Christine's own luxury search rather than guessed:
+    //
+    //   state;dur=366, catalogue;dur=1768, filter;dur=122, prewarm;dur=2482,
+    //   total;dur=4738
+    //
+    // The prewarm was the single largest cost on the page — 2.5 of 4.7 seconds
+    // spent holding the entire response back while MLS Grid resolved photo URLs
+    // nobody had asked for yet. Filtering all 29,150 listings, which I had assumed
+    // was the expensive part, took 122ms.
+    //
+    // The prewarm still earns its place: without it a page of cold listings fires
+    // a dozen separate resolves at an API limited to two requests a second. But it
+    // is an OPTIMISATION, and an optimisation must never cost more than it saves.
+    // It now runs against a hard deadline: whatever has resolved by then is
+    // cached and helps, and the response goes out regardless. Anything unresolved
+    // simply resolves later, on demand, in listing-photo.js — which is the exact
+    // path that already handles a direct hit or a shared link.
+    //
+    // Deliberately NOT fire-and-forget: a Netlify container can freeze the moment
+    // it returns, so work nobody waits for is work that only sometimes happens.
+    // Waiting a bounded amount is honest; waiting indefinitely was not.
+    const PREWARM_DEADLINE_MS = 700;
+    let prewarmOutcome = "completed";
+    await Promise.race([
+      prewarmPhotoUrls(page, {
+        store,
+        token: process.env.MLSGRID_API_TOKEN,
+        baseUrl: BASE_URL,
+        selectFields: SELECT_FIELDS,
+        timeoutMs: PREWARM_DEADLINE_MS,
+      }),
+      new Promise((resolve) => setTimeout(() => {
+        prewarmOutcome = `gave up after ${PREWARM_DEADLINE_MS}ms — photos resolve on demand`;
+        resolve();
+      }, PREWARM_DEADLINE_MS)),
+    ]);
 
-    timing.mark("prewarm");
+    timing.mark("prewarm", prewarmOutcome);
 
     const response = {
       listings: page,
