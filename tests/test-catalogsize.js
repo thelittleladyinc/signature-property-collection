@@ -72,5 +72,33 @@ check(
     !!m && Number(m[2]) >= Number(m[1]) * 3);
 }
 
+// ---- The cleanup has to REACH the listings already stored ------------------
+// Both changes below would otherwise have measured as doing nothing at all.
+// pruneAndSlimStore only re-slims a record when it still looks like the OLD fat
+// shape, and 29,000 already-slimmed records carry neither remarks nor photos[].
+// A new field worth dropping has to be named in that test or it is skipped
+// forever — and at the crawl's fifty records a run, "eventually" is months.
+{
+  const fn = sync.slice(sync.indexOf("function pruneAndSlimStore"));
+  const body = fn.slice(0, fn.indexOf("\n}"));
+  check("the cleanup re-slims records carrying a dead photo URL",
+    /hasDeadPhotoUrl/.test(body) && /l\.remarks \|\| Array\.isArray\(l\.photos\) \|\| hasDeadPhotoUrl/.test(body),
+    "already-slim records have no remarks and no photos[] — without naming the new " +
+    "field, the 5MB stays exactly where it is");
+
+  // Same class of staleness, different field. Christine's luxury page kept showing
+  // Fraser because it was stored with county null before "fraser" was in the town
+  // table, and a null county is deliberately kept.
+  check("the county is re-inferred from the stored city, not trusted",
+    /inferCountyFromCity\(String\(l\.city/.test(body),
+    "the town table grew from 110 towns to 295 — that has to reach stored listings");
+  check("and the re-inferred county is written back",
+    /if \(county && county !== l\.county\) l\.county = county;/.test(body),
+    "otherwise every run re-derives it and nothing is ever learned");
+  check("out-of-area listings are dropped on the re-inferred county",
+    /!OPERATING_COUNTIES\.has\(county\)/.test(body),
+    "dropping on the STORED county is what let Fraser survive the table fix");
+}
+
 console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

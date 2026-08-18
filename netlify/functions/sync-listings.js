@@ -69,6 +69,7 @@ const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES, OPERATING_COUNTIES,
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
+  inferCountyFromCity,
 } = require("./lib/_mls-shared");
 const {
   cachePhotoToCloudinary, isCloudinaryConfigured, isOnCurrentCloud,
@@ -779,12 +780,33 @@ function pruneAndSlimStore(listingsById) {
   for (const id of Object.keys(listingsById)) {
     const l = listingsById[id];
     if (!l) { delete listingsById[id]; continue; }
-    if (OPERATING_COUNTIES.size > 0 && l.county && !OPERATING_COUNTIES.has(l.county) && !isHerListing(l)) {
+    // 2026-08-18. The stored county is whatever the town table could infer on the
+    // day the listing was ingested, and that table has since grown from 110 towns
+    // to 295. Christine's luxury page was still showing Fraser — Grand County, two
+    // hours over Berthoud Pass — because it was stored with county null before
+    // "fraser" existed in the table, and a null county is deliberately KEPT so a
+    // real listing in an unincorporated corner of Larimer is never discarded.
+    //
+    // So the county is re-inferred from the stored city rather than trusted. That
+    // is what makes an improvement to the table apply to the 29,000 listings
+    // already in the store, instead of only to whatever the crawl happens to
+    // re-reach — which at fifty records a run is months.
+    const county = l.county || inferCountyFromCity(String(l.city || "").toLowerCase().trim());
+    if (OPERATING_COUNTIES.size > 0 && county && !OPERATING_COUNTIES.has(county) && !isHerListing(l)) {
       delete listingsById[id];
       dropped += 1;
       continue;
     }
-    if (!isHerListing(l) && (l.remarks || Array.isArray(l.photos))) {
+    if (county && county !== l.county) l.county = county;
+    // The re-slim test has to name every shape worth shrinking, or the cleanup
+    // silently skips the listings it exists for. `photo` was added on 2026-08-18:
+    // a dead MLS Grid signed URL, ~180 bytes, on every non-Christine listing, and
+    // already-slimmed records carry neither remarks nor photos[] — so without
+    // naming it here the 5MB this was meant to reclaim would have stayed exactly
+    // where it was, and the fix would have measured as doing nothing.
+    const hasDeadPhotoUrl = typeof l.photo === "string" &&
+      l.photo.indexOf("res.cloudinary.com") === -1;
+    if (!isHerListing(l) && (l.remarks || Array.isArray(l.photos) || hasDeadPhotoUrl)) {
       listingsById[id] = slimForStorage(l);
       slimmed += 1;
     }
