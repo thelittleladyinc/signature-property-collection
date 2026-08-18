@@ -749,13 +749,66 @@ a refusal to run without one. Until then, **the single most important operationa
 rule is the one its own runbook already wrote down: never probe the live API by
 hand.**
 
+## 7h. The account's real usage, read 2026-08-18 — the quota question is closed
+
+From MLS Grid's own Usage tab, for the whole account (all three apps together):
+
+| Window | Used | Limit | % of limit |
+|---|---|---|---|
+| Requests, last hour | **32** | 7,200 | **0.4%** |
+| Download, last hour | **3.83 MB** | 3,072 MB | **0.12%** |
+| Requests, last 24h | **808** | 40,000 | **2%** |
+| Download, last 24h | **622.7 MB** | 40 GB | **1.5%** |
+| Sustained rate, 24h avg | **1.4 rps** | 2 rps | 70% |
+| Peak instantaneous | **2–3 rps** | 4 rps | — |
+
+The busiest single hour in the log was 207 requests and 203 MB — **2.9% of the
+hourly request allowance and 6.6% of the hourly bandwidth**.
+
+**There is no capacity problem, and there never was.** A second subscription would
+have bought headroom that is already 98% unused. That question is now closed on
+evidence rather than inference, and every earlier recommendation in this document
+that hedged on it should be read as settled: **do not buy more quota.**
+
+### What this DOES explain
+
+**Attribution, finally.** This site's own log recorded 7 requests in 24 hours
+against the account's 808. **The website is under 1% of the account's usage.**
+Listing-Engine and Expired-Luxury are essentially all of it — visible as the two
+bulk hours at 04:00 and 05:00 (387 requests, 387 MB between them) and another at
+14:00 the previous day (145 MB), which are photo imports and the daily sweep.
+
+**The 429s are a RATE collision, not a volume shortage.** The account averages
+1.4 rps against a 2 rps sustained ceiling — 70% of the rate limit while using 2%
+of the daily volume. So the binding constraint is requests *per second*, exactly
+as MLS Grid's documentation says, and it binds while the account is nearly empty
+on every other axis. When two apps fire at the same instant, the account brushes
+the ceiling and somebody gets a 429. That is why the health probe took one at
+14:07 while this site had made five requests all hour.
+
+**Which means the remedy is coordination, not capacity.** Nothing bought from MLS
+Grid fixes a per-second collision between three of your own applications. What
+fixes it is exactly what this branch has been doing: never fetch a photo twice,
+never fire a burst, and let a warm page cost nothing. Every one of those reduces
+the chance of being the app that collides.
+
+### The one number worth watching
+
+**1.4 rps average against a 2 rps sustained limit is 70%, and that is the only
+figure on the page that is not comfortable.** It is also the exact metric the
+2026-08-01 suspension fired on ("your hourly 6.0 requests per second exceeded the
+2 requests per second limit"). Volume has enormous headroom; rate does not. If
+anything is ever going to suspend this account again, it is that column — which
+makes Listing-Engine's unpaced diagnostic script (§7g) the single largest
+remaining risk to every photo on this website.
+
 ## 8. Open items
 
 External:
 
-- [ ] Read the Usage tab (`app.mlsgrid.com/subs/view/usage/`) and record what the
-      three apps actually consume — AFTER the fixes have been live for a day, so
-      the number means something
+- [x] ~~Read the Usage tab and record what the three apps actually consume~~ —
+      done 2026-08-18, see §7h. Account uses 2% of its daily allowance; this site
+      is under 1% of the account. Quota question closed.
 - [x] ~~Per-call log + usage view for this site~~ — built 2026-08-18, see §7d
 - [ ] Expired-Luxury (read only, not touched): Media URL cache is 7 days against a
       1-hour single-use URL, and it renders raw MLS Grid URLs in `<img src>`. Both

@@ -436,6 +436,20 @@ limits are the suspension-notice ones, not the published ones. §7d of the doc h
 the details, including the honest limitation: concurrent invocations can lose a
 count, which is why the budget is half.
 
+**SETTLED 2026-08-18, from MLS Grid's own Usage tab.** The whole account — all
+three apps — used **808 requests and 622 MB in 24 hours**, against limits of 40,000
+and 40 GB. Two percent of the daily allowance. The busiest single hour was 207
+requests, 2.9% of the hourly cap. There is no capacity problem and there never was;
+a second subscription would have bought headroom that is 98% unused.
+
+It also settles attribution: this site logged **7 requests in that same 24 hours**
+against the account's 808, so the website is **under 1% of usage** — Listing-Engine
+and Expired-Luxury are effectively all of it. And it reframes the 429s: the account
+averages **1.4 rps against a 2 rps sustained ceiling**, so the binding constraint is
+rate, not volume, and it binds while everything else sits nearly empty. The 429s are
+three of Christine's own apps colliding within the same second. No purchase fixes
+that; only pacing and not re-fetching does.
+
 Also: **usage is self-serve** — Manage Subscriptions → Edit Data Subscription
 Details → Usage tab → Usage Logs gives the hourly and 24-hour breakdown without
 emailing anybody. And the subscription types (IDX/VOW/BO/PT) are use-case
