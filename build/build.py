@@ -4064,7 +4064,15 @@ def build_home():
     body += faq_html
     extra = _leaflet_lazy_loader_extra()
     page(
-        "Northern Colorado Luxury Real Estate Agent | Christine Gwinnup",
+        # 2026-08-18, corrected with actual search-volume data after Christine
+        # asked "did you confirm that is what they type?" — the honest answer
+        # was no. "northern colorado luxury real estate" measures ~zero search
+        # volume; what people type is town-first: "loveland real estate agent"
+        # (~4,300/mo, competition 12) and "loveland real estate" (~5,200/mo,
+        # competition 7). Her office IS in Loveland, so the title now leads
+        # with the phrase that is actually searched, keeps the regional reach,
+        # and front-loads the keywords inside the ~60 chars Google displays.
+        "Loveland Real Estate Agent | Luxury Homes Across Northern Colorado | Christine Gwinnup",
         # 2026-08-16: this named Loveland, Berthoud and Masonville -- one real town and
         # two of the smallest in the county -- and then three counties out of nine.
         # The description is the line Google prints, and it was describing a fraction
