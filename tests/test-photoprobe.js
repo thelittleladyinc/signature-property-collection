@@ -91,6 +91,27 @@ const mediaJson = { value: [{ ListingId: "IRE1059947", Media: [{ Order: 0, Media
   check("zero calls during a sync suspension", calls === 0, `${calls} calls`);
   check("same honest wording", /Not tested just now/.test(r.detail));
 
+  // 2026-08-18: the probe must be able to FINISH. Its own steps allowed 6000ms to
+  // resolve plus 8000ms to fetch against a 6500ms group budget, so this row was
+  // structurally incapable of refreshing — Christine's page showed every other probe
+  // current to the second and this one fifteen hours old, which reads as bad luck
+  // rather than as arithmetic. The one row that matters when photos are the problem
+  // was the one row that could never answer.
+  {
+    const src2 = require("fs").readFileSync(
+      require("path").join(ROOT, "netlify", "functions", "site-health.js"), "utf8");
+    const budget = Number((src2.match(/PROBE_BUDGET_MS = (\d+)/) || [])[1]);
+    const resolveMs = Number((src2.match(/PHOTO_PROBE_RESOLVE_MS = (\d+)/) || [])[1]);
+    const fetchMs = Number((src2.match(/PHOTO_PROBE_FETCH_MS = (\d+)/) || [])[1]);
+    check("the photo probe's worst case fits inside the group budget",
+      !!budget && !!resolveMs && !!fetchMs && (resolveMs + fetchMs) < budget,
+      `${resolveMs} + ${fetchMs} = ${resolveMs + fetchMs} vs budget ${budget}`);
+    check("and the page still fits inside Netlify's 10s function ceiling", budget < 10000);
+    check("the probe's own image fetch is measured against the MLS quota",
+      /fetchMediaResponse\(urls\[0\], token, PHOTO_PROBE_FETCH_MS, store\)/.test(src2),
+      "a diagnostic that spends quota invisibly is how the usage number starts lying");
+  }
+
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.error("harness error:", e); process.exit(1); });

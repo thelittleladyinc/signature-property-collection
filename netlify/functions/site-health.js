@@ -137,7 +137,8 @@ async function probePhotoPipeline(mineListings, token) {
       return out;
     }
     const resolved = await resolveMediaFor([first.listingId], {
-      store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS, timeoutMs: 6000,
+      store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS,
+      timeoutMs: PHOTO_PROBE_RESOLVE_MS,
     });
     const urls = resolved[first.listingId];
     if (!urls || !urls.length) {
@@ -150,7 +151,7 @@ async function probePhotoPipeline(mineListings, token) {
     try { out.mediaHost = new URL(urls[0]).host; } catch (e) { out.mediaHost = "unparseable"; }
     out.presigned = looksPresigned(urls[0]);
 
-    const attempt = await fetchMediaResponse(urls[0], token, 8000);
+    const attempt = await fetchMediaResponse(urls[0], token, PHOTO_PROBE_FETCH_MS, store);
     // 2026-08-17: the probe SPENDS this URL. MLS Grid media URLs are single-use, so
     // leaving it in the cache marked unused would hand the next real visitor a URL
     // that cannot work -- a diagnostic that creates the fault it is there to find.
@@ -381,7 +382,24 @@ function describeAge(ms) {
 //      older than the TTL. This is the backstop: a probe can still fail or time
 //      out, and then the page falls back to the cached value -- which must never
 //      again be presented as if it were current.
-const PROBE_BUDGET_MS = 6500;
+// 2026-08-18. This was 6500ms while the photo probe's own steps allowed 6000ms to
+// resolve plus 8000ms to fetch an image -- up to 14 seconds for a budget of six and
+// a half. So the photo row could essentially never finish inside the group, and
+// Christine's page showed every other probe refreshed to the second while "Listing
+// photos load end to end" sat at a fifteen-hour-old reading, with no indication
+// that the row was structurally incapable of updating rather than merely unlucky.
+//
+// That is the one row that matters when photos are the problem, and it was the one
+// row that could not answer. Raised here, and the photo probe's own steps tightened
+// below so the whole chain fits: 3000 + 4500 = 7500 worst case, inside this budget,
+// inside Netlify's 10-second function ceiling.
+const PROBE_BUDGET_MS = 8500;
+
+// The photo probe's own sub-timeouts, sized to fit PROBE_BUDGET_MS with room. A
+// real resolve takes well under a second and a photo download a second or two; if
+// either takes longer than these, "too slow to measure" IS the finding.
+const PHOTO_PROBE_RESOLVE_MS = 3000;
+const PHOTO_PROBE_FETCH_MS = 4500;
 
 function verdictAgeMs(v) {
   return v && v.checkedAt ? Date.now() - Date.parse(v.checkedAt) : null;
