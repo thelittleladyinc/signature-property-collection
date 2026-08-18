@@ -31,7 +31,7 @@
 //      15-minute listing sync -- photo traffic taking down data replication.
 //      Photo requests now respect that flag but never set it; they set their
 //      own, shorter cooldown instead.
-const { recordMlsCall, recordMlsBytes, checkMlsQuota, bytesFromResponse } = require("./_mls-usage");
+const { recordMlsCall, recordMlsBytes, checkMlsQuota, bytesFromResponse , paceMlsCall } = require("./_mls-usage");
 
 const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
 
@@ -384,6 +384,10 @@ async function resolveOneBatch(wanted, { store, token, baseUrl, selectFields, ti
     console.warn(`resolveMediaFor: quota guard refused the request — ${quota.reason}`);
     return null;
   }
+  // Volume above, SPEED here: at most 2 MLS-bound starts per second across
+  // every concurrent lambda — see paceMlsCall in _mls-usage.js and the
+  // 2026-08-18 suspension it exists to prevent (10 of these in one second).
+  await paceMlsCall(store);
   try {
     const res = await fetch(`${baseUrl}?${qs.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -625,6 +629,10 @@ async function fetchMediaResponse(url, token, timeoutMs, store) {
   // Every attempt, so a caller in debug mode can show which modes were tried and
   // what each said -- the thing that was missing when this 404 first turned up.
   const attempts = [];
+  // Same per-second gate as the resolve path — a media download is a request
+  // against the same 2 rps account ceiling. Once per call, not per mode: the
+  // second mode only runs after the first has already failed, never in parallel.
+  await paceMlsCall(store);
   for (const mode of modes) {
     // 2026-08-17: the User-Agent used to be sent ONLY in `auth` mode, described as
     // something "only sent alongside the Authorization header". MLS Grid's docs are

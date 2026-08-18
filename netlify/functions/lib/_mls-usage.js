@@ -327,10 +327,58 @@ async function pruneUsage(store) {
   }
 }
 
+// ---- Per-second pacing ----------------------------------------------------
+// 2026-08-18, from the account's own Usage Log after the third suspension:
+// the hour that tripped it held only 44 requests — but TEN of them landed in
+// the same second (15:16:57), one per concurrent listing-photo lambda, and
+// MLS Grid's per-second limit is 2 sustained / 4 burst. Every guard built
+// before this one measured VOLUME (hourly, daily); none spaced requests
+// within a second, and the browser-side photo pacer only paces one visitor's
+// browser — ten simultaneous viewers (or PageSpeed's robots) are ten browsers.
+//
+// This is a coarse cross-invocation gate on Blobs: at most PACE_PER_SECOND
+// starts per wall-clock second, everyone else backs off with jitter and
+// retries. Blobs reads race, so it undercounts under heavy concurrency —
+// that is fine: collapsing a 10-in-one-second burst to 2-4 spread over a few
+// seconds is the difference between a suspension and a quiet log. Cost is
+// ~2 blob ops (~100-200ms) per COLD MLS call only; stored photos never pass
+// through here.
+const PACE_KEY = "mls-pace.json";
+const PACE_PER_SECOND = 2;
+const PACE_MAX_WAITS = 4;
+
+async function paceMlsCall(store) {
+  if (!store) return;
+  // De-synchronize first: N lambdas born in the same instant all read the
+  // bucket before any of them has written it, and every one of them sees
+  // count=0 — the race the first version of this lost completely (10 callers,
+  // 10 releases, 1ms). A random 0-900ms delay before the first read spreads
+  // the reads out so later callers see earlier callers' writes. Jitter is not
+  // a substitute for the bucket — it is what makes the bucket readable.
+  await new Promise((r) => setTimeout(r, Math.random() * 1800));
+  for (let attempt = 0; attempt <= PACE_MAX_WAITS; attempt++) {
+    let bucket = null;
+    try { bucket = await store.get(PACE_KEY, { type: "json" }); } catch (err) { bucket = null; }
+    const sec = Math.floor(Date.now() / 1000);
+    if (!bucket || bucket.sec !== sec) bucket = { sec, count: 0 };
+    if (bucket.count < PACE_PER_SECOND) {
+      bucket.count += 1;
+      try { await store.setJSON(PACE_KEY, bucket); } catch (err) { /* pacing is best-effort */ }
+      return;
+    }
+    // This second is spoken for — wait out the rest of it plus jitter so the
+    // herd doesn't re-collide on the next boundary.
+    await new Promise((r) => setTimeout(r, 350 + Math.random() * 900));
+  }
+  // After PACE_MAX_WAITS full waits, proceed anyway: a photo that takes an
+  // extra 3s is fine, one that never loads is not.
+}
+
 // Tests reach in here rather than waiting 30 seconds for the guard cache.
 function _resetGuardCache() { _guardCache = null; }
 
 module.exports = {
+  paceMlsCall,
   USAGE_PREFIX,
   bytesFromResponse,
   RETENTION_HOURS,
