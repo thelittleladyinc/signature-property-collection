@@ -318,6 +318,70 @@ CITY_DATA_SLUG = {
 # build/assets/img/communities/<data_slug>.jpg.
 CITY_HERO_PHOTOS = {"erie", "loveland", "eaton", "johnstown", "ault", "greeley"}
 
+# ---- Community build-out galleries (2026-08-19, Christine's photo drops) --
+# Real aerial photography of the master-planned communities where this
+# site's move-up and new-construction buyers are actually shopping. This is
+# deliberately NOT the same gallery as thelittleladysellshomes.com's town
+# pages: that site shows the whole town (downtown, splash pad, parks) for
+# the general buyer; this one shows the amenity infrastructure and build-out
+# trajectory of specific communities, framed for the buyer weighing a
+# $900K+ build against resale. Same photographs may appear on both sites --
+# the copy never should (the two brands must not read as each other; see
+# Christine's brand-division doc). Processing rule for every new drop:
+# resize 1600px wide, re-encode via Pillow (strips EXIF/GPS), caption only
+# what is visible in the frame or what Christine said about the shot.
+COMMUNITY_BUILDOUT_GALLERIES = {
+    "erie": {
+        "community": "Colliers Hill",
+        "intro": (
+            "Erie's Colliers Hill is a master-planned community still mid-build, "
+            "which is exactly why it matters to a move-up buyer: the amenity "
+            "spine — parks, courts, trails, the pump track — is already built "
+            "and paid for, while new phases keep grading behind it. Christine "
+            "has toured and filmed homes here, including a $1.35M build on "
+            "Green Mountain Drive."
+        ),
+        "shots": [
+            ("erie-colliers-hill-park.jpg",
+             "The community park at the heart of Colliers Hill — built before many of the homes around it"),
+            ("erie-colliers-hill-ballfields.jpg",
+             "Ballfields in the foreground; the next phase already grading on the horizon"),
+            ("erie-colliers-hill-courts.jpg",
+             "Lighted tennis and pickleball courts along the community's amenity corridor"),
+            ("erie-colliers-hill-pumptrack.jpg",
+             "The Revolution Pumptrack — amenity infrastructure most resale neighborhoods never get"),
+            ("erie-colliers-hill-courts-play.jpg",
+             "Courts, climbing structures, and gathering pavilions clustered at the community core"),
+            ("erie-colliers-hill-green.jpg",
+             "The central green, sized for the community Colliers Hill is becoming, not just the one it is"),
+            ("erie-colliers-hill-parkland.jpg",
+             "Trail connections and open space threading the neighborhoods together"),
+        ],
+    },
+}
+
+
+def _community_buildout_block(data_slug, city):
+    g = COMMUNITY_BUILDOUT_GALLERIES.get(data_slug)
+    if not g:
+        return ""
+    figs = "\n      ".join(
+        f'<figure class="town-shot"><img src="/assets/img/communities/gallery/{fname}" '
+        f'alt="{esc(cap)}" loading="lazy"><figcaption>{esc(cap)}</figcaption></figure>'
+        for fname, cap in g["shots"]
+    )
+    return f"""
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The {esc(g['community'])} Build-Out</span>
+    <h2 class="section-title">Inside {esc(g['community'])}, {esc(city)}</h2>
+    <p class="lede">{esc(g['intro'])}</p>
+    <div class="town-gallery">
+      {figs}
+    </div>
+  </div>
+</section>"""
+
 SITE = {
     "name": "Signature Property Collection",
     "agent": "Christine Gwinnup",
@@ -5722,7 +5786,7 @@ def build_city_pages():
       <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 250+
       homes sold as a duo and $200M+ in combined sales volume across Northern Colorado's luxury
       tier. A
-      Certified Negotiation Specialist and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
+      Certified Real Estate Negotiator (CREN) and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
       represents estate homes, acreage, and architecturally significant properties in and
       around {esc(city)}.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:20px">
@@ -5931,6 +5995,7 @@ def build_city_pages():
             # city_content.json's "local_faqs" list as they're researched.
             for q, a in info.get("local_faqs", []):
                 faq_pairs.append((q, a))
+            body += _community_buildout_block(data_slug, city)
             body += _walkability_block(city, f"{city}, CO")
             faq_html, faq_schema = _faq_block(faq_pairs)
             body += faq_html
@@ -6000,7 +6065,7 @@ def build_about():
       her real estate partner Kendra Bajcar as a duo, and together they serve a diverse
       clientele, including veterans and seasoned investors.</p>
       <p class="lede">Her expertise spans luxury homes, farm and ranch properties, VA loans,
-      and acreage estates. As a Certified Negotiation Specialist and Luxury Home Marketing
+      and acreage estates. As a Certified Real Estate Negotiator (CREN) and Luxury Home Marketing
       Expert, she's known for helping investors build lucrative portfolios through creative
       financing, lease options, and fix-and-flip ventures.</p>
       <p class="lede">A proud member of NAR, CAR, and LBAR, {SITE['agent'].split()[0]} holds a
@@ -6024,7 +6089,7 @@ def build_about():
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
       NAR, CAR &amp; LBAR Member<br>
-      Certified Negotiation Specialist &amp; Luxury Home Marketing Expert</p>
+      REALTOR&reg; &middot; CREN &middot; PSA &middot; Luxury Home Marketing Expert</p>
       <a class="cta" href="/press-recognition.html">See The Full Story &rarr;</a>
     </div>
   </div>
@@ -6221,7 +6286,7 @@ def build_press():
     </div>
     <div class="card">
       <h3>Certifications &amp; Credentials</h3>
-      <p>Certified Negotiation Specialist<br>
+      <p>Certified Real Estate Negotiator (CREN)<br>
       Luxury Home Marketing Expert<br>
       Pricing Strategy Advisor<br>
       Social Media Marketing Certification<br>
@@ -9359,7 +9424,7 @@ def build_luxury_market():
          "/search-homes.html?minPrice=1000000"),
         ("&ldquo;Best negotiator real estate agent&rdquo;",
          "A fair thing to search for, and hard to verify from a website. I'm a "
-         "Certified Negotiation Specialist, and the more useful proof is the "
+         "Certified Real Estate Negotiator (CREN), and the more useful proof is the "
          "track record and what past sellers said about how their deal was "
          "handled.",
          "/testimonials.html"),
@@ -12362,7 +12427,7 @@ def build_llms_txt(paths):
 ## Why choose Signature Property Collection
 - 150+ homes sold personally; 250+ and $200M+ in sales volume combined with Kendra Bajcar
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
-- Certified Negotiation Specialist and Luxury Home Marketing Expert
+- REALTOR® | CREN (Certified Real Estate Negotiator) | PSA (Pricing Strategy Advisor) | Luxury Home Marketing Expert
 - Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
 - Deep local knowledge of Larimer, Weld, and Boulder County — especially Loveland, Berthoud, Masonville, and Fort Collins
 

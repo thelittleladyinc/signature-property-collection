@@ -1483,3 +1483,12 @@ h2.widget-title {
 .yt-facade::before { content: ""; position: absolute; top: 50%; left: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(20,20,21,.82); box-shadow: 0 4px 18px rgba(20,20,21,.35); transition: background .2s ease; }
 .yt-facade:hover::before, .yt-facade:focus-visible::before { background: var(--deep-mauve); }
 .yt-facade::after { content: ""; position: absolute; top: 50%; left: 50%; margin: -11px 0 0 -7px; border-style: solid; border-width: 11px 0 11px 18px; border-color: transparent transparent transparent #fff; }
+
+/* Community build-out galleries (2026-08-19): Christine's aerial photography
+   of the master-planned communities this site's buyers shop -- two-up on
+   desktop, single column on phones. */
+.town-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 28px; }
+.town-gallery figure { margin: 0; }
+.town-gallery img { width: 100%; border-radius: 4px; box-shadow: 0 10px 30px rgba(20,20,21,.10); display: block; }
+.town-gallery figcaption { margin-top: 9px; font-size: .85rem; line-height: 1.5; color: var(--slate-soft); }
+@media (max-width: 760px) { .town-gallery { grid-template-columns: 1fr; gap: 20px; } }
