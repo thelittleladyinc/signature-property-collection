@@ -34,7 +34,7 @@
   # This is why the feature could pass every static check and still be broken: the
   # file exists in the repo, the reference is correct, the build produces it -- and
   # none of that puts it inside the deployed function.
-  included_files = ["netlify/functions/lib/_listing-page-shell.html"]
+  included_files = ["netlify/functions/lib/_listing-page-shell.html", "netlify/functions/lib/_listing-page-shell-tllsh.html"]
 
 # 2026-08-14: there was no [[headers]] block at all. Two costs, in order of
 # impact:

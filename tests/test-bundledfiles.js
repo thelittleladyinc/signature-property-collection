@@ -64,6 +64,23 @@ for (const f of jsFiles(FN_DIR)) {
   }
 }
 
+// 2026-08-19: listing-page.js reads its shell through a brand-dispatched
+// variable (shell(brand) picks between two SHELL_PATH* consts), which the
+// one-level indirection above cannot trace. The consts themselves are still
+// plain path.join(__dirname, ...) declarations, so trace those directly.
+{
+  const lpSrc = fs.readFileSync(path.join(FN_DIR, "listing-page.js"), "utf8");
+  for (const d of lpSrc.matchAll(/SHELL_PATH[A-Z_]*\s*=\s*path\.join\(\s*__dirname\s*,\s*([^)]+)\)/g)) {
+    const parts = [...d[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+    if (parts.length) {
+      const target = path.posix.join("netlify/functions", ...parts);
+      if (!reads.some((r) => r.target === target)) {
+        reads.push({ file: "netlify/functions/listing-page.js", target });
+      }
+    }
+  }
+}
+
 check("found the runtime file reads to check", reads.length > 0, `${reads.length} found`);
 
 const covered = (target) =>

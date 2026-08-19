@@ -70,21 +70,34 @@ const FALLBACK_SHELL = '<!doctype html><html lang="en"><head><meta charset="utf-
   '<p style="margin-top:40px"><a href="/">' + AGENT_NAME + ' — Signature Property Collection</a></p>' +
   '</main></body></html>';
 
-let _shell = null;
-function shell() {
-  if (_shell === null) {
+// 2026-08-19: this one function serves BOTH brands. thelittleladysellshomes.com
+// proxies /listing/:id here with ?brand=tllsh (see that repo's netlify.toml),
+// and gets its own header/footer/palette instead of Signature's -- same
+// listing data, same canonical (Signature stays the canonical home of listing
+// pages so the two domains never compete in search). The TLLSH shell is a
+// checked-in copy of that repo's generated lib/_listing-page-shell.html;
+// refresh it after a TLLSH redesign by copying the regenerated file over.
+const SHELL_PATH_TLLSH = path.join(__dirname, "lib", "_listing-page-shell-tllsh.html");
+
+const _shells = {};
+function shell(brand) {
+  const key = brand === "tllsh" ? "tllsh" : "default";
+  if (_shells[key] == null) {
+    const p = key === "tllsh" ? SHELL_PATH_TLLSH : SHELL_PATH;
     try {
-      _shell = fs.readFileSync(SHELL_PATH, "utf8");
+      _shells[key] = fs.readFileSync(p, "utf8");
     } catch (err) {
       console.error(
-        `listing-page: shell missing at ${SHELL_PATH} (${err && err.code}) — serving the ` +
-        "plain fallback. Check included_files in netlify.toml; the bundler cannot trace " +
-        "an fs.readFileSync, so this file has to be declared explicitly."
+        `listing-page: shell missing at ${p} (${err && err.code}) — falling back. ` +
+        "Check included_files in netlify.toml; the bundler cannot trace an " +
+        "fs.readFileSync, so these files have to be declared explicitly."
       );
-      _shell = FALLBACK_SHELL;
+      // A missing brand shell degrades to the Signature shell (worse branding,
+      // working page); a missing Signature shell degrades to the plain document.
+      _shells[key] = key === "tllsh" ? shell() : FALLBACK_SHELL;
     }
   }
-  return _shell;
+  return _shells[key];
 }
 
 function esc(s) {
@@ -499,7 +512,7 @@ exports.handler = async (event) => {
       "Cache-Control": "public, max-age=120",
       "X-Robots-Tag": "noindex",
     },
-    body: render(shell(), {
+    body: render(shell(params.brand), {
       TITLE: "Listing Unavailable | Signature Property Collection",
       DESCRIPTION: "This listing is no longer available. Search current Northern Colorado listings instead.",
       CANONICAL: `${SITE_DOMAIN}/search-homes.html`,
@@ -594,7 +607,7 @@ exports.handler = async (event) => {
         // price change or status flip surfaces within the hour.
         "Cache-Control": "public, max-age=600, stale-while-revalidate=3600",
       },
-      body: render(shell(), {
+      body: render(shell(params.brand), {
         TITLE: title,
         DESCRIPTION: description,
         CANONICAL: canonical,
