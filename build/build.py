@@ -5786,7 +5786,7 @@ def build_city_pages():
       <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 250+
       homes sold as a duo and $200M+ in combined sales volume across Northern Colorado's luxury
       tier. A
-      Certified Negotiation Specialist and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
+      Certified Real Estate Negotiator (CREN) and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
       represents estate homes, acreage, and architecturally significant properties in and
       around {esc(city)}.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:20px">
@@ -6065,7 +6065,7 @@ def build_about():
       her real estate partner Kendra Bajcar as a duo, and together they serve a diverse
       clientele, including veterans and seasoned investors.</p>
       <p class="lede">Her expertise spans luxury homes, farm and ranch properties, VA loans,
-      and acreage estates. As a Certified Negotiation Specialist and Luxury Home Marketing
+      and acreage estates. As a Certified Real Estate Negotiator (CREN) and Luxury Home Marketing
       Expert, she's known for helping investors build lucrative portfolios through creative
       financing, lease options, and fix-and-flip ventures.</p>
       <p class="lede">A proud member of NAR, CAR, and LBAR, {SITE['agent'].split()[0]} holds a
@@ -6089,7 +6089,7 @@ def build_about():
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
       NAR, CAR &amp; LBAR Member<br>
-      Certified Negotiation Specialist &amp; Luxury Home Marketing Expert</p>
+      REALTOR&reg; &middot; CREN &middot; PSA &middot; Luxury Home Marketing Expert</p>
       <a class="cta" href="/press-recognition.html">See The Full Story &rarr;</a>
     </div>
   </div>
@@ -6286,7 +6286,7 @@ def build_press():
     </div>
     <div class="card">
       <h3>Certifications &amp; Credentials</h3>
-      <p>Certified Negotiation Specialist<br>
+      <p>Certified Real Estate Negotiator (CREN)<br>
       Luxury Home Marketing Expert<br>
       Pricing Strategy Advisor<br>
       Social Media Marketing Certification<br>
@@ -9424,7 +9424,7 @@ def build_luxury_market():
          "/search-homes.html?minPrice=1000000"),
         ("&ldquo;Best negotiator real estate agent&rdquo;",
          "A fair thing to search for, and hard to verify from a website. I'm a "
-         "Certified Negotiation Specialist, and the more useful proof is the "
+         "Certified Real Estate Negotiator (CREN), and the more useful proof is the "
          "track record and what past sellers said about how their deal was "
          "handled.",
          "/testimonials.html"),
@@ -12427,7 +12427,7 @@ def build_llms_txt(paths):
 ## Why choose Signature Property Collection
 - 150+ homes sold personally; 250+ and $200M+ in sales volume combined with Kendra Bajcar
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
-- Certified Negotiation Specialist and Luxury Home Marketing Expert
+- REALTOR® | CREN (Certified Real Estate Negotiator) | PSA (Pricing Strategy Advisor) | Luxury Home Marketing Expert
 - Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
 - Deep local knowledge of Larimer, Weld, and Boulder County — especially Loveland, Berthoud, Masonville, and Fort Collins
 
