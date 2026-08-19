@@ -100,6 +100,14 @@ function shell(brand) {
   return _shells[key];
 }
 
+// The brand owns more than the shell: the <title> a visitor sees in the tab
+// (and in a texted link's preview) must match the site they're browsing. The
+// tllsh proxy always sends brand=tllsh in the query, so the CDN caches the
+// two brands' renders separately without any Vary gymnastics.
+function brandName(brand) {
+  return brand === "tllsh" ? "The Little Lady Sells Homes" : "Signature Property Collection";
+}
+
 function esc(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -513,7 +521,7 @@ exports.handler = async (event) => {
       "X-Robots-Tag": "noindex",
     },
     body: render(shell(params.brand), {
-      TITLE: "Listing Unavailable | Signature Property Collection",
+      TITLE: `Listing Unavailable | ${brandName(params.brand)}`,
       DESCRIPTION: "This listing is no longer available. Search current Northern Colorado listings instead.",
       CANONICAL: `${SITE_DOMAIN}/search-homes.html`,
       OG_IMAGE: `${SITE_DOMAIN}/assets/img/logo-full.png`,
@@ -584,7 +592,7 @@ exports.handler = async (event) => {
 
     const canonical = `${SITE_DOMAIN}/listing/${encodeURIComponent(id)}`;
     const addressLine = [l.address, l.city, l.state].filter(Boolean).join(", ");
-    const title = `${l.address || "Listing"}, ${l.city || "CO"} — ${money(l.price)} | Signature Property Collection`;
+    const title = `${l.address || "Listing"}, ${l.city || "CO"} — ${money(l.price)} | ${brandName(params.brand)}`;
     const bits = [
       l.beds ? `${l.beds} bed` : null,
       l.baths ? `${l.baths} bath` : null,
