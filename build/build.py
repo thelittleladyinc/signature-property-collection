@@ -12143,8 +12143,24 @@ def build_redirects_and_meta():
     # tree that was just written, and a bad one fails the build instead of shipping.
     # Anchors and query strings are stripped before checking; external targets and
     # function rewrites are skipped, since they are not files on disk.
+    # 2026-08-19: 58 general-market blog posts moved to the sister brand (see
+    # blog_moved_to_tllsh.json). Any legacy rule that pointed an old URL at one
+    # of those local posts now sends it to the post's new home instead --
+    # cross-domain, which the existence guard below rightly skips.
+    _moved_path = os.path.join(os.path.dirname(__file__), "data", "blog_moved_to_tllsh.json")
+    _moved_slugs = set()
+    if os.path.exists(_moved_path):
+        with open(_moved_path) as _f:
+            _moved_slugs = set(json.load(_f))
+    _legacy_url_redirects = {
+        _old: (f"https://www.thelittleladysellshomes.com{_new}"
+               if _new.startswith("/blog/") and _new[len("/blog/"):-len(".html")] in _moved_slugs
+               else _new)
+        for _old, _new in LEGACY_URL_REDIRECTS.items()
+    }
+
     _bad_targets = []
-    for _old, _new in LEGACY_URL_REDIRECTS.items():
+    for _old, _new in _legacy_url_redirects.items():
         if _new.startswith(("http://", "https://", "/.netlify/")):
             continue
         _path = _new.split("#")[0].split("?")[0]
@@ -12157,7 +12173,7 @@ def build_redirects_and_meta():
             + "\n!! Fix the destination or drop the rule. A redirect to a missing "
               "page is a soft 404 wearing a 301."
         )
-    redirect_lines += [f"{old}  {new}  301" for old, new in LEGACY_URL_REDIRECTS.items()]
+    redirect_lines += [f"{old}  {new}  301" for old, new in _legacy_url_redirects.items()]
 
     # ---- Legacy AgentFire/WordPress URL reclamation (2026-08-14) ----
     #
@@ -12220,6 +12236,20 @@ def build_redirects_and_meta():
     #
     # Deliberately placed LAST: it is a broad pattern and must not shadow any
     # real page above it.
+    # 2026-08-19 (Christine: "take the best blogs posts weve done and pull
+    # them over"): the 58 general-market posts moved to the sister brand --
+    # brand doctrine puts buyer/seller how-tos on thelittleladysellshomes.com
+    # and keeps only genuinely luxury posts here. Serving both copies would be
+    # cross-site duplicate content, so the moved slugs 301 to their new home.
+    _moved_path = os.path.join(os.path.dirname(__file__), "data", "blog_moved_to_tllsh.json")
+    if os.path.exists(_moved_path):
+        with open(_moved_path) as _f:
+            for _slug in json.load(_f):
+                redirect_lines.append(
+                    f"/blog/{_slug}.html  https://www.thelittleladysellshomes.com/blog/{_slug}.html  301")
+                redirect_lines.append(
+                    f"/blog/{_slug}  https://www.thelittleladysellshomes.com/blog/{_slug}.html  301")
+
     redirect_lines += [
         "/:num-:street-:city-co-:zip/  /current-listings.html  301",
         "/:num-:street-:city-co-:zip  /current-listings.html  301",
