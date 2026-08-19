@@ -318,6 +318,70 @@ CITY_DATA_SLUG = {
 # build/assets/img/communities/<data_slug>.jpg.
 CITY_HERO_PHOTOS = {"erie", "loveland", "eaton", "johnstown", "ault", "greeley"}
 
+# ---- Community build-out galleries (2026-08-19, Christine's photo drops) --
+# Real aerial photography of the master-planned communities where this
+# site's move-up and new-construction buyers are actually shopping. This is
+# deliberately NOT the same gallery as thelittleladysellshomes.com's town
+# pages: that site shows the whole town (downtown, splash pad, parks) for
+# the general buyer; this one shows the amenity infrastructure and build-out
+# trajectory of specific communities, framed for the buyer weighing a
+# $900K+ build against resale. Same photographs may appear on both sites --
+# the copy never should (the two brands must not read as each other; see
+# Christine's brand-division doc). Processing rule for every new drop:
+# resize 1600px wide, re-encode via Pillow (strips EXIF/GPS), caption only
+# what is visible in the frame or what Christine said about the shot.
+COMMUNITY_BUILDOUT_GALLERIES = {
+    "erie": {
+        "community": "Colliers Hill",
+        "intro": (
+            "Erie's Colliers Hill is a master-planned community still mid-build, "
+            "which is exactly why it matters to a move-up buyer: the amenity "
+            "spine — parks, courts, trails, the pump track — is already built "
+            "and paid for, while new phases keep grading behind it. Christine "
+            "has toured and filmed homes here, including a $1.35M build on "
+            "Green Mountain Drive."
+        ),
+        "shots": [
+            ("erie-colliers-hill-park.jpg",
+             "The community park at the heart of Colliers Hill — built before many of the homes around it"),
+            ("erie-colliers-hill-ballfields.jpg",
+             "Ballfields in the foreground; the next phase already grading on the horizon"),
+            ("erie-colliers-hill-courts.jpg",
+             "Lighted tennis and pickleball courts along the community's amenity corridor"),
+            ("erie-colliers-hill-pumptrack.jpg",
+             "The Revolution Pumptrack — amenity infrastructure most resale neighborhoods never get"),
+            ("erie-colliers-hill-courts-play.jpg",
+             "Courts, climbing structures, and gathering pavilions clustered at the community core"),
+            ("erie-colliers-hill-green.jpg",
+             "The central green, sized for the community Colliers Hill is becoming, not just the one it is"),
+            ("erie-colliers-hill-parkland.jpg",
+             "Trail connections and open space threading the neighborhoods together"),
+        ],
+    },
+}
+
+
+def _community_buildout_block(data_slug, city):
+    g = COMMUNITY_BUILDOUT_GALLERIES.get(data_slug)
+    if not g:
+        return ""
+    figs = "\n      ".join(
+        f'<figure class="town-shot"><img src="/assets/img/communities/gallery/{fname}" '
+        f'alt="{esc(cap)}" loading="lazy"><figcaption>{esc(cap)}</figcaption></figure>'
+        for fname, cap in g["shots"]
+    )
+    return f"""
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The {esc(g['community'])} Build-Out</span>
+    <h2 class="section-title">Inside {esc(g['community'])}, {esc(city)}</h2>
+    <p class="lede">{esc(g['intro'])}</p>
+    <div class="town-gallery">
+      {figs}
+    </div>
+  </div>
+</section>"""
+
 SITE = {
     "name": "Signature Property Collection",
     "agent": "Christine Gwinnup",
@@ -5931,6 +5995,7 @@ def build_city_pages():
             # city_content.json's "local_faqs" list as they're researched.
             for q, a in info.get("local_faqs", []):
                 faq_pairs.append((q, a))
+            body += _community_buildout_block(data_slug, city)
             body += _walkability_block(city, f"{city}, CO")
             faq_html, faq_schema = _faq_block(faq_pairs)
             body += faq_html
