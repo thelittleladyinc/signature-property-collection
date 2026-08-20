@@ -1242,9 +1242,11 @@
         html += '<a class="dr-listing" href="' + esc(p.url || '#') + '">' +
           esc(fmtPrice(p.price)) + ' — ' + esc(p.address || '') + ', ' + esc(p.city || '') + '</a>';
       });
-    } else {
-      html += '<p class="dr-line">None of my listings are in this area right now.</p>';
     }
+    // No else: when nothing of Christine's is inside the area, say nothing --
+    // "none of my listings are here" is an advertisement for absence
+    // (removed at her request, 2026-08-20). The "See all my current
+    // listings" link below still gives the visitor somewhere to go.
     if (r.allListingsLink) {
       html += '<a class="dr-listing" href="/current-listings.html" style="font-weight:600">' +
         'See all my current listings &rsaquo;</a>';
