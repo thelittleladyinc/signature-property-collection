@@ -8327,6 +8327,10 @@ MONEY_PAGES = [
     ("/northern-colorado-riverfront-homes.html", "Riverfront & Waterfront"),
     ("/northern-colorado-golf-course-homes.html", "Golf Course Homes"),
     ("/estes-park-luxury-homes.html", "Estes Park Luxury Homes"),
+    ("/vail-co-buyers-agent.html", "Buying In Vail"),
+    ("/breckenridge-co-buyers-agent.html", "Buying In Breckenridge"),
+    ("/steamboat-springs-co-buyers-agent.html", "Buying In Steamboat"),
+    ("/winter-park-co-buyers-agent.html", "Buying In Winter Park"),
 ]
 
 
@@ -8866,6 +8870,248 @@ def build_money_pages():
                  "driveway aspect and grade, plowing access, and canyon-highway closures are real "
                  "considerations. South-facing and in-town properties winter easiest; Christine walks "
                  "buyers through exactly this on showings."),
+            ],
+        },
+        # ---- Mountain buyer-representation pages, 2026-08-20 ----------------
+        # Christine: "lets do estes now then keep going then all of them that
+        # you suggest." Built to be correct in BOTH feed outcomes: the live
+        # feed widget shows any mountain inventory the IRES feed delivers
+        # (OPERATING_COUNTIES now includes eagle/summit/routt/grand — the test
+        # is running), and until/unless it does, the feed's empty state plus
+        # feed_note_extra say the honest thing: these are buyer-representation
+        # markets, worked directly. Colorado licenses are statewide, so
+        # representing buyers in Vail or Breck is simply true; what these pages
+        # deliberately never claim is membership in the mountain MLSs or any
+        # market statistic. No outcome of the feed test can make them wrong.
+        {
+            "path": "/vail-co-buyers-agent.html",
+            "title": "Buying A Home In Vail CO | Buyer's Agent & Front Range Sequencing",
+            "meta": "Buyer representation for Vail and the Eagle County resort corridor from a Colorado "
+                    "luxury broker — offer strategy, short-term-rental diligence, and sequencing the sale "
+                    "of your Front Range home to buy in the mountains.",
+            "h1": "Buying In Vail, With Someone In Your Corner",
+            "eyebrow": "Vail Village &middot; Lionshead &middot; East &amp; West Vail &middot; Eagle County",
+            "intro": "Vail's market runs on relationships and speed — the best properties trade quickly and "
+                     "quietly, and the buyer who wins is the one whose agent is organized before the listing "
+                     "appears. I'm a Colorado-licensed luxury broker: I represent buyers statewide, and for "
+                     "many of my Front Range clients the Vail purchase and the sale of their current home "
+                     "are one connected move. That sequencing is my specialty.",
+            "feed_id": "vail_feed",
+            "feed_params": {"cities": "vail"},
+            "feed_heading": "Vail Listings Reaching This Feed Right Now",
+            "feed_note_extra": " Resort-market inventory reaches this IRES-based feed selectively — an "
+                               "empty feed here never means an empty market. Ask Christine what's actually "
+                               "available; she works these searches directly.",
+            "paragraphs": [
+                "How Buying In Vail Actually Works",
+                "The resort corridor is a different market culture than the Front Range: more cash, more "
+                "second-home and investment intent, more properties that change hands before they're widely "
+                "marketed. What a buyer's agent contributes here is preparation — financing or proof of funds "
+                "ready, your criteria sharp enough to move in days, and a clear-eyed read on what a property "
+                "is worth against what it's listed for. That's the same discipline I bring to $2M+ purchases "
+                "on the Front Range, pointed up the hill.",
+                "Short-Term Rentals: Verify Before You Offer",
+                "If your Vail purchase depends on rental income, know that the Town of Vail and Eagle County "
+                "each regulate short-term rentals with their own registration and zoning rules, and they "
+                "change. I won't quote a rule here that could be stale by the time you read it — before any "
+                "offer, we verify the specific property's rental position with the town or county directly. "
+                "An assumption on this point is the most expensive mistake a resort buyer can make.",
+                "Selling On The Front Range To Buy In The Mountains",
+                "Many of my mountain buyers are funding the purchase with Front Range equity — and that's "
+                "where working with one broker for both sides pays off. I sequence the sale and the purchase "
+                "so neither holds the other hostage: honest pricing on the home you're leaving, bridge and "
+                "HELOC options laid out plainly ([my guide to buying before you sell]"
+                "(/blog/bridge-loans-helocs-more-creative-ways-to-buy-before-you-sell.html)), and a timeline "
+                "both transactions can actually keep. If you're still weighing mountain towns against each "
+                "other, [ask me on the map](/explore.html?ask=commute%20to%20Denver%20in%2060%20min) or "
+                "start with [Estes Park](/estes-park-luxury-homes.html), the mountain market inside my home "
+                "county.",
+            ],
+            "faq": [
+                ("Can Christine represent buyers in Vail?",
+                 "Yes — Colorado real estate licenses are statewide, so she represents buyers anywhere in "
+                 "Colorado, including Vail and the Eagle County resort corridor, working directly with "
+                 "listing brokers there."),
+                ("Why is the listing feed on this page sometimes empty?",
+                 "The site's live feed comes through IRES, Northern Colorado's MLS; resort-corridor "
+                 "listings reach it selectively. An empty feed never means an empty market — contact "
+                 "Christine and she'll pull what's actually available for your criteria."),
+                ("Can I rent out a Vail property short-term?",
+                 "It depends on the specific property: the Town of Vail and Eagle County each have their "
+                 "own short-term-rental registration and zoning rules, and they change by ordinance. "
+                 "Christine verifies a property's rental position with the town or county before her "
+                 "buyers write an offer that depends on rental income."),
+            ],
+        },
+        {
+            "path": "/breckenridge-co-buyers-agent.html",
+            "title": "Buying A Home In Breckenridge CO | Buyer's Agent & Second-Home Strategy",
+            "meta": "Buyer representation for Breckenridge and Summit County from a Colorado luxury broker — "
+                    "second-home strategy, short-term-rental license diligence, and sequencing your Front "
+                    "Range sale to buy in the mountains.",
+            "h1": "Buying In Breckenridge, With Someone In Your Corner",
+            "eyebrow": "Breckenridge &middot; Frisco &middot; Silverthorne &middot; Summit County",
+            "intro": "Summit County is the Front Range's mountain backyard — close enough for weekends, "
+                     "which is exactly why so many of my Northern Colorado clients buy here. I'm a "
+                     "Colorado-licensed luxury broker representing buyers statewide, and for most Summit "
+                     "purchases the real project is the whole move: what to buy, what it's honestly worth, "
+                     "and how the Front Range home you already own funds it.",
+            "feed_id": "breck_feed",
+            "feed_params": {"cities": "breckenridge,frisco,silverthorne,dillon,keystone"},
+            "feed_heading": "Summit County Listings Reaching This Feed Right Now",
+            "feed_note_extra": " Resort-market inventory reaches this IRES-based feed selectively — an "
+                               "empty feed here never means an empty market. Ask Christine what's actually "
+                               "available; she works these searches directly.",
+            "paragraphs": [
+                "The Weekend-Distance Advantage",
+                "Summit's defining fact is the drive: for a Fort Collins or Loveland family, a Breckenridge "
+                "place gets used forty weekends a year instead of four. That changes what to buy — ski "
+                "access matters, but so do parking, storage for the gear, and whether the property works in "
+                "July as well as January. I help buyers weigh Breckenridge proper against Frisco, "
+                "Silverthorne, Dillon and Keystone, because the right answer is often one town over from "
+                "the first idea.",
+                "Short-Term Rental Licenses: The Make-Or-Break Question",
+                "Breckenridge and Summit County regulate short-term rentals through license systems with "
+                "real caps and zones, and the rules differ between the towns and the unincorporated county — "
+                "and they keep changing. A property's existing license status, and whether it transfers, can "
+                "swing its value substantially. I won't print a rule that might be stale: before any offer, "
+                "we verify the specific property's license position with the town or county. This single "
+                "check is where I earn my keep in Summit County.",
+                "Funding It From The Front Range",
+                "Most of my Summit buyers hold their wealth in a Northern Colorado home. Sequencing that "
+                "sale against the mountain purchase — contingencies done credibly, bridge and HELOC options "
+                "([laid out honestly here](/blog/bridge-loans-helocs-more-creative-ways-to-buy-before-you-sell.html)), "
+                "tax questions flagged for your CPA early — is the difference between a smooth move and two "
+                "transactions holding each other hostage. Start with a real valuation of the home you'd "
+                "sell, and we build the plan from there.",
+            ],
+            "faq": [
+                ("Can Christine represent buyers in Breckenridge and Summit County?",
+                 "Yes — Colorado licenses are statewide. She represents buyers throughout Summit County, "
+                 "working directly with the listing brokers there, and handles the Front Range sale that "
+                 "often funds the purchase."),
+                ("Do I need a license to rent my Breckenridge home short-term?",
+                 "Yes, generally — Breckenridge and Summit County run short-term-rental license systems "
+                 "with caps and zone rules that differ by jurisdiction and change by ordinance. Christine "
+                 "verifies a specific property's license position before her buyers offer."),
+                ("Which Summit County town should I buy in?",
+                 "It depends what the place is for: Breckenridge for the town-and-slopes experience, "
+                 "Frisco for year-round town life on the water, Silverthorne and Dillon for value and "
+                 "access, Keystone for ski-focused convenience. Christine helps buyers test the choice "
+                 "against how they'll actually use it."),
+            ],
+        },
+        {
+            "path": "/steamboat-springs-co-buyers-agent.html",
+            "title": "Buying A Home In Steamboat Springs CO | Buyer's Agent For Routt County",
+            "meta": "Buyer representation for Steamboat Springs and Routt County from a Colorado luxury "
+                    "broker — ranch and acreage diligence, short-term-rental zones, and sequencing your "
+                    "Front Range sale.",
+            "h1": "Buying In Steamboat, With Someone In Your Corner",
+            "eyebrow": "Steamboat Springs &middot; Ranch &amp; Acreage &middot; Routt County",
+            "intro": "Steamboat is the mountain town my ranch and acreage clients gravitate to — a real "
+                     "working valley with a ski resort in it, not the other way around. I'm a "
+                     "Colorado-licensed broker representing buyers statewide, and Routt County purchases "
+                     "reward exactly the diligence my Northern Colorado acreage work runs on: water, land "
+                     "use, access, and honest value.",
+            "feed_id": "steamboat_feed",
+            "feed_params": {"cities": "steamboat springs"},
+            "feed_heading": "Steamboat Listings Reaching This Feed Right Now",
+            "feed_note_extra": " Resort-market inventory reaches this IRES-based feed selectively — an "
+                               "empty feed here never means an empty market. Ask Christine what's actually "
+                               "available; she works these searches directly.",
+            "paragraphs": [
+                "A Ranch Valley With A Ski Resort",
+                "Steamboat's character comes from the Yampa Valley's ranching roots, and its property types "
+                "reflect it: genuine acreage and ranch parcels minutes from town, in-town neighborhoods "
+                "with real community, and the resort-base condo market. My Northern Colorado practice is "
+                "heavy on [horse property and acreage](/northern-colorado-horse-property.html) — wells, "
+                "water rights, fencing, access easements, outbuildings — and that exact checklist is what "
+                "Routt County land deserves before an offer.",
+                "Short-Term Rentals: Zoned, Not Assumed",
+                "Steamboat Springs regulates short-term rentals with a zone-based system — where a property "
+                "sits on that map materially affects what you may do with it, and the rules evolve. Before "
+                "any offer that depends on rental income, we verify the property's zone and license "
+                "position with the city directly. Printed summaries go stale; the city's answer doesn't.",
+                "The Front Range Connection",
+                "Steamboat buyers from my market are usually making a life move, not just a purchase — "
+                "selling acreage or a family home in Larimer or Weld County to fund the valley. One broker "
+                "handling both ends keeps the timeline honest: [the buy-before-you-sell options]"
+                "(/blog/bridge-loans-helocs-more-creative-ways-to-buy-before-you-sell.html) laid out "
+                "plainly, and both transactions sequenced so neither forces a bad decision on the other.",
+            ],
+            "faq": [
+                ("Can Christine represent buyers in Steamboat Springs?",
+                 "Yes — Colorado licenses are statewide. She represents buyers throughout Routt County, "
+                 "and her Northern Colorado acreage practice (wells, water, access, land use) maps "
+                 "directly onto Steamboat's ranch and land market."),
+                ("Can I short-term rent a Steamboat property?",
+                 "It depends where it sits: Steamboat Springs uses a zone-based short-term-rental system, "
+                 "and the answer varies street by street and changes by ordinance. Christine verifies the "
+                 "specific property's position with the city before her buyers offer."),
+                ("Is Steamboat only a ski market?",
+                 "No — it's a working ranch valley with a resort in it. Acreage, in-town neighborhoods, "
+                 "and resort-base condos are three genuinely different markets, and the right one depends "
+                 "on how you'll actually live there."),
+            ],
+        },
+        {
+            "path": "/winter-park-co-buyers-agent.html",
+            "title": "Buying A Home In Winter Park CO | Buyer's Agent For Grand County",
+            "meta": "Buyer representation for Winter Park, Fraser, Granby and Grand Lake from a Colorado "
+                    "luxury broker — the closest major ski market to the Front Range, with honest "
+                    "short-term-rental and access diligence.",
+            "h1": "Buying In Winter Park, With Someone In Your Corner",
+            "eyebrow": "Winter Park &middot; Fraser &middot; Granby &middot; Grand Lake",
+            "intro": "Grand County is the Front Range's closest major ski market — over Berthoud Pass or "
+                     "through the Moffat Tunnel corridor, it's the mountain purchase that gets used the "
+                     "most because it's the easiest to reach. I'm a Colorado-licensed broker representing "
+                     "buyers statewide; for Northern Colorado families, Winter Park is often the "
+                     "best-value answer to the second-home question.",
+            "feed_id": "winter_park_feed",
+            "feed_params": {"cities": "winter park,fraser,granby,grand lake,tabernash"},
+            "feed_heading": "Grand County Listings Reaching This Feed Right Now",
+            "feed_note_extra": " Resort-market inventory reaches this IRES-based feed selectively — an "
+                               "empty feed here never means an empty market. Ask Christine what's actually "
+                               "available; she works these searches directly.",
+            "paragraphs": [
+                "The Closest Real Mountains",
+                "For a Fort Collins or Loveland family, Grand County is the mountain market you'll actually "
+                "use on ordinary weekends. Winter Park and Fraser carry the ski-centered inventory; Granby "
+                "and the Grand Lake side add golf, water, and year-round town life at friendlier prices; "
+                "Tabernash sits usefully between. The right choice depends on whether the place is for "
+                "skiing, for summers on the water, or for both — and the price difference between those "
+                "answers is real.",
+                "Rental Rules And Winter Access",
+                "Short-term-rental rules in Grand County differ between the towns and the unincorporated "
+                "county, and they change; before any offer that depends on rental income we verify the "
+                "specific property's position with the relevant jurisdiction. And winter access deserves "
+                "the same scrutiny as anywhere at elevation: plowing, driveway grade and aspect, and what "
+                "a Berthoud Pass closure does to your drive. These are showing-day questions, and I ask "
+                "them so you don't learn them in January.",
+                "One Broker, Both Ends Of The Move",
+                "As with all my mountain buyers, the purchase usually pairs with a Front Range sale or "
+                "refinance. I sequence both — honest valuation on what you own, [the buy-before-you-sell "
+                "toolbox](/blog/bridge-loans-helocs-more-creative-ways-to-buy-before-you-sell.html) laid "
+                "out plainly, and one timeline that protects you on both sides. Start the conversation "
+                "with what you want the mountain place to do for your family, and we work backward from "
+                "there.",
+            ],
+            "faq": [
+                ("Can Christine represent buyers in Winter Park and Grand County?",
+                 "Yes — Colorado licenses are statewide. She represents buyers throughout Grand County, "
+                 "working directly with listing brokers there, alongside the Front Range sale that often "
+                 "funds the purchase."),
+                ("Winter Park or Granby — how do I choose?",
+                 "By how you'll use it: Winter Park and Fraser for ski-centered living, Granby and Grand "
+                 "Lake for golf, water and year-round town life at friendlier prices, Tabernash in "
+                 "between. Christine helps buyers test the choice against real weekend patterns, not the "
+                 "brochure."),
+                ("Can I rent out a Grand County property short-term?",
+                 "The rules differ between the towns and unincorporated Grand County and change by "
+                 "ordinance, so it depends on the specific property. Christine verifies its position with "
+                 "the relevant jurisdiction before her buyers write an offer that depends on rental "
+                 "income."),
             ],
         },
     ]
