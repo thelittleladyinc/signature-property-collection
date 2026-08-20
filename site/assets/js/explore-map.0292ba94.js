@@ -84,6 +84,23 @@
     host.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:32px;text-align:center;background:#141415">' +
       '<p style="color:rgba(248,246,244,.85);font-size:15px;line-height:1.8;max-width:460px;margin:0">' + html + '</p></div>';
+    if (dbgEl) host.appendChild(dbgEl);
+  }
+
+  // ?mapdebug=1: a small on-page log of every boot step, so a phone
+  // screenshot IS the diagnosis. Shows nothing unless asked for by URL.
+  var dbgEl = null;
+  if (new URLSearchParams(location.search).has('mapdebug')) {
+    dbgEl = document.createElement('div');
+    dbgEl.style.cssText = 'position:absolute;top:8px;left:8px;right:8px;z-index:2147483001;' +
+      'background:rgba(0,0,0,.85);color:#9fc7a8;font:11px/1.7 ui-monospace,Menlo,monospace;' +
+      'padding:10px 12px;pointer-events:none;white-space:pre-wrap;word-break:break-all';
+    dbgEl.textContent = 'map debug\n';
+  }
+  function dbg(line) {
+    if (!dbgEl) return;
+    if (!dbgEl.parentNode && host) host.appendChild(dbgEl);
+    dbgEl.textContent += line + '\n';
   }
 
   /* ---------------- styles (scoped under #spc-explore) ---------------- */
@@ -326,6 +343,9 @@
     glCssReady
   ]).then(function (loaded) {
     var tok = loaded[0], countySearch = loaded[1], countiesRaw = loaded[2], glOk = loaded[3];
+    dbg('token fetch: ' + (tok ? (tok.token ? 'ok (pk…' + String(tok.token).slice(-6) + ')' : JSON.stringify(tok)) : 'FAILED'));
+    dbg('mapbox-gl.js: ' + (glOk && typeof mapboxgl !== 'undefined' ? 'loaded ✓ v' + (mapboxgl.version || '?') : 'FAILED'));
+    dbg('county data: ' + (countySearch ? 'ok' : 'FAILED') + ' · county shapes: ' + (countiesRaw ? 'ok' : 'FAILED'));
     if (!tok || !tok.token) {
       notice('The interactive map is warming up — the Mapbox key isn\'t configured yet. ' +
         'Meanwhile, every community is covered in the <a href="/communities/index.html" style="color:#BA8C84">area guides</a>.');
@@ -364,6 +384,26 @@
       attributionControl: true, cooperativeGestures: true
     });
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+
+    // A rejected token or a URL restriction that doesn't cover this domain
+    // fails as a silent black rectangle unless someone says so out loud.
+    // 2026-08-20, Christine from her phone: "the map isnt showing" -- and
+    // nothing on the page explained why. Now it does: the first auth-shaped
+    // error tears the map down and names the two possible causes.
+    var authFailed = false;
+    map.on('error', function (e) {
+      dbg('map error: ' + ((e && e.error && (e.error.message || e.error.status)) || 'unknown'));
+      var msg = (e && e.error && (e.error.message || '')) + ' ' + (e && e.error && e.error.status || '');
+      if (authFailed || !/401|403|Unauthorized|Forbidden|access token/i.test(msg)) return;
+      authFailed = true;
+      notice('The map key was rejected by Mapbox. Two possible causes: the token in ' +
+        'MAPBOX_PUBLIC_TOKEN is no longer valid, or its URL restriction doesn’t ' +
+        'include this exact domain (www counts as its own entry). ' +
+        'Meanwhile, every community is covered in the ' +
+        '<a href="/communities/index.html" style="color:#BA8C84">area guides</a>.');
+    });
+    map.on('load', function () { dbg('map loaded ✓'); });
+    map.on('style.load', function () { dbg('style loaded ✓'); });
 
     map.on('style.load', addStyleLayers);
     map.on('load', function () {
