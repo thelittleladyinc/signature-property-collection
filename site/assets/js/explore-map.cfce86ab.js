@@ -159,6 +159,8 @@
     '#spc-explore .ctrl-btn svg{width:15px;height:15px;flex:0 0 auto}' +
     '#spc-explore .ctrl-btn:hover{border-color:#BA8C84;color:#BA8C84}' +
     '#spc-explore .ctrl-btn.on{background:#B86F7A;border-color:#B86F7A;color:#F8F6F4}' +
+    '#spc-explore .ctrl-btn.accent{background:#B86F7A;border-color:#B86F7A;color:#F8F6F4;font-weight:700}' +
+    '#spc-explore .ctrl-btn.accent:hover{background:#F8F6F4;color:#141415;border-color:#F8F6F4}' +
     '#spc-explore .xm-foot{position:absolute;bottom:58px;right:14px;z-index:20;display:flex;flex-direction:column;gap:6px;align-items:flex-end}' +
     '#spc-explore .xm-foot button{border:1px solid rgba(248,246,244,.14);cursor:pointer;background:rgba(20,20,21,.8);color:rgba(248,246,244,.75);padding:8px 12px;font-family:"Poppins",sans-serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase}' +
     '#spc-explore .xm-foot button:hover{color:#BA8C84;border-color:#BA8C84}' +
@@ -285,16 +287,12 @@
       '<p class="wordmark">Signature Property Collection</p>' +
       '<p class="tag">Northern Colorado, from someone who actually goes there.</p>' +
       '<p class="status" id="xm-status"></p>' +
-      '<p class="legend"><b>Price bubbles</b> — my listings for sale right now<br>' +
-      '<b>Rose pulsing pins</b> — places with my videos (zoom in and they become the video)<br>' +
-      '<b>★ pins</b> — places I\'ve reviewed on Google<br>' +
-      '<b>Cream dots</b> — homes I\'ve sold (toggle on the right)<br>' +
-      '<b>Draw Search Area</b> — outline any shape, see what\'s inside it</p>' +
     '</div>' +
     '<div class="askbar"><button class="mic" id="xm-mic" title="Speak your search" aria-label="Speak your search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/></svg></button>' +
     '<input id="xm-ask" autocomplete="off" spellcheck="false" placeholder="Try: &#8220;commute to Denver in 30 min&#8221; or &#8220;Loveland under $600K&#8221;">' +
     '<button class="go" id="xm-go">Ask</button></div>' +
     '<div class="ctrls">' +
+      '<button class="ctrl-btn accent" id="xm-area"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg><span>Search This Area</span></button>' +
       '<button class="ctrl-btn" id="xm-3d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M2 20 L9 7 L13 14 L16 9 L22 20 Z"/></svg><span>3D Terrain</span></button>' +
       '<button class="ctrl-btn" id="xm-sat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18"/></svg><span>Satellite</span></button>' +
       '<button class="ctrl-btn" id="xm-mine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><path d="M9.5 10.5 L12 8 L14.5 10.5"/><path d="M10.2 10.2v3h3.6v-3"/></svg><span>My Listings</span></button>' +
@@ -436,6 +434,7 @@
       var open = $('xm-panel').classList.toggle('open');
       $('xm-pill').setAttribute('aria-expanded', open ? 'true' : 'false');
     });
+    $('xm-area').addEventListener('click', viewportSearch);
     $('xm-3d').addEventListener('click', toggle3D);
     $('xm-sat').addEventListener('click', toggleSat);
     $('xm-mine').addEventListener('click', toggleMine);
@@ -751,10 +750,38 @@
       if (hoveredCounty !== null) map.setFeatureState({ source: 'counties', id: hoveredCounty }, { hover: false });
       hoveredCounty = null;
     });
+    // Christine, 2026-08-20: "when they click into the county - we should
+    // have all listed in that county and then a see more listings - then a
+    // click to all current listings." So a county tap now zooms AND opens
+    // the results card scoped to the county's real shape: her listings
+    // inside it first, then the price presets over that county's towns,
+    // then the See All My Current Listings handoff.
     map.on('click', 'county-fill', function (e) {
       if (!e.features.length || tour.on || draw.active) return;
-      var b = geomBounds(e.features[0].geometry);
+      var f = e.features[0];
+      var b = geomBounds(f.geometry);
       if (b) map.fitBounds(b, { padding: 70, pitch: tiltOn ? 55 : 0, duration: 1800 });
+      var name = (f.properties && f.properties.name) || 'This County';
+      var geom = f.geometry || {};
+      var rings = geom.type === 'Polygon' ? [geom.coordinates[0]]
+        : geom.type === 'MultiPolygon' ? geom.coordinates.map(function (p) { return p[0]; })
+        : [];
+      var inAny = function (lng, lat) {
+        return rings.some(function (ring) { return pointInPoly(lng, lat, ring); });
+      };
+      var r = {
+        listings: myListings.filter(function (p) { return inAny(p.lng, p.lat); }),
+        spots: spots.filter(function (s) { return inAny(s._lnglat[0], s._lnglat[1]); }),
+        sold: soldPins.filter(function (p) { return inAny(p.lng, p.lat); }),
+        // Town list by the county's own name — exact, and never misses a
+        // town whose center sits a hair outside a simplified polygon edge.
+        towns: DATA.towns.filter(function (t) { return t.county === name; }),
+        nearTown: false,
+        allListingsLink: true
+      };
+      renderInsideCard(name + ' County', r, function () {
+        $('xm-results').classList.remove('open');
+      });
     });
     map.on('mouseenter', 'town-dot', function () { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'town-dot', function () { map.getCanvas().style.cursor = ''; });
@@ -1138,12 +1165,44 @@
 
   function analyzeArea(ring) {
     var inPoly = function (lng, lat) { return pointInPoly(lng, lat, ring); };
-    return {
+    var r = {
       listings: myListings.filter(function (p) { return inPoly(p.lng, p.lat); }),
       spots: spots.filter(function (s) { return inPoly(s._lnglat[0], s._lnglat[1]); }),
       sold: soldPins.filter(function (p) { return inPoly(p.lng, p.lat); }),
-      towns: DATA.towns.filter(function (t) { return inPoly(t.lng, t.lat); })
+      towns: DATA.towns.filter(function (t) { return inPoly(t.lng, t.lat); }),
+      nearTown: false
     };
+    // Christine, live: "the outline isnt really working for searching." A
+    // neighborhood-sized outline contains no town CENTER point, so this used
+    // to come back with no searchable town and read as broken. A small shape
+    // drawn INSIDE a town now snaps to the nearest town center within ~20km
+    // of the outline's middle, phrased as "near <Town>" in the card.
+    if (!r.towns.length && ring.length) {
+      var cx = 0, cy = 0;
+      ring.forEach(function (p) { cx += p[0]; cy += p[1]; });
+      cx /= ring.length; cy /= ring.length;
+      var best = null, bestD = Infinity;
+      DATA.towns.forEach(function (t) {
+        var d = Math.pow((t.lng - cx) * 84, 2) + Math.pow((t.lat - cy) * 111, 2); // ~km²
+        if (d < bestD) { bestD = d; best = t; }
+      });
+      if (best && bestD < 20 * 20) { r.towns = [best]; r.nearTown = true; }
+    }
+    return r;
+  }
+
+  // The one-tap search the old Leaflet map had, restored and smarter:
+  // whatever is on screen right now IS the area — no drawing, no reading.
+  function viewportSearch() {
+    stopTour(); closeCard(); hideTip();
+    var b = map.getBounds();
+    var ring = [
+      [b.getWest(), b.getSouth()], [b.getEast(), b.getSouth()],
+      [b.getEast(), b.getNorth()], [b.getWest(), b.getNorth()]
+    ];
+    renderInsideCard('Homes In This View', analyzeArea(ring), function () {
+      $('xm-results').classList.remove('open');
+    });
   }
 
   function renderInsideCard(title, r, onClear) {
@@ -1156,7 +1215,11 @@
           esc(fmtPrice(p.price)) + ' — ' + esc(p.address || '') + ', ' + esc(p.city || '') + '</a>';
       });
     } else {
-      html += '<p class="dr-line">None of my listings are inside this outline right now.</p>';
+      html += '<p class="dr-line">None of my listings are in this area right now.</p>';
+    }
+    if (r.allListingsLink) {
+      html += '<a class="dr-listing" href="/current-listings.html" style="font-weight:600">' +
+        'See all my current listings &rsaquo;</a>';
     }
     html += '<p class="dr-line"><b>' + r.spots.length + '</b> of my local spots · <b>' +
       (soldPins.length ? r.sold.length : '—') + '</b> homes I’ve sold' +
@@ -1166,9 +1229,16 @@
       var names = r.towns.map(function (t) { return t.name; });
       var q = names.length === 1 ? 'city=' + encodeURIComponent(names[0])
                                  : 'cities=' + encodeURIComponent(names.join(','));
-      html += '<a href="/search-homes.html?' + q + '&minPrice=950000">Search MLS Homes Here</a>';
+      html += '<p class="dr-line" style="width:100%">See every home for sale ' +
+        (r.nearTown ? 'near <b>' + esc(names[0]) + '</b>' : 'here') + ':</p>';
+      // The old map's price presets, one tap each — the smart way she asked for.
+      [[350000, '$350K+'], [500000, '$500K+'], [700000, '$700K+'], [950000, '$950K+']]
+        .forEach(function (p) {
+          var extra = p[0] < 950000 ? '&noFloor=true' : '';
+          html += '<a href="/search-homes.html?' + q + '&minPrice=' + p[0] + extra + '">' + p[1] + '</a>';
+        });
     } else {
-      html += '<p class="dr-line" style="width:100%"><i>Stretch the outline over a town to search MLS homes in it.</i></p>';
+      html += '<p class="dr-line" style="width:100%"><i>Zoom closer to a town and tap Search This Area again.</i></p>';
     }
     if (r.towns.length) {
       html += '<div class="dr-actions" style="margin-top:10px;gap:6px">' +
