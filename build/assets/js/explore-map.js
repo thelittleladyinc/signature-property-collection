@@ -216,8 +216,31 @@
     '.spc-town-links a:hover{background:#B86F7A;border-color:#B86F7A;color:#F8F6F4}' +
     '.spc-town-links button{border:1px solid #141415;background:transparent;color:#141415;cursor:pointer;font-family:"Poppins",sans-serif;font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:8px 11px}' +
     '.spc-town-links button:hover{background:#B86F7A;border-color:#B86F7A;color:#F8F6F4}' +
+    /* Full-screen mode: the map takes the whole viewport, app-style. dvh so
+       iOS Safari's collapsing chrome doesn't leave a dead strip. */
+    '#spc-explore.xm-full{position:fixed;inset:0;z-index:2147483000;height:100dvh}' +
+    'body.xm-lock{overflow:hidden}' +
     '@media (max-width:860px){#spc-explore .askbar{top:60px;width:min(430px,calc(100% - 28px))}}' +
-    '@media (max-width:640px){#spc-explore .ctrl-btn span{display:none}#spc-explore .ctrl-btn{padding:11px}#spc-explore .brand-pill .script{font-size:22px}}';
+    /* Phones: controls become a thumb-reach strip along the bottom (labels
+       kept — icon-only buttons tested as guesswork), the filter chips hug the
+       very bottom edge with safe-area padding for the iPhone home bar, and
+       results cards become a full-width bottom sheet instead of a floating
+       box. Mapbox's own zoom/attribution controls move up out of the way. */
+    '@media (max-width:640px){' +
+      '#spc-explore .brand-pill .script{font-size:22px}' +
+      '#spc-explore .toast,#spc-explore .draw-hint{top:108px}' +
+      '#spc-explore .ctrls{top:auto;bottom:calc(56px + env(safe-area-inset-bottom,0px));left:0;right:0;flex-direction:row;overflow-x:auto;padding:6px 10px;gap:6px;scrollbar-width:none}' +
+      '#spc-explore .ctrls::-webkit-scrollbar{display:none}' +
+      '#spc-explore .ctrl-btn{padding:10px 12px;flex:0 0 auto;font-size:10px;white-space:nowrap}' +
+      '#spc-explore .ctrl-btn svg{width:13px;height:13px}' +
+      '#spc-explore .chipbar{bottom:0;left:0;right:0;transform:none;max-width:none;border-left:none;border-right:none;padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px))}' +
+      '#spc-explore .chip{padding:10px 13px}' +
+      '#spc-explore .draw-results{left:0;right:0;bottom:0;width:100%;max-height:58%;border-left:none;border-right:none;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:31}' +
+      '#spc-explore .tour-card{bottom:calc(116px + env(safe-area-inset-bottom,0px))}' +
+      '#spc-explore .xm-foot{bottom:calc(116px + env(safe-area-inset-bottom,0px))}' +
+      '#spc-explore .mapboxgl-ctrl-bottom-right{bottom:calc(108px + env(safe-area-inset-bottom,0px))}' +
+      '#spc-explore .mapboxgl-ctrl-bottom-left{bottom:calc(108px + env(safe-area-inset-bottom,0px))}' +
+    '}';
 
   var MARKUP = '' +
     '<div class="xm-map" id="xm-map"></div>' +
@@ -244,6 +267,7 @@
       '<button class="ctrl-btn" id="xm-tour"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span>Fly the Tour</span></button>' +
       '<button class="ctrl-btn" id="xm-reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span>Reset View</span></button>' +
       '<button class="ctrl-btn" id="xm-share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-3"/><path d="M4 14 L14 4"/><path d="M9 4h5v5"/></svg><span>Copy Link</span></button>' +
+      '<button class="ctrl-btn" id="xm-full-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M9 20H4v-5"/><path d="M15 20h5v-5"/></svg><span>Full Screen</span></button>' +
     '</div>' +
     '<div class="tour-card" id="xm-tour-card"><p class="tour-n" id="xm-tour-n"></p><h3 id="xm-tour-name"></h3><p id="xm-tour-blurb"></p></div>' +
     '<div class="toast" id="xm-toast"></div>' +
@@ -268,6 +292,16 @@
   var style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
+
+  // ?uitest=1 renders the overlay UI with no map and no network, so the
+  // layout is verifiable in a browser before shipping — this repo's hard
+  // rule after the card-photo incident ("everything that can only be
+  // verified in a browser needs a browser"). No data flows; visitors never
+  // hit it unless they type the parameter themselves.
+  if (new URLSearchParams(location.search).has('uitest')) {
+    host.innerHTML = MARKUP;
+    return;
+  }
 
   Promise.all([
     fetch('/.netlify/functions/mapbox-token').then(function (r) { return r.json(); }).catch(function () { return null; }),
@@ -340,6 +374,7 @@
       map.flyTo({ center: HOME_VIEW.center, zoom: HOME_VIEW.zoom, pitch: tiltOn ? 55 : 0, bearing: 0, duration: 2200 });
     });
     $('xm-share').addEventListener('click', copyViewLink);
+    $('xm-full-btn').addEventListener('click', toggleFull);
     $('xm-draw').addEventListener('click', function () {
       if (draw.active) cancelDraw();
       else if (draw.done) clearArea();
@@ -349,15 +384,36 @@
     $('xm-draw-cancel').addEventListener('click', cancelDraw);
     setupAskBar();
 
-    // Esc backs out of whatever is open — drawing first, then cards/tips.
+    // Esc backs out of whatever is open — drawing, then the tour, then any
+    // open card, then full-screen mode.
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
       if (draw.active) { cancelDraw(); return; }
       if (tour.on) { stopTour(); return; }
-      closeCard(); hideTip();
+      if (cardPop || hoverPop) { closeCard(); hideTip(); return; }
+      if (host.classList.contains('xm-full')) toggleFull();
     });
 
     applyDeepLink();
+  }
+
+  /* App mode: the map takes the whole screen. On phones this is the
+     difference between "a map on a page" and "the map" — and inside it the
+     two-finger courtesy gesture is dropped, because a full-screen map IS the
+     scroll surface. */
+  function toggleFull() {
+    var on = host.classList.toggle('xm-full');
+    document.body.classList.toggle('xm-lock', on);
+    var btn = $('xm-full-btn');
+    btn.classList.toggle('on', on);
+    var span = btn.querySelector('span');
+    if (span) span.textContent = on ? 'Exit Full Screen' : 'Full Screen';
+    try {
+      if (map.cooperativeGestures && map.cooperativeGestures.disable) {
+        on ? map.cooperativeGestures.disable() : map.cooperativeGestures.enable();
+      }
+    } catch (err) { /* older GL builds: gesture handler stays as configured */ }
+    setTimeout(function () { map.resize(); }, 60);
   }
 
   /* Deep links: /explore.html?town=Erie&filter=eat&ask=... — the URLs that
