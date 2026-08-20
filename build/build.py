@@ -8319,6 +8319,13 @@ def _subdivision_photo(sub):
 
 
 
+# Christine's RealScout agent-search portal (her link, 2026-08-20). Used on
+# the mountain pages as the "never a dead end" search: inventory the IRES
+# feed carries selectively is fully searchable there, and every search a
+# visitor runs inside it is visible to her as buyer activity.
+REALSCOUT_SEARCH_URL = "https://christinegwinnup.realscout.com/agent/search"
+
+
 MONEY_PAGES = [
     ("/loveland-luxury-homes.html", "Loveland Luxury Homes"),
     ("/fort-collins-luxury-homes.html", "Fort Collins Luxury Homes"),
@@ -8805,6 +8812,7 @@ def build_money_pages():
             # STR answer below deliberately points at the Town's own licensing
             # office rather than quoting a cap number that changes by ordinance.
             "path": "/estes-park-luxury-homes.html",
+            "realscout": True,
             "title": "Estes Park CO Luxury Homes For Sale | Mountain & River Estates",
             "meta": "Every active $950K+ Estes Park listing, live from IRES — view estates above town, "
                     "Fall River and Big Thompson river frontage, and homes at the doorstep of Rocky "
@@ -8885,6 +8893,7 @@ def build_money_pages():
         # market statistic. No outcome of the feed test can make them wrong.
         {
             "path": "/vail-co-buyers-agent.html",
+            "realscout": True,
             "title": "Buying A Home In Vail CO | Buyer's Agent & Front Range Sequencing",
             "meta": "Buyer representation for Vail and the Eagle County resort corridor from a Colorado "
                     "luxury broker — offer strategy, short-term-rental diligence, and sequencing the sale "
@@ -8945,6 +8954,7 @@ def build_money_pages():
         },
         {
             "path": "/breckenridge-co-buyers-agent.html",
+            "realscout": True,
             "title": "Buying A Home In Breckenridge CO | Buyer's Agent & Second-Home Strategy",
             "meta": "Buyer representation for Breckenridge and Summit County from a Colorado luxury broker — "
                     "second-home strategy, short-term-rental license diligence, and sequencing your Front "
@@ -9003,6 +9013,7 @@ def build_money_pages():
         },
         {
             "path": "/steamboat-springs-co-buyers-agent.html",
+            "realscout": True,
             "title": "Buying A Home In Steamboat Springs CO | Buyer's Agent For Routt County",
             "meta": "Buyer representation for Steamboat Springs and Routt County from a Colorado luxury "
                     "broker — ranch and acreage diligence, short-term-rental zones, and sequencing your "
@@ -9057,6 +9068,7 @@ def build_money_pages():
         },
         {
             "path": "/winter-park-co-buyers-agent.html",
+            "realscout": True,
             "title": "Buying A Home In Winter Park CO | Buyer's Agent For Grand County",
             "meta": "Buyer representation for Winter Park, Fraser, Granby and Grand Lake from a Colorado "
                     "luxury broker — the closest major ski market to the Front Range, with honest "
@@ -9143,6 +9155,11 @@ def build_money_pages():
   </div>
 </section>
 """
+        realscout_html = (
+            '<div class="btn-row" style="margin-top:18px;justify-content:flex-start">'
+            f'<a class="btn btn-dark" href="{REALSCOUT_SEARCH_URL}" target="_blank" '
+            'rel="noopener">Search Live Mountain Listings With Christine &rsaquo;</a></div>'
+        ) if pg.get("realscout") else ""
         body = f"""
 <section class="hero" style="padding:90px 0 60px">
   <div class="wrap">
@@ -9156,6 +9173,7 @@ def build_money_pages():
     <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live, Active IRES MLS Listings</span>
     <h2 class="section-title">{pg["feed_heading"]}</h2>
     {feed_html}
+    {realscout_html}
   </div>
 </section>
 {videos_html}
