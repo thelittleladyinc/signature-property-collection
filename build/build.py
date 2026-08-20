@@ -508,6 +508,7 @@ def _same_as_urls():
 NAV = [
     ("Communities", "/communities/index.html"),
     ("Search Homes", "/search-homes.html"),
+    ("Explore", "/explore.html"),
     ("Current Listings", "/current-listings.html"),
     ("About", "/about.html"),
     ("Buy", "/buyers.html"),
@@ -4141,6 +4142,7 @@ def build_home():
     <div class="communities-panel">
       <span class="eyebrow">Click To Explore</span>
       <h2 class="section-title" style="color:#fff">Find Your Community</h2>
+      <a href="/explore.html" class="btn" style="display:inline-block;background:#B86F7A;color:#F8F6F4;margin:0 0 18px;font-weight:600;letter-spacing:.06em">&#10024; Try the New 3D Map &rsaquo;</a>
       <div class="county-list">
         {county_btns}
       </div>
@@ -4388,6 +4390,7 @@ def build_communities_index():
   <div class="wrap">
     <span class="eyebrow">Click To Explore</span>
     <h1 class="section-title" style="color:#fff">Find Your Community</h1>
+      <a href="/explore.html" class="btn" style="display:inline-block;background:#B86F7A;color:#F8F6F4;margin:0 0 18px;font-weight:600;letter-spacing:.06em">&#10024; Try the New 3D Map &rsaquo;</a>
     <p class="lede" style="color:rgba(255,255,255,.8)">Explore Northern Colorado county by
     county — {_county_name_list()}.</p>
   </div>
