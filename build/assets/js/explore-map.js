@@ -90,6 +90,11 @@
   var CSS = '' +
     '#spc-explore{position:relative;background:#141415;overflow:hidden}' +
     '#spc-explore .xm-map{position:absolute;inset:0}' +
+    /* The site stylesheet's global `img{max-width:100%}` and friends must
+       never leak into Mapbox's internals — a constrained canvas or control
+       image shifts everything off its true position. */
+    '#spc-explore .mapboxgl-canvas{max-width:none!important}' +
+    '#spc-explore .mapboxgl-map img{max-width:none}' +
     '#spc-explore .brand-pill{position:absolute;top:14px;left:14px;z-index:21;display:flex;align-items:center;gap:10px;cursor:pointer;border:1px solid rgba(248,246,244,.16);background:rgba(20,20,21,.86);backdrop-filter:blur(8px);color:#F8F6F4;padding:7px 14px 7px 12px;box-shadow:0 8px 30px rgba(0,0,0,.4)}' +
     '#spc-explore .brand-pill .script{font-family:"Corinthia",cursive;font-size:26px;line-height:1;color:#BA8C84}' +
     '#spc-explore .brand-pill .dot{width:7px;height:7px;border-radius:50%;background:#BA8C84;flex:0 0 auto}' +
@@ -286,9 +291,19 @@
     });
   }
 
-  var link = document.createElement('link');
-  link.rel = 'stylesheet'; link.href = GL_CSS;
-  document.head.appendChild(link);
+  // mapbox-gl.css must be APPLIED before the map is constructed — without it
+  // the canvas, markers and popups all render unpositioned ("nothing is
+  // centered", Christine, 2026-08-20, on her phone: dynamically-injected
+  // stylesheets load async, and on a slow connection the 2MB GL script can
+  // win the race against its own CSS). The boot below awaits this promise;
+  // a 4s timeout keeps a hung CDN from blanking the page forever.
+  var glCssReady = new Promise(function (resolve) {
+    var link = document.createElement('link');
+    link.rel = 'stylesheet'; link.href = GL_CSS;
+    link.onload = resolve; link.onerror = resolve;
+    document.head.appendChild(link);
+    setTimeout(resolve, 4000);
+  });
   var style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
@@ -307,7 +322,8 @@
     fetch('/.netlify/functions/mapbox-token').then(function (r) { return r.json(); }).catch(function () { return null; }),
     fetch('/assets/data/county-search.json').then(function (r) { return r.json(); }).catch(function () { return null; }),
     fetch('/assets/data/noco-counties.geojson').then(function (r) { return r.json(); }).catch(function () { return null; }),
-    loadScript(GL_JS).then(function () { return true; }).catch(function () { return false; })
+    loadScript(GL_JS).then(function () { return true; }).catch(function () { return false; }),
+    glCssReady
   ]).then(function (loaded) {
     var tok = loaded[0], countySearch = loaded[1], countiesRaw = loaded[2], glOk = loaded[3];
     if (!tok || !tok.token) {
