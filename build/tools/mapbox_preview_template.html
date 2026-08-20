@@ -1241,9 +1241,11 @@ var SPC_DATA = /*__SPC_DATA_JSON__*/null;
         html += '<a class="dr-listing" href="' + esc(SPC_DATA.siteOrigin + (p.url || '')) + '" target="_blank" rel="noopener">' +
           esc(fmtPrice(p.price)) + ' — ' + esc(p.address || '') + ', ' + esc(p.city || '') + '</a>';
       });
-    } else {
-      html += '<p class="dr-line">None of my listings are inside this outline right now.</p>';
     }
+    // No else: when nothing of Christine's is inside the area, say nothing --
+    // "none of my listings are here" is an advertisement for absence
+    // (removed at her request, 2026-08-20). The "See all my current
+    // listings" link below still gives the visitor somewhere to go.
     html += '<p class="dr-line"><b>' + r.spots.length + '</b> of my local spots · <b>' +
       (soldState === 'on' || soldPins.length ? r.sold.length : '—') + '</b> homes I’ve sold' +
       (soldPins.length ? '' : ' <i>(turn on the sold layer to count them)</i>') + '</p>';
