@@ -203,7 +203,16 @@ exports.handler = async () => {
 function json200(payload) {
   return {
     statusCode: 200,
-    headers: { "Content-Type": "application/json", "Cache-Control": RESPONSE_CACHE_CONTROL },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": RESPONSE_CACHE_CONTROL,
+      // 2026-08-20: lets mapbox/preview.html (opened as a local file, or
+      // hosted anywhere later) load the exact geocoded pins. This response
+      // is public data already served to every site visitor -- the wildcard
+      // widens where it can be READ, not what it contains, and no secrets
+      // or per-user data pass through this function.
+      "Access-Control-Allow-Origin": "*",
+    },
     body: JSON.stringify(payload),
   };
 }

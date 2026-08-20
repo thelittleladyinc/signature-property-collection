@@ -1,0 +1,560 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Ault",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/ault.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.73191,
+     40.58248
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Berthoud",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/berthoud.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.08109,
+     40.30832
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Boulder",
+    "county": "Boulder",
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/boulder.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.27474,
+     40.01897
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Broomfield",
+    "county": "Broomfield",
+    "pageUrl": "https://signaturepropertycollection.com/communities/broomfield/broomfield.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.08665,
+     39.92054
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Brush",
+    "county": "Morgan",
+    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/brush.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -103.62384,
+     40.25887
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Carr",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/carr.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.87834,
+     40.89322
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Dacono",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/dacono.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.93942,
+     40.08471
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Denver",
+    "county": "Denver",
+    "pageUrl": "https://signaturepropertycollection.com/communities/denver/denver.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.99025,
+     39.73924
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Eaton",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/eaton.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.70252,
+     40.5194
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Erie",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/erie.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.04998,
+     40.05026
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Estes Park",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/estes-park.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.52167,
+     40.37721
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Firestone",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/firestone.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.93664,
+     40.11248
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Fort Collins",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/fort-collins.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.08442,
+     40.58526
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Fort Lupton",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/fort-lupton.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.81303,
+     40.08471
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Fort Morgan",
+    "county": "Morgan",
+    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/fort-morgan.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -103.79995,
+     40.25026
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Frederick",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/frederick.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.9372,
+     40.09915
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Greeley",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/greeley.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.70913,
+     40.42331
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Johnstown",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/johnstown.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.9122,
+     40.33693
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Lafayette",
+    "county": "Boulder",
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/lafayette.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.08971,
+     39.9936
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Log Lane Village",
+    "county": "Morgan",
+    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/log-lane-village.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -103.82967,
+     40.27054
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Longmont",
+    "county": "Boulder",
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/longmont.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.10193,
+     40.16721
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Louisville",
+    "county": "Boulder",
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/louisville.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.13193,
+     39.97776
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Loveland",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/loveland.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.07458,
+     40.39545
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Lyons",
+    "county": "Boulder",
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/lyons.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.27138,
+     40.22471
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Masonville",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/masonville.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.21082,
+     40.48748
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Mead",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/mead.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.99859,
+     40.23332
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Milliken",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/milliken.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.85525,
+     40.32943
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Nederland",
+    "county": "Boulder",
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/nederland.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.51083,
+     39.96138
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Nunn",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/nunn.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.7808,
+     40.70359
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Pierce",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/pierce.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.75525,
+     40.63554
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Red Feather Lakes",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.59166,
+     40.80248
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Severance",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/severance.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.85108,
+     40.52415
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Timnath",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/timnath.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.98525,
+     40.52915
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Wellington",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/wellington.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.00859,
+     40.70387
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Wiggins",
+    "county": "Morgan",
+    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/wiggins.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.07273,
+     40.23054
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Windsor",
+    "county": "Larimer",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/windsor.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.90136,
+     40.47748
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Windsor",
+    "county": "Weld",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/windsor.html"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.90136,
+     40.47748
+    ]
+   }
+  }
+ ]
+}
