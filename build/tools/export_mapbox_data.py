@@ -31,6 +31,7 @@ Run after editing local_spots.json or adding a town:
     python3 build/tools/export_mapbox_data.py
 """
 
+import datetime
 import json
 import re
 from pathlib import Path
@@ -103,19 +104,45 @@ def counties_geojson(county_search):
     return {"type": "FeatureCollection", "features": feats}
 
 
-def towns_geojson(county_search):
+def town_market():
+    """Per-town active-inventory stats, IF fresh. Same 21-day staleness rule
+    build.py applies to the town pages: a median is only worth printing while
+    the twice-weekly refresh is actually running, and a silent stale figure
+    is worse than none."""
+    try:
+        data = load_json(ROOT / "build" / "data" / "town_market.json")
+    except FileNotFoundError:
+        return {}
+    try:
+        age = (datetime.date.today()
+               - datetime.date.fromisoformat(data.get("generated_at", ""))).days
+    except ValueError:
+        return {}
+    if age > 21:
+        print(f"  note: town_market.json is {age} days old (>21) -- price tags omitted, "
+              "same staleness rule as the town pages")
+        return {}
+    return data.get("towns", {}) or {}
+
+
+def towns_geojson(county_search, market):
     feats = []
     for cname, c in county_search.get("counties", {}).items():
         for t in c.get("towns", []) or []:
             if not isinstance(t.get("lat"), (int, float)):
                 continue
+            props = {
+                "name": t["name"],
+                "county": cname,
+                "pageUrl": SITE_ORIGIN + t.get("url", ""),
+            }
+            m = market.get(t["name"])
+            if m and isinstance(m.get("median_list"), (int, float)):
+                props["medianList"] = m["median_list"]
+                props["activeCount"] = m.get("active")
             feats.append({
                 "type": "Feature",
-                "properties": {
-                    "name": t["name"],
-                    "county": cname,
-                    "pageUrl": SITE_ORIGIN + t.get("url", ""),
-                },
+                "properties": props,
                 "geometry": {"type": "Point", "coordinates": [t["lng"], t["lat"]]},
             })
     feats.sort(key=lambda f: f["properties"]["name"])
@@ -151,7 +178,7 @@ def spots_geojson(spots):
     return fc, skipped
 
 
-def preview_data(county_search, spots):
+def preview_data(county_search, spots, market):
     """Everything the preview page embeds. Town centers double as the
     approximate fallback position for spots whose exact geocode has to come
     from the live site."""
@@ -159,11 +186,16 @@ def preview_data(county_search, spots):
     for cname, c in county_search.get("counties", {}).items():
         for t in c.get("towns", []) or []:
             if isinstance(t.get("lat"), (int, float)):
-                towns.append({
+                row = {
                     "name": t["name"], "county": cname,
                     "lat": t["lat"], "lng": t["lng"],
                     "url": SITE_ORIGIN + t.get("url", ""),
-                })
+                }
+                m = market.get(t["name"])
+                if m and isinstance(m.get("median_list"), (int, float)):
+                    row["medianList"] = m["median_list"]
+                    row["activeCount"] = m.get("active")
+                towns.append(row)
     clean_spots = []
     for s in spots:
         cs = {k: v for k, v in s.items() if not k.startswith("_")}
@@ -181,8 +213,9 @@ def main():
     local_spots = load_json(ROOT / "build" / "data" / "local_spots.json")
     spots = BUILTIN_POIS + local_spots.get("spots", [])
 
+    market = town_market()
     write_json(OUT_DATA / "spc-counties.geojson", counties_geojson(county_search))
-    write_json(OUT_DATA / "spc-towns.geojson", towns_geojson(county_search))
+    write_json(OUT_DATA / "spc-towns.geojson", towns_geojson(county_search, market))
 
     spots_fc, skipped = spots_geojson(spots)
     write_json(OUT_DATA / "spc-local-spots.geojson", spots_fc)
@@ -193,7 +226,7 @@ def main():
               + ", ".join(skipped))
 
     template = TEMPLATE.read_text(encoding="utf-8")
-    data_js = json.dumps(preview_data(county_search, spots), ensure_ascii=False,
+    data_js = json.dumps(preview_data(county_search, spots, market), ensure_ascii=False,
                          separators=(",", ":"))
     # </script> inside a JSON string would end the script block early.
     data_js = data_js.replace("</", "<\\/")

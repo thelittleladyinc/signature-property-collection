@@ -97,6 +97,7 @@
 
 ## Tools & services
 - [Search Homes — Live IRES MLS Listings](/search-homes.html)
+- [Explore Northern Colorado — Christine Gwinnup's Interactive Map: Her Listings, Local Spots With Videos, Sold Homes, 3D Terrain](/explore.html)
 - [Current Listings — Christine Gwinnup's Own Active Inventory With Video Tours](/current-listings.html)
 - [Relocation Services](/relocation.html)
 - [Free Home Valuation](/free-home-valuation.html)

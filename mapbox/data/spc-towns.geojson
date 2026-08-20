@@ -6,7 +6,9 @@
    "properties": {
     "name": "Ault",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/ault.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/ault.html",
+    "medianList": 443750,
+    "activeCount": 28
    },
    "geometry": {
     "type": "Point",
@@ -21,7 +23,9 @@
    "properties": {
     "name": "Berthoud",
     "county": "Larimer",
-    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/berthoud.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/berthoud.html",
+    "medianList": 629900,
+    "activeCount": 183
    },
    "geometry": {
     "type": "Point",
@@ -36,7 +40,9 @@
    "properties": {
     "name": "Boulder",
     "county": "Boulder",
-    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/boulder.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/boulder.html",
+    "medianList": 950000,
+    "activeCount": 668
    },
    "geometry": {
     "type": "Point",
@@ -51,7 +57,9 @@
    "properties": {
     "name": "Broomfield",
     "county": "Broomfield",
-    "pageUrl": "https://signaturepropertycollection.com/communities/broomfield/broomfield.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/broomfield/broomfield.html",
+    "medianList": 579000,
+    "activeCount": 275
    },
    "geometry": {
     "type": "Point",
@@ -66,7 +74,9 @@
    "properties": {
     "name": "Brush",
     "county": "Morgan",
-    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/brush.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/brush.html",
+    "medianList": 400000,
+    "activeCount": 47
    },
    "geometry": {
     "type": "Point",
@@ -81,7 +91,9 @@
    "properties": {
     "name": "Carr",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/carr.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/carr.html",
+    "medianList": 219500,
+    "activeCount": 26
    },
    "geometry": {
     "type": "Point",
@@ -96,7 +108,9 @@
    "properties": {
     "name": "Dacono",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/dacono.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/dacono.html",
+    "medianList": 560000,
+    "activeCount": 22
    },
    "geometry": {
     "type": "Point",
@@ -111,7 +125,9 @@
    "properties": {
     "name": "Denver",
     "county": "Denver",
-    "pageUrl": "https://signaturepropertycollection.com/communities/denver/denver.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/denver/denver.html",
+    "medianList": 499900,
+    "activeCount": 3100
    },
    "geometry": {
     "type": "Point",
@@ -126,7 +142,9 @@
    "properties": {
     "name": "Eaton",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/eaton.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/eaton.html",
+    "medianList": 550000,
+    "activeCount": 40
    },
    "geometry": {
     "type": "Point",
@@ -141,7 +159,9 @@
    "properties": {
     "name": "Erie",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/erie.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/erie.html",
+    "medianList": 699999,
+    "activeCount": 189
    },
    "geometry": {
     "type": "Point",
@@ -156,7 +176,9 @@
    "properties": {
     "name": "Estes Park",
     "county": "Larimer",
-    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/estes-park.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/estes-park.html",
+    "medianList": 659000,
+    "activeCount": 179
    },
    "geometry": {
     "type": "Point",
@@ -171,7 +193,9 @@
    "properties": {
     "name": "Firestone",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/firestone.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/firestone.html",
+    "medianList": 543551,
+    "activeCount": 62
    },
    "geometry": {
     "type": "Point",
@@ -186,7 +210,9 @@
    "properties": {
     "name": "Fort Collins",
     "county": "Larimer",
-    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/fort-collins.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/fort-collins.html",
+    "medianList": 497000,
+    "activeCount": 842
    },
    "geometry": {
     "type": "Point",
@@ -201,7 +227,9 @@
    "properties": {
     "name": "Fort Lupton",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/fort-lupton.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/fort-lupton.html",
+    "medianList": 494990,
+    "activeCount": 97
    },
    "geometry": {
     "type": "Point",
@@ -216,7 +244,9 @@
    "properties": {
     "name": "Fort Morgan",
     "county": "Morgan",
-    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/fort-morgan.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/fort-morgan.html",
+    "medianList": 349900,
+    "activeCount": 123
    },
    "geometry": {
     "type": "Point",
@@ -231,7 +261,9 @@
    "properties": {
     "name": "Frederick",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/frederick.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/frederick.html",
+    "medianList": 520000,
+    "activeCount": 71
    },
    "geometry": {
     "type": "Point",
@@ -246,7 +278,9 @@
    "properties": {
     "name": "Greeley",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/greeley.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/greeley.html",
+    "medianList": 419000,
+    "activeCount": 401
    },
    "geometry": {
     "type": "Point",
@@ -261,7 +295,9 @@
    "properties": {
     "name": "Johnstown",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/johnstown.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/johnstown.html",
+    "medianList": 492000,
+    "activeCount": 178
    },
    "geometry": {
     "type": "Point",
@@ -276,7 +312,9 @@
    "properties": {
     "name": "Lafayette",
     "county": "Boulder",
-    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/lafayette.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/lafayette.html",
+    "medianList": 570000,
+    "activeCount": 81
    },
    "geometry": {
     "type": "Point",
@@ -291,7 +329,9 @@
    "properties": {
     "name": "Log Lane Village",
     "county": "Morgan",
-    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/log-lane-village.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/log-lane-village.html",
+    "medianList": 227450,
+    "activeCount": 6
    },
    "geometry": {
     "type": "Point",
@@ -306,7 +346,9 @@
    "properties": {
     "name": "Longmont",
     "county": "Boulder",
-    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/longmont.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/longmont.html",
+    "medianList": 557000,
+    "activeCount": 410
    },
    "geometry": {
     "type": "Point",
@@ -321,7 +363,9 @@
    "properties": {
     "name": "Louisville",
     "county": "Boulder",
-    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/louisville.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/louisville.html",
+    "medianList": 850000,
+    "activeCount": 69
    },
    "geometry": {
     "type": "Point",
@@ -336,7 +380,9 @@
    "properties": {
     "name": "Loveland",
     "county": "Larimer",
-    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/loveland.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/loveland.html",
+    "medianList": 499500,
+    "activeCount": 510
    },
    "geometry": {
     "type": "Point",
@@ -351,7 +397,9 @@
    "properties": {
     "name": "Lyons",
     "county": "Boulder",
-    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/lyons.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/lyons.html",
+    "medianList": 726500,
+    "activeCount": 90
    },
    "geometry": {
     "type": "Point",
@@ -381,7 +429,9 @@
    "properties": {
     "name": "Mead",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/mead.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/mead.html",
+    "medianList": 619990,
+    "activeCount": 67
    },
    "geometry": {
     "type": "Point",
@@ -396,7 +446,9 @@
    "properties": {
     "name": "Milliken",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/milliken.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/milliken.html",
+    "medianList": 470000,
+    "activeCount": 35
    },
    "geometry": {
     "type": "Point",
@@ -411,7 +463,9 @@
    "properties": {
     "name": "Nederland",
     "county": "Boulder",
-    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/nederland.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/boulder/nederland.html",
+    "medianList": 577000,
+    "activeCount": 62
    },
    "geometry": {
     "type": "Point",
@@ -426,7 +480,9 @@
    "properties": {
     "name": "Nunn",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/nunn.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/nunn.html",
+    "medianList": 350000,
+    "activeCount": 25
    },
    "geometry": {
     "type": "Point",
@@ -441,7 +497,9 @@
    "properties": {
     "name": "Pierce",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/pierce.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/pierce.html",
+    "medianList": 372500,
+    "activeCount": 22
    },
    "geometry": {
     "type": "Point",
@@ -456,7 +514,9 @@
    "properties": {
     "name": "Red Feather Lakes",
     "county": "Larimer",
-    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html",
+    "medianList": 240000,
+    "activeCount": 124
    },
    "geometry": {
     "type": "Point",
@@ -471,7 +531,9 @@
    "properties": {
     "name": "Severance",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/severance.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/severance.html",
+    "medianList": 489900,
+    "activeCount": 67
    },
    "geometry": {
     "type": "Point",
@@ -486,7 +548,9 @@
    "properties": {
     "name": "Timnath",
     "county": "Larimer",
-    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/timnath.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/timnath.html",
+    "medianList": 675000,
+    "activeCount": 83
    },
    "geometry": {
     "type": "Point",
@@ -501,7 +565,9 @@
    "properties": {
     "name": "Wellington",
     "county": "Larimer",
-    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/wellington.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/wellington.html",
+    "medianList": 490000,
+    "activeCount": 84
    },
    "geometry": {
     "type": "Point",
@@ -516,7 +582,9 @@
    "properties": {
     "name": "Wiggins",
     "county": "Morgan",
-    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/wiggins.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/morgan/wiggins.html",
+    "medianList": 400000,
+    "activeCount": 96
    },
    "geometry": {
     "type": "Point",
@@ -531,7 +599,9 @@
    "properties": {
     "name": "Windsor",
     "county": "Larimer",
-    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/windsor.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/windsor.html",
+    "medianList": 627495,
+    "activeCount": 244
    },
    "geometry": {
     "type": "Point",
@@ -546,7 +616,9 @@
    "properties": {
     "name": "Windsor",
     "county": "Weld",
-    "pageUrl": "https://signaturepropertycollection.com/communities/weld/windsor.html"
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/windsor.html",
+    "medianList": 627495,
+    "activeCount": 244
    },
    "geometry": {
     "type": "Point",
