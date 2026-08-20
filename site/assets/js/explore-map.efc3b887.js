@@ -79,6 +79,11 @@
 
   var ALERTS_ENDPOINT = (location.hostname.indexOf('signaturepropertycollection') === -1
     ? 'https://signaturepropertycollection.com' : '') + '/.netlify/functions/area-alerts';
+  // Full-MLS escape hatch for areas the IRES feed reaches thinly (resort
+  // markets especially): her RealScout agent search. Searches made there are
+  // visible to her as buyer activity, so an empty area is a tracked lead
+  // action instead of a dead end.
+  var REALSCOUT_URL = 'https://christinegwinnup.realscout.com/agent/search';
   var DATA = { counties: null, towns: [], spots: [] };
   var map, spots = [], markers = [], soldMarkers = [], hoverPop = null, cardPop = null;
   var hoveredCounty = null, satOn = false, tiltOn = false, layerEventsBound = false;
@@ -1249,6 +1254,12 @@
         '<p class="dr-line" id="xm-alert-msg" style="min-height:16px;font-size:10.5px"></p>';
     }
     html += '<button id="xm-dr-clear">Clear</button></div>' +
+      // Only when the area came up empty: the full-MLS escape hatch, so a
+      // thin-feed area (mountain towns especially) never reads as "no homes".
+      (r.listings.length ? '' :
+        '<div class="dr-actions" style="margin-top:8px"><a href="' + REALSCOUT_URL +
+        '" target="_blank" rel="noopener" style="width:100%;text-align:center">' +
+        'Search The Full MLS With Christine &rsaquo;</a></div>') +
       // The lead net. Every portal map converts attention into contacts;
       // this one converts it into a conversation with the person who
       // actually filmed the places on it.
