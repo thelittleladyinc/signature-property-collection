@@ -19,11 +19,19 @@ once for your Mapbox **public token**:
 
 What you'll see, all in the brand (charcoal, dusty rose, cream, Corinthia):
 
+- **The map fills the screen.** The panel is a small "The Little Lady" pill
+  in the corner (click it for the legend and status); the filter chips sit
+  in a slim bar along the bottom.
 - **Your nine counties** with elegant labels — hover glows, click zooms in.
 - **All 37 towns** as labeled pins linking to their town pages and a
   pre-filtered $950K+ home search.
-- **Every local spot** with its category glyph and the ▶ play badge when
-  you zoom in, your video playing right in the popup, review quotes and all.
+- **Video spots you can't miss** — rose, softly pulsing pins at every zoom,
+  and past zoom 11 they turn into actual mini video thumbnails with a play
+  button. Click one and the video plays right there.
+- **★ pins** for places you've reviewed on Google — the quote is in the
+  popup and "On Google" opens the place.
+- **Homes I've Sold** — a toggle that adds your 46 sold homes (cream dots,
+  tour videos in their popups), from the site's own sold-homes geocoder.
 - **3D Terrain** — the Front Range actually rises out of the map. Try it
   with Satellite on and look at Horsetooth or the Poudre Canyon.
 - **Fly the Tour** — a cinematic camera flight across seven of your spots,
