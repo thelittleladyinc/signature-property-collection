@@ -3534,10 +3534,13 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#141415">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap"></noscript>
+<!-- Self-hosted fonts (2026-08-20, see the header in build/assets/css/style.css).
+     Only the two faces that render above-the-fold text (hero serif, body sans)
+     are preloaded: preloading all ten would crowd the CSS on slow links.
+     `crossorigin` is required on font preloads even same-origin, or the
+     browser fetches the file twice. -->
+<link rel="preload" href="/assets/fonts/libre-baskerville-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/poppins-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/css/style.css">
 {'<meta name="robots" content="noindex, follow">' if path in NOINDEX_PATHS else ''}
 <script type="application/ld+json">{_real_estate_agent_schema()}</script>

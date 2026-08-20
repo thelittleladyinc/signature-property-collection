@@ -92,6 +92,14 @@
 # to serve — and because the filename now identifies the content, these can be
 # cached as hard as the images are. Repeat visitors stop re-fetching 71KB of CSS
 # and 48KB of map code on every visit.
+# Self-hosted woff2 files (2026-08-20, see build/assets/css/style.css header).
+# Not content-hashed, so immutable is safe ONLY under the rule that a changed
+# font gets a new filename.
+[[headers]]
+  for = "/assets/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 [[headers]]
   for = "/assets/css/*"
   [headers.values]
