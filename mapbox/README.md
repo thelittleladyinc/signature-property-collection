@@ -76,6 +76,19 @@ say "all at their exact geocoded locations", then click **⬇ GeoJSON for
 Studio** in the bottom-right corner. That file is built from your live
 geocoder, so every pin is on the right building.
 
+## One licensing item to settle before heavy promotion
+
+A competitive audit (2026-08-20) surfaced this: Google's Maps Platform terms
+say Geocoding API results may not be displayed on a **non-Google** map. The
+pins on this Mapbox map (and, note, on the existing Leaflet/CARTO maps —
+this predates the Mapbox work) come from Google-geocoded coordinates. The
+clean fix is to switch the three geocode functions (local-spots,
+sold-homes-geocode, my-listings-geo) to **Mapbox permanent geocoding** —
+about $5 per 1,000 addresses, so under a dollar for everything on this map,
+and it also removes Google's 30-day caching ceiling. Needs a card on file
+with Mapbox. Until then this is a preview/low-traffic posture, not a
+foundation to advertise on.
+
 ## What this is not (yet)
 
 The preview is a standalone page, not part of the website. If you like it,

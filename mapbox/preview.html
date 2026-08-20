@@ -616,6 +616,30 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
       stopTour(); map.flyTo({ center: HOME.center, zoom: HOME.zoom, pitch: tiltOn ? 55 : 0, bearing: 0, duration: 2200 });
     });
     document.getElementById('btn-dl').addEventListener('click', downloadGeojson);
+
+    // Esc backs out of whatever is open — drawing first, then cards/tips.
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (draw.active) { cancelDraw(); return; }
+      if (tour.on) { stopTour(); return; }
+      closeCard(); hideTip();
+    });
+
+    // Deep links (?town=Erie&filter=eat&view=lng,lat,zoom) — parity with the
+    // site's /explore.html, so a link built against either works on both.
+    var view = (params.get('view') || '').split(',').map(parseFloat);
+    if (view.length === 3 && view.every(isFinite)) {
+      map.jumpTo({ center: [view[0], view[1]], zoom: view[2] });
+    }
+    var dlTown = (params.get('town') || '').toLowerCase();
+    if (dlTown) {
+      var tc = townCenter(dlTown);
+      if (tc) map.flyTo({ center: [tc.lng, tc.lat], zoom: 12.2, duration: 2600 });
+    }
+    var dlFilter = (params.get('filter') || '').toLowerCase();
+    if (dlFilter && FILTER_GROUPS.some(function (g) { return g.key === dlFilter; })) {
+      document.getElementById('map').classList.add('only-' + dlFilter);
+    }
   }
 
   function syncZoomClass() {
@@ -1235,7 +1259,11 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
     } else {
       html += '<p class="dr-line" style="width:100%"><i>Stretch the outline over a town to search MLS homes in it.</i></p>';
     }
-    html += '<button id="dr-clear">Clear</button></div>';
+    html += '<button id="dr-clear">Clear</button></div>' +
+      // The lead net: attention on an area becomes a conversation with the
+      // person who actually filmed it.
+      '<div class="dr-actions" style="margin-top:8px"><a href="' + esc(SPC_DATA.siteOrigin) +
+      '/contact.html" target="_blank" rel="noopener" style="width:100%;text-align:center">Ask Christine About This Area</a></div>';
     el.innerHTML = html;
     el.classList.add('open');
     el.querySelector('#dr-clear').addEventListener('click', onClear);

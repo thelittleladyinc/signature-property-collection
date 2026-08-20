@@ -243,6 +243,7 @@
       '<button class="ctrl-btn" id="xm-sold-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 L12 3 L21 11"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg><span>Homes I\'ve Sold</span></button>' +
       '<button class="ctrl-btn" id="xm-tour"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span>Fly the Tour</span></button>' +
       '<button class="ctrl-btn" id="xm-reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span>Reset View</span></button>' +
+      '<button class="ctrl-btn" id="xm-share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-3"/><path d="M4 14 L14 4"/><path d="M9 4h5v5"/></svg><span>Copy Link</span></button>' +
     '</div>' +
     '<div class="tour-card" id="xm-tour-card"><p class="tour-n" id="xm-tour-n"></p><h3 id="xm-tour-name"></h3><p id="xm-tour-blurb"></p></div>' +
     '<div class="toast" id="xm-toast"></div>' +
@@ -338,6 +339,7 @@
       stopTour();
       map.flyTo({ center: HOME_VIEW.center, zoom: HOME_VIEW.zoom, pitch: tiltOn ? 55 : 0, bearing: 0, duration: 2200 });
     });
+    $('xm-share').addEventListener('click', copyViewLink);
     $('xm-draw').addEventListener('click', function () {
       if (draw.active) cancelDraw();
       else if (draw.done) clearArea();
@@ -346,6 +348,59 @@
     $('xm-draw-finish').addEventListener('click', finishDraw);
     $('xm-draw-cancel').addEventListener('click', cancelDraw);
     setupAskBar();
+
+    // Esc backs out of whatever is open — drawing first, then cards/tips.
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (draw.active) { cancelDraw(); return; }
+      if (tour.on) { stopTour(); return; }
+      closeCard(); hideTip();
+    });
+
+    applyDeepLink();
+  }
+
+  /* Deep links: /explore.html?town=Erie&filter=eat&ask=... — the URLs that
+     go in YouTube descriptions and texts to buyers, opening the map already
+     flown and filtered. `view=lng,lat,zoom` restores a copied view. */
+  function applyDeepLink() {
+    var p = new URLSearchParams(location.search);
+    var view = (p.get('view') || '').split(',').map(parseFloat);
+    if (view.length === 3 && view.every(isFinite)) {
+      map.jumpTo({ center: [view[0], view[1]], zoom: view[2] });
+    }
+    var townName = (p.get('town') || '').toLowerCase();
+    if (townName) {
+      var t = townCenter(townName);
+      if (t) map.flyTo({ center: [t.lng, t.lat], zoom: 12.2, duration: 2600 });
+    }
+    var filter = (p.get('filter') || '').toLowerCase();
+    if (FILTER_GROUPS.some(function (g) { return g.key === filter && filter; })) {
+      // Chips exist after buildChips(), which ran before this.
+      Array.prototype.forEach.call($('xm-chips').querySelectorAll('.chip'), function (c) {
+        var g = FILTER_GROUPS.filter(function (x) { return x.label === c.textContent; })[0];
+        c.classList.toggle('on', !!g && g.key === filter);
+      });
+      host.classList.add('only-' + filter);
+    }
+    var ask = p.get('ask');
+    if (ask) {
+      $('xm-ask').value = ask;
+      // Let the town/spot data land first so the answer is complete.
+      setTimeout(runAsk, 1200);
+    }
+  }
+
+  function copyViewLink() {
+    var c = map.getCenter();
+    var url = location.origin + location.pathname +
+      '?view=' + c.lng.toFixed(5) + ',' + c.lat.toFixed(5) + ',' + map.getZoom().toFixed(2);
+    var done = function () { toast('Link copied — paste it in a text or a video description.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done, function () { window.prompt('Copy this link:', url); });
+    } else {
+      window.prompt('Copy this link:', url);
+    }
   }
 
   function syncZoomClass() {
@@ -916,7 +971,11 @@
     } else {
       html += '<p class="dr-line" style="width:100%"><i>Stretch the outline over a town to search MLS homes in it.</i></p>';
     }
-    html += '<button id="xm-dr-clear">Clear</button></div>';
+    html += '<button id="xm-dr-clear">Clear</button></div>' +
+      // The lead net. Every portal map converts attention into contacts;
+      // this one converts it into a conversation with the person who
+      // actually filmed the places on it.
+      '<div class="dr-actions" style="margin-top:8px"><a href="/contact.html" style="width:100%;text-align:center">Ask Christine About This Area</a></div>';
     el.innerHTML = html;
     el.classList.add('open');
     el.querySelector('#xm-dr-clear').addEventListener('click', onClear);
