@@ -146,6 +146,18 @@ Order matters: rotate at each provider → save new values in a password manager
 THEN tick "Contains secret value" in Netlify. Marking secret is one-way; the value
 becomes unreadable afterwards. She has NOT confirmed doing this.
 
+### 1.3b Mapbox token locked down — DONE 2026-08-20
+
+`MAPBOX_PUBLIC_TOKEN` now holds a fresh token Christine created with URL
+restrictions covering all four site origins (both domains, with and without
+`www.`). Public scopes only, no secret scopes. Her two 2021-era tokens predate
+Mapbox URL restrictions and cannot be restricted retroactively — the default
+public token stays in her account unused (it cannot be deleted), and the other
+old token can be deleted whenever she likes. TLLSH needs no change: its
+`mapbox-token` function proxies this site's at runtime, per the one-pacer rule.
+Note for future swaps: functions bake env values at deploy time, so a token
+change in the dashboard does nothing until the next production deploy.
+
 ### 1.4 The Relocation Guide — DONE 2026-08-17, and how to regenerate it
 
 The 22-page PDF now exists and is delivered. Superseded notes kept below for the
