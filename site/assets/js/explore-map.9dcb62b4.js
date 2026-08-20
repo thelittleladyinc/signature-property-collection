@@ -332,13 +332,18 @@
   // stylesheets load async, and on a slow connection the 2MB GL script can
   // win the race against its own CSS). The boot below awaits this promise;
   // a 4s timeout keeps a hung CDN from blanking the page forever.
-  var glCssReady = new Promise(function (resolve) {
-    var link = document.createElement('link');
-    link.rel = 'stylesheet'; link.href = GL_CSS;
-    link.onload = resolve; link.onerror = resolve;
-    document.head.appendChild(link);
-    setTimeout(resolve, 4000);
-  });
+  var _glCss = null;
+  function glCssReady() {
+    if (_glCss) return _glCss;
+    _glCss = new Promise(function (resolve) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet'; link.href = GL_CSS;
+      link.onload = resolve; link.onerror = resolve;
+      document.head.appendChild(link);
+      setTimeout(resolve, 4000);
+    });
+    return _glCss;
+  }
   var style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
@@ -353,13 +358,31 @@
     return;
   }
 
-  Promise.all([
+  // Boot only when the mount is near the viewport. On /explore the map IS
+  // the page, so this resolves immediately; on the homepage the mount sits
+  // below the fold, and eagerly booting there is what put PSI mobile at 61
+  // (TBT 930ms) the day this shipped (2026-08-20): ~2MB of mapbox-gl.js
+  // plus token/data fetches raced the hero for slow-4G bandwidth and main
+  // thread. Sibling fix landed the same day on thelittleladysellshomes.
+  var bootWhenVisible = new Promise(function (resolve) {
+    if (!('IntersectionObserver' in window)) return resolve();
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { io.disconnect(); resolve(); }
+      });
+    }, { rootMargin: '200px 0px' });
+    io.observe(host);
+  });
+
+  bootWhenVisible.then(function () {
+    return Promise.all([
     fetch('/.netlify/functions/mapbox-token').then(function (r) { return r.json(); }).catch(function () { return null; }),
     fetch('/assets/data/county-search.json').then(function (r) { return r.json(); }).catch(function () { return null; }),
     fetch('/assets/data/noco-counties.geojson').then(function (r) { return r.json(); }).catch(function () { return null; }),
     loadScript(GL_JS).then(function () { return true; }).catch(function () { return false; }),
-    glCssReady
-  ]).then(function (loaded) {
+    glCssReady()
+  ]);
+  }).then(function (loaded) {
     var tok = loaded[0], countySearch = loaded[1], countiesRaw = loaded[2], glOk = loaded[3];
     dbg('token fetch: ' + (tok ? (tok.token ? 'ok (pk…' + String(tok.token).slice(-6) + ')' : JSON.stringify(tok)) : 'FAILED'));
     dbg('mapbox-gl.js: ' + (glOk && typeof mapboxgl !== 'undefined' ? 'loaded ✓ v' + (mapboxgl.version || '?') : 'FAILED'));
