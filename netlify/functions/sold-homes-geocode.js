@@ -57,6 +57,7 @@
 //    the client can pick up the rest without a page refresh.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
+const { geocodeAddress } = require("./lib/_geocode");
 const SOLD_HOMES_DATA = require("./lib/_sold-homes-data.json");
 
 const GEOCODE_STORE_NAME = "sold-homes-geocode-cache";
@@ -87,18 +88,6 @@ function normalizeAddressKey(address) {
   return address.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-async function geocodeAddress(address, apiKey) {
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(GEOCODE_TIMEOUT_MS) });
-  if (!res.ok) throw new Error(`Geocoding API HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.status !== "OK" || !json.results || !json.results.length) {
-    throw new Error(`Geocoding API status ${json.status}: ${json.error_message || "no results"}`);
-  }
-  const loc = json.results[0].geometry.location;
-  const formatted = json.results[0].formatted_address;
-  return { lat: loc.lat, lng: loc.lng, formatted };
-}
 
 // Runs `worker` over `items` with at most `limit` in flight at once,
 // preserving input order in the returned array.

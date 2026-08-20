@@ -21,55 +21,64 @@
           "name": "Berthoud",
           "url": "/communities/larimer/berthoud.html",
           "lat": 40.30832,
-          "lng": -105.08109
+          "lng": -105.08109,
+          "schoolDistrict": "Thompson School District R2-J"
         },
         {
           "name": "Estes Park",
           "url": "/communities/larimer/estes-park.html",
           "lat": 40.37721,
-          "lng": -105.52167
+          "lng": -105.52167,
+          "schoolDistrict": "Estes Park School District R-3"
         },
         {
           "name": "Fort Collins",
           "url": "/communities/larimer/fort-collins.html",
           "lat": 40.58526,
-          "lng": -105.08442
+          "lng": -105.08442,
+          "schoolDistrict": "Poudre School District R-1"
         },
         {
           "name": "Loveland",
           "url": "/communities/larimer/loveland.html",
           "lat": 40.39545,
-          "lng": -105.07458
+          "lng": -105.07458,
+          "schoolDistrict": "Thompson School District R2-J"
         },
         {
           "name": "Masonville",
           "url": "/communities/larimer/masonville.html",
           "lat": 40.48748,
-          "lng": -105.21082
+          "lng": -105.21082,
+          "schoolDistrict": "Thompson School District R2-J"
         },
         {
           "name": "Red Feather Lakes",
           "url": "/communities/larimer/red-feather-lakes.html",
           "lat": 40.80248,
-          "lng": -105.59166
+          "lng": -105.59166,
+          "schoolDistrict": "Poudre School District R-1 (local schooling via PSD's Mountain Schools cluster, including Red Feather Lakes Elementary; older students bus toward Fort Collins/Laporte schools)"
         },
         {
           "name": "Timnath",
           "url": "/communities/larimer/timnath.html",
           "lat": 40.52915,
-          "lng": -104.98525
+          "lng": -104.98525,
+          "schoolDistrict": "Poudre School District R-1"
         },
         {
           "name": "Wellington",
           "url": "/communities/larimer/wellington.html",
           "lat": 40.70387,
-          "lng": -105.00859
+          "lng": -105.00859,
+          "schoolDistrict": "Poudre School District R-1 (Wellington Middle-High School serves the town)"
         },
         {
           "name": "Windsor",
           "url": "/communities/larimer/windsor.html",
           "lat": 40.47748,
-          "lng": -104.90136
+          "lng": -104.90136,
+          "schoolDistrict": "Weld RE-4 School District"
         }
       ]
     },
@@ -110,97 +119,113 @@
           "name": "Ault",
           "url": "/communities/weld/ault.html",
           "lat": 40.58248,
-          "lng": -104.73191
+          "lng": -104.73191,
+          "schoolDistrict": "Weld RE-9 School District (Ault-Highland)"
         },
         {
           "name": "Carr",
           "url": "/communities/weld/carr.html",
           "lat": 40.89322,
-          "lng": -104.87834
+          "lng": -104.87834,
+          "schoolDistrict": "Weld RE-9 School District (Highland — serving Ault, Pierce, Nunn and Carr)"
         },
         {
           "name": "Dacono",
           "url": "/communities/weld/dacono.html",
           "lat": 40.08471,
-          "lng": -104.93942
+          "lng": -104.93942,
+          "schoolDistrict": "St. Vrain Valley School District RE-1J"
         },
         {
           "name": "Eaton",
           "url": "/communities/weld/eaton.html",
           "lat": 40.5194,
-          "lng": -104.70252
+          "lng": -104.70252,
+          "schoolDistrict": "Weld RE-2 School District (Eaton School District)"
         },
         {
           "name": "Erie",
           "url": "/communities/weld/erie.html",
           "lat": 40.05026,
-          "lng": -105.04998
+          "lng": -105.04998,
+          "schoolDistrict": "St. Vrain Valley Schools serves most of Erie (including Erie High School); a portion of town falls in Boulder Valley School District (BVSD) depending on the neighborhood"
         },
         {
           "name": "Firestone",
           "url": "/communities/weld/firestone.html",
           "lat": 40.11248,
-          "lng": -104.93664
+          "lng": -104.93664,
+          "schoolDistrict": "St. Vrain Valley Schools (includes Firestone Charter Academy, feeds into Frederick High School)"
         },
         {
           "name": "Fort Lupton",
           "url": "/communities/weld/fort-lupton.html",
           "lat": 40.08471,
-          "lng": -104.81303
+          "lng": -104.81303,
+          "schoolDistrict": "Weld RE-8 School District, headquartered in Fort Lupton"
         },
         {
           "name": "Frederick",
           "url": "/communities/weld/frederick.html",
           "lat": 40.09915,
-          "lng": -104.9372
+          "lng": -104.9372,
+          "schoolDistrict": "St. Vrain Valley Schools (feeds into Frederick High School)"
         },
         {
           "name": "Greeley",
           "url": "/communities/weld/greeley.html",
           "lat": 40.42331,
-          "lng": -104.70913
+          "lng": -104.70913,
+          "schoolDistrict": "Greeley-Evans School District 6"
         },
         {
           "name": "Johnstown",
           "url": "/communities/weld/johnstown.html",
           "lat": 40.33693,
-          "lng": -104.9122
+          "lng": -104.9122,
+          "schoolDistrict": "Weld RE-5J (Johnstown-Milliken School District)"
         },
         {
           "name": "Mead",
           "url": "/communities/weld/mead.html",
           "lat": 40.23332,
-          "lng": -104.99859
+          "lng": -104.99859,
+          "schoolDistrict": "St. Vrain Valley School District RE-1J"
         },
         {
           "name": "Milliken",
           "url": "/communities/weld/milliken.html",
           "lat": 40.32943,
-          "lng": -104.85525
+          "lng": -104.85525,
+          "schoolDistrict": "Weld RE-5J (Johnstown-Milliken School District)"
         },
         {
           "name": "Nunn",
           "url": "/communities/weld/nunn.html",
           "lat": 40.70359,
-          "lng": -104.7808
+          "lng": -104.7808,
+          "schoolDistrict": "Weld RE-9 School District (Highland — serving Ault, Pierce, Nunn and Carr)"
         },
         {
           "name": "Pierce",
           "url": "/communities/weld/pierce.html",
           "lat": 40.63554,
-          "lng": -104.75525
+          "lng": -104.75525,
+          "schoolDistrict": "Weld RE-9 School District (Highland — serving Ault, Pierce, Nunn and Carr)"
         },
         {
           "name": "Severance",
           "url": "/communities/weld/severance.html",
           "lat": 40.52415,
-          "lng": -104.85108
+          "lng": -104.85108,
+          "schoolDistrict": "Weld RE-4 (Windsor)"
         },
         {
           "name": "Windsor",
           "url": "/communities/weld/windsor.html",
           "lat": 40.47748,
-          "lng": -104.90136
+          "lng": -104.90136,
+          "schoolDistrict": "Weld RE-4 School District"
         }
       ]
     },
@@ -223,37 +248,43 @@
           "name": "Boulder",
           "url": "/communities/boulder/boulder.html",
           "lat": 40.01897,
-          "lng": -105.27474
+          "lng": -105.27474,
+          "schoolDistrict": "Boulder Valley School District (BVSD, Re-2)"
         },
         {
           "name": "Lafayette",
           "url": "/communities/boulder/lafayette.html",
           "lat": 39.9936,
-          "lng": -105.08971
+          "lng": -105.08971,
+          "schoolDistrict": "Boulder Valley School District (BVSD, Re-2)"
         },
         {
           "name": "Longmont",
           "url": "/communities/boulder/longmont.html",
           "lat": 40.16721,
-          "lng": -105.10193
+          "lng": -105.10193,
+          "schoolDistrict": "St. Vrain Valley Schools (RE-1J)"
         },
         {
           "name": "Louisville",
           "url": "/communities/boulder/louisville.html",
           "lat": 39.97776,
-          "lng": -105.13193
+          "lng": -105.13193,
+          "schoolDistrict": "Boulder Valley School District (BVSD, Re-2)"
         },
         {
           "name": "Lyons",
           "url": "/communities/boulder/lyons.html",
           "lat": 40.22471,
-          "lng": -105.27138
+          "lng": -105.27138,
+          "schoolDistrict": "St. Vrain Valley Schools (Lyons Elementary and Lyons Middle/Senior High)"
         },
         {
           "name": "Nederland",
           "url": "/communities/boulder/nederland.html",
           "lat": 39.96138,
-          "lng": -105.51083
+          "lng": -105.51083,
+          "schoolDistrict": "Boulder Valley School District (BVSD, Re-2) — served locally by Nederland Elementary and Nederland Middle-Senior High School"
         }
       ]
     },
@@ -268,7 +299,8 @@
           "name": "Broomfield",
           "url": "/communities/broomfield/broomfield.html",
           "lat": 39.92054,
-          "lng": -105.08665
+          "lng": -105.08665,
+          "schoolDistrict": "Adams 12 Five Star Schools (primary district for most of the city; a portion of northwest Broomfield falls in Boulder Valley School District Re-2)"
         }
       ]
     },
@@ -302,7 +334,8 @@
           "name": "Denver",
           "url": "/communities/denver/denver.html",
           "lat": 39.73924,
-          "lng": -104.99025
+          "lng": -104.99025,
+          "schoolDistrict": "Denver Public Schools (DPS)"
         }
       ]
     },
@@ -335,25 +368,29 @@
           "name": "Brush",
           "url": "/communities/morgan/brush.html",
           "lat": 40.25887,
-          "lng": -103.62384
+          "lng": -103.62384,
+          "schoolDistrict": "Brush School District RE-2(J)"
         },
         {
           "name": "Fort Morgan",
           "url": "/communities/morgan/fort-morgan.html",
           "lat": 40.25026,
-          "lng": -103.79995
+          "lng": -103.79995,
+          "schoolDistrict": "Morgan County School District Re-3"
         },
         {
           "name": "Log Lane Village",
           "url": "/communities/morgan/log-lane-village.html",
           "lat": 40.27054,
-          "lng": -103.82967
+          "lng": -103.82967,
+          "schoolDistrict": "Morgan County School District Re-3 (Fort Morgan)"
         },
         {
           "name": "Wiggins",
           "url": "/communities/morgan/wiggins.html",
           "lat": 40.23054,
-          "lng": -104.07273
+          "lng": -104.07273,
+          "schoolDistrict": "Wiggins School District RE-50(J)"
         }
       ]
     },

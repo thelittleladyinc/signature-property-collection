@@ -12,7 +12,11 @@ const SITE = "https://signaturepropertycollection.com";
 const urls = [...new Set([...doc.matchAll(/https:\/\/signaturepropertycollection\.com(\/[^\s`)]*)/g)].map(m => m[1]))];
 console.log(`       ${urls.length} distinct site URLs referenced`);
 
-const missing = urls.filter((u) => {
+const missing = urls.filter((raw) => {
+  // A query string is runtime state, not a page: /explore.html?town=Erie is
+  // served by /explore.html. Strip it so the guard keeps testing what it was
+  // built to test — that no URL in a paste-ready doc 404s.
+  const u = raw.split("?")[0];
   if (u === "/communities") return !fs.existsSync(`${ROOT}/site/communities/index.html`);
   if (u === "/seller-local-proof") return !fs.existsSync(`${ROOT}/site/seller-local-proof.html`);
   return !fs.existsSync(`${ROOT}/site${u}`);

@@ -81,6 +81,12 @@ def main():
         L.append("```")
         L.append(f"📍 More of {town} the way locals actually see it — every spot I've filmed here,")
         L.append(f"plus homes for sale nearby: {SITE}{href}")
+        # 2026-08-20: the interactive map exists now, and a deep link opens it
+        # already flown to this video's town with the spots lit up. One extra
+        # line per description, straight onto the page with the lead nets.
+        if town:
+            from urllib.parse import quote
+            L.append(f"🗺️ Explore {town} on my live 3D map: {SITE}/explore.html?town={quote(town)}")
         L.append("```")
         L.append("")
 
