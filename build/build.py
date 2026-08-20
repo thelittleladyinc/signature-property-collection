@@ -8326,6 +8326,7 @@ MONEY_PAGES = [
     ("/northern-colorado-horse-property.html", "Horse Property & Acreage"),
     ("/northern-colorado-riverfront-homes.html", "Riverfront & Waterfront"),
     ("/northern-colorado-golf-course-homes.html", "Golf Course Homes"),
+    ("/estes-park-luxury-homes.html", "Estes Park Luxury Homes"),
 ]
 
 
@@ -8788,6 +8789,83 @@ def build_money_pages():
                  "No — in MLS listings it can mean anything from genuine river frontage to a pond view or "
                  "irrigation ditch. Christine lives on riverfront property herself and reads these listings "
                  "accordingly; ask her which ones deliver the real thing."),
+            ],
+        },
+        {
+            # 2026-08-20, Christine: "lets do estes now then keep going". First of
+            # the mountain-market pages. Estes Park is Larimer County, so it is
+            # already fully inside the IRES feed and the site's live search — no
+            # coverage question, unlike the Vail/Breck/Steamboat pages parked
+            # behind the OPERATING_COUNTIES feed test. Content rules unchanged:
+            # no hand-typed market stats, no fabricated specifics — the honest
+            # STR answer below deliberately points at the Town's own licensing
+            # office rather than quoting a cap number that changes by ordinance.
+            "path": "/estes-park-luxury-homes.html",
+            "title": "Estes Park CO Luxury Homes For Sale | Mountain & River Estates",
+            "meta": "Every active $950K+ Estes Park listing, live from IRES — view estates above town, "
+                    "Fall River and Big Thompson river frontage, and homes at the doorstep of Rocky "
+                    "Mountain National Park, with a Larimer County luxury specialist.",
+            "h1": "Estes Park CO Luxury Homes For Sale",
+            "eyebrow": "RMNP Gateway &middot; River Frontage &middot; View Estates At 7,500 Feet",
+            "intro": "Estes Park luxury is its own market: view homes perched above town, river frontage "
+                     "along Fall River and the Big Thompson, and mountain estates minutes from the Rocky "
+                     "Mountain National Park entrance. Every active $950K+ listing in Estes Park is live on "
+                     "this page, straight from IRES.",
+            "feed_id": "estes_park_luxury_feed",
+            "feed_params": {"cities": "estes park"},
+            "feed_heading": "Every Active Luxury Listing In Estes Park Right Now",
+            "feed_note_extra": " Mountain inventory is thinner than the valley towns', so an empty week "
+                               "is normal — ask Christine what's coming rather than waiting for the feed.",
+            "paragraphs": [
+                "What Luxury Means At 7,500 Feet",
+                "Estes Park's top of the market isn't about square footage — it's about position. The homes "
+                "that command luxury prices here have one of three things: a protected view of the Continental "
+                "Divide or Longs Peak, real river frontage on Fall River or the Big Thompson, or land that "
+                "backs to public forest. A home with all three is the rarest property type in Larimer County, "
+                "and when one lists, it moves on relationships as much as marketing.",
+                "The Micro-Markets That Matter",
+                "West of downtown, the Fall River corridor toward the national park entrance carries riverfront "
+                "homes and lodges-turned-residences. Windcliff and the slopes off Highway 66 hold the "
+                "dramatic view estates. Prospect Mountain rises straight out of downtown with homes that look "
+                "down on the whole valley. Carriage Hills and the Marys Lake area trade a little drama for "
+                "sun and easier winter driving — worth understanding before you fall for a north-facing "
+                "driveway at this elevation. And around downtown itself there's a quiet market of condos and "
+                "townhomes that let second-home owners lock-and-leave. For the full picture of living here "
+                "year-round, start with my [Estes Park guide](/communities/larimer/estes-park.html).",
+                "Second Homes, Short-Term Rentals, And The Honest Answer",
+                "A large share of Estes buyers intend to rent their home when they're not using it — and "
+                "Estes Park regulates vacation rentals with a licensing system that has real limits and, at "
+                "times, a waitlist. The rules differ inside and outside town limits and they change by "
+                "ordinance, so I won't quote you a number that could be wrong by the time you read it: before "
+                "you write an offer that depends on rental income, we verify the property's licensing "
+                "position directly with the Town of Estes Park and Larimer County. That one phone call has "
+                "saved my buyers from expensive assumptions more than once.",
+                "Mountain Ownership, Eyes Open",
+                "Buying at elevation comes with questions the valley towns never ask: wildfire insurance and "
+                "defensible space, wells and septic outside town limits, winter access on a steep grade, and "
+                "what a Highway 34 or 36 closure means for your commute down the canyon. None of these are "
+                "reasons not to buy — they're reasons to buy with someone who asks about them before the "
+                "inspection, not after. If you're weighing Estes against the foothills towns lower down, "
+                "read [the honest town-by-town comparison](/blog/moving-to-northern-colorado-which-town-actually-fits.html) "
+                "first, or [explore the whole map](/explore.html?town=Estes%20Park) with my videos and "
+                "local spots on it.",
+            ],
+            "faq": [
+                ("What price range counts as a luxury home in Estes Park?",
+                 "The feed on this page uses the site's $950,000 luxury floor, and Estes Park's top tier runs "
+                 "well past that for true view estates and river frontage. What sets the tier apart here is "
+                 "position — Continental Divide views, Fall River or Big Thompson frontage, or land backing "
+                 "to public forest — more than finish level."),
+                ("Can I rent out an Estes Park home as a short-term rental?",
+                 "Sometimes — Estes Park licenses vacation rentals, the rules differ inside and outside town "
+                 "limits, and licenses have been capped with waitlists at times. Christine verifies a "
+                 "specific property's licensing position with the Town and Larimer County before her buyers "
+                 "make an offer that depends on rental income."),
+                ("Is Estes Park livable year-round?",
+                 "Yes — thousands of people do it happily — but winter matters when choosing the property: "
+                 "driveway aspect and grade, plowing access, and canyon-highway closures are real "
+                 "considerations. South-facing and in-town properties winter easiest; Christine walks "
+                 "buyers through exactly this on showings."),
             ],
         },
     ]
