@@ -30,6 +30,15 @@ What you'll see, all in the brand (charcoal, dusty rose, cream, Corinthia):
   button. Click one and the video plays right there.
 - **★ pins** for places you've reviewed on Google — the quote is in the
   popup and "On Google" opens the place.
+- **Your listings, live** — price bubbles for your 11-12 active listings,
+  geocoded by the new `my-listings-geo` function (same Google geocoder and
+  30-day cache your sold-homes map already uses), with the cover photo,
+  beds/baths, and a View This Home link in the popup. Prices and pending
+  flips refresh with the normal 30-minute sync.
+- **Draw Search Area** — outline any shape on the map and it tells you
+  what's inside: your listings (linked), your spots, your sold homes, and
+  a one-click MLS search scoped to the towns in the outline (the same
+  honest town-based scope the site's own "Search This Area" uses).
 - **Homes I've Sold** — a toggle that adds your 46 sold homes (cream dots,
   tour videos in their popups), from the site's own sold-homes geocoder.
 - **3D Terrain** — the Front Range actually rises out of the map. Try it

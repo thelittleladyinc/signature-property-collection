@@ -215,6 +215,61 @@
   .zoomed-thumbs .spc-pin.has-video .spc-pin-inner { display: none; }
   .zoomed-thumbs .spc-pin.has-video .spc-thumb { display: block; }
 
+  /* her active listings: price bubbles — the thing a buyer scans for first */
+  .spc-listing {
+    cursor: pointer; background: var(--cream); color: var(--charcoal);
+    font-family: var(--sans); font-weight: 700; font-size: 12px; letter-spacing: .01em;
+    padding: 5px 10px; border: 2px solid var(--rose); border-radius: 14px;
+    box-shadow: 0 3px 12px rgba(0,0,0,.55); white-space: nowrap;
+    transition: transform .15s ease, background .15s ease;
+  }
+  .spc-listing:hover { transform: scale(1.12); background: var(--rose); color: var(--cream); }
+  .spc-listing.pending { border-style: dashed; opacity: .9; }
+  .hide-listings .spc-listing { display: none; }
+  .spc-card-photo { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; background: #222; }
+  .spc-card-facts { font-size: 12px; color: rgba(248,246,244,.85); margin: 0 0 12px; letter-spacing: .02em; }
+  .spc-card-facts b { color: var(--cream); }
+
+  /* draw-an-area: results card + the drawing hint */
+  .draw-hint {
+    position: absolute; top: 70px; left: 50%; transform: translateX(-50%); z-index: 26;
+    display: none; gap: 10px; align-items: center;
+    background: rgba(20,20,21,.92); border: 1px solid rgba(184,111,122,.6); color: var(--cream);
+    font-size: 12px; padding: 10px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  }
+  .draw-hint.open { display: flex; }
+  .draw-hint button {
+    border: 1px solid rgba(248,246,244,.4); background: transparent; color: var(--cream);
+    font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; padding: 6px 10px; cursor: pointer;
+  }
+  .draw-hint button.go { background: var(--rose); border-color: var(--rose); }
+  .draw-hint button:hover { border-color: var(--mauve); }
+  .draw-results {
+    position: absolute; bottom: 64px; left: 14px; z-index: 24; width: min(300px, calc(100vw - 28px));
+    max-height: 46vh; overflow-y: auto; display: none;
+    background: rgba(20,20,21,.92); backdrop-filter: blur(8px);
+    border: 1px solid rgba(184,111,122,.55); color: var(--cream); padding: 16px 18px;
+    box-shadow: 0 16px 50px rgba(0,0,0,.5);
+  }
+  .draw-results.open { display: block; }
+  .draw-results h3 { font-family: var(--serif); font-weight: 400; font-size: 17px; margin: 0 0 10px; }
+  .draw-results .dr-line { font-size: 12px; line-height: 1.8; color: rgba(248,246,244,.85); margin: 0; }
+  .draw-results .dr-line b { color: var(--cream); }
+  .draw-results a.dr-listing {
+    display: block; font-size: 12px; color: var(--mauve); text-decoration: none; padding: 3px 0;
+  }
+  .draw-results a.dr-listing:hover { color: var(--cream); }
+  .draw-results .dr-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .draw-results .dr-actions a, .draw-results .dr-actions button {
+    border: 1px solid rgba(248,246,244,.45); background: transparent; color: var(--cream);
+    text-decoration: none; cursor: pointer; font-family: var(--sans);
+    font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; padding: 8px 11px;
+  }
+  .draw-results .dr-actions a { background: var(--rose); border-color: var(--rose); }
+  .draw-results .dr-actions a:hover, .draw-results .dr-actions button:hover { border-color: var(--mauve); color: var(--mauve); }
+  .drawing .mapboxgl-canvas-container { cursor: crosshair !important; }
+
   /* sold-home pins: cream dot, rose ring — quiet next to the spots, loud enough to count */
   .spc-sold {
     width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
@@ -325,9 +380,11 @@
   <p class="tag">Northern Colorado, from someone who actually goes there.</p>
   <p class="status" id="status"></p>
   <p class="legend">
+    <b>Price bubbles</b> — my listings for sale right now<br>
     <b>Rose pulsing pins</b> — places with my videos (zoom in and they become the video)<br>
     <b>★ pins</b> — places I've reviewed on Google<br>
-    <b>Cream dots</b> — homes I've sold (toggle on the right)
+    <b>Cream dots</b> — homes I've sold (toggle on the right)<br>
+    <b>Draw Search Area</b> — outline any shape, see what's inside it
   </p>
 </div>
 
@@ -340,6 +397,12 @@
   <button class="ctrl-btn" id="btn-sat">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18"/></svg>
     <span>Satellite</span></button>
+  <button class="ctrl-btn" id="btn-mine">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><path d="M9.5 10.5 L12 8 L14.5 10.5"/><path d="M10.2 10.2v3h3.6v-3"/></svg>
+    <span>My Listings</span></button>
+  <button class="ctrl-btn" id="btn-draw">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8 L11 4 L20 7 L17 16 L7 19 Z" stroke-dasharray="3 2"/><circle cx="4" cy="8" r="1.6" fill="currentColor" stroke="none"/><circle cx="11" cy="4" r="1.6" fill="currentColor" stroke="none"/><circle cx="20" cy="7" r="1.6" fill="currentColor" stroke="none"/><circle cx="17" cy="16" r="1.6" fill="currentColor" stroke="none"/><circle cx="7" cy="19" r="1.6" fill="currentColor" stroke="none"/></svg>
+    <span>Draw Search Area</span></button>
   <button class="ctrl-btn" id="btn-sold">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 L12 3 L21 11"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg>
     <span>Homes I've Sold</span></button>
@@ -358,6 +421,13 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="draw-hint" id="draw-hint">
+  <span>Click the map to outline your area</span>
+  <button class="go" id="draw-finish">Finish</button>
+  <button id="draw-cancel">Cancel</button>
+</div>
+<div class="draw-results" id="draw-results"></div>
 
 <div class="foot" id="foot" style="display:none">
   <button id="btn-dl" title="Download every spot as GeoJSON, ready to upload to Mapbox Studio">⬇ GeoJSON for Studio</button>
@@ -407,6 +477,8 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
   var map, spots = [], markers = [], soldMarkers = [], hoverPop = null, cardPop = null;
   var hoveredCounty = null, satOn = false, tiltOn = false, layerEventsBound = false;
   var soldState = 'off'; // off | loading | on | unavailable
+  var soldPins = [], myListings = [], listingMarkers = [];
+  var draw = { active: false, pts: [] };
   var tour = { on: false, i: 0, timer: null };
 
   function esc(s) {
@@ -473,6 +545,7 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
       buildChips();
       syncZoomClass();
       fetchLiveSpots();
+      fetchMyListings();
     });
     map.on('zoom', syncZoomClass);
     ['dragstart', 'wheel'].forEach(function (ev) { map.on(ev, stopTour); });
@@ -486,6 +559,14 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
     document.getElementById('btn-3d').addEventListener('click', toggle3D);
     document.getElementById('btn-sat').addEventListener('click', toggleSat);
     document.getElementById('btn-sold').addEventListener('click', toggleSold);
+    document.getElementById('btn-mine').addEventListener('click', toggleMine);
+    document.getElementById('btn-draw').addEventListener('click', function () {
+      if (draw.active) cancelDraw();
+      else if (draw.done) clearArea();
+      else startDraw();
+    });
+    document.getElementById('draw-finish').addEventListener('click', finishDraw);
+    document.getElementById('draw-cancel').addEventListener('click', cancelDraw);
     document.getElementById('btn-tour').addEventListener('click', function () { tour.on ? stopTour() : startTour(); });
     document.getElementById('btn-reset').addEventListener('click', function () {
       stopTour(); map.flyTo({ center: HOME.center, zoom: HOME.zoom, pitch: tiltOn ? 55 : 0, bearing: 0, duration: 2200 });
@@ -559,6 +640,13 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
         }
       });
     }
+    if (!map.getSource('draw-poly')) {
+      map.addSource('draw-poly', { type: 'geojson', data: drawFeature() });
+    }
+    if (!map.getLayer('draw-fill')) {
+      map.addLayer({ id: 'draw-fill', type: 'fill', source: 'draw-poly', paint: { 'fill-color': '#B86F7A', 'fill-opacity': 0.14 } });
+      map.addLayer({ id: 'draw-line', type: 'line', source: 'draw-poly', paint: { 'line-color': '#F8F6F4', 'line-width': 2, 'line-dasharray': [2, 1.5] } });
+    }
     if (!map.getLayer('town-dot')) {
       map.addLayer({
         id: 'town-dot', type: 'circle', source: 'towns',
@@ -601,15 +689,28 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
       if (hoveredCounty !== null) map.setFeatureState({ source: 'counties', id: hoveredCounty }, { hover: false });
       hoveredCounty = null;
     });
+    // Every click adds a vertex while an area is being drawn — registered
+    // before the county/town click handlers' work matters, and those guard
+    // on draw.active so a drawing click never also zooms a county.
+    map.on('click', function (e) {
+      if (!draw.active) return;
+      draw.pts.push([e.lngLat.lng, e.lngLat.lat]);
+      syncDraw();
+    });
+    map.on('dblclick', function (e) {
+      if (!draw.active) return;
+      e.preventDefault();
+      finishDraw();
+    });
     map.on('click', 'county-fill', function (e) {
-      if (!e.features.length || tour.on) return;
+      if (!e.features.length || tour.on || draw.active) return;
       var b = geomBounds(e.features[0].geometry);
       if (b) map.fitBounds(b, { padding: 70, pitch: tiltOn ? 55 : 0, duration: 1800 });
     });
     map.on('mouseenter', 'town-dot', function () { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'town-dot', function () { map.getCanvas().style.cursor = ''; });
     map.on('click', 'town-dot', function (e) {
-      if (!e.features.length) return;
+      if (!e.features.length || draw.active) return;
       var p = e.features[0].properties;
       closeCard();
       cardPop = new mapboxgl.Popup({ className: 'spc-town', offset: 12 })
@@ -827,6 +928,7 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
               .setLngLat([p.lng, p.lat]).setHTML(html).addTo(map);
           });
           soldMarkers.push(new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat([p.lng, p.lat]).addTo(map));
+          soldPins.push(p);
         });
         soldState = 'on';
         document.getElementById('btn-sold').classList.add('on');
@@ -837,6 +939,195 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
         soldState = 'off';
         toast('The sold-homes layer loads from the live site — it works once this branch deploys (or open the preview from the deploy-preview link).', 7000);
       });
+  }
+
+  /* ---------------- her active listings ---------------- */
+  function fmtPrice(p) {
+    if (typeof p !== 'number') return 'For Sale';
+    if (p >= 1e6) return '$' + (p / 1e6).toFixed(p % 1e6 >= 5e4 ? 2 : 1).replace(/\.?0+$/, '') + 'M';
+    return '$' + Math.round(p / 1000) + 'K';
+  }
+
+  /* Her 11-12 active listings, geocoded by the site's my-listings-geo
+     function (same Google geocoder + 30-day cache her sold-homes map uses).
+     Price bubbles, because that is the number a buyer scans for first. */
+  function fetchMyListings() {
+    fetch(SPC_DATA.siteOrigin + '/.netlify/functions/my-listings-geo')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var pins = (data && data.pins) || [];
+        if (!pins.length) return;
+        myListings = pins.filter(function (p) { return typeof p.lat === 'number' && typeof p.lng === 'number'; });
+        buildListingMarkers();
+        document.getElementById('btn-mine').classList.add('on');
+        // A cold geocode cache resolves over a couple of loads, same
+        // progressive-warming contract as the sold-homes map.
+        if (data.pending) setTimeout(fetchMyListings, 12000);
+      })
+      .catch(function () { /* the toggle explains itself when clicked */ });
+  }
+
+  function buildListingMarkers() {
+    listingMarkers.forEach(function (m) { m.remove(); });
+    listingMarkers = [];
+    myListings.forEach(function (p) {
+      var el = document.createElement('div');
+      var pending = /pending|contract/i.test(String(p.status || ''));
+      el.className = 'spc-listing' + (pending ? ' pending' : '');
+      el.textContent = fmtPrice(p.price) + (pending ? ' · Pending' : '');
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (draw.active) return;
+        openListingCard(p);
+      });
+      listingMarkers.push(new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat([p.lng, p.lat]).addTo(map));
+    });
+  }
+
+  function openListingCard(p) {
+    closeCard();
+    var facts = [];
+    if (p.beds != null) facts.push('<b>' + esc(p.beds) + '</b> bd');
+    if (p.baths != null) facts.push('<b>' + esc(p.baths) + '</b> ba');
+    if (p.sqft != null) facts.push('<b>' + Number(p.sqft).toLocaleString() + '</b> sqft');
+    var html =
+      '<img class="spc-card-photo" alt="" loading="lazy" src="' +
+        esc(SPC_DATA.siteOrigin) + '/.netlify/functions/listing-photo?id=' + encodeURIComponent(p.listingId || '') + '&i=0"' +
+        ' onerror="this.style.display=\'none\'">' +
+      '<div class="spc-card-body">' +
+        '<h3>' + esc(fmtPrice(p.price)) + '</h3>' +
+        '<p class="spc-card-city">' + esc(p.address || '') + ' · ' + esc(p.city || '') +
+          (p.status ? ' · ' + esc(p.status) : '') + '</p>' +
+        (facts.length ? '<p class="spc-card-facts">' + facts.join(' &nbsp;·&nbsp; ') + '</p>' : '') +
+        '<p class="spc-card-credit">Listed by Christine — The Little Lady Sells Homes</p>' +
+        '<div class="spc-card-actions">' +
+          (p.url ? '<a href="' + esc(SPC_DATA.siteOrigin + p.url) + '" target="_blank" rel="noopener">View This Home</a>' : '') +
+          (p.city ? '<a href="' + esc(SPC_DATA.siteOrigin) + '/search-homes.html?city=' + encodeURIComponent(p.city) + '&minPrice=950000" target="_blank" rel="noopener">More in ' + esc(p.city) + '</a>' : '') +
+        '</div>' +
+      '</div>';
+    cardPop = new mapboxgl.Popup({ className: 'spc-card', offset: 18, maxWidth: 'none' })
+      .setLngLat([p.lng, p.lat]).setHTML(html).addTo(map);
+  }
+
+  function toggleMine() {
+    var btn = document.getElementById('btn-mine');
+    if (!myListings.length) {
+      toast('Your listings load from the live site — this works once the branch deploys (or open it from the deploy-preview link).', 7000);
+      return;
+    }
+    var hidden = document.getElementById('map').classList.toggle('hide-listings');
+    btn.classList.toggle('on', !hidden);
+  }
+
+  /* ---------------- draw-an-area search ---------------- */
+  function drawFeature() {
+    var pts = draw.pts;
+    var geom = pts.length >= 3
+      ? { type: 'Polygon', coordinates: [pts.concat([pts[0]])] }
+      : { type: 'LineString', coordinates: pts };
+    return { type: 'Feature', properties: {}, geometry: pts.length ? geom : { type: 'LineString', coordinates: [] } };
+  }
+
+  function syncDraw() {
+    var src = map.getSource('draw-poly');
+    if (src) src.setData(drawFeature());
+  }
+
+  function setDrawLabel(text) {
+    var span = document.getElementById('btn-draw').querySelector('span');
+    if (span) span.textContent = text;
+  }
+
+  function startDraw() {
+    stopTour(); closeCard(); hideTip();
+    draw.active = true; draw.done = false; draw.pts = [];
+    syncDraw();
+    document.getElementById('map').classList.add('drawing');
+    document.getElementById('draw-hint').classList.add('open');
+    document.getElementById('draw-results').classList.remove('open');
+    document.getElementById('btn-draw').classList.add('on');
+    setDrawLabel('Cancel Drawing');
+    map.doubleClickZoom.disable();
+  }
+
+  function cancelDraw() { endDrawMode(); clearArea(); }
+
+  function endDrawMode() {
+    draw.active = false;
+    document.getElementById('map').classList.remove('drawing');
+    document.getElementById('draw-hint').classList.remove('open');
+    map.doubleClickZoom.enable();
+  }
+
+  function clearArea() {
+    draw.pts = []; draw.done = false;
+    syncDraw();
+    document.getElementById('draw-results').classList.remove('open');
+    document.getElementById('btn-draw').classList.remove('on');
+    setDrawLabel('Draw Search Area');
+  }
+
+  function finishDraw() {
+    if (draw.pts.length < 3) { toast('Click at least three points to outline an area.'); return; }
+    endDrawMode();
+    draw.done = true;
+    syncDraw();
+    setDrawLabel('Clear Area');
+    renderAreaResults(analyzeArea(draw.pts));
+  }
+
+  // Standard ray-cast. Good enough at neighborhood scale; nothing here is
+  // near a pole or the antimeridian.
+  function pointInPoly(lng, lat, ring) {
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+
+  function analyzeArea(ring) {
+    var inPoly = function (lng, lat) { return pointInPoly(lng, lat, ring); };
+    return {
+      listings: myListings.filter(function (p) { return inPoly(p.lng, p.lat); }),
+      spots: spots.filter(function (s) { return inPoly(s._lnglat[0], s._lnglat[1]); }),
+      sold: soldPins.filter(function (p) { return inPoly(p.lng, p.lat); }),
+      towns: SPC_DATA.towns.filter(function (t) { return inPoly(t.lng, t.lat); }),
+    };
+  }
+
+  function renderAreaResults(r) {
+    var el = document.getElementById('draw-results');
+    var html = '<h3>In Your Area</h3>';
+    if (r.listings.length) {
+      html += '<p class="dr-line"><b>' + r.listings.length + '</b> of my listings:</p>';
+      r.listings.forEach(function (p) {
+        html += '<a class="dr-listing" href="' + esc(SPC_DATA.siteOrigin + (p.url || '')) + '" target="_blank" rel="noopener">' +
+          esc(fmtPrice(p.price)) + ' — ' + esc(p.address || '') + ', ' + esc(p.city || '') + '</a>';
+      });
+    } else {
+      html += '<p class="dr-line">None of my listings are inside this outline right now.</p>';
+    }
+    html += '<p class="dr-line"><b>' + r.spots.length + '</b> of my local spots · <b>' +
+      (soldState === 'on' || soldPins.length ? r.sold.length : '—') + '</b> homes I’ve sold' +
+      (soldPins.length ? '' : ' <i>(turn on the sold layer to count them)</i>') + '</p>';
+    html += '<div class="dr-actions">';
+    if (r.towns.length) {
+      var names = r.towns.map(function (t) { return t.name; });
+      var q = names.length === 1 ? 'city=' + encodeURIComponent(names[0])
+                                 : 'cities=' + encodeURIComponent(names.join(','));
+      // The same honest scope the site's own "Search This Area" uses: MLS
+      // search is by town, so the area resolves to the towns inside it and
+      // the result page's chips show exactly what was searched.
+      html += '<a href="' + esc(SPC_DATA.siteOrigin) + '/search-homes.html?' + q + '&minPrice=950000" target="_blank" rel="noopener">Search MLS Homes Here</a>';
+    } else {
+      html += '<p class="dr-line" style="width:100%"><i>Stretch the outline over a town to search MLS homes in it.</i></p>';
+    }
+    html += '<button id="dr-clear">Clear</button></div>';
+    el.innerHTML = html;
+    el.classList.add('open');
+    el.querySelector('#dr-clear').addEventListener('click', clearArea);
   }
 
   /* ---------------- chips ---------------- */
