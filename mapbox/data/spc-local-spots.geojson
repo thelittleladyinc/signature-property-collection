@@ -1,0 +1,93 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Mariana Butte Golf Course",
+    "category": "golf",
+    "city": "Loveland",
+    "blurb": "A public, city-owned 18-hole course along the Big Thompson River with sweeping Front Range views — one of the lifestyle perks of calling Loveland home.",
+    "videoId": "gvO0ZPJ4gD0",
+    "videoTitle": "Mariana Butte Golf Course — Loveland, CO",
+    "videoSource": "Golf Loveland (City of Loveland)",
+    "searchCity": "Loveland",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/loveland.html",
+    "locationPrecision": "exact"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.143,
+     40.399
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Beaver Meadows Resort Ranch",
+    "category": "lake",
+    "city": "Red Feather Lakes",
+    "blurb": "Lodging, trails and winter activities up at Red Feather. This is the honest answer to \"what would we actually do up there in February\".",
+    "videoId": "NoKEJ3uQQ0Q",
+    "videoTitle": "Discover Beaver Meadows: Winter Magic with Elves and Fun Activities!",
+    "views": 78,
+    "googleReviewUrl": "https://maps.google.com/?cid=15846497758055752850",
+    "searchCity": "Red Feather Lakes",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html",
+    "locationPrecision": "exact"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.6521353,
+     40.842073
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "24 Carrot Bistro",
+    "category": "restaurant",
+    "city": "Erie",
+    "blurb": "Farm-to-table in historic downtown Erie. When someone asks me what there is to eat in Erie, this is the first name out of my mouth.",
+    "videoId": "JFfx8G9OxP0",
+    "videoTitle": "Why Everyone Loves Living in Erie Colorado!",
+    "views": 1820,
+    "googleReviewUrl": "https://maps.google.com/?cid=15012359042481323730",
+    "searchCity": "Erie",
+    "pageUrl": "https://signaturepropertycollection.com/communities/weld/erie.html",
+    "locationPrecision": "exact"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.0478222,
+     40.0499209
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Vatos Tacos + Tequila",
+    "category": "restaurant",
+    "city": "Loveland",
+    "blurb": "Street tacos and serious tequila at The Foundry, right in downtown Loveland. Come on a Friday night if you want to know what this downtown is actually like.",
+    "googleReviewUrl": "https://maps.google.com/?cid=2905957499092980905",
+    "searchCity": "Loveland",
+    "pageUrl": "https://signaturepropertycollection.com/communities/larimer/loveland.html",
+    "locationPrecision": "exact"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.0741366,
+     40.3942284
+    ]
+   }
+  }
+ ]
+}

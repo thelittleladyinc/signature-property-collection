@@ -216,6 +216,10 @@ exports.handler = async () => {
         "Cache-Control": pending
           ? "no-store"
           : "public, max-age=86400, stale-while-revalidate=604800",
+        // 2026-08-20: same reasoning as local-spots.js -- this is public,
+        // unauthenticated data already served to every visitor; the wildcard
+        // lets mapbox/preview.html (a local file) draw the sold-homes layer.
+        "Access-Control-Allow-Origin": "*",
       },
       body: JSON.stringify({
         pins,

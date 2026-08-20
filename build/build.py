@@ -3771,6 +3771,7 @@ def footer_html():
         <h2 class="footer-col-title">Resources</h2>
         <ul>
           <li><a href="/search-homes.html">Search Homes</a></li>
+          <li><a href="/explore.html">Explore the Map</a></li>
           <li><a href="/luxury-market.html">Homes Over $1 Million</a></li>
           <li><a href="/current-listings.html">Current Listings</a></li>
           <li><a href="/blog/index.html">Blog</a></li>
@@ -11709,6 +11710,58 @@ def build_current_listings():
     )
 
 
+# ------------------------------------------------------------- EXPLORE ----
+def build_explore():
+    """/explore.html — the Mapbox map of the whole business on one page:
+    her listings as price bubbles, the 37 towns with live median asking
+    prices, her spot videos and Google reviews, sold homes, 3D terrain,
+    draw-an-area search, drive-time isochrones, and the Ask-the-Map bar.
+
+    2026-08-20, Christine's "lets do it all!" after approving the standalone
+    preview (mapbox/preview.html — same features, same lineage; change one,
+    change the other). All rendering lives in assets/js/explore-map.js; this
+    page contributes the chrome, the container, and the one dataset that is
+    baked at build time rather than fetched: the per-town market medians,
+    filtered through _town_market_stats() so the map obeys the same 21-day
+    staleness rule as the town pages.
+
+    The map needs MAPBOX_PUBLIC_TOKEN set in Netlify env vars (served at
+    runtime by netlify/functions/mapbox-token.js). Until that is set the
+    page shows a friendly notice — deliberately shippable before the token
+    exists, same pattern as every optional integration here. Deliberately
+    NOT in the main nav yet: Christine sees it live first, then decides
+    where it links from."""
+    market = {}
+    for name in (TOWN_MARKET.get("towns") or {}):
+        s = _town_market_stats(name)
+        if s:
+            market[name] = {"medianList": s["median_list"], "activeCount": s.get("active")}
+
+    body = f"""
+  <section class="section" style="padding-bottom:28px">
+    <div class="container">
+      <p class="eyebrow">One Map, The Whole Story</p>
+      <h1>Explore Northern Colorado</h1>
+      <p class="lede" style="max-width:720px">Every town I serve with its live median asking
+      price, the restaurants and trails I actually go to — with my own videos playing right
+      on the map — the homes I have for sale now, and the homes I've already sold. Draw a
+      shape to search inside it, ask the map a question out loud, or turn on 3D and fly the
+      Front Range.</p>
+    </div>
+  </section>
+  <div id="spc-explore" style="height:min(82vh,860px);min-height:520px"></div>
+  <script>window.SPC_EXPLORE_MARKET = {json.dumps(market, separators=(",", ":"))};</script>
+  <script src="/assets/js/explore-map.js" defer></script>
+"""
+    page(
+        "Explore Northern Colorado | Interactive Map of Towns, Prices & Local Life | Signature Property Collection",
+        "One interactive map of Northern Colorado: live median prices for 37 towns, "
+        f"{SITE['agent']}'s current listings and sold homes, her filmed local spots, "
+        "3D terrain, drive-time search and more.",
+        "/explore.html", "Explore", body,
+    )
+
+
 # ---------------------------------------------------------------- 404 -----
 def build_404():
     """A branded 404 instead of Netlify's default blank one — cheap, and
@@ -12000,7 +12053,7 @@ def build_redirects_and_meta():
     paths += ["/relocation.html", "/expired-listings.html", "/free-home-valuation.html",
               "/lifestyle-search.html", "/listing-video-portfolio.html",
               "/past-sales.html", "/mortgage-calculator.html",
-              "/search-homes.html", "/current-listings.html",
+              "/search-homes.html", "/current-listings.html", "/explore.html",
               "/sold-homes-map.html", "/luxury-market.html",
               "/press-recognition.html", "/concierge-experience.html",
               "/how-to-choose-a-real-estate-agent.html",
@@ -12371,6 +12424,8 @@ def build_llms_txt(paths):
     blog_lines = "\n".join(_blog_line(p) for p in BLOG)
     tool_lines = "\n".join([
         "- [Search Homes — Live IRES MLS Listings](/search-homes.html)",
+        f"- [Explore Northern Colorado — {SITE['agent']}'s Interactive Map: Her Listings, "
+        "Local Spots With Videos, Sold Homes, 3D Terrain](/explore.html)",
         f"- [Current Listings — {SITE['agent']}'s Own Active Inventory With Video Tours](/current-listings.html)",
         "- [Relocation Services](/relocation.html)",
         "- [Free Home Valuation](/free-home-valuation.html)",
@@ -12779,6 +12834,7 @@ if __name__ == "__main__":
     build_nav_pages()
     build_search_homes()
     build_current_listings()
+    build_explore()
     build_legal()
     build_404()
     build_redirects_and_meta()
