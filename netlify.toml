@@ -140,3 +140,6 @@
   to = "/.netlify/functions/listing-page?id=:id"
   status = 200
   force = false
+
+[functions."area-alerts-run"]
+  schedule = "0 */6 * * *"

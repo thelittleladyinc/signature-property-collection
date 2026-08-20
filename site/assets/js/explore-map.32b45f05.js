@@ -50,6 +50,17 @@
     { key: 'outdoors', label: 'Outdoors' },
     { key: 'town', label: 'Around town' }
   ];
+  // Job centers a Northern Colorado commuter actually drives to.
+  var COMMUTE_HUBS = {
+    'denver': [-104.9903, 39.7392], 'downtown denver': [-104.9903, 39.7392],
+    'denver tech center': [-104.8863, 39.6478], 'dtc': [-104.8863, 39.6478],
+    'boulder': [-105.2705, 40.0150], 'fort collins': [-105.0844, 40.5853],
+    'csu': [-105.0844, 40.5734], 'greeley': [-104.7091, 40.4233],
+    'unc': [-104.6913, 40.4044], 'loveland': [-105.0748, 40.3978],
+    'longmont': [-105.1019, 40.1672], 'cheyenne': [-104.8202, 41.1400],
+    'denver airport': [-104.6737, 39.8561], 'dia': [-104.6737, 39.8561],
+    'the airport': [-104.6737, 39.8561]
+  };
   var ASK_GROUPS = [
     { key: 'eat', chip: 'Where I eat', words: /coffee|cafe|restaurant|food|eat|dining|dinner|lunch|breakfast/ },
     { key: 'drink', chip: 'Wine & drinks', words: /wine|winery|brewery|drinks?|bar\b/ },
@@ -66,10 +77,13 @@
     'Beaver Meadows Resort Ranch'
   ];
 
+  var ALERTS_ENDPOINT = (location.hostname.indexOf('signaturepropertycollection') === -1
+    ? 'https://signaturepropertycollection.com' : '') + '/.netlify/functions/area-alerts';
   var DATA = { counties: null, towns: [], spots: [] };
   var map, spots = [], markers = [], soldMarkers = [], hoverPop = null, cardPop = null;
   var hoveredCounty = null, satOn = false, tiltOn = false, layerEventsBound = false;
   var soldState = 'off', soldPins = [], myListings = [], listingMarkers = [];
+  var floodOn = false;
   var draw = { active: false, done: false, pts: [] };
   var iso = { feature: null, label: '' };
   var tour = { on: false, i: 0, timer: null };
@@ -278,7 +292,7 @@
       '<b>Draw Search Area</b> — outline any shape, see what\'s inside it</p>' +
     '</div>' +
     '<div class="askbar"><button class="mic" id="xm-mic" title="Speak your search" aria-label="Speak your search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/></svg></button>' +
-    '<input id="xm-ask" autocomplete="off" spellcheck="false" placeholder="Try: &#8220;Loveland under $600K near trails&#8221;">' +
+    '<input id="xm-ask" autocomplete="off" spellcheck="false" placeholder="Try: &#8220;commute to Denver in 30 min&#8221; or &#8220;Loveland under $600K&#8221;">' +
     '<button class="go" id="xm-go">Ask</button></div>' +
     '<div class="ctrls">' +
       '<button class="ctrl-btn" id="xm-3d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M2 20 L9 7 L13 14 L16 9 L22 20 Z"/></svg><span>3D Terrain</span></button>' +
@@ -286,6 +300,7 @@
       '<button class="ctrl-btn" id="xm-mine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><path d="M9.5 10.5 L12 8 L14.5 10.5"/><path d="M10.2 10.2v3h3.6v-3"/></svg><span>My Listings</span></button>' +
       '<button class="ctrl-btn" id="xm-draw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8 L11 4 L20 7 L17 16 L7 19 Z" stroke-dasharray="3 2"/><circle cx="4" cy="8" r="1.6" fill="currentColor" stroke="none"/><circle cx="11" cy="4" r="1.6" fill="currentColor" stroke="none"/><circle cx="20" cy="7" r="1.6" fill="currentColor" stroke="none"/><circle cx="17" cy="16" r="1.6" fill="currentColor" stroke="none"/><circle cx="7" cy="19" r="1.6" fill="currentColor" stroke="none"/></svg><span>Draw Search Area</span></button>' +
       '<button class="ctrl-btn" id="xm-sold-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 L12 3 L21 11"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg><span>Homes I\'ve Sold</span></button>' +
+      '<button class="ctrl-btn" id="xm-flood"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 3-2"/><path d="M3 16c2.5 0 2.5 2 5 2s2.5-2 5-2 2.5 2 5 2 2.5-2 3-2"/><path d="M12 3v4"/></svg><span>Flood Zones</span></button>' +
       '<button class="ctrl-btn" id="xm-tour"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span>Fly the Tour</span></button>' +
       '<button class="ctrl-btn" id="xm-reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span>Reset View</span></button>' +
       '<button class="ctrl-btn" id="xm-share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-3"/><path d="M4 14 L14 4"/><path d="M9 4h5v5"/></svg><span>Copy Link</span></button>' +
@@ -367,6 +382,7 @@
       ((counties[cname] || {}).towns || []).forEach(function (t) {
         if (typeof t.lat !== 'number') return;
         var row = { name: t.name, county: cname, lat: t.lat, lng: t.lng, url: t.url };
+        if (t.schoolDistrict) row.schoolDistrict = t.schoolDistrict;
         var m = MARKET[t.name];
         if (m && typeof m.medianList === 'number') { row.medianList = m.medianList; row.activeCount = m.activeCount; }
         DATA.towns.push(row);
@@ -424,6 +440,14 @@
     $('xm-sat').addEventListener('click', toggleSat);
     $('xm-mine').addEventListener('click', toggleMine);
     $('xm-sold-btn').addEventListener('click', toggleSold);
+    $('xm-flood').addEventListener('click', function () {
+      floodOn = !floodOn;
+      $('xm-flood').classList.toggle('on', floodOn);
+      if (map.getLayer('fema-flood')) {
+        map.setLayoutProperty('fema-flood', 'visibility', floodOn ? 'visible' : 'none');
+      }
+      if (floodOn) toast('FEMA flood hazard zones, straight from FEMA\u2019s public map service. Zones, not per-property scores \u2014 for a property-level read, ask Christine for the free ClimateCheck report.', 8000);
+    });
     $('xm-tour').addEventListener('click', function () { tour.on ? stopTour() : startTour(); });
     $('xm-reset').addEventListener('click', function () {
       stopTour();
@@ -542,6 +566,36 @@
     if (tiltOn) map.setTerrain({ source: 'dem', exaggeration: 1.5 });
     map.setFog({ range: [0.6, 9], color: satOn ? '#20242c' : '#17171a', 'high-color': '#22303c', 'horizon-blend': 0.06, 'star-intensity': 0.12 });
 
+    // Commute arteries: I-25, US-34/85/287 and friends, bright enough to read
+    // at county zoom. dark-v11 has these roads but nearly invisible at z8; a
+    // commuter's first question is "where's the highway from here". Skipped in
+    // satellite view, which already draws real roads.
+    if (!satOn && !map.getLayer('spc-highways') && map.getSource('composite')) {
+      map.addLayer({
+        id: 'spc-highways', type: 'line', source: 'composite', 'source-layer': 'road',
+        filter: ['match', ['get', 'class'], ['motorway', 'trunk'], true, false],
+        minzoom: 6,
+        paint: {
+          'line-color': '#7d8aa0',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.1, 10, 3.2, 14, 7],
+          'line-opacity': 0.85
+        }
+      });
+      map.addLayer({
+        id: 'spc-highway-refs', type: 'symbol', source: 'composite', 'source-layer': 'road',
+        filter: ['all',
+          ['match', ['get', 'class'], ['motorway', 'trunk'], true, false],
+          ['has', 'ref']],
+        minzoom: 7,
+        layout: {
+          'symbol-placement': 'line', 'text-field': ['get', 'ref'],
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': 10.5, 'text-letter-spacing': 0.05
+        },
+        paint: { 'text-color': '#c8d2e0', 'text-halo-color': '#141415', 'text-halo-width': 1.6 }
+      });
+    }
+
     if (!map.getLayer('spc-3d-buildings') && map.getSource('composite')) {
       map.addLayer({
         id: 'spc-3d-buildings', type: 'fill-extrusion', source: 'composite',
@@ -590,6 +644,26 @@
       map.addLayer({ id: 'draw-fill', type: 'fill', source: 'draw-poly', paint: { 'fill-color': '#B86F7A', 'fill-opacity': 0.14 } });
       map.addLayer({ id: 'draw-line', type: 'line', source: 'draw-poly', paint: { 'line-color': '#F8F6F4', 'line-width': 2, 'line-dasharray': [2, 1.5] } });
     }
+    // FEMA National Flood Hazard Layer, via FEMA's own public WMS -- zone
+    // shapes only, never a per-property score (that's the fight Zillow just
+    // retreated from; mapbox/README.md has the audit). Hidden until toggled.
+    if (!map.getSource('fema-nfhl')) {
+      map.addSource('fema-nfhl', {
+        type: 'raster', tileSize: 256,
+        tiles: ['https://hazards.fema.gov/gis/nfhl/services/public/NFHL/MapServer/WMSServer' +
+          '?service=WMS&request=GetMap&version=1.1.1&layers=28&styles=&format=image/png' +
+          '&transparent=true&srs=EPSG:3857&width=256&height=256&bbox={bbox-epsg-3857}'],
+        attribution: 'FEMA NFHL'
+      });
+    }
+    if (!map.getLayer('fema-flood')) {
+      map.addLayer({
+        id: 'fema-flood', type: 'raster', source: 'fema-nfhl',
+        layout: { visibility: floodOn ? 'visible' : 'none' },
+        paint: { 'raster-opacity': 0.55 }
+      });
+    }
+
     if (!map.getSource('iso')) {
       map.addSource('iso', { type: 'geojson', data: isoFeature() });
     }
@@ -608,6 +682,7 @@
               type: 'Feature',
               properties: {
                 name: t.name, county: t.county, url: t.url,
+                schoolDistrict: t.schoolDistrict || '',
                 medianList: t.medianList || 0, activeCount: t.activeCount || 0,
                 priceLabel: t.medianList ? fmtPrice(t.medianList) : ''
               },
@@ -693,12 +768,24 @@
         market = '<p class="spc-town-market">Median asking <b>' + fmtPrice(Number(p.medianList)) + '</b>' +
           (Number(p.activeCount) > 0 ? ' · <b>' + esc(p.activeCount) + '</b> active listings' : '') + '</p>';
       }
+      var presets = [[950000, '$950K+'], [700000, '$700K+'], [500000, '$500K+'], [350000, '$350K+']]
+        .map(function (pr) {
+          var q = 'city=' + encodeURIComponent(p.name) + '&minPrice=' + pr[0] +
+            (pr[0] !== 950000 ? '&noFloor=true' : '');
+          return '<a class="line" style="padding:6px 8px;font-size:9.5px" href="/search-homes.html?' + q + '">' + pr[1] + '</a>';
+        }).join('');
+      var school = p.schoolDistrict
+        ? '<p class="spc-town-market" style="margin-top:-4px">Schools: <b>' + esc(p.schoolDistrict) + '</b> · ' +
+          '<a href="https://www.greatschools.org/search/search.page?q=' + encodeURIComponent(p.name + ' CO') +
+          '" target="_blank" rel="noopener" style="color:#B86F7A">ratings</a></p>'
+        : '';
       cardPop = new mapboxgl.Popup({ className: 'spc-town', offset: 12 })
         .setLngLat(coords)
         .setHTML(
           '<p class="spc-town-name">' + esc(p.name) + '</p>' +
           '<p class="spc-town-county">' + esc(p.county) + ' County</p>' +
-          market +
+          market + school +
+          '<div class="spc-town-links" style="margin-bottom:8px">' + presets + '</div>' +
           '<div class="spc-town-links">' +
             '<a class="dark" href="/search-homes.html?city=' + encodeURIComponent(p.name) + '&minPrice=950000">See Homes</a>' +
             '<a class="line" href="' + esc(p.url) + '">Town Guide</a>' +
@@ -1083,6 +1170,14 @@
     } else {
       html += '<p class="dr-line" style="width:100%"><i>Stretch the outline over a town to search MLS homes in it.</i></p>';
     }
+    if (r.towns.length) {
+      html += '<div class="dr-actions" style="margin-top:10px;gap:6px">' +
+        '<input type="email" id="xm-alert-email" placeholder="you@email.com" ' +
+          'style="flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid rgba(248,246,244,.3);' +
+          'color:#F8F6F4;font-family:inherit;font-size:12px;padding:8px 10px">' +
+        '<button id="xm-alert-go">Email Me New Homes Here</button></div>' +
+        '<p class="dr-line" id="xm-alert-msg" style="min-height:16px;font-size:10.5px"></p>';
+    }
     html += '<button id="xm-dr-clear">Clear</button></div>' +
       // The lead net. Every portal map converts attention into contacts;
       // this one converts it into a conversation with the person who
@@ -1091,6 +1186,26 @@
     el.innerHTML = html;
     el.classList.add('open');
     el.querySelector('#xm-dr-clear').addEventListener('click', onClear);
+    var alertBtn = el.querySelector('#xm-alert-go');
+    if (alertBtn) {
+      alertBtn.addEventListener('click', function () {
+        var email = (el.querySelector('#xm-alert-email').value || '').trim();
+        var msg = el.querySelector('#xm-alert-msg');
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.textContent = 'That email doesn\u2019t look right.'; return; }
+        alertBtn.disabled = true;
+        fetch(ALERTS_ENDPOINT, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, cities: r.towns.map(function (t) { return t.name; }), label: title })
+        }).then(function (resp) { return resp.json(); })
+          .then(function (out) {
+            msg.textContent = out && out.ok
+              ? 'Done \u2014 you\u2019ll get an email when something new lists here. Unsubscribe anytime from the email.'
+              : 'Couldn\u2019t save that \u2014 try again in a moment.';
+            alertBtn.disabled = false;
+          })
+          .catch(function () { msg.textContent = 'Couldn\u2019t save that \u2014 try again in a moment.'; alertBtn.disabled = false; });
+      });
+    }
   }
 
   /* ---------------- isochrone ---------------- */
@@ -1103,11 +1218,12 @@
     if (src) src.setData(isoFeature());
   }
 
-  function openIso(lng, lat, label) {
+  function openIso(lng, lat, label, minutes) {
+    minutes = minutes || 15;
     closeCard();
-    toast('Tracing a 15-minute drive from ' + label + '…', 3000);
-    fetch('https://api.mapbox.com/isochrone/v1/mapbox/driving/' + lng + ',' + lat +
-      '?contours_minutes=15&polygons=true&denoise=1&access_token=' + encodeURIComponent(mapboxgl.accessToken))
+    toast('Tracing a ' + minutes + '-minute drive from ' + label + ' (typical traffic)…', 3000);
+    fetch('https://api.mapbox.com/isochrone/v1/mapbox/driving-traffic/' + lng + ',' + lat +
+      '?contours_minutes=' + minutes + '&polygons=true&denoise=1&access_token=' + encodeURIComponent(mapboxgl.accessToken))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         var f = data && data.features && data.features[0];
@@ -1120,7 +1236,7 @@
         var b = null;
         ring.forEach(function (c) { b = b ? b.extend(c) : new mapboxgl.LngLatBounds(c, c); });
         map.fitBounds(b, { padding: 80, duration: 1800 });
-        renderInsideCard('Within a 15-minute drive of ' + label, analyzeArea(ring), clearIso);
+        renderInsideCard('Within a ' + minutes + '-minute drive of ' + label + ' (typical traffic)', analyzeArea(ring), clearIso);
       })
       .catch(function () {
         toast('Couldn’t trace the drive-time area — try again in a moment.');
@@ -1174,7 +1290,25 @@
       /(?:over|above|at least|starting at|minimum(?: of)?)\s*\$?\s*([\d.,]+)\s*(k|m|million|thousand)?/
     ]);
     var groups = ASK_GROUPS.filter(function (g) { return g.words.test(text); });
-    return { town: town, maxPrice: maxPrice, minPrice: minPrice, groups: groups, raw: raw };
+    // "commute to denver in 30 minutes": a drive-time question centered on
+    // the WORKPLACE, not the home -- the direction portals get wrong. A hub
+    // that is also the named town doesn't count ("Loveland under 500k" is a
+    // town ask, not a commute to Loveland).
+    var commute = null;
+    if (/commut|drive|min|within/.test(text)) {
+      var hubKeys = Object.keys(COMMUTE_HUBS).sort(function (a, b) { return b.length - a.length; });
+      for (var i = 0; i < hubKeys.length; i++) {
+        if (text.indexOf(hubKeys[i]) !== -1 && (!town || town.name.toLowerCase() !== hubKeys[i])) {
+          var mMin = text.match(/(\d{1,2})\s*(?:min|minute)/);
+          commute = {
+            hub: hubKeys[i], center: COMMUTE_HUBS[hubKeys[i]],
+            minutes: Math.min(60, Math.max(10, mMin ? parseInt(mMin[1], 10) : 30))
+          };
+          break;
+        }
+      }
+    }
+    return { town: town, maxPrice: maxPrice, minPrice: minPrice, groups: groups, commute: commute, raw: raw };
   }
 
   function runAsk() {
@@ -1184,6 +1318,11 @@
     var el = $('xm-results');
     var html = '<h3>Here’s what I can show you</h3>';
 
+    if (q.commute) {
+      openIso(q.commute.center[0], q.commute.center[1],
+        q.commute.hub.replace(/\b\w/g, function (c) { return c.toUpperCase(); }), q.commute.minutes);
+      return;
+    }
     if (q.town) {
       map.flyTo({ center: [q.town.lng, q.town.lat], zoom: 12.2, pitch: tiltOn ? 55 : 0, duration: 2600 });
       html += '<p class="dr-line">Flying to <b>' + esc(q.town.name) + '</b>' +

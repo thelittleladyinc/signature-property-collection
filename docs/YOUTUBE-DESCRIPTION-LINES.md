@@ -26,6 +26,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Erie the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/erie.html
+🗺️ Explore Erie on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Erie
 ```
 
 ### 1,635 views — #elpueblito loveland restaurants
@@ -36,6 +37,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 1,571 views — Red Feather Lakes: The Hidden Gem of Colorado
@@ -46,6 +48,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Red Feather Lakes the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html
+🗺️ Explore Red Feather Lakes on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Red%20Feather%20Lakes
 ```
 
 ### 1,439 views — What Makes Loveland's Cherry Treats So Special?
@@ -56,6 +59,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 1,322 views — Is This the Best Steakhouse in Loveland?
@@ -66,6 +70,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 1,314 views — Trying Sushi at Mr. Chen for the First Time! Would I eat here again?
@@ -76,6 +81,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 1,188 views — Sweetheart Winery is one reason I moved back to Loveland
@@ -86,6 +92,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 1,107 views — Riding Through the Historic Baldwin Tunnel – Poudre Canyon, Colorado
@@ -96,6 +103,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Bellvue the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/fort-collins.html
+🗺️ Explore Bellvue on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Bellvue
 ```
 
 ### 1,096 views — Is This the Cutest Home in Windsor, Colorado?
@@ -106,6 +114,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Windsor the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/windsor.html
+🗺️ Explore Windsor on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Windsor
 ```
 
 ### 996 views — Downtown Loveland — Sweetheart City's Best Events!
@@ -116,6 +125,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 770 views — If you're planning to hike Devil's Backbone, here are 3 things you NEED to know
@@ -126,6 +136,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 744 views — Upgrade Your View: Luxurious Living in Windsor, Colorado
@@ -136,6 +147,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Windsor the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/windsor.html
+🗺️ Explore Windsor on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Windsor
 ```
 
 ### 557 views — Inside the Eaton Country Club with Mccarty's: A Hidden Gem
@@ -146,6 +158,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Eaton the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/eaton.html
+🗺️ Explore Eaton on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Eaton
 ```
 
 ### 553 views — Unveiling Eaton, Colorado: Hidden Gem with Gelato, Fun & Family
@@ -156,6 +169,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Eaton the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/eaton.html
+🗺️ Explore Eaton on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Eaton
 ```
 
 ### 551 views — Why Erie, Colorado Feels Like Home | Scenic, Social, & So Worth It
@@ -166,6 +180,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Erie the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/erie.html
+🗺️ Explore Erie on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Erie
 ```
 
 ### 466 views — Venezia: Eaton's Best Italian Restaurant
@@ -176,6 +191,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Eaton the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/eaton.html
+🗺️ Explore Eaton on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Eaton
 ```
 
 ### 445 views — Discover Ault: Hidden Gems and Local Dining Spots!
@@ -186,6 +202,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Ault the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/ault.html
+🗺️ Explore Ault on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Ault
 ```
 
 ### 309 views — Under $450,000 in Denver? This one's a Hidden Gem Near Garfield Lake Park
@@ -196,6 +213,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Denver the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/denver/denver.html
+🗺️ Explore Denver on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Denver
 ```
 
 ### 279 views — Is this the best Lake in Fort Collins?
@@ -206,6 +224,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Fort Collins the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/fort-collins.html
+🗺️ Explore Fort Collins on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Fort%20Collins
 ```
 
 ### 273 views — Explore Ault's Hidden Gems and Community Spirit!
@@ -216,6 +235,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Ault the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/ault.html
+🗺️ Explore Ault on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Ault
 ```
 
 ### 260 views — Where Is Red Feather Lakes? Exploring Colorado's Hidden Gem & Gnome Road!
@@ -226,6 +246,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Red Feather Lakes the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html
+🗺️ Explore Red Feather Lakes on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Red%20Feather%20Lakes
 ```
 
 ### 246 views — Get Ready to DISCOVER the Ultimate Wine Experience in Ault, Colorado!
@@ -236,6 +257,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Ault the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/ault.html
+🗺️ Explore Ault on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Ault
 ```
 
 ### 156 views — Taste of Loveland 2026
@@ -246,6 +268,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 78 views — Discover Beaver Meadows: Winter Magic with Elves and Fun Activities!
@@ -256,6 +279,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Red Feather Lakes the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/red-feather-lakes.html
+🗺️ Explore Red Feather Lakes on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Red%20Feather%20Lakes
 ```
 
 ### 58 views — Why Loveland Buyers Love The Olde Course | Colorado Golf Living
@@ -266,6 +290,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Loveland the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/larimer/loveland.html
+🗺️ Explore Loveland on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Loveland
 ```
 
 ### 21 views — What Makes a Home Luxurious? | Colliers Hill Erie CO Luxury Home
@@ -276,6 +301,7 @@ Add to the description (near the top, above the hashtags):
 ```
 📍 More of Erie the way locals actually see it — every spot I've filmed here,
 plus homes for sale nearby: https://signaturepropertycollection.com/communities/weld/erie.html
+🗺️ Explore Erie on my live 3D map: https://signaturepropertycollection.com/explore.html?town=Erie
 ```
 
 ---
