@@ -29,7 +29,1518 @@
      browser fetches the file twice. -->
 <link rel="preload" href="/assets/fonts/libre-baskerville-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/poppins-400-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/style.b4afa78c.css">
+<style>/* Self-hosted web fonts (2026-08-20). Latin-subset woff2 files replacing the
+   Google Fonts stylesheet: the homepage's LCP element is the hero TEXT, and
+   after the explore-map lazy-boot fix its remaining delay was the third-party
+   font chain (css from fonts.googleapis.com, files from fonts.gstatic.com) --
+   PSI mobile 78, LCP 4.2s, 2026-08-20. Same fix, same day-earlier precedent
+   as thelittleladysellshomes. If a font is ever updated, give the file a NEW
+   name -- /assets/fonts/* is cached immutable for a year (netlify.toml). */
+@font-face{font-family:'Corinthia';font-style:normal;font-weight:400;font-display:swap;src:url(/assets/fonts/corinthia-400-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Corinthia';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/corinthia-700-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Libre Baskerville';font-style:italic;font-weight:400;font-display:swap;src:url(/assets/fonts/libre-baskerville-400-italic-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Libre Baskerville';font-style:normal;font-weight:400;font-display:swap;src:url(/assets/fonts/libre-baskerville-400-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Libre Baskerville';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/libre-baskerville-700-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Poppins';font-style:normal;font-weight:300;font-display:swap;src:url(/assets/fonts/poppins-300-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Poppins';font-style:normal;font-weight:400;font-display:swap;src:url(/assets/fonts/poppins-400-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Poppins';font-style:normal;font-weight:500;font-display:swap;src:url(/assets/fonts/poppins-500-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Poppins';font-style:normal;font-weight:600;font-display:swap;src:url(/assets/fonts/poppins-600-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:'Poppins';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/poppins-700-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+/* ==========================================================================
+   Signature Property Collection — brand tokens
+   Colors audited from the official brand swatch in Google Drive
+   (SignaturePropertyCollection_Colors.jpg — matches the fill color used
+   inside the real logo file):
+     #B86F7A  dusty rose   — PRIMARY accent (this is "the dusty rose")
+     #BA8C84  mauve        — secondary accent / hover state
+     #DEB3A5  peach        — tertiary tint only, used sparingly (not primary)
+     #000000 / #FFFFFF     — true black / white
+     #A7A9AC / #C0C1C4     — cool grays
+   No red anywhere — removed per Christine's note.
+   Fonts audited from SignaturePropertyCollection_Typography doc:
+     Baskerville (headers) -> Libre Baskerville (closest free equivalent)
+     Poppins (sub-headers & body) -> Poppins (exact match, free on Google Fonts)
+   Corinthia (script accent) confirmed separately via the live site's own
+   Google Fonts link — kept for small script eyebrow text only.
+   ========================================================================== */
+
+/* Fonts intentionally NOT imported here. An @import inside a stylesheet
+   serializes three render-blocking round trips (this file -> the import is
+   discovered -> Google's font CSS -> the font files), which held first paint
+   hostage to Google Fonts' latency on every page. The fonts now load from a
+   non-blocking <link> emitted in the <head> by build.py (search for
+   FONT_CSS_URL there) — same families, same weights, same display=swap. */
+
+:root {
+  --charcoal: #141415;
+  --rose: #B86F7A;       /* primary — "the dusty rose" */
+  --mauve: #BA8C84;      /* secondary / hover */
+  --peach: #DEB3A5;      /* tertiary tint only — used sparingly */
+  --cream: #F8F6F4; /* 2026-08-12: was #F9F9EC (read as yellow to Christine) — warm neutral ivory, no yellow cast */
+  --white: #FFFFFF;
+  --black: #000000;
+  --gray: #A7A9AC;
+  --gray-light: #C0C1C4;
+
+  /* 2026-08-15 (Christine: "add slate... think more delicate lines"). Slate is
+     the cool counterweight the palette was missing: the rose is warm and the
+     cream is warm, so every neutral on the page was warm too, which is what
+     makes a layout read "soft" instead of "composed". Slate does the
+     structural work -- rules, borders, fine print -- and leaves the rose free
+     to be the only accent, which is what actually reads as expensive.
+     Deliberately blue-gray rather than another brown-gray, and dark enough to
+     stay legible as body/fine-print text (checks AA on cream). */
+  /* All three are contrast-checked against BOTH grounds they appear on, cream
+     and white, and all three clear WCAG AA (4.5:1) for normal-size text. This
+     matters more than it looks: the first draft of this palette used a prettier
+     #8A98A6 for the mist tone, which came in at 2.73:1 and would have quietly
+     dropped 13 pieces of existing fine print from a passing 5.01:1 to failing
+     — on a site that publishes an accessibility statement. Ratios on cream:
+     slate 9.7, soft 6.5, mist 4.7. Don't lighten these without re-checking. */
+  --slate: #33414F;        /* structural dark — rules, sub-heads, emphasis    */
+  --slate-soft: #4E5B68;   /* secondary body text                            */
+  --slate-mist: #63707D;   /* fine print, captions — the lightest allowed     */
+
+  /* Every line on the site now comes from these three, not from ad-hoc greys.
+     --hairline is the default: slate at 12% is visible as a drawn line but
+     never as a border "box". --hairline-strong is for a rule that has to
+     separate two filled areas; --hairline-light for lines inside a card,
+     where the card edge is already doing the work. Sub-pixel weights get
+     rounded up by browsers, so delicacy comes from LOW ALPHA at 1px rather
+     than from fractional widths. */
+  --hairline: rgba(51,65,79,.12);
+  --hairline-strong: rgba(51,65,79,.20);
+  --hairline-light: rgba(51,65,79,.07);
+  --hairline-rose: rgba(184,111,122,.28);
+
+  /* legacy aliases so nothing silently breaks if referenced elsewhere */
+  --dusty-rose: var(--rose);
+  /* 2026-08-18 (WCAG): --deep-mauve was aliased to --mauve (#BA8C84), which is
+     LIGHTER than the rose — 2.92:1 against white, failing contrast both as a
+     button background under white text and as label text on white, i.e. every
+     one of its ~14 uses. Now a genuinely deep rose: 5.78:1 on white, 5.19:1
+     on the cream tint, computed to clear WCAG AA at both. The --mauve token
+     itself is untouched (still used for the map marker fill). */
+  --deep-mauve: #8f5560;
+
+  --font-script: 'Corinthia', cursive;
+  --font-serif: 'Libre Baskerville', Georgia, serif;
+  --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --max-width: 1280px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+/* 2026-08-14 (Christine: "i want some of the patterns textures to be add
+   to make it a little more gradient visually"): every light section on the
+   site (the default, unstyled <section> -- most of every page) previously
+   sat on a completely flat --cream fill with zero depth. Added a soft,
+   very-low-opacity rose-tinted radial wash top-left/bottom-right (echoes
+   the dusty-rose brand color at a whisper, not a tint anyone would
+   consciously notice) plus an extremely fine dot-grid texture (a repeating
+   radial-gradient, not an image file -- no asset to go missing, no extra
+   request, renders identically at any zoom/DPI). Both are subtle by
+   design: this should read as "a little more depth," never as visible
+   pattern or noise sitting on top of text. */
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--charcoal);
+  background-color: var(--cream);
+  /* 2026-08-15 (Christine: "still no texture?"). It WAS there, at 3.5% alpha
+     on a 26px grid -- which is to say it was theoretically present and
+     practically invisible, so the honest answer to her question was "no".
+     Rebuilt as a real, tuned surface:
+       - a fine slate cross-hatch (two 1px linear-gradients at 90 degrees) on
+         a tight 7px grid -- this is the layer you can actually see, and
+         weave reads as woven paper where dots read as screen artifact;
+       - the dot grid kept but tightened and lifted, sitting over the weave at
+         a coarser interval so the two don't moire;
+       - the rose corner washes kept, slightly deepened, for the gradient
+         falloff she asked for on 2026-08-14.
+     Still nowhere near a pattern you'd read as decoration -- it's paper
+     grain. Slate rather than black keeps it from greying the cream down. */
+  background-image:
+    radial-gradient(circle at 12% -5%, rgba(184,111,122,.075), transparent 40%),
+    radial-gradient(circle at 92% 105%, rgba(184,111,122,.065), transparent 44%),
+    radial-gradient(rgba(51,65,79,.055) 1px, transparent 1px),
+    linear-gradient(rgba(51,65,79,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(51,65,79,.022) 1px, transparent 1px);
+  background-size: auto, auto, 22px 22px, 7px 7px, 7px 7px;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, repeat;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; text-decoration: none; }
+.wrap { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+
+/* ---------- Header ---------- */
+.site-header {
+  background: var(--dusty-rose);
+  color: var(--white);
+  padding: 18px 0;
+  position: relative;
+}
+.site-header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.brand { display: flex; align-items: center; gap: 14px; }
+/* 2026-08-14 (logo overlap fix): logo-full.png bakes the cursive
+   "Signature" script and the "PROPERTY COLLECTION" line into one flattened
+   image, with the script's loops intentionally dipping down over the text
+   below it -- a fine effect at full letterhead size, but at this header's
+   34px height the whole thing compresses into an unreadable jumble (the
+   "PROPERTY COLLECTION" line becomes a few illegible pixels the script
+   swoops right through). Fixed by using logo.png -- the same real script
+   mark, just without the subtext baked in -- and rebuilding "Property
+   Collection" as real, crisp HTML text underneath it. Two separate flex
+   items can never visually overlap regardless of how far the script's
+   loops swing, and real text stays sharp at any zoom level instead of
+   degrading like a scaled-down raster image. logo-full.png is untouched
+   everywhere else (OG/social share images), since a single self-contained
+   image is the right call there. */
+/* 2026-08-14: the diamond "PC" monogram (real vector, Logo/Rose Color/SVG
+   in Christine's Drive) added as a small badge to the left of the script
+   wordmark. Kept in its natural black+rose two-tone -- unlike brand-logo
+   and brokerage-logo it is NOT run through brightness(0) invert(1), since
+   that would flatten it to solid white and lose the rose accent that makes
+   it read as a monogram rather than a blob -- so it gets a small white
+   circular backing instead, giving both colors contrast against the
+   header's rose background. Sized to roughly match the wordmark's height. */
+.brand-monogram-badge {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: 50%; background: var(--white);
+  box-shadow: 0 1px 4px rgba(20,20,21,.18);
+}
+.brand-monogram { height: 26px; width: 26px; display: block; }
+.brand-wordmark { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.brand-logo { height: 26px; width: auto; display: block; filter: brightness(0) invert(1); }
+.brand-mark { font-family: var(--font-script); font-size: 30px; line-height: 1; color: var(--white); }
+.brand-sub { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; color: var(--charcoal); }
+.brokerage { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; border-left: 1px solid rgba(255,255,255,.5); padding-left: 14px; margin-left: 4px; opacity: .95; }
+/* 2026-08-13: replaced the plain-text "LPT Realty" brokerage label in the
+   header with the real LPT Realty logo (transparent PNG, any-color source
+   per Christine — inverted to white here to match .brand-logo's existing
+   treatment so both marks read consistently on the dark header). Same
+   left-border divider and spacing the text version used, so the swap
+   didn't change the header's layout. */
+.brokerage-logo { height: 30px; width: auto; display: block; filter: brightness(0) invert(1); opacity: .95; border-left: 1px solid rgba(255,255,255,.5); padding-left: 14px; margin-left: 4px; }
+
+nav.primary-nav { display: flex; gap: 28px; }
+nav.primary-nav a {
+  /* 2026-08-18 (WCAG, desktop-only finding): these links inherited white from
+     .site-header, and 13px white on the rose header is 3.75:1 — the one
+     contrast failure mobile audits never see, because the nav collapses
+     behind the hamburger below 900px. Charcoal on rose is 4.90:1, and matches
+     .brand-sub's fix, the monogram's natural two-tone, and the mobile menu
+     (same override there, where links sit on the same rose panel). */
+  color: var(--charcoal);
+  font-size: 13px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  text-underline-offset: 4px;
+  text-decoration-color: transparent;
+  transition: text-decoration-color .2s ease, opacity .2s ease;
+}
+nav.primary-nav a:hover { text-decoration: underline; text-decoration-color: currentColor; opacity: .85; }
+
+/* ---------- Trust ribbon ----------
+   2026-08-14 (site-wide "classier + fuller impact" pass, Christine's
+   request): a persistent thread of real credibility data -- her actual 99
+   five-star Google reviews, 200+ homes sold, $200M+ volume, RealTrends
+   Top 0.5% -- carried on EVERY page via page()'s template (not just the
+   homepage), so a visitor lands on any page of the site already inside the
+   same trust story rather than having to find About or Testimonials to see
+   it. Sits between the header and each page's hero; charcoal to bookend
+   the footer's charcoal and read as one continuous frame around the
+   rose-colored header/content instead of a fourth competing color. */
+.trust-ribbon { background: var(--charcoal); color: rgba(255,255,255,.92); padding: 13px 0; }
+.trust-ribbon .wrap {
+  display: flex; justify-content: center; align-items: center; flex-wrap: wrap;
+  gap: 8px 26px; text-align: center;
+}
+.trust-ribbon span.item {
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600;
+}
+.trust-ribbon a.item { color: inherit; text-decoration: none; }
+.trust-ribbon a.item:hover { text-decoration: underline; text-decoration-color: var(--dusty-rose); }
+.trust-ribbon .stars { color: var(--dusty-rose); letter-spacing: 2px; margin-right: 6px; font-size: 12px; }
+.trust-ribbon .divider { opacity: .3; }
+@media (max-width: 700px) {
+  .trust-ribbon { padding: 11px 0; }
+  .trust-ribbon .wrap { gap: 6px 16px; }
+  .trust-ribbon span.item { font-size: 10px; }
+}
+
+/* 2026-08-13 (mobile-nav fix): hidden on desktop by default -- shown only
+   inside the max-width:900px block below, where nav.primary-nav itself
+   switches from "display:none" (the old, broken, no-alternative behavior)
+   to a toggleable dropdown panel this button controls. */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.nav-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--white);
+  transition: transform .2s ease, opacity .2s ease;
+}
+.nav-toggle.is-active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-toggle.is-active span:nth-child(2) { opacity: 0; }
+.nav-toggle.is-active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ---------- Hero ---------- */
+/* 2026-08-14: same "a little more gradient visually" pass as body above --
+   a soft rose-tinted glow (top-right) plus the same fine dot texture, this
+   time in white at a whisper of opacity so it reads against charcoal
+   instead of cream. Layered underneath the existing dark overlay, so text
+   contrast/readability is completely unaffected -- purely a texture behind
+   the same dark backdrop that was already there. */
+.hero {
+  background-color: var(--charcoal);
+  background-image:
+    radial-gradient(circle at 88% -10%, rgba(184,111,122,.16), transparent 45%),
+    radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(20,20,21,.55), rgba(20,20,21,.75));
+  background-size: cover, 24px 24px, 7px 7px, 7px 7px, cover;
+  background-position: center, 0 0, 0 0, 0 0, center;
+  background-repeat: no-repeat, repeat, repeat, repeat, no-repeat;
+  color: var(--white);
+  padding: 170px 0 130px;
+  text-align: center;
+}
+.hero h1 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(40px, 6vw, 78px);
+  margin: 0 0 18px;
+  line-height: 1.12;
+  letter-spacing: -.01em;
+}
+.hero p.lede {
+  color: rgba(255,255,255,.85);
+  font-size: 18px;
+  max-width: 620px;
+  margin: 18px auto 42px;
+  opacity: .92;
+}
+.btn-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-block;
+  padding: 16px 36px;
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.btn-primary { background: var(--deep-mauve); color: var(--white); }
+.btn-primary:hover { background: #7a4650; }
+.btn-outline { border-color: var(--white); color: var(--white); background: transparent; }
+.btn-outline:hover { background: var(--white); color: var(--charcoal); }
+.btn-dark { background: var(--charcoal); color: var(--white); }
+.btn-dark:hover { background: #000; }
+
+/* ---------- Sections ----------
+   2026-08-12: Christine flagged "too much space apart on some pages" —
+   pages like the city pages stack 5-7 sections in a row, and at the old
+   130px/90px padding that added up to 500-800px of pure vertical
+   whitespace before you even hit any content. Tightened both, still
+   generous/elegant but no longer sparse-feeling on long pages. */
+section { padding: 90px 0; }
+section.tight { padding: 64px 0; }
+.eyebrow {
+  font-family: var(--font-script);
+  font-size: 32px;
+  color: var(--deep-mauve);
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+/* A longer, lighter rule that fades out reads as a drawn line; a short solid
+   dash reads as a UI divider. Same idea as the hairlines above -- delicacy
+   from alpha and length, not from weight. */
+.eyebrow::after {
+  content: '';
+  /* Width stays at the original 46px on purpose. Lengthening it to 84px looked
+     better in isolation and wrapped the eyebrow text onto two lines in four
+     places on the homepage alone (.eyebrow is an inline-flex, so a wider rule
+     takes its space out of the text). The refinement here is the fade and the
+     lower alpha, which cost no layout at all. */
+  flex: 0 0 46px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--hairline-rose), rgba(184,111,122,0));
+}
+.section-dark .eyebrow::after {
+  background: linear-gradient(90deg, rgba(184,111,122,.55), rgba(184,111,122,0));
+}
+/* 2026-08-14 (Christine's request): the site-wide .eyebrow script font
+   (Corinthia, a calligraphy cursive) reads beautifully for ordinary phrases
+   ("A Private Advisory", "The Signature Duo") but falls apart on jammed-
+   together all-caps acronyms like "IRES MLS" -- cursive letterforms are
+   drawn to join into flowing lowercase, not stand alone as blocky capitals,
+   so acronyms turn into an illegible tangle. Rather than changing the
+   script font site-wide (it works well everywhere else), this is a scoped
+   override for the handful of eyebrows that specifically reference the
+   MLS/IRES feed -- small-caps sans-serif with letter-spacing, the standard
+   readable "eyebrow/kicker" treatment, applied only where an acronym is
+   actually present. */
+.eyebrow-clear {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+h2.section-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1.18;
+  letter-spacing: -.005em;
+  margin: 0 0 28px;
+  max-width: 760px;
+}
+/* Slate rather than a warm near-black: on a warm cream ground a brown-grey
+   body colour muddies, where a cool grey stays crisp. */
+.lede { font-size: 17px; line-height: 1.8; max-width: 680px; color: var(--slate-soft); }
+
+/* 2026-08-17 (Christine: "spacing is odd pn this page too", on /sellers.html).
+   It was not spacing, it was centring, and the cause is one missing pair of
+   margins. `.lede` is capped at 680px; in a centred section the TEXT centred
+   inside that box while the BOX itself stayed pinned to the left edge of the
+   wrap, so the paragraph sat measurably left of the heading above it. Nothing
+   looks broken — it just reads as slightly wrong, which is worse, because there
+   is nothing to point at.
+
+   Fixed by centring the box rather than by adding margins to the section, and
+   with a real class instead of the inline `style="text-align:center"` these
+   blocks used to carry, so the rule cannot be defeated by specificity later.
+   Affected /sellers.html, /current-listings.html, /expired-listings.html and
+   /listing-video-portfolio.html — pinned by test-centredlede.js. */
+.center { text-align: center; }
+.center .lede { margin-left: auto; margin-right: auto; }
+
+/* 2026-08-14: same subtle rose-glow + dot-texture treatment as .hero above,
+   so the site's other full-width dark sections (Success Stories, etc.)
+   don't read as a flatter, less-finished version of the hero right above
+   them on the same page. */
+.section-dark {
+  background-color: var(--charcoal);
+  background-image:
+    radial-gradient(circle at 10% 110%, rgba(184,111,122,.13), transparent 42%),
+    radial-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size: cover, 24px 24px, 7px 7px, 7px 7px;
+  background-repeat: no-repeat, repeat, repeat, repeat;
+  color: var(--white);
+}
+.section-dark .lede { color: rgba(255,255,255,.78); }
+.section-dark .eyebrow { color: var(--dusty-rose); }
+
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 52px; }
+/* 2026-08-14 (Christine's request: equal size regardless of photo/video,
+   then a follow-up fix so a video's content is never cropped) -- a fixed
+   square tile, like Instagram's own profile grid, instead of a
+   fixed-height box that still let content fill unevenly. The JS watchdog
+   in _instagram_feed_section() scales+centers each rendered iframe to FIT
+   inside this square (not fill it) so nothing is ever cut off; overflow:
+   hidden here is just a safety net, not an active crop. */
+.instagram-embed-wrap {
+  width: 100%; max-width: 360px; aspect-ratio: 1 / 1; overflow: hidden;
+  border-radius: 8px; position: relative; background: #fafafa;
+}
+.instagram-embed-wrap > .instagram-media { margin: 0 auto !important; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+/* 2026-08-13: mobile-audit fix -- free-home-valuation.html's 4-card "Proven
+   Results" block used to hardcode style="grid-template-columns:1fr 1fr"
+   directly on a .grid-3 div. That inline style has higher specificity than
+   the .grid-3 media-query rule below, so it never collapsed to one column
+   on phones -- confirmed via a 390px-viewport Playwright check showing the
+   page forced to a 433px layout viewport (mobile Safari/Chrome zooming out
+   to fit the overflowing 2-column grid). .grid-2col replaces that inline
+   style with a real class that has its own mobile breakpoint. */
+.grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 52px; }
+@media (max-width: 600px) { .grid-2col { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .nav-toggle { display: flex; }
+  nav.primary-nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    background: var(--dusty-rose);
+    padding: 8px 24px 20px;
+    box-shadow: 0 16px 30px rgba(20,20,21,.18);
+    z-index: 50;
+  }
+  nav.primary-nav.nav-open { display: flex; }
+  nav.primary-nav a {
+    padding: 14px 0;
+    border-top: 1px solid rgba(255,255,255,.18);
+  }
+}
+
+/* 2026-08-15: cards used to be a white rectangle floating on a big soft
+   shadow, with a rose line across the top and no other edge. On a textured
+   ground that reads as a cut-out, not a card. Now the shadow is much lighter
+   and a full slate hairline draws the whole edge -- the line does the work,
+   the shadow only lifts it off the grain. The rose accent stays, but as a
+   finer, lower-alpha line rather than the strongest mark on the card. */
+.card {
+  background: var(--white);
+  padding: 50px 40px 44px;
+  border-radius: 1px;
+  box-shadow: 0 18px 44px rgba(51,65,79,.035);
+  border: 1px solid var(--hairline);
+  border-top: 1px solid var(--hairline-rose);
+  transition: box-shadow .25s ease, transform .25s ease, border-color .25s ease;
+}
+/* 2026-08-16, merging the discoverability branch. Both sides had rewritten
+   these three rules. Taken deliberately rather than by picking a side:
+   the hover is master's, because it uses the current design tokens
+   (--hairline-strong / --rose) that the other branch predates; the heading
+   selector is the branch's, because its wider reach (.card-title, h2.card-title)
+   is what the promoted h2 headings on 97 guide pages depend on; and .card p is
+   stated once, with the token instead of the branch's hardcoded #57575a, since
+   duplicating the selector was master's own copy-paste slip. */
+.card:hover {
+  box-shadow: 0 26px 60px rgba(51,65,79,.07);
+  transform: translateY(-2px);
+  border-color: var(--hairline-strong);
+  border-top-color: var(--rose);
+}
+.card h3, .card .card-title, h2.card-title { font-family: var(--font-serif); font-weight: 400; font-size: 21px; margin: 0 0 16px; letter-spacing: .01em; line-height: 1.3; max-width: none; }
+.card p { color: var(--slate-soft); line-height: 1.8; font-size: 14.5px; font-weight: 300; }
+.card a.cta {
+  display: inline-block; margin-top: 24px; font-size: 11px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--deep-mauve);
+  border-bottom: 1px solid rgba(186,140,132,.4); padding-bottom: 3px;
+  transition: border-color .2s ease, opacity .2s ease;
+}
+.card a.cta:hover { border-color: var(--deep-mauve); opacity: .8; }
+
+/* 2026-08-14: paired agent bio cards for the About page's "Meet The Team"
+   section (Christine + Kendra) -- a photo alongside bio copy, stacking to
+   a single column on narrow screens since side-by-side headshot+text gets
+   cramped below ~500px. */
+.team-card { display: flex; gap: 24px; align-items: flex-start; }
+.team-card img {
+  width: 130px; height: 160px; object-fit: cover; border-radius: 4px;
+  flex-shrink: 0; box-shadow: 0 10px 24px rgba(20,20,21,.08);
+}
+.team-card h3 { font-family: var(--font-serif); font-weight: 400; font-size: 20px; margin: 0 0 10px; }
+.team-card p { color: var(--slate-soft); line-height: 1.75; font-size: 14px; font-weight: 300; margin: 0; }
+@media (max-width: 560px) {
+  .team-card { flex-direction: column; }
+  .team-card img { width: 100%; height: 240px; }
+}
+
+/* ---------- Video embeds ---------- */
+.video-embed { position: relative; width: 100%; padding-top: 56.25%; border-radius: 2px; overflow: hidden; background: #141415; box-shadow: 0 10px 30px rgba(20,20,21,.10); }
+.video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-embed-caption { margin-top: 12px; font-size: 14px; color: var(--slate-mist); }
+.video-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 40px; }
+@media (max-width: 900px) { .video-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Communities / Map ---------- */
+.communities-layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; align-items: stretch; min-height: 760px; }
+@media (max-width: 980px) { .communities-layout { grid-template-columns: 1fr; min-height: auto; } }
+.communities-panel { display: flex; flex-direction: column; justify-content: center; padding: 50px 24px; }
+.county-list { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 24px; }
+.county-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  background: transparent; color: var(--white);
+  border: 1px solid rgba(255,255,255,.3);
+  padding: 16px 20px; font-weight: 500; font-size: 13px;
+  letter-spacing: .04em;
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+.county-btn:hover, .county-btn.active { background: var(--dusty-rose); border-color: var(--dusty-rose); transform: translateX(3px); }
+#county-map { width: 100%; min-height: 760px; height: 100%; background: var(--charcoal); }
+@media (max-width: 980px) { #county-map { min-height: 520px; } }
+.leaflet-container { background: var(--charcoal) !important; font-family: var(--font-sans); }
+
+/* Sold Homes Map (2026-08-13, Christine's request) — separate from
+   #county-map above but same visual language (dark base, brand rose pins). */
+#sold-homes-map { width: 100%; min-height: 560px; border-radius: 4px; background: var(--charcoal); }
+@media (max-width: 700px) { #sold-homes-map { min-height: 420px; } }
+.sold-homes-map-status {
+  display: none; text-align: center; padding: 20px; color: var(--slate-mist);
+  font-size: 14px; background: var(--off-white, #F9F9EC); border-radius: 4px; margin-top: 12px;
+}
+
+/* County name labels shown directly on the map (not just on hover) */
+.county-label {
+  color: var(--white);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .03em;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* City icon markers — clean white line-art SVGs (mountain/tree/paw/columns/
+   grad-cap/wave), not colored emoji, to match the original map's look */
+.city-icon-marker {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--rose); border: 2px solid var(--white);
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+  color: var(--white);
+}
+.city-icon-marker svg { width: 15px; height: 15px; }
+.city-icon-marker.priority { background: var(--mauve); width: 30px; height: 30px; }
+.city-icon-marker.priority svg { width: 17px; height: 17px; }
+.city-label {
+  color: var(--white);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.9);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.river-label {
+  color: #BFE0EC;
+  font-family: var(--font-script);
+  font-size: 20px;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+}
+.leaflet-control-zoom a { font-size: 20px !important; width: 34px !important; height: 34px !important; line-height: 32px !important; }
+
+/* ---------- FAQ (answer-shaped content for AI/local search) ---------- */
+.faq-item { padding: 32px 0; border-top: 1px solid var(--hairline); }
+.faq-item h3 { font-family: var(--font-serif); font-weight: 600; font-size: 19px; margin: 0 0 12px; letter-spacing: -.005em; }
+.faq-item p { color: var(--slate-soft); line-height: 1.75; font-size: 15px; margin: 0; }
+
+/* ---------- Testimonials ---------- */
+.testimonial {
+  background: var(--white);
+  padding: 48px 42px 40px;
+  border-left: 1px solid rgba(184,111,122,.4);
+  position: relative;
+}
+.testimonial::before {
+  content: '\201C';
+  font-family: var(--font-serif);
+  font-size: 64px;
+  line-height: 1;
+  color: rgba(184,111,122,.28);
+  display: block;
+  margin-bottom: 6px;
+}
+.testimonial p { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--slate); line-height: 1.85; font-size: 15.5px; }
+.testimonial .who { margin-top: 22px; font-weight: 600; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--slate-mist); }
+/* 2026-08-14: real 5-star rating marker on every testimonial card -- these
+   are genuinely 5-star reviews (99 of them on Google, per Christine), so
+   showing the stars alongside each quote makes that concrete rather than
+   just claimed once in a stat elsewhere. Sits above the opening-quote mark,
+   not competing with it. */
+.testimonial .stars { color: var(--dusty-rose); font-size: 14px; letter-spacing: 3px; margin-bottom: 4px; }
+
+/* ---------- Scroll reveal ----------
+   2026-08-14 (site-wide "flow better" pass): JS-driven-only (added below
+   via a script in every page's footer) -- the .reveal class itself is
+   applied at runtime, never baked into the server-rendered HTML, so a
+   visitor with JS disabled or a slow/failed script load simply sees every
+   section at full opacity immediately (progressive enhancement, not a
+   render-blocking gate). prefers-reduced-motion is honored for anyone with
+   that OS setting, per accessibility best practice. */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.is-visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* ---------- Forms ---------- */
+form.lead-form { display: grid; gap: 16px; max-width: 560px; }
+form.lead-form input, form.lead-form textarea {
+  padding: 14px 16px; border: 1px solid var(--hairline-strong); background: var(--white);
+  font-family: var(--font-sans); font-size: 14px;
+}
+form.lead-form label.consent { font-size: 12px; color: var(--slate-mist); display: flex; gap: 8px; align-items: flex-start; }
+
+/* ---------- Footer ---------- */
+.site-footer {
+  background-color: var(--charcoal);
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(184,111,122,.1), transparent 40%),
+    radial-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size: cover, 24px 24px, 7px 7px, 7px 7px;
+  background-repeat: no-repeat, repeat, repeat, repeat;
+  color: rgba(255,255,255,.8); padding: 90px 0 40px; font-size: 14px;
+}
+.footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1.3fr 1fr; gap: 52px; }
+@media (max-width: 1100px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .footer-grid { grid-template-columns: 1fr; } }
+.footer-grid h4, .footer-grid .footer-col-title { color: var(--white); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 20px; opacity: .85; font-family: var(--font-sans); font-weight: 600; }
+.footer-grid ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 13px; }
+.footer-grid ul a { color: rgba(255,255,255,.72); font-size: 14px; }
+.footer-grid ul a:hover { color: var(--white); text-decoration: underline; }
+.footer-bottom { margin-top: 64px; padding-top: 28px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12px; opacity: .6; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.qr-share-btn { background: none; border: none; padding: 0; margin: 0; font-family: inherit; font-size: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+
+/* ---------- Blog post pull-quote (typographic break, no photo available) ---------- */
+.blog-pull-quote {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  line-height: 1.4;
+  font-style: italic;
+  color: var(--charcoal);
+  border-left: 3px solid var(--dusty-rose);
+  padding: 4px 0 4px 28px;
+  margin: 40px 0;
+}
+
+/* ---------- Breadcrumb / county page hero variants ---------- */
+.county-hero {
+  padding: 120px 0 80px;
+  background-color: var(--charcoal);
+  background-image:
+    radial-gradient(circle at 88% -10%, rgba(184,111,122,.16), transparent 45%),
+    radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: cover, 26px 26px;
+  background-repeat: no-repeat, repeat;
+  color: var(--white);
+}
+.county-hero .eyebrow { color: var(--dusty-rose); }
+.county-hero .lede { color: rgba(255,255,255,.85); }
+.city-pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.city-pill { border: 1px solid rgba(255,255,255,.35); padding: 8px 16px; font-size: 13px; border-radius: 999px; display: inline-block; transition: background .15s ease, border-color .15s ease; }
+a.city-pill:hover { background: var(--rose); border-color: var(--rose); }
+
+/* ---------- Live property search (MLS Grid / IRES) ---------- */
+.search-form { display: grid; grid-template-columns: repeat(5, 1fr) auto; gap: 12px; align-items: end; margin-top: 30px; }
+.search-form .field { display: flex; flex-direction: column; }
+.search-form label { font-size: 12px; color: var(--slate-mist); margin-bottom: 6px; }
+.search-form select, .search-form input {
+  padding: 12px 14px; border: 1px solid var(--hairline-strong); background: var(--white);
+  font-family: var(--font-sans); font-size: 14px; width: 100%;
+}
+@media (max-width: 900px) { .search-form { grid-template-columns: 1fr 1fr; } }
+
+.search-status { margin-top: 26px; font-size: 14px; color: var(--slate-mist); }
+.listing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; margin-top: 28px; }
+@media (max-width: 900px) { .listing-grid { grid-template-columns: 1fr; } }
+.listing-card { border: 1px solid var(--hairline); background: var(--white); overflow: hidden; }
+.listing-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #eee; }
+.listing-card .listing-body { padding: 24px 24px 22px; }
+.listing-status-badge { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 4px 10px; margin-bottom: 10px; color: var(--white); }
+.listing-status-badge.status-active { background: #3f6b52; }
+.listing-status-badge.status-pending { background: #b7791f; }
+.listing-status-badge.status-other { background: #6a6a6c; }
+/* 2026-08-13: prominent banner across the photo for under-contract listings
+   (Christine's request — the small pill badge above wasn't visible enough).
+   .listing-media already has position:relative (see below) so this anchors
+   to the photo, not the whole card. */
+.listing-ribbon { position: absolute; top: 0; left: 0; right: 0; z-index: 2; background: #b7791f; color: var(--white); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; text-align: center; padding: 9px 12px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.listing-card .listing-price { font-family: var(--font-serif); font-size: 22px; margin: 0 0 4px; }
+.listing-card .listing-meta { color: var(--slate-soft); font-size: 14px; margin: 0 0 8px; }
+.listing-card .listing-address { font-size: 14px; color: var(--slate-mist); margin: 0 0 10px; }
+.listing-card .listing-compliance { font-size: 14px; color: var(--slate); line-height: 1.5; border-top: 1px solid var(--hairline-light); padding-top: 10px; margin-top: 10px; }
+.mls-disclaimer { font-size: 12px; color: var(--slate-mist); line-height: 1.7; margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.mls-disclaimer .mls-source-badge { font-weight: 700; color: var(--slate); text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+
+/* ---------- Nearby & Distances (grocery/schools/parks per listing) ---------- */
+.listing-nearby { border-top: 1px solid var(--hairline-light); margin-top: 12px; padding-top: 12px; }
+.nearby-toggle {
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--charcoal);
+}
+.nearby-toggle:hover { color: var(--dusty-rose); }
+.nearby-panel { margin-top: 12px; }
+.nearby-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.nearby-tab {
+  padding: 5px 12px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--white);
+  font-family: var(--font-sans); font-size: 12px; cursor: pointer; color: var(--charcoal);
+}
+.nearby-tab.active { background: var(--charcoal); border-color: var(--charcoal); color: var(--white); }
+.nearby-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.nearby-list li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--slate-soft); }
+.nearby-name { flex: 1; }
+.nearby-distance { color: var(--dusty-rose); font-weight: 600; white-space: nowrap; }
+.nearby-name a { color: inherit; text-decoration: underline; text-decoration-color: var(--gray-light); }
+.nearby-name a:hover { color: var(--rose); text-decoration-color: var(--rose); }
+/* Kept clearly legible on purpose -- Places attribution must not be
+   obscured or faded into the background. */
+.nearby-attrib { font-size: 11px; color: var(--slate); margin: 10px 0 0; line-height: 1.6; }
+
+/* ---------- The three criteria (how-to-choose-a-real-estate-agent.html) ----------
+   2026-08-16. The number is a real part of the argument here -- price is first because
+   getting it wrong makes the other two harder -- so it gets to look deliberate rather
+   than rendering as "1Can they price it exactly right?", which is what an unstyled
+   <span> gave on the first build. */
+.agent-crit { margin-top: 42px; padding-top: 34px; border-top: 1px solid var(--hairline); }
+.agent-crit:first-of-type { border-top: 0; padding-top: 8px; }
+.agent-crit-head {
+  display: flex; align-items: baseline; gap: 14px;
+  font-family: var(--font-display); font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1.25; margin: 0 0 16px; color: var(--charcoal); font-weight: 400;
+}
+.agent-crit-head span {
+  flex: 0 0 auto;
+  font-family: var(--font-sans); font-size: 13px; font-weight: 600; letter-spacing: .1em;
+  color: var(--white); background: var(--deep-mauve);
+  width: 30px; height: 30px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transform: translateY(-2px);
+}
+
+/* ---------- Every sold home, by year (past-sales.html) ----------
+   2026-08-16 (Christine: "maybe a page with all sold listings not just hte ones with
+   videos"). A plain list, on purpose. Forty-two rows as cards would be a wall of
+   boxes; what a seller does here is scan for a street they recognise, so the address
+   is the strongest thing on each row and everything else gets out of its way. */
+.sold-year { margin-top: 30px; }
+.sold-year-head {
+  font-family: var(--font-sans); font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--deep-mauve); margin: 0 0 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--hairline); display: flex; justify-content: space-between; gap: 12px;
+}
+.sold-year-head span { color: var(--slate); letter-spacing: .04em; font-weight: 400; }
+.sold-list { list-style: none; padding: 0; margin: 0; }
+.sold-list li {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto;
+  gap: 14px; align-items: baseline;
+  padding: 11px 0; border-bottom: 1px solid var(--hairline);
+}
+.sold-list li:last-child { border-bottom: 0; }
+.sold-addr { font-size: 16px; color: var(--charcoal); }
+.sold-town { font-size: 14px; color: var(--slate-soft); }
+.sold-tour { font-size: 13px; color: var(--deep-mauve); white-space: nowrap; }
+.sold-tour:hover { color: var(--rose); }
+@media (max-width: 560px) {
+  /* Three columns cannot hold an address, a town and a link on a phone without the
+     address wrapping to two lines and colliding with the town. */
+  .sold-list li { grid-template-columns: 1fr; gap: 2px; padding: 12px 0; }
+  .sold-town { font-size: 13px; }
+}
+
+/* ---------- "How far is everything" on a town page ----------
+   2026-08-16 (Christine: "maybe do a miles minutes to the closest restaurant and
+   gas station"). Same markup as the listing panel, which is the point -- but that
+   panel is a 13px detail inside a card the reader already chose to open, and this
+   is a section heading's worth of answer on its own. Two lines, so they get room
+   to be read rather than scanned past. */
+.town-far {
+  margin-top: 24px; padding: 22px 24px;
+  border: 1px solid var(--hairline); border-radius: 4px; background: var(--white);
+  max-width: 620px;
+}
+.town-far .nearby-list { gap: 14px; }
+.town-far .nearby-list li {
+  font-size: 16px; color: var(--charcoal); align-items: baseline;
+  padding-bottom: 14px; border-bottom: 1px solid var(--hairline);
+}
+.town-far .nearby-list li:last-child { padding-bottom: 0; border-bottom: 0; }
+.town-far .nearby-distance { font-size: 16px; }
+.town-far .nearby-attrib { margin-top: 18px; }
+@media (max-width: 520px) {
+  /* The name and the drive time both matter, and side by side they collide on a
+     phone once a business name runs past a few words. */
+  .town-far { padding: 18px; }
+  .town-far .nearby-list li { flex-direction: column; gap: 4px; }
+}
+
+/* ---------- Buyer/seller profile rows (Homes Over $1M) ----------
+   2026-08-15: deliberately NOT cards. A stack of boxed cards is the busiest
+   possible way to present five paragraphs; a single hairline between rows says
+   the same thing and lets the page breathe, which is most of what reads as
+   expensive. The rose tick on the heading is the only ornament. */
+.profile-list { margin-top: 40px; border-top: 1px solid var(--hairline); }
+.profile-row { padding: 30px 0; border-bottom: 1px solid var(--hairline); }
+.profile-row h3 {
+  font-family: var(--font-serif); font-weight: 400; font-size: 20px;
+  letter-spacing: .01em; margin: 0 0 12px; color: var(--charcoal);
+  display: flex; align-items: baseline; gap: 12px;
+}
+.profile-row h3::before {
+  content: ''; flex: 0 0 18px; height: 1px; background: var(--rose);
+  opacity: .55; transform: translateY(-6px);
+}
+.profile-row p {
+  margin: 0; color: var(--slate-soft); font-size: 15.5px;
+  line-height: 1.85; font-weight: 300; max-width: 74ch;
+}
+.profile-list-dark { border-top-color: rgba(255,255,255,.14); }
+.profile-list-dark .profile-row { border-bottom-color: rgba(255,255,255,.14); }
+.profile-list-dark .profile-row h3 { color: var(--white); }
+.profile-list-dark .profile-row p { color: rgba(255,255,255,.76); }
+.fine-note { color: var(--slate-mist); font-size: 13px; }
+@media (max-width: 600px) {
+  .profile-row { padding: 24px 0; }
+  .profile-row h3 { font-size: 18px; gap: 9px; }
+  .profile-row h3::before { flex-basis: 12px; }
+}
+
+/* ---------- Walkability panel (city + subdivision pages) ----------
+   2026-08-15 (Christine): "a much more detailed walkability score ... maybe
+   add more than school, park and grocery store?" Ten weighted categories,
+   scored server-side by netlify/functions/walkability.js. Deliberately NOT
+   styled to imitate Walk Score(R)'s badge -- this is her own estimate and
+   the panel says so. */
+.walk-panel { margin-top: 28px; }
+.walk-panel[hidden] { display: none; }
+.walk-headline { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.walk-dial {
+  flex: 0 0 auto; width: 104px; height: 104px; border-radius: 50%;
+  display: grid; place-items: center; position: relative;
+  background: var(--white); border: 1px solid var(--hairline);
+}
+.walk-dial-score {
+  font-family: var(--font-serif); font-size: 34px; line-height: 1; color: var(--charcoal);
+}
+.walk-dial-of { font-size: 11px; color: var(--slate-mist); letter-spacing: .04em; margin-top: 3px; }
+.walk-band { font-family: var(--font-serif); font-size: 24px; color: var(--charcoal); margin: 0; }
+.walk-band-sub { font-size: 14px; color: var(--slate-soft); margin: 6px 0 0; max-width: 46ch; line-height: 1.6; }
+.walk-cats {
+  list-style: none; padding: 0; margin: 26px 0 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px;
+}
+.walk-cat { border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; background: var(--white); }
+.walk-cat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.walk-cat-label { font-size: 13px; font-weight: 600; color: var(--charcoal); }
+.walk-cat-dist { font-size: 13px; font-weight: 600; color: var(--rose); white-space: nowrap; }
+/* --slate-mist, not a lighter grey: this still reads as de-emphasised next
+   to the rose used for close-by distances, and unlike #8a8a8c it clears AA. */
+.walk-cat-dist.walk-far { color: var(--slate-mist); }
+.walk-cat-examples { list-style: none; padding: 0; margin: 8px 0 0; }
+.walk-cat-examples li { font-size: 12px; color: var(--slate-mist); line-height: 1.7; }
+.walk-method { font-size: 12px; color: var(--slate-mist); line-height: 1.7; margin-top: 20px; }
+/* Google requires Places attribution to be clearly visible and not obscured,
+   so this is a touch darker than the surrounding fine print rather than
+   lighter. */
+.walk-attrib { color: var(--slate); }
+.walk-cat-examples a { color: inherit; text-decoration: underline; text-decoration-color: var(--gray-light); }
+.walk-cat-examples a:hover { color: var(--rose); text-decoration-color: var(--rose); }
+.walk-status { font-size: 14px; color: var(--slate-mist); }
+@media (max-width: 520px) {
+  .walk-headline { gap: 16px; }
+  .walk-dial { width: 84px; height: 84px; }
+  .walk-dial-score { font-size: 28px; }
+  .walk-band { font-size: 20px; }
+}
+
+/* ---------- Listing media links + inquiry CTAs (Current Listings) ---------- */
+.listing-media { position: relative; }
+/* 2026-08-13: .video-embed's own default box is 16:9 (padding-top: 56.25%),
+   shorter/wider than .listing-card img's 4:3 box above -- so a row mixing
+   video-thumbnail and photo-only listings rendered visibly different card
+   heights, pushing price/address text to a different vertical position
+   depending on which one a given card happened to have. Force video embeds
+   to the same 4:3 box (and drop the border-radius/shadow the standalone
+   .video-embed usage on the video-tour pages wants but which looked out of
+   place against a plain photo here) so every card in the grid lines up. */
+.listing-card .video-embed { padding-top: 75%; border-radius: 0; box-shadow: none; }
+.media-links { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 20px 0; }
+.media-link { background: none; border: none; padding: 0; margin: 0; font-family: var(--font-sans); font-size: 13px; color: var(--deep-mauve); text-decoration: underline; cursor: pointer; }
+.listing-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.listing-actions .btn { padding: 10px 18px; font-size: 13px; }
+
+/* ---------- Shared lightbox/modal (photo gallery + listing inquiry) ---------- */
+.lb-overlay { display: none; position: fixed; inset: 0; background: rgba(20,20,21,.85); z-index: 1000; align-items: center; justify-content: center; padding: 24px; }
+.lb-overlay.open { display: flex; }
+.lb-box { position: relative; background: var(--white); max-width: 520px; width: 100%; padding: 36px 32px; max-height: 90vh; overflow-y: auto; }
+.lb-box .lb-close { position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 28px; line-height: 1; color: var(--charcoal); cursor: pointer; }
+.lb-box h3 { margin: 0 0 6px; font-family: var(--font-serif); font-size: 26px; }
+.lb-box-media { background: transparent; max-width: 900px; padding: 0; }
+.lb-box-media .lb-close { color: var(--white); top: -8px; right: -8px; }
+#gallery-img { max-width: 100%; max-height: 76vh; display: block; margin: 0 auto; background: #222; }
+.gallery-nav { display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 16px; }
+.gallery-nav button { background: none; border: 1px solid var(--white); color: var(--white); padding: 8px 18px; font-family: var(--font-sans); font-size: 13px; cursor: pointer; }
+.gallery-nav span { color: var(--white); font-size: 13px; }
+
+/* ---------- Map click-to-search popup (build/assets/js/map.e669db83.js) ---------- */
+.quick-price-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.quick-price-btn {
+  background: var(--white); border: 1px solid var(--hairline); color: var(--charcoal);
+  padding: 10px 16px; font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.quick-price-btn:hover { border-color: var(--dusty-rose); }
+.quick-price-btn.active { background: var(--dusty-rose); border-color: var(--dusty-rose); color: var(--white); }
+#map-quick-search .lb-box { max-width: 440px; }
+
+/* ---------- Fancy live-search widget (dual price slider + pill filters) ---------- */
+.fs-widget { margin-top: 30px; }
+.fs-row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+.fs-block { flex: 1 1 260px; min-width: 220px; }
+.fs-label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--slate-mist); margin-bottom: 12px; display: block; }
+
+.fs-price-values { display: flex; justify-content: space-between; font-family: var(--font-serif); font-size: 19px; color: var(--charcoal); margin-bottom: 14px; }
+.fs-price-values span { color: var(--deep-mauve); }
+
+.fs-slider { position: relative; height: 34px; }
+.fs-slider-track { position: absolute; top: 50%; left: 0; right: 0; height: 3px; background: var(--gray-light); transform: translateY(-50%); }
+.fs-slider-range { position: absolute; top: 50%; height: 3px; background: var(--dusty-rose); transform: translateY(-50%); }
+.fs-slider input[type="range"] {
+  position: absolute; top: 0; left: 0; width: 100%; height: 34px; margin: 0;
+  background: transparent; -webkit-appearance: none; appearance: none; pointer-events: none;
+}
+.fs-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; pointer-events: auto;
+  width: 20px; height: 20px; border-radius: 50%; background: var(--white);
+  border: 2px solid var(--dusty-rose); cursor: pointer; margin-top: 0;
+  box-shadow: 0 2px 6px rgba(20,20,21,.18); position: relative; z-index: 2;
+}
+.fs-slider input[type="range"]::-moz-range-thumb {
+  pointer-events: auto; width: 18px; height: 18px; border-radius: 50%; background: var(--white);
+  border: 2px solid var(--dusty-rose); cursor: pointer; box-shadow: 0 2px 6px rgba(20,20,21,.18);
+}
+.fs-slider input[type="range"]::-webkit-slider-runnable-track { -webkit-appearance: none; background: transparent; }
+.fs-slider input[type="range"]::-moz-range-track { background: transparent; border: none; }
+.fs-slider input[type="range"]:focus { outline: none; }
+.fs-slider input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(184,111,122,.25); }
+
+.fs-pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.fs-pill {
+  background: var(--white); border: 1px solid var(--hairline); color: var(--charcoal);
+  padding: 10px 18px; font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+  cursor: pointer; border-radius: 999px; transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.fs-pill:hover { border-color: var(--dusty-rose); }
+.fs-pill.active { background: var(--charcoal); border-color: var(--charcoal); color: var(--white); }
+
+.fs-actions { margin-top: 26px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+@media (max-width: 700px) { .fs-row { gap: 22px; } }
+
+/* Multi-select county/town pickers — 2026-08-15 (Christine: "i also want them
+   to be able to pick mu;tiple towns or counties to search"). A native
+   <select multiple> is the one option that couldn't work: it needs ctrl-click
+   to add a second choice on desktop and degrades to an unusable scroll box on
+   a phone, on a site where most buyers are on phones. This is a button plus a
+   checkbox panel — keyboard-operable, touch-friendly, no library — with the
+   current selection also shown as removable chips so it's never a mystery what
+   the search is scoped to. Borders use the hairline tokens above, so the panel
+   reads as a drawn edge rather than a box. */
+.fs-multi { position: relative; }
+.fs-multi-toggle {
+  width: 100%; text-align: left; background: var(--white); border: 1px solid var(--hairline);
+  color: var(--charcoal); padding: 12px 34px 12px 14px; font-family: var(--font-sans);
+  font-size: 14px; cursor: pointer;
+}
+.fs-multi-toggle:hover { border-color: var(--rose); }
+.fs-multi-toggle::after {
+  content: ''; position: absolute; right: 14px; top: 50%; width: 7px; height: 7px;
+  border-right: 1.5px solid var(--slate-mist); border-bottom: 1.5px solid var(--slate-mist);
+  transform: translateY(-70%) rotate(45deg);
+}
+.fs-multi-toggle[aria-expanded="true"]::after { transform: translateY(-30%) rotate(225deg); }
+.fs-multi-panel {
+  position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; right: 0; min-width: 240px;
+  background: var(--white); border: 1px solid var(--hairline-strong);
+  box-shadow: 0 12px 30px rgba(20,20,21,.12);
+  max-height: 320px; overflow-y: auto; padding: 4px 0;
+}
+.fs-multi-panel[hidden] { display: none; }
+.fs-multi-heading {
+  display: block; padding: 12px 14px 5px; font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--slate-mist);
+}
+.fs-multi-option {
+  display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+  font-size: 14px; color: var(--charcoal); cursor: pointer;
+}
+/* Both of these need an explicit [hidden] rule: `display: flex` on the row and
+   `display: block` on the empty-state paragraph each beat the UA stylesheet's
+   [hidden] { display: none }, so setting .hidden in JS changed nothing visible.
+   Caught in a browser screenshot -- the county filter was setting the attribute
+   correctly and the towns stayed on screen anyway. */
+.fs-multi-option[hidden], .fs-multi-empty[hidden] { display: none; }
+.fs-multi-option:hover { background: var(--cream); }
+.fs-multi-option input { accent-color: var(--rose); width: 15px; height: 15px; flex: none; }
+.fs-multi-empty { padding: 12px 14px; font-size: 13px; color: var(--slate-mist); }
+.fs-multi-foot {
+  display: flex; justify-content: flex-end; padding: 10px 14px;
+  border-top: 1px solid var(--hairline-light);
+  position: sticky; bottom: 0; background: var(--white);
+}
+.fs-multi-foot button {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: 12px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--deep-mauve);
+}
+.fs-multi-foot button:hover { color: var(--rose); }
+.fs-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.fs-chips:empty { margin-top: 0; }
+.fs-chip {
+  display: inline-flex; align-items: center; gap: 6px; background: var(--white);
+  border: 1px solid var(--hairline-strong); border-radius: 999px;
+  padding: 6px 8px 6px 14px; font-size: 13px; color: var(--charcoal);
+}
+.fs-chip button {
+  background: none; border: none; cursor: pointer; color: var(--slate-mist);
+  font-size: 16px; line-height: 1; padding: 0 4px;
+}
+.fs-chip button:hover { color: var(--rose); }
+
+/* "More filters" — a real <details>, so it opens with no JS and stays keyboard
+   accessible. Collapsed by default: the four primary controls answer most
+   searches, and a wall of filters is what makes an IDX page feel like software
+   instead of like help. */
+.fs-advanced { margin-top: 26px; border-top: 1px solid var(--hairline); padding-top: 18px; }
+.fs-advanced > summary {
+  cursor: pointer; font-family: var(--font-sans); font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--deep-mauve); list-style: none;
+}
+.fs-advanced > summary::-webkit-details-marker { display: none; }
+.fs-advanced > summary::before { content: '+\00a0'; font-weight: 600; }
+.fs-advanced[open] > summary::before { content: '\2212\00a0'; }
+.fs-advanced > summary:hover { color: var(--rose); }
+.fs-select {
+  width: 100%; padding: 12px 14px; background: var(--white);
+  border: 1px solid var(--hairline); color: var(--charcoal);
+  font-family: var(--font-sans); font-size: 14px;
+}
+.fs-select:hover { border-color: var(--rose); }
+.fs-check {
+  display: flex; align-items: center; gap: 10px; font-size: 14px;
+  color: var(--charcoal); cursor: pointer; padding: 6px 0;
+}
+.fs-check input { accent-color: var(--rose); width: 15px; height: 15px; flex: none; }
+.fs-advanced-note {
+  margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: var(--slate-mist);
+  max-width: 70ch;
+}
+
+/* ---------- Neighborhood Quiz (now a collapsible section on
+   /sold-homes-map.html, see build_sold_homes_map()'s 2026-08-14 comment) --------- */
+.quiz-disclosure {
+  border: 1px solid var(--hairline); border-radius: 12px; padding: 28px 32px;
+  max-width: 720px; margin: 0 auto; transition: border-color .2s ease, background .2s ease;
+}
+.quiz-disclosure[open] { background: #fbf9f7; }
+.quiz-disclosure:hover { border-color: var(--dusty-rose); }
+.quiz-disclosure summary {
+  cursor: pointer; list-style: none; display: flex; flex-direction: column; align-items: center;
+  text-align: center; position: relative;
+}
+.quiz-disclosure summary::-webkit-details-marker { display: none; }
+.quiz-disclosure summary::after {
+  content: '+'; position: absolute; top: 0; right: 0; font-size: 26px; line-height: 1;
+  color: var(--dusty-rose); font-weight: 300; transition: transform .2s ease;
+}
+.quiz-disclosure[open] summary::after { content: '\2212'; }
+.quiz-disclosure summary .lede { max-width: 560px; }
+.quiz-disclosure .quiz-widget { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--hairline); }
+.quiz-widget { max-width: 720px; margin: 0 auto; }
+.quiz-progress { display: flex; gap: 8px; margin-bottom: 32px; }
+.quiz-progress-dot { flex: 1; height: 4px; background: var(--gray-light); border-radius: 2px; transition: background .2s ease; }
+.quiz-progress-dot.done { background: var(--dusty-rose); }
+.quiz-question h3 { font-family: var(--font-serif); font-weight: 400; font-size: 28px; margin: 0 0 26px; }
+.quiz-options { display: grid; gap: 14px; }
+.quiz-option {
+  text-align: left; padding: 18px 22px; border: 1.5px solid var(--gray-light); border-radius: 10px;
+  background: var(--white); cursor: pointer; font-size: 16px; color: var(--charcoal);
+  transition: border-color .15s ease, background .15s ease;
+}
+.quiz-option:hover { border-color: var(--dusty-rose); }
+.quiz-option.selected { border-color: var(--dusty-rose); background: rgba(184,111,122,.08); }
+.quiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; }
+.quiz-nav .btn[disabled] { opacity: .35; pointer-events: none; }
+.quiz-result { text-align: center; }
+.quiz-result .match-eyebrow { color: var(--dusty-rose); }
+.quiz-result .match-name { font-family: var(--font-serif); font-size: 40px; margin: 8px 0 18px; }
+.quiz-result .match-blurb { max-width: 560px; margin: 0 auto 30px; }
+.quiz-runner-up { font-size: 14px; color: var(--gray); margin-top: -14px; margin-bottom: 30px; }
+.quiz-result .lead-form { max-width: 480px; margin: 34px auto 0; text-align: left; }
+
+/* Visually hidden but still announced by screen readers (used by the quiz's
+   live step-announcement region). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* ---------- Map lifestyle/amenity POI markers (build/assets/js/map.e669db83.js) ---------- */
+.poi-icon-marker {
+  width: 100%; height: 100%; border-radius: 50%; background: var(--dusty-rose); color: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(20,20,21,.45), 0 0 0 2px var(--white);
+  transition: transform .15s ease;
+}
+.poi-icon-marker svg { width: 60%; height: 60%; }
+.leaflet-marker-icon:hover .poi-icon-marker { transform: scale(1.12); }
+
+/* The play badge on pins backed by one of Christine's own films (2026-08-17).
+   position:relative on the parent so the badge hangs off the corner; the parent
+   already carries the pin's own ring, so the badge gets its own to stay legible
+   against a photo-dark basemap. Hidden until the map is zoomed in — at county
+   level the pins overlap and a badge on each is noise. */
+.poi-icon-marker { position: relative; }
+.poi-icon-marker .poi-video-badge {
+  position: absolute; right: -3px; bottom: -3px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--white); color: var(--charcoal, #141415);
+  display: none; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(20,20,21,.5);
+}
+.poi-icon-marker .poi-video-badge svg { width: 8px; height: 8px; }
+#county-map.map-zoomed-in .poi-icon-marker.has-video .poi-video-badge { display: flex; }
+
+/* Category chips (2026-08-17). Christine: "nobody cares that I filmed 13 placces -
+   just be more gentle like Loving the comminity I sell homes in - restaurants
+   categories etc". So these read as things to do, not as an inventory, and they
+   carry no counts.
+
+   The filtering itself is pure CSS against the classes poiIcon() puts on each pin —
+   no marker list, nothing removed from the map. Selecting "Where I eat" dims the
+   other pins rather than deleting them, so the map never looks emptier than it is
+   and a mis-click costs nothing. */
+.spot-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.spot-chip {
+  font-family: inherit; font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+  padding: 9px 16px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: rgba(255,255,255,.78);
+  border: 1px solid rgba(255,255,255,.28);
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.spot-chip:hover { border-color: rgba(255,255,255,.6); color: #fff; }
+.spot-chip.is-on { background: var(--dusty-rose); border-color: var(--dusty-rose); color: #fff; }
+.spot-chip:focus-visible { outline: 2px solid var(--dusty-rose); outline-offset: 2px; }
+
+#county-map[class*="only-"] .poi-pin { opacity: .2; }
+#county-map.only-eat      .poi-pin.cat-restaurant,
+#county-map.only-drink    .poi-pin.cat-winery,
+#county-map.only-outdoors .poi-pin.cat-trail,
+#county-map.only-outdoors .poi-pin.cat-lake,
+#county-map.only-outdoors .poi-pin.cat-scenic,
+#county-map.only-outdoors .poi-pin.cat-golf,
+#county-map.only-town     .poi-pin.cat-downtown,
+#county-map.only-town     .poi-pin.cat-event,
+#county-map.only-town     .poi-pin.cat-spot { opacity: 1; }
+
+/* The hover card: her own thumbnail rather than a view count (2026-08-17). */
+.poi-tooltip { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.poi-tooltip::before { display: none; }
+.poi-tip {
+  display: block; max-width: 190px; padding: 8px 10px; border-radius: 8px;
+  background: rgba(20,20,21,.94); color: #fff; font-size: 12.5px; line-height: 1.35;
+  box-shadow: 0 4px 16px rgba(20,20,21,.45);
+}
+.poi-tip.has-thumb { padding: 0; overflow: hidden; }
+.poi-tip img { display: block; width: 100%; height: auto; }
+.poi-tip-name { display: block; padding: 8px 10px; }
+
+/* Respect a reduced-motion preference: the badge is information, the scale is not. */
+@media (prefers-reduced-motion: reduce) {
+  .poi-icon-marker { transition: none; }
+  .leaflet-marker-icon:hover .poi-icon-marker { transform: none; }
+}
+
+/* Sort control, sitting beside the Search button (2026-08-15). */
+.fs-sort { display: inline-flex; align-items: center; gap: 10px; }
+.fs-sort .fs-label { white-space: nowrap; }
+
+/* Individual listing page (/listing/<MLS#>, rendered by
+   netlify/functions/listing-page.js). 2026-08-15.
+   .listing-detail-thumbs was referenced by that function before this rule
+   existed, which stacked 12 photos in a single 100%-wide column -- caught in a
+   browser screenshot, not in review. */
+.listing-detail-thumbs {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 8px;
+}
+.listing-detail-thumbs img {
+  width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 3px;
+  background: #eee; box-shadow: 0 4px 14px rgba(20,20,21,.07);
+}
+.listing-detail-thumbs > p { grid-column: 1 / -1; margin: 4px 0 0; }
+@media (max-width: 860px) { .listing-detail-thumbs { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .listing-detail-thumbs { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---- "Tour It With Me" local spots on a town page ----------------------
+   2026-08-15 (Christine: "we can have a touring community link - so in each
+   town there are videos maybe to restaurants and thy are also on my mao
+   correct?"). The same spots the county map pins, laid out on the town page
+   that Google actually sends people to. */
+.spot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 28px;
+  margin-top: 28px;
+}
+/* 2026-08-16 (Christine, looking at the Loveland page: "i want the videos to all
+   be level, balanced - easier to see"). She was right, and the cause was not the
+   embeds -- .video-embed has always been a locked 16:9 box. It was the TITLES.
+   "Sage" fits on one line and "Mr. Chen Sushi & Hibachi Steak House" takes two,
+   so every thumbnail in the row started at a different height and a grid of
+   identical boxes read as ragged.
+   Reserving two lines of title space lines every video up on one baseline, and
+   letting the blurb absorb the slack puts every card's footer on one baseline
+   too. Both are floors, not fixed heights: a title that needs three lines still
+   gets them, it just doesn't happen at these sizes. */
+.spot-card { min-width: 0; display: flex; flex-direction: column; }
+.spot-card-title { margin: 6px 0 12px; font-size: 21px; line-height: 1.3; }
+.spot-card .video-embed { margin: 0; }
+.spot-blurb { margin: 10px 0 8px; font-size: 15px; }
+@media (min-width: 600px) {
+  /* Only worth doing once the grid is more than one column wide -- stacked on a
+     phone there is no neighbour to line up with, and the reserved space would
+     just be a gap under every heading. */
+  .spot-card-title { min-height: 2.6em; }   /* exactly two lines at 1.3 */
+  .spot-blurb { flex: 1 1 auto; }
+  .spot-card .media-link { margin-top: auto; align-self: start; }
+}
+/* Her review, quoted. Matches the map modal's pull quote so the same content
+   reads the same way in both places. */
+.spot-quote {
+  margin: 0;
+  padding: 14px 18px;
+  border-left: 3px solid var(--dusty-rose);
+  background: rgba(184, 111, 122, .06);
+  font-style: italic;
+  font-size: 15px;
+}
+.spot-proof {
+  margin: 10px 0 0;
+  font-size: 13px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--deep-mauve);
+}
+/* 2026-08-18: the closing brace above was missing. Under native CSS nesting
+   that is not a syntax error — every rule from here to the end of the file
+   quietly became a NESTED child of .spot-proof, matching nothing. The mobile
+   contact bar rendered as four unstyled 17px links instead of the fixed
+   56px-tall tap bar, and the keyboard skip-link below was dead too. Found by
+   Lighthouse's touch-target audit refusing to agree with what this file says. */
+/* 2026-08-14 (a11y): skip link paired with the new <main id="main">
+   landmark in build.py's page(). Visually hidden until keyboard-focused,
+   so it costs sighted users nothing and gives keyboard/screen-reader
+   users a way past the nav + trust ribbon that repeat on all 136 pages. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  padding: 12px 20px;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+  text-decoration: none;
+  border: 2px solid #B86F7A;
+  border-radius: 0 0 4px 0;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* 2026-08-14 (document outline): article/guide section headings were <h3>
+   sitting directly under the page <h1>, skipping a level on 97 pages. They
+   are now <h2> for a valid outline; this rule preserves the exact previous
+   h3 rendering so the promotion is semantic only, with no visual change. */
+h2.article-subhead {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 1.17em;
+  line-height: 1.35;
+  letter-spacing: 0;
+  margin-bottom: 10px;
+  max-width: none;
+}
+
+/* 2026-08-14 (document outline): the "Ask A Question" and "Share This Page"
+   widget headings were <h3> sitting directly under the page <h1>, skipping
+   a level. Promoted to <h2>; this keeps their previous h3 rendering so the
+   change is semantic only. */
+h2.widget-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 1.17em;
+  line-height: 1.35;
+  letter-spacing: 0;
+  margin: 0 0 10px;
+  max-width: none;
+}
+
+/* ---- Sticky contact bar, phones only (2026-08-16) ----------------------------
+   Christine: "I would like to have mroe tapable links for my phone number -
+   whatever is the best roi ... make it easy to get ahold of me through email or
+   phone or text". Her number was plain text on all 144 pages, so on a phone the
+   only way to call was to select, copy, switch app, paste.
+
+   Mobile only, deliberately. On desktop a tel: link mostly does nothing useful and
+   a fixed bar would just eat screen height. env(safe-area-inset-bottom) keeps it
+   clear of the iPhone home indicator, and the matching body padding means the bar
+   never covers the last line of a page -- the bug this pattern usually ships with. */
+.contact-bar { display: none; }
+@media (max-width: 760px) {
+  .contact-bar {
+    display: flex;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 900;
+    background: rgba(255,255,255,.97);
+    backdrop-filter: saturate(160%) blur(8px);
+    border-top: 1px solid var(--hairline-strong, #e4e4d8);
+    box-shadow: 0 -6px 22px rgba(20,20,21,.10);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .contact-bar .cbar-item {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    /* 56px keeps every target above the 44px minimum for a comfortable thumb. */
+    min-height: 56px;
+    padding: 8px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--slate, #33414f);
+    border-left: 1px solid rgba(20,20,21,.07);
+  }
+  .contact-bar .cbar-item:first-child { border-left: 0; }
+  .contact-bar .cbar-ico { font-size: 17px; line-height: 1; }
+  .contact-bar .cbar-item-primary { background: var(--deep-mauve, #8f5560); color: #fff; }
+  .contact-bar .cbar-item:active { background: rgba(184,111,122,.14); }
+  .contact-bar .cbar-item-primary:active { background: var(--deep-mauve, #8f5560); }
+  body { padding-bottom: 62px; }
+}
+
+/* ---- Town directory on the communities hub (2026-08-16) ----------------------
+   The hub linked 20 county pages and none of the 31 town pages, so every town page
+   had exactly one inbound internal link and Google was declining to index them. This
+   is the crawlable, readable index of the same thing the map shows. */
+.town-dir {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 28px 36px;
+  margin-top: 28px;
+}
+.town-dir-col { min-width: 0; }
+.town-dir-county {
+  font-family: var(--font-serif); font-weight: 400; font-size: 18px;
+  margin: 0 0 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--hairline-strong, #e4e4d8);
+}
+.town-dir-county a { text-decoration: none; color: var(--deep-mauve, #8f5560); }
+.town-dir-list { list-style: none; margin: 0; padding: 0; }
+.town-dir-list li { margin: 0 0 7px; font-size: 15px; line-height: 1.5; }
+.town-dir-list a { font-weight: 500; }
+/* The "why click" half is deliberately quieter than the link itself. */
+.town-dir-note { color: var(--slate-mist, #8a8a8f); font-size: 13.5px; font-weight: 300; }
+
+/* ---- Town comparison table on county pages (2026-08-16) ---------------------
+   Christine, on what used to be here: "why is it even there?!!! Who cares about that!
+   Lets make it what people are actually searching for!" She was right -- it counted how
+   many town pages the site has. This answers the three searches people actually make
+   about a county at once: which town, how far, what schools.
+
+   The wrapper scrolls rather than the page: a four-column table on a 360px phone has to
+   overflow somewhere, and the one place it must never overflow is the body. */
+.town-table-wrap { overflow-x: auto; margin-top: 26px; -webkit-overflow-scrolling: touch; }
+.town-table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 620px; }
+.town-table thead th {
+  text-align: left; font-family: var(--font-sans); font-size: 12px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--slate-mist, #8a8a8f);
+  padding: 0 16px 10px 0; border-bottom: 1px solid var(--hairline-strong, #e4e4d8);
+  white-space: nowrap;
+}
+.town-table tbody th, .town-table td {
+  padding: 13px 16px 13px 0; border-bottom: 1px solid rgba(20,20,21,.07);
+  vertical-align: top; font-weight: 300; line-height: 1.5; text-align: left;
+}
+.town-table tbody th { font-weight: 500; white-space: nowrap; }
+.town-table tbody th a { font-weight: 600; }
+.town-table tbody tr:last-child th, .town-table tbody tr:last-child td { border-bottom: 0; }
+.town-table tbody tr:hover td, .town-table tbody tr:hover th { background: rgba(184,111,122,.04); }
+
+
+/* ---------- Captioned, geotagged location photos ----------
+   2026-08-16 (Christine: "lets do great photos that are geotagged and captioned and any
+   other finability"). The caption is not decoration: it is the text Google Images reads,
+   and it is what the image sitemap carries. So it gets real type rather than being
+   shrunk to a legal line, and the credit sits inside it in a lighter weight. */
+.loc-photo { margin: 0; }
+.loc-photo img,
+.loc-photo picture { display: block; width: 100%; height: auto; border-radius: 4px; }
+.loc-photo figcaption {
+  margin-top: 12px; font-size: 14px; line-height: 1.65; color: var(--slate-soft);
+  max-width: 70ch;
+}
+.loc-photo figcaption span { color: var(--slate); font-style: italic; }
+
+/* ---------- Monthly market report ----------
+   2026-08-16. The figures ARE the content here, so they get to be the largest thing on
+   the page rather than being set as body copy with numbers in it. */
+.mr-stats { display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 26px; }
+.mr-stat { display: flex; flex-direction: column; gap: 4px; }
+.mr-figure { font-family: var(--font-display); font-size: clamp(30px, 4vw, 44px); line-height: 1.05; color: var(--charcoal); }
+.mr-label { font-family: var(--font-sans); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--deep-mauve); }
+.mr-note { font-size: 13px; line-height: 1.6; color: var(--slate-soft); margin-top: 4px; }
+.mr-stats-dark .mr-figure { color: #fff; }
+.mr-stats-dark .mr-label { color: var(--dusty-rose); }
+.mr-stats-dark .mr-note { color: rgba(255, 255, 255, .7); }
+/* The "as of" line is a credibility statement, not fine print -- it is what separates
+   this from a national aggregator's guess, so it stays legible. */
+.mr-asof { font-size: 14px; line-height: 1.7; color: var(--slate-soft); margin-top: 18px; max-width: 70ch; }
+
+
+/* 2026-08-18: YouTube facade — the real thumbnail plus a play button, so the
+   ~600KB player loads only when someone actually clicks (see __ytPlay in
+   build.py's header script). Brand play button: charcoal disc, white glyph. */
+/* Inside .video-embed the container already reserves the box with
+   padding-top (56.25% on tour pages, 75% on listing cards) — the facade must
+   fill it absolutely, exactly as the iframe it replaced did, or the button
+   stacks BELOW the reserved space and the card shows a blank charcoal box
+   with a squished thumbnail underneath (2026-08-18, Christine's screenshot,
+   minutes after the facade shipped). Standalone .yt-facade (outside a
+   .video-embed) keeps its own 16:9 box via aspect-ratio. */
+.yt-facade { position: relative; display: block; width: 100%; aspect-ratio: 16/9; padding: 0; border: 0; cursor: pointer; background: var(--charcoal); overflow: hidden; }
+.video-embed .yt-facade { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; }
+.yt-facade img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .92; transition: opacity .2s ease, transform .3s ease; }
+.yt-facade:hover img, .yt-facade:focus-visible img { opacity: 1; transform: scale(1.02); }
+.yt-facade::before { content: ""; position: absolute; top: 50%; left: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(20,20,21,.82); box-shadow: 0 4px 18px rgba(20,20,21,.35); transition: background .2s ease; }
+.yt-facade:hover::before, .yt-facade:focus-visible::before { background: var(--deep-mauve); }
+.yt-facade::after { content: ""; position: absolute; top: 50%; left: 50%; margin: -11px 0 0 -7px; border-style: solid; border-width: 11px 0 11px 18px; border-color: transparent transparent transparent #fff; }
+
+/* Community build-out galleries (2026-08-19): Christine's aerial photography
+   of the master-planned communities this site's buyers shop -- two-up on
+   desktop, single column on phones. */
+.town-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 28px; }
+.town-gallery figure { margin: 0; }
+.town-gallery img { width: 100%; border-radius: 4px; box-shadow: 0 10px 30px rgba(20,20,21,.10); display: block; }
+.town-gallery figcaption { margin-top: 9px; font-size: .85rem; line-height: 1.5; color: var(--slate-soft); }
+@media (max-width: 760px) { .town-gallery { grid-template-columns: 1fr; gap: 20px; } }
+</style>
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "@id": "https://signaturepropertycollection.com/#christine-gwinnup", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/", "image": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "thelittleladyinc@gmail.com", "priceRange": "$$$$", "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "08:00", "closes": "20:00"}], "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Morgan County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady", "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390", "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2", "https://christinegwinnup.lpt.com/", "https://www.thelittleladysellshomes.com/"], "knowsAbout": ["Luxury real estate", "Relocation to Northern Colorado", "Acreage and horse property", "Downsizing", "Estate homes", "New construction", "Land development", "Multi-generational homes", "Retirement relocation", "Expired listings", "Home valuation", "Real estate negotiation"], "dateModified": "2026-08-20", "geo": {"@type": "GeoCoordinates", "latitude": 40.3978, "longitude": -105.075}, "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://signaturepropertycollection.com/index.html"}, {"@type": "ListItem", "position": 2, "name": "Explore Northern Colorado"}]}</script>
