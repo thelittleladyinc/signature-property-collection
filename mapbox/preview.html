@@ -640,6 +640,24 @@ var SPC_DATA = {"siteOrigin":"https://signaturepropertycollection.com","counties
         }
       });
     }
+    // 3D buildings: real footprints extruded to their mapped heights, fading
+    // in past zoom ~13.5. Honest expectations set in the README: this is
+    // OpenStreetMap massing — solid shapes, not photoreal houses — and it is
+    // richest downtown (Fort Collins, Boulder, Denver) and thinner on rural
+    // parcels. Looks best tilted (3D Terrain on).
+    if (!map.getLayer('spc-3d-buildings') && map.getSource('composite')) {
+      map.addLayer({
+        id: 'spc-3d-buildings', type: 'fill-extrusion', source: 'composite',
+        'source-layer': 'building', minzoom: 13.2,
+        filter: ['==', ['get', 'extrude'], 'true'],
+        paint: {
+          'fill-extrusion-color': satOn ? '#8a8a8e' : '#3a3a40',
+          'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13.2, 0, 14.2, ['get', 'height']],
+          'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 13.2, 0, 14.2, ['get', 'min_height']],
+          'fill-extrusion-opacity': 0.72
+        }
+      });
+    }
     if (!map.getSource('draw-poly')) {
       map.addSource('draw-poly', { type: 'geojson', data: drawFeature() });
     }

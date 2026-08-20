@@ -43,6 +43,10 @@ What you'll see, all in the brand (charcoal, dusty rose, cream, Corinthia):
   tour videos in their popups), from the site's own sold-homes geocoder.
 - **3D Terrain** — the Front Range actually rises out of the map. Try it
   with Satellite on and look at Horsetooth or the Poudre Canyon.
+- **3D buildings** — zoom past ~13 with 3D Terrain on and buildings rise
+  from their real footprints. Honest expectations: these are solid shapes
+  at mapped heights (from OpenStreetMap), not photoreal houses — richest
+  in downtown Fort Collins / Boulder / Denver, thinner on rural parcels.
 - **Fly the Tour** — a cinematic camera flight across seven of your spots,
   captioned in your voice. This is the "listing flyover" idea in miniature.
 - **Filter chips** — Where I eat / Wine & drinks / Outdoors / Around town.
