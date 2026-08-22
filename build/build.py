@@ -12886,6 +12886,79 @@ def build_redirects_and_meta():
         )
     redirect_lines += [f"{old}  {new}  301" for old, new in _legacy_url_redirects.items()]
 
+    # ---- Luxury-brand prune: 27 general-market community pages -> TLLSH ----
+    # 2026-08-22, from signature_prune_list.md. Signature is a luxury-only
+    # brand and these 27 general-market town pages duplicate the same URLs on
+    # TLLSH -- two domains competing for the same town-name queries. Each is
+    # 301'd to the identical URL on TLLSH so ranking signal consolidates on
+    # the right brand and the search result stops showing two of Christine's
+    # sites for the same query.
+    #
+    # NOTE: force flag (`301!`). These HTML files still ship on Signature (a
+    # follow-up pass will delete them from the build entirely); Netlify serves
+    # files before consulting `_redirects`, so a plain 301 would never fire.
+    # Force overrides file precedence -- the redirect wins regardless of what
+    # is on disk. Once the pages are actually removed from `paths`, the force
+    # flag can come off.
+    _TLLSH = "https://www.thelittleladysellshomes.com"
+    _PRUNE_TO_TLLSH = [
+        # Larimer County (8)
+        "/communities/larimer.html",
+        "/communities/larimer/fort-collins.html",
+        "/communities/larimer/loveland.html",
+        "/communities/larimer/berthoud.html",
+        "/communities/larimer/masonville.html",
+        "/communities/larimer/timnath.html",
+        "/communities/larimer/wellington.html",
+        "/communities/larimer/red-feather-lakes.html",
+        "/communities/larimer/estes-park.html",
+        # Weld County (16)
+        "/communities/weld.html",
+        "/communities/weld/greeley.html",
+        "/communities/weld/windsor.html",
+        "/communities/weld/severance.html",
+        "/communities/weld/eaton.html",
+        "/communities/weld/ault.html",
+        "/communities/weld/johnstown.html",
+        "/communities/weld/milliken.html",
+        "/communities/weld/firestone.html",
+        "/communities/weld/frederick.html",
+        "/communities/weld/dacono.html",
+        "/communities/weld/fort-lupton.html",
+        "/communities/weld/mead.html",
+        "/communities/weld/erie.html",
+        "/communities/weld/nunn.html",
+        "/communities/weld/pierce.html",
+        "/communities/weld/carr.html",
+        # Boulder + sub-towns
+        "/communities/boulder.html",
+        "/communities/boulder/boulder.html",
+        "/communities/boulder/lafayette.html",
+        "/communities/boulder/longmont.html",
+        "/communities/boulder/louisville.html",
+        "/communities/boulder/lyons.html",
+        "/communities/boulder/nederland.html",
+        # Broomfield
+        "/communities/broomfield.html",
+        "/communities/broomfield/broomfield.html",
+        # Denver
+        "/communities/denver.html",
+        "/communities/denver/denver.html",
+        # Adams / Jefferson / Arapahoe
+        "/communities/adams.html",
+        "/communities/jefferson.html",
+        "/communities/arapahoe.html",
+        # Morgan + sub-towns
+        "/communities/morgan.html",
+        "/communities/morgan/brush.html",
+        "/communities/morgan/fort-morgan.html",
+        "/communities/morgan/log-lane-village.html",
+        "/communities/morgan/wiggins.html",
+        # Communities index (the general county picker itself)
+        "/communities/index.html",
+    ]
+    redirect_lines += [f"{p}  {_TLLSH}{p}  301!" for p in _PRUNE_TO_TLLSH]
+
     # ---- Legacy AgentFire/WordPress URL reclamation (2026-08-14) ----
     #
     # The previous platform served trailing-slash directory URLs (/relocation/,
@@ -12903,6 +12976,7 @@ def build_redirects_and_meta():
     # after the explicit LEGACY_URL_REDIRECTS above (which are hand-curated
     # and must win) and before the catch-all pattern at the end.
     seen_targets = {ln.split()[0] for ln in redirect_lines}
+    _prune_set = set(_PRUNE_TO_TLLSH)                # short-circuit lookup
     legacy_lines = []
     for p in paths:
         if p == "/index.html":
@@ -12910,6 +12984,12 @@ def build_redirects_and_meta():
         slug = p[: -len(".html")]
         if slug.endswith("/index"):
             slug = slug[: -len("/index")]
+        # If this page is being pruned to TLLSH, point the trailing-slash and
+        # bare variants at TLLSH directly rather than at the local .html --
+        # otherwise every old inbound link becomes a two-hop chain
+        # (/foo/ -> /foo.html -> https://tllsh/foo.html). Netlify tolerates it
+        # but Google prefers a single 301.
+        _pruned_target = f"{_TLLSH}{p}" if p in _prune_set else p
         for old in (slug + "/", slug):
             if old not in seen_targets:
                 # 301! — the bang FORCES the redirect. Without it these rules were
@@ -12936,7 +13016,7 @@ def build_redirects_and_meta():
                 # the canonical tag, the sitemap and every internal link already
                 # name. No loop is possible: /foo 301s to /foo.html, and /foo.html
                 # has no rule of its own.
-                legacy_lines.append(f"{old}  {p}  301!")
+                legacy_lines.append(f"{old}  {_pruned_target}  301!")
                 seen_targets.add(old)
     redirect_lines += legacy_lines
 
