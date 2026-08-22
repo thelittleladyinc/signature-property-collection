@@ -12745,10 +12745,32 @@ def build_redirects_and_meta():
                 redirect_lines.append(
                     f"/blog/{_slug}  https://www.thelittleladysellshomes.com/blog/{_slug}.html  301")
 
-    redirect_lines += [
-        "/:num-:street-:city-co-:zip/  /current-listings.html  301",
-        "/:num-:street-:city-co-:zip  /current-listings.html  301",
-    ]
+    # 2026-08-22: REMOVED the two greedy address-shaped catch-all rules that
+    # used to live here:
+    #   /:num-:street-:city-co-:zip/  /current-listings.html  301
+    #   /:num-:street-:city-co-:zip    /current-listings.html  301
+    #
+    # Intent: catch old property-address URLs like 50842-county-road-33-nunn-co-80648
+    # and route them to the current listings page. Reality: Netlify's parameter
+    # matcher is greedy — it matched ANY hyphen-separated URL ending in a short
+    # trailing token, including nonsense URLs, spam probes, crawler fuzz, and
+    # hypothetical strings like /foreclosure-homes-for-sale-in-loveland that
+    # don't correspond to any real page. Every unknown URL therefore returned
+    # 301 to /current-listings.html instead of a proper 404. Consequences:
+    #
+    #   1. Every crawler/bot hit "succeeded", inflating Signature's traffic
+    #      to ~90% bots (GA4 showed Singapore/Frankfurt/HK dominating).
+    #   2. Duplicate-URL signals to Google — hundreds of unique inbound URLs
+    #      pointing at one destination page looks like scaled-content abuse
+    #      even though no such pages exist as real files.
+    #   3. Real 404s were hidden, so genuinely broken internal links from other
+    #      sites or old inbound campaigns went undetected.
+    #
+    # The two explicit per-address 301s earlier in the file (50842-county-road-33
+    # and 475-homestead-ln) still handle the actual legacy address URLs that
+    # matter. Any new address-URL redirects should be added explicitly, one
+    # line each, above in the _legacy_url_redirects block or its equivalent.
+    # (No trailing catch-all rule is appended.)
 
     redirects = "\n".join(redirect_lines) + "\n"
     with open(os.path.join(OUT, "_redirects"), "w") as f:

@@ -459,22 +459,3 @@
 /blog/why-timing-the-market-rarely-works-and-what-to-focus-on-instead  https://www.thelittleladysellshomes.com/blog/why-timing-the-market-rarely-works-and-what-to-focus-on-instead.html  301
 /blog/why-your-home-didnt-sell-the-first-time-and-how-to-fix-it.html  https://www.thelittleladysellshomes.com/blog/why-your-home-didnt-sell-the-first-time-and-how-to-fix-it.html  301
 /blog/why-your-home-didnt-sell-the-first-time-and-how-to-fix-it  https://www.thelittleladysellshomes.com/blog/why-your-home-didnt-sell-the-first-time-and-how-to-fix-it.html  301
-# 2026-08-22: REMOVED the two greedy address-shaped catch-all rules.
-# They were:
-#   /:num-:street-:city-co-:zip/  /current-listings.html  301
-#   /:num-:street-:city-co-:zip    /current-listings.html  301
-#
-# Intent: catch old property-address URLs like 50842-county-road-33-nunn-co-80648
-# and route them to current listings. Reality: Netlify's parameter matcher is
-# greedy — it matched ANY hyphen-separated URL ending in a short trailing token,
-# including nonsense URLs, spam probes, crawler fuzz, and hypothetical
-# "foreclosure-homes-for-sale-in-loveland" strings. Every unknown URL returned
-# 301 to a real page instead of 404. Consequences:
-#   1. Every crawler/bot request "succeeded", inflating traffic ~90% with bots.
-#   2. Duplicate-URL signals to Google — hundreds of unique URLs pointing at
-#      one destination looks like scaled-content abuse.
-#   3. Real 404s were hidden, so broken internal links went undetected.
-#
-# The two explicit per-address redirects earlier in this file (50842-county-road-33
-# and 475-homestead-ln) still cover the actual old address URLs that matter.
-# Any new address-URL redirects should be added explicitly, one line each.
