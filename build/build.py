@@ -5538,6 +5538,95 @@ def _usd(n):
     return f"${n:,.0f}"
 
 
+# ---- Regional live-inventory snapshot (2026-08-22) -----------------------
+# The manual /northern-colorado-market-report page carries hand-maintained sold
+# figures each month -- this site's feed deliberately never carries Sold/Closed
+# data (compliance), which is why the sold-comps section still has to be edited
+# by hand from the monthly IRES pull.
+#
+# What the feed DOES carry is active inventory across every NoCo town, and we
+# already load it here as TOWN_MARKET. Signature's regional page had no way to
+# express "here is what is on the market right now" between hand-updates, so a
+# reader landing in mid-August saw June numbers and no live signal at all.
+#
+# This function is a straight port of the same helper on TLLSH: same 21-day
+# staleness rule, same NoCo trio (Larimer/Weld/Boulder), same weighted-median
+# math. It runs alongside the hand-maintained sold data rather than replacing
+# it -- the two answer different questions and the page now says so.
+def _live_market_snapshot():
+    """Region-wide active-inventory stats, or None when we shouldn't quote numbers."""
+    towns = TOWN_MARKET.get("towns") or {}
+    if not towns:
+        return None
+    generated = TOWN_MARKET.get("generated_at")
+    try:
+        age = (datetime.date.fromisoformat(BUILD_DATE)
+               - datetime.date.fromisoformat(generated)).days
+    except (TypeError, ValueError):
+        return None
+    if age > TOWN_MARKET_STALE_DAYS:
+        return None
+
+    # The three counties this site's regional page speaks for. NOT the wider
+    # priority list -- averaging Denver metro into a page titled "Northern
+    # Colorado" would be a different market wearing this page's name.
+    NOCO = {"larimer", "weld", "boulder"}
+    wanted = []
+    for county in COUNTIES:
+        if county["slug"] in NOCO:
+            wanted.extend((c, county["slug"]) for c in county["cities"])
+    seen, rows = set(), []
+    for city, county_slug in wanted:            # de-dupe (Windsor spans two counties)
+        if city in seen:
+            continue
+        seen.add(city)
+        st = towns.get(city)
+        if st and st.get("median_list") and st.get("active"):
+            rows.append({"city": city, "url": _city_url(county_slug, city), **st})
+    if len(rows) < 5:                           # too thin to call a regional read
+        return None
+
+    def _weighted_median(key):
+        pairs = sorted(((r[key], r["active"]) for r in rows if r.get(key)),
+                       key=lambda p: p[0])
+        total = sum(w for _, w in pairs)
+        if not total:
+            return None
+        half, run = total / 2.0, 0
+        for value, weight in pairs:
+            run += weight
+            if run >= half:
+                return value
+        return pairs[-1][0]
+
+    return {
+        "generated_at": generated,
+        "age_days": age,
+        "towns": rows,
+        "town_count": len(rows),
+        "active_total": sum(r["active"] for r in rows),
+        "median_list": _weighted_median("median_list"),
+        "median_ppsf": _weighted_median("median_price_per_sqft"),
+        "by_volume": sorted(rows, key=lambda r: -r["active"]),
+        # Top of the market -- 50-listing floor so a small town's outlier can't
+        # sit at the top on the strength of two ranches.
+        "by_price": sorted([r for r in rows if r["active"] >= 50],
+                           key=lambda r: -r["median_list"]),
+    }
+
+
+def _live_market_asof(snap):
+    """The dated 'live from IRES' line -- freshness claim rather than apology."""
+    when = datetime.date.fromisoformat(snap["generated_at"]).strftime("%B %-d, %Y")
+    age = snap["age_days"]
+    freshness = ("today" if age == 0 else
+                 "yesterday" if age == 1 else f"{age} days ago")
+    return (f'<p class="mr-asof">Live from <strong>IRES MLS</strong>, last refreshed '
+            f'{freshness} ({esc(when)}) across {snap["town_count"]} Northern Colorado '
+            f'towns. These are <strong>asking</strong> prices on homes for sale right '
+            f'now &mdash; what sellers are asking, not what buyers finally paid.</p>')
+
+
 def _town_place_schema(city, county_name, url_path, welcome, data_slug=None):
     """Place node for a town page, so the page declares the entity it is about.
 
@@ -11062,6 +11151,69 @@ def build_nav_pages():
          f"privately."),
     ]
     mr_faq_html, mr_faq_schema = _faq_block(mr_faqs)
+
+    # ---- Live active-inventory section --------------------------------
+    # Sits above the monthly sold section: asking prices from town_market.json,
+    # refreshed on every build, degrade-to-nothing when older than 21 days.
+    # This site's feed deliberately never carries Sold/Closed data (compliance),
+    # so the sold section below still needs a hand-updated JSON each month --
+    # this section keeps the top of the page from ever looking stale.
+    snap = _live_market_snapshot()
+    live_section = ""
+    if snap:
+        live_region_stats = "".join([
+            _stat(f"{snap['active_total']:,}", "Homes for sale right now",
+                  f"Across {snap['town_count']} Northern Colorado towns."),
+            _stat(f"${snap['median_list']:,}", "Median asking price",
+                  "Weighted by how many homes each town actually has listed."),
+            _stat(f"${snap['median_ppsf']}", "Median price per square foot",
+                  "The number that compares a 1,400 sq ft ranch to a 3,000 sq ft two-story."),
+        ])
+        live_table_rows = []
+        for r in snap["by_volume"][:12]:
+            name = (f'<a href="{esc(r["url"])}">{esc(r["city"])}</a>'
+                    if r.get("url") else esc(r["city"]))
+            ppsf = f"${r['median_price_per_sqft']}" if r.get("median_price_per_sqft") else "&mdash;"
+            live_table_rows.append(
+                f"<tr><th scope=\"row\">{name}</th>"
+                f"<td>{r['active']:,}</td>"
+                f"<td>${r['median_list']:,}</td>"
+                f"<td>{ppsf}</td></tr>")
+        live_town_table = f"""<div class="town-table-wrap">
+      <table class="town-table">
+        <thead><tr><th scope="col">Town</th><th scope="col">Homes For Sale</th>
+        <th scope="col">Median Asking Price</th><th scope="col">Per Sq Ft</th></tr></thead>
+        <tbody>
+        {"".join(live_table_rows)}
+        </tbody>
+      </table>
+    </div>"""
+        live_section = f"""
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Live From IRES MLS</span>
+    <h2 class="section-title">Northern Colorado Right Now</h2>
+    {_live_market_asof(snap)}
+    <div class="mr-stats">{live_region_stats}</div>
+    <p class="lede" style="max-width:75ch;margin-top:28px">Asking prices answer a different
+    question than the sold figures below &mdash; they are what sellers are asking for homes on
+    the market today, not what buyers finally paid. The monthly report underneath is the
+    sold half of the picture, hand-verified from IRES each month. Together they are the
+    whole market: what is available and what actually trades.</p>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Town By Town</span>
+    <h3 class="section-title">Where The Inventory Is</h3>
+    <p class="lede">Busiest markets first &mdash; also the towns whose medians rest on the
+    most listings, which makes them the most reliable to read.</p>
+    {live_town_table}
+    <p class="mr-asof" style="margin-top:20px">Towns with too few listings to aggregate
+    honestly are left out rather than guessed at.</p>
+  </div>
+</section>"""
+
     mr_body = f"""
 <section class="hero" style="padding:100px 0 60px">
   <div class="wrap">
@@ -11073,9 +11225,10 @@ def build_nav_pages():
     {_market_report_age_note(mr)}
   </div>
 </section>
+{live_section}
 <section class="tight">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">The Whole Market</span>
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Whole Market &middot; Sold Prices</span>
     <h2 class="section-title">{esc(mr['month_label'])} At A Glance</h2>
     <div class="mr-stats">{region_stats}</div>
     <p class="lede" style="max-width:75ch;margin-top:28px">{esc(mr.get('takeaway') or '')}</p>
