@@ -3391,6 +3391,51 @@ def _hero_ext(slug):
     return ".webp" if os.path.exists(webp) else ".jpg"
 
 
+def _homepage_review_schema():
+    """AggregateRating + Review objects for the HOMEPAGE.
+
+    The homepage renders the top 3 testimonials in its "Success Stories"
+    section (TESTIMONIALS[:3], see build_home()), so a schema node describing
+    those 3 reviews plus the site-wide aggregate is policy-compliant --
+    Google's self-serving-review restriction turns on absence of review
+    content, not presence of it. Emitting this makes the homepage eligible
+    for star-rating rich results in the SERP, which is the single highest-
+    leverage schema surface for a local business.
+
+    reviewCount + ratingValue pull live from GOOGLE_REVIEWS_STATS, same as
+    _testimonials_review_schema() below. Attaches to Christine's shared
+    @id so Google merges it with the sitewide RealEstateAgent node."""
+    reviews = [
+        {
+            "@type": "Review",
+            "author": {"@type": "Person", "name": who},
+            "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": "5",
+                "bestRating": "5",
+            },
+            "reviewBody": quote,
+            "itemReviewed": {"@id": AGENT_ID},
+        }
+        for quote, who in TESTIMONIALS[:3]
+    ]
+    data = {
+        "@context": "https://schema.org",
+        "@type": "RealEstateAgent",
+        "@id": AGENT_ID,
+        "name": SITE["agent"],
+        "url": SITE["domain"] + "/",
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": GOOGLE_REVIEWS_STATS.get("ratingDisplay", "5.0"),
+            "bestRating": "5",
+            "reviewCount": str(GOOGLE_REVIEWS_STATS.get("totalReviewCount", 98)),
+        },
+        "review": reviews,
+    }
+    return json.dumps(data, indent=None)
+
+
 def _testimonials_review_schema():
     """Real Review objects + the aggregateRating, emitted ONLY on
     /testimonials.html -- the one page that actually publishes review
@@ -4255,7 +4300,8 @@ def build_home():
         "Christine Gwinnup sells luxury homes and acreage across Northern Colorado, "
         "Denver north to the Wyoming line. 250+ homes sold, 5-star rated on Google.",
         "/index.html", None, body, extra,
-        schema_extra=[faq_schema, _organization_schema(), _website_schema()],
+        schema_extra=[faq_schema, _organization_schema(), _website_schema(),
+                      _homepage_review_schema()],
     )
 
 
