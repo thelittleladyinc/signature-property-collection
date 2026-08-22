@@ -3072,11 +3072,27 @@ def nav_html(active=None):
 # was silently changing its meaning.
 GOOGLE_REVIEWS_URL = "https://g.page/r/CZbs8kiTCII_EBM"
 
+# Live Google Business Profile review stats, cached to build/data/google_reviews.json.
+# 2026-08-22 (per Christine): the site-wide visible copy no longer displays a review
+# COUNT (previously "158 Five-Star Google Reviews", which was the combined
+# Christine+Kendra brochure number and not verifiable via any single connected GBP).
+# Every visible mention is now the count-free phrase "5-Star Rated on Google". The
+# real numeric count (from Christine's actual GBP location, via the Perplexity Computer
+# GBP connector) is still emitted in AggregateRating structured data so Google can
+# verify it against her live profile. Refresh via: python3 build/refresh_google_reviews.py
+# (which in the Perplexity environment triggers the connector).
+try:
+    with open(os.path.join(os.path.dirname(__file__), "data", "google_reviews.json")) as _gr_f:
+        GOOGLE_REVIEWS_STATS = json.load(_gr_f)
+except (OSError, json.JSONDecodeError):
+    # Fall back to the last-known verified number rather than crashing the build.
+    GOOGLE_REVIEWS_STATS = {"totalReviewCount": 98, "averageRating": 5.0, "ratingDisplay": "5.0"}
+
 
 def _trust_ribbon_html():
     return f"""<div class="trust-ribbon">
   <div class="wrap">
-    <a class="item" href="{GOOGLE_REVIEWS_URL}" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>158 Five-Star Google Reviews</a>
+    <a class="item" href="{GOOGLE_REVIEWS_URL}" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>5-Star Rated on Google</a>
     <span class="divider">&middot;</span>
     <span class="item">250+ Homes Sold As A Team</span>
     <span class="divider">&middot;</span>
@@ -3386,11 +3402,12 @@ def _testimonials_review_schema():
     policy AND matched its spam-guidance pattern, so it carried the
     downside without the upside.
 
-    The 99/5.0 figure itself is real and deliberately conservative --
-    Christine's own individually-verified Google Business Profile count,
-    NOT the 158 combined Christine+Kendra total quoted in her brochure.
-    Keep it that way: aggregateRating should only ever describe the entity
-    it's attached to."""
+    The reviewCount/ratingValue below now pull live from GOOGLE_REVIEWS_STATS
+    (build/data/google_reviews.json), which caches Christine's individually-
+    verified Google Business Profile numbers. It is deliberately NOT the 158
+    combined Christine+Kendra total quoted in her brochure -- aggregateRating
+    should only ever describe the entity it's attached to, and this schema is
+    attached to Christine as an individual RealEstateAgent."""
     reviews = [
         {
             "@type": "Review",
@@ -3413,9 +3430,9 @@ def _testimonials_review_schema():
         "url": SITE["domain"] + "/testimonials.html",
         "aggregateRating": {
             "@type": "AggregateRating",
-            "ratingValue": "5.0",
+            "ratingValue": GOOGLE_REVIEWS_STATS.get("ratingDisplay", "5.0"),
             "bestRating": "5",
-            "reviewCount": "99",
+            "reviewCount": str(GOOGLE_REVIEWS_STATS.get("totalReviewCount", 98)),
         },
         "review": reviews,
     }
@@ -4202,7 +4219,7 @@ def build_home():
 
 <section>
   <div class="wrap">
-    <span class="eyebrow">158 Five-Star Google Reviews</span>
+    <span class="eyebrow">5-Star Rated on Google</span>
     <h2 class="section-title">Success Stories</h2>
     <div class="grid-3">
       {testimonial_cards}
@@ -4236,7 +4253,7 @@ def build_home():
         # _fit_description trimmed off "Denver north to the Wyoming line", which was
         # the whole point of rewriting it.
         "Christine Gwinnup sells luxury homes and acreage across Northern Colorado, "
-        "Denver north to the Wyoming line. 250+ homes sold, 158 five-star Google reviews.",
+        "Denver north to the Wyoming line. 250+ homes sold, 5-star rated on Google.",
         "/index.html", None, body, extra,
         schema_extra=[faq_schema, _organization_schema(), _website_schema()],
     )
@@ -6108,7 +6125,7 @@ def build_about():
     </div>
     <div class="card">
       <h3>By The Numbers</h3>
-      <p>&#9733;&#9733;&#9733;&#9733;&#9733; 158 Five-Star Reviews on Google<br>
+      <p>&#9733;&#9733;&#9733;&#9733;&#9733; 5-Star Rated on Google<br>
       250+ Homes Sold &amp; $200M+ in Sales Volume &mdash; combined with Kendra Bajcar<br>
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
@@ -6194,7 +6211,7 @@ def build_about():
     <div class="grid-3">
       <div class="card">
         <h3>Read The Reviews</h3>
-        <p>158 five-star Google reviews, in her clients' own words &mdash; buyers, sellers,
+        <p>5-star rated on Google, in her clients' own words &mdash; buyers, sellers,
         and fellow agents alike.</p>
         <a class="cta" href="/testimonials.html">Read Testimonials &rarr;</a>
       </div>
@@ -6772,12 +6789,12 @@ def build_testimonials():
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">&#9733;&#9733;&#9733;&#9733;&#9733; 158 Reviews on Google &mdash; Every One 5 Stars</span>
+    <span class="eyebrow" style="color:var(--dusty-rose)">&#9733;&#9733;&#9733;&#9733;&#9733; 5-Star Rated on Google</span>
     <h1>Testimonials</h1>
     <p class="lede">Discover what sellers, agents, and buyers have to say about working
     with {SITE['agent']} &mdash; a hand-picked few below, straight from real Google reviews.</p>
     <div class="btn-row">
-      <a class="btn btn-outline" href="{google_reviews_url}" target="_blank" rel="noopener">Read All 158 On Google &rarr;</a>
+      <a class="btn btn-outline" href="{google_reviews_url}" target="_blank" rel="noopener">Read Them All On Google &rarr;</a>
     </div>
   </div>
 </section>
@@ -11325,7 +11342,7 @@ def build_nav_pages():
          f"There is no honest single answer, and any agent claiming to be it should be "
          f"treated with suspicion. What you can check is verifiable: {SITE['agent']} of "
          f"{SITE['name']} ({SITE['brokerage']}) has sold 150+ homes herself and 250+ as a "
-         f"duo, holds 158 five-star Google reviews, and publishes her closed sales by "
+         f"duo, is 5-star rated on Google, and publishes her closed sales by "
          f"town. Compare that against any other agent you are considering, on the same "
          f"three questions."),
     ]

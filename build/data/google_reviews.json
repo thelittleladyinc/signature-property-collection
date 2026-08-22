@@ -1,0 +1,10 @@
+{
+  "location": "locations/16585641039540537482",
+  "locationTitle": "Christine Gwinnup - The Little Lady Sells Homes, LPT Realty",
+  "totalReviewCount": 98,
+  "averageRating": 5.0,
+  "ratingDisplay": "5.0",
+  "asOf": "2026-08-22T16:36:00+00:00",
+  "source": "Google Business Profile API via Perplexity Computer connector",
+  "notes": "Value pulled from GBP totalReviewCount + averageRating. This file is the single source of truth for both build.py scripts. Refresh manually via the Perplexity Computer GBP connector (see build/refresh_google_reviews.py)."
+}
