@@ -6354,35 +6354,41 @@ def build_city_pages():
 
 # --------------------------------------------------------------- ABOUT ----
 def build_about():
+    # 2026-08-23 (Wave 3 differentiation): hero + opening bio rewritten to
+    # lead with the RealTrends Top 0.5% credential and the $200M+ Kendra
+    # partnership rather than generic "top-performing / award-winning /
+    # exceptional results" language that overlapped with TLLSH. Signature
+    # voice rules apply: Advisor register, no exclamations, italics not bold.
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">Meet {SITE['agent']}</span>
-    <h1>Representing Northern<br>Colorado's Finest</h1>
-    <p class="lede">Recognized among Northern Colorado's top-performing real estate
-    professionals, delivering award-winning service, innovative strategies, and
-    exceptional results.</p>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Signature Property Collection</span>
+    <h1>Two Agents, One Segment.<br>Northern Colorado&rsquo;s Luxury Tier.</h1>
+    <p class="lede">{SITE['agent']} and Kendra Bajcar co-lead the Signature Property
+    Collection &mdash; RealTrends Verified 2025, Top 0.5% of Realtors&reg; nationwide,
+    with a combined $200M+ in sales volume across Larimer, Weld and Boulder County&rsquo;s
+    estate and acreage tier.</p>
   </div>
 </section>
 <section>
   <div class="wrap grid-2">
     <div>
       <h2 class="section-title">{SITE['agent']}</h2>
-      <p class="lede">{SITE['agent']} is a top-performing, award-winning Realtor&reg; known
-      for delivering exceptional results across Northern Colorado. She works alongside
-      her real estate partner Kendra Bajcar as a duo, and together they serve a diverse
-      clientele, including veterans and seasoned investors.</p>
-      <p class="lede">Her expertise spans luxury homes, farm and ranch properties, VA loans,
-      and acreage estates. As a Certified Real Estate Negotiator (CREN) and Luxury Home Marketing
-      Expert, she's known for helping investors build lucrative portfolios through creative
-      financing, lease options, and fix-and-flip ventures.</p>
-      <p class="lede">A proud member of NAR, CAR, and LBAR, {SITE['agent'].split()[0]} holds a
-      Social Media Marketing Certification, a Pricing Strategy Advisor designation, and a
-      B.A. and M.Ed. Before real estate, she spent 23 years as an ESL teacher — and today
-      donates 10% of every commission to people in need. That commitment isn't just a line
-      item — after Hurricane Helene devastated communities across the Southeast, she personally
-      drove a trailer of food and supplies to families in crisis. No platform, no publicity —
-      just gratitude in motion.</p>
+      <p class="lede">Christine leads pricing, listing narrative, and negotiation on
+      every Signature Property Collection listing &mdash; the parts of a luxury sale that
+      decide the outcome. She holds the CREN (Certified Real Estate Negotiator), PSA
+      (Pricing Strategy Advisor), and CLHMS (Certified Luxury Home Marketing Specialist)
+      designations, and was recognized as RealTrends Verified Top 0.5% of Realtors
+      nationwide in 2025.</p>
+      <p class="lede">Her depth is in Northern Colorado&rsquo;s land, acreage, and rural
+      luxury market &mdash; the well-and-septic diligence, water-rights realities, and
+      wildfire and insurance exposure that separate a good estate offer from a bad one.
+      She has been an active real estate investor since 1992, which means she reads a
+      transaction from the principal&rsquo;s side of the table as well as the agent&rsquo;s.</p>
+      <p class="lede">Before real estate she spent 23 years as an ESL teacher, and she
+      donates 10% of every commission to people in need &mdash; a line she keeps quiet
+      about. After Hurricane Helene, she drove a trailer of food and supplies to families
+      in the Southeast personally. No platform, no publicity, just gratitude in motion.</p>
       <div class="btn-row" style="justify-content:flex-start;margin-top:20px">
         <a class="btn btn-dark" href="/sellers.html">List Your Home</a>
         <a class="btn btn-outline" href="/seller-local-proof.html">What Is My Neighborhood Already Worth? &rarr;</a>
@@ -6817,6 +6823,52 @@ SELLERS_FAQ = [
      "homes, not a showreel from a vendor."),
 ]
 
+# 2026-08-23 (luxury differentiation): Signature-specific seller FAQ used only
+# on Signature's /sellers.html. Written for owners of $900K+ homes, estate
+# properties, and acreage where the concerns are different — the smaller
+# qualified buyer pool, discretion, the co-list partnership with Kendra, and
+# how a luxury launch differs from a residential one. Signature voice rules
+# apply (Advisor register, no exclamations, italics not bold).
+SELLERS_FAQ_SIGNATURE = [
+    ("How is a luxury listing marketed differently from a standard one?",
+     "The audience is smaller and more deliberate, so the marketing has to reach the "
+     "right thirty people rather than the closest three hundred. That means editorial "
+     "photography and cinematic video shot for the home specifically, printed brochures "
+     "and a luxury magazine placement, targeted outreach through the luxury broker "
+     "network, and private showings by appointment instead of open-house foot traffic. "
+     "The public MLS listing is the last step, not the first."),
+    ("Why are two agents on the Signature Property Collection listings?",
+     "Kendra Bajcar and I co-lead every Signature listing at $900,000 and above — a "
+     "true 50/50 partnership, not a team lead handing you off to an assistant. You get "
+     "two agents whose entire focus is Northern Colorado's luxury tier, not one agent "
+     "stretched across residential, luxury, and everything in between."),
+    ("Will my listing be kept discreet if we ask for that?",
+     "Yes. Some sellers want the full public launch — syndication, open house, every "
+     "portal. Others want the property shown quietly, by appointment, to a short list "
+     "of buyers before anything appears online. Both work at this level, and we set "
+     "which lane you want at the strategy meeting, before a single photo is taken."),
+    ("What is the Platinum marketing package, and is it standard?",
+     "Platinum is the Signature Property Collection standard — not an upgrade you have "
+     "to ask for. It includes editorial photography, drone imagery, property naming "
+     "when appropriate, professional staging where needed, a printed luxury brochure "
+     "and magazine placement, a pre-listing inspection, billboards, targeted luxury "
+     "buyer outreach, a broker event, private showings by appointment, and "
+     "concierge-level service through closing. Every $900K+ listing gets it."),
+    ("How long does a luxury home usually take to sell in Northern Colorado?",
+     "Longer than a mid-market home, and that is normal rather than a warning. In the "
+     "$1M+ tier the qualified buyer pool is a fraction of the size, and those buyers "
+     "take their time — they tour, they think, they come back. Precision on price at "
+     "launch is what decides whether a luxury home trades inside sixty days or sits "
+     "for six months. The current tier-specific figures live on the monthly Northern "
+     "Colorado market report rather than being frozen into this page."),
+    ("Is a pre-listing inspection worth it on a luxury home?",
+     "On a home at this price, almost always. A pre-inspection is included in the "
+     "Platinum package for a reason — it moves the discovery of any real issue from "
+     "the middle of your contract, where it becomes a renegotiation you are losing, to "
+     "before the property goes live, where it is a repair you chose to make on your "
+     "timeline."),
+]
+
 RELOCATION_FAQ = [
     ("Which Northern Colorado town should I move to?",
      "It depends on the four things people ask about before houses: the schools, the "
@@ -6850,6 +6902,54 @@ RELOCATION_FAQ = [
      "with Christine, she is paid through the transaction in the normal way."),
 ]
 
+# 2026-08-23 (luxury differentiation): Signature-specific FAQ used only on
+# Signature's /relocation.html — the shared RELOCATION_FAQ above stays in
+# place for TLLSH-style pages. This one is written for executives, corporate
+# relocation buyers, and out-of-state luxury buyers moving into the estate
+# and acreage tier, and follows Signature voice rules (Advisor register,
+# quiet luxury, no ALL CAPS, no exclamation points, italics not bold).
+RELOCATION_FAQ_SIGNATURE = [
+    ("What does an executive relocation into Northern Colorado look like?",
+     "It usually starts before you can travel. We map estate-tier neighborhoods against "
+     "the four things that actually decide the move — the commute to your office or "
+     "private terminal, the schools your family needs, what your household requires from "
+     "acreage or privacy, and whether you want to be in an established neighborhood or "
+     "on land. From there we run private tours, coordinate a jumbo lender if one is not "
+     "already in place, and handle every step through closing so you arrive to a home "
+     "that is ready, not a project."),
+    ("Can you show properties before they are on the public market?",
+     "When they exist, yes. Kendra and I keep an active roster of pre-MLS inventory and "
+     "pocket listings across the Signature Property Collection — homes where the owner "
+     "is willing to sell to the right buyer but not yet ready for the public showings "
+     "and open houses that come with a listed property. Off-market is not a promise on "
+     "every search; it is a lane we can open when your timing, price, and profile fit."),
+    ("How is a luxury relocation different from a standard one?",
+     "The property itself is a smaller part of the work. At this level the transaction "
+     "usually involves a jumbo or private-bank lender, a home to sell in another market "
+     "on its own timeline, a corporate relocation package with its own rules, an estate "
+     "attorney, and a household that has to keep functioning through the move. The "
+     "agent's job is to hold all of that together so the property decision is the one "
+     "you actually spend time on."),
+    ("What does Northern Colorado offer executives compared to the Denver Metro?",
+     "Space, view, and a shorter distance between your front door and open country — "
+     "without giving up flight access. Mariana Butte, Waterfront at Boyd Lake, the "
+     "foothills corridors above Loveland and Fort Collins, and the acreage belts around "
+     "Windsor and Berthoud all deliver estate-tier homes at price points that in the "
+     "southern metro would buy considerably less land and considerably more traffic. "
+     "For clients splitting time between here and Denver, DIA is roughly an hour, and "
+     "the Northern Colorado Regional Airport handles private aircraft directly."),
+    ("Do you work with buyers who cannot travel to Colorado first?",
+     "Regularly. We run live video walkthroughs on the property, on the street, and "
+     "through the neighborhood — the parts a listing photo never shows. When the fit "
+     "is right we can write and negotiate remotely, then hand you a full inspection "
+     "package and a walk-in-ready home when you land."),
+    ("Is there a fee to work with you on relocation?",
+     "No. There is no consultation charge and no retainer. If you eventually buy with "
+     "the Signature Property Collection, we are paid through the transaction in the "
+     "normal way — and if the right fit turns out to be a specialist elsewhere, we will "
+     "tell you directly."),
+]
+
 
 # --------------------------------------------------------------- BUYERS ---
 def build_buyers():
@@ -6859,35 +6959,73 @@ def build_buyers():
     # direction to narrow Signature to the luxury tier specifically rather
     # than compete with her general-market brand for the same broad
     # buyer-intent search terms.
+    # 2026-08-23 (Wave 3 differentiation): reframed around the four distinct
+    # luxury-buyer profiles (executive relocation, out-of-state remote, land
+    # and acreage, private/discreet), and expanded the process into six
+    # concrete Signature-specific steps (pre-approval with a jumbo lender,
+    # off-market roster access, private showings, well/septic/water-rights
+    # diligence, discreet negotiation, concierge close). Adds an explicit
+    # Kendra 50/50 beat so the co-list partnership shows up consistently
+    # with /sellers.html. Target similarity: <55% vs TLLSH's /buyers.html.
     body = """
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
-    <h1>Your Estate Awaits</h1>
-    <p class="lede">For buyers who expect more than a standard search — private showings,
-    off-market access, and a process built for estate homes, acreage, and architecturally
-    significant properties.</p>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Signature Property Collection</span>
+    <h1>Buying An Estate Home In Northern Colorado</h1>
+    <p class="lede">Estate homes, acreage, and architecturally significant properties
+    across Larimer, Weld and Boulder County &mdash; represented by two RealTrends-verified
+    agents whose entire focus is Northern Colorado&rsquo;s luxury and acreage tier.</p>
     <div class="btn-row">
-      <a class="btn btn-primary" href="/contact.html">Get Started</a>
-      <a class="btn btn-outline" href="/concierge-experience.html">See What That Means &rarr;</a>
+      <a class="btn btn-primary" href="/contact.html">Request A Private Search</a>
+      <a class="btn btn-outline" href="/concierge-experience.html">See The Concierge Experience &rarr;</a>
     </div>
   </div>
 </section>
 <section>
   <div class="wrap">
-    <span class="eyebrow">The Advantage You Deserve</span>
-    <h2 class="section-title">Buy With Confidence</h2>
-    <p class="lede">From helping veterans secure VA loans on estate-sized acreage to guiding
-    luxury buyers through a well-crafted offer on a marquee property, we make high-end
-    homeownership seamless and rewarding.</p>
+    <span class="eyebrow">Who We Represent</span>
+    <h2 class="section-title">Four Kinds Of Luxury Buyer, One Approach</h2>
+    <p class="lede">A luxury search is not one profile. Most Signature Property Collection
+    buyers fall into one of four situations &mdash; the approach adjusts to yours.</p>
+    <div class="grid-2" style="gap:32px">
+      <div class="card"><h3>Executive Relocation</h3><p>Corporate relocation packages,
+      jumbo lender coordination, and a search that stays quiet until you decide it should
+      not. See our <a href="/relocation.html">executive relocation</a> page for the full
+      process.</p></div>
+      <div class="card"><h3>Out-Of-State &amp; Remote</h3><p>Live video walkthroughs on
+      the property and through the neighborhood, remote writing and negotiating, and a
+      full inspection package waiting when you arrive.</p></div>
+      <div class="card"><h3>Land, Acreage &amp; Water Rights</h3><p>Well permits, augmentation
+      plans, ditch-company rules, septic diligence &mdash; the specialist work Kendra leads
+      on rural and equestrian properties in Larimer and Weld County.</p></div>
+      <div class="card"><h3>Private &amp; Discreet</h3><p>For buyers who need the search
+      itself to stay confidential &mdash; pocket listings, off-MLS inventory, and showings
+      that never appear on a public calendar.</p></div>
+    </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Process</span>
+    <h2 class="section-title">Six Steps From Introduction To Keys</h2>
     <div class="grid-3">
-      <div class="card"><h3>01&ndash;02 &middot; Get Ready</h3><p>Pre-approval and a
-      focused search across Loveland, Berthoud, Masonville and beyond, including
-      off-market and pre-public inventory.</p></div>
-      <div class="card"><h3>03&ndash;05 &middot; Make It Yours</h3><p>A well-crafted
-      offer, earnest money, and a qualified inspection team experienced with estate
-      homes and acreage.</p></div>
-      <div class="card"><h3>06&ndash;07 &middot; Close</h3><p>Radon testing, final
-      walkthrough, and a smooth path to closing day.</p></div>
+      <div class="card"><h3>01 &middot; Confidential Consultation</h3><p>What you are
+      looking for, what needs to stay private, and what timeline the search actually
+      has.</p></div>
+      <div class="card"><h3>02 &middot; Jumbo &amp; Private-Bank Pre-Approval</h3><p>Introductions
+      to local jumbo lenders who write in the estate tier every week, if you do not
+      already have one.</p></div>
+      <div class="card"><h3>03 &middot; Off-Market Roster</h3><p>Access to our pocket
+      listings and pre-MLS inventory across the Signature Property Collection, in
+      addition to the public IRES feed.</p></div>
+      <div class="card"><h3>04 &middot; Private Showings</h3><p>Cinematic virtual tours
+      for out-of-state buyers, and in-person showings scheduled around the property
+      &mdash; not the other way around.</p></div>
+      <div class="card"><h3>05 &middot; Diligence &amp; Discreet Negotiation</h3><p>Well
+      and septic inspection, radon, wildfire and insurance review, and an offer written
+      with the leverage the market actually gives you.</p></div>
+      <div class="card"><h3>06 &middot; Concierge Close</h3><p>Final walkthrough, closing,
+      and local introductions on your terms once you have the keys.</p></div>
     </div>
   </div>
 </section>
@@ -6928,33 +7066,70 @@ def build_sellers():
     # narrow Signature's seller content to the luxury tier rather than
     # compete with her general-market brand for the same broad
     # seller-intent search terms.
+    # 2026-08-23 (Wave 3 differentiation): copy rewritten again, this time
+    # with concrete Platinum-package specifics from Christine's AI Clone v9
+    # (Part 5 — editorial photography 30–40 images, property naming, luxury
+    # magazine, broker event, pre-inspection standard) and explicit Kendra
+    # 50/50 co-list language, to drive the Signature-vs-TLLSH similarity on
+    # this page below 50%.
     body = """
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
-    <h1>Marketing Matters</h1>
-    <p class="lede">Luxury homes don't sell themselves — they sell on cinematic marketing,
-    precise pricing, and a strategy built for Northern Colorado's high-end market.</p>
-    <div class="btn-row"><a class="btn btn-primary" href="/contact.html">Free Home Valuation</a></div>
+    <span class="eyebrow" style="color:var(--dusty-rose)">Signature Property Collection</span>
+    <h1>Selling An Estate Home In Northern Colorado</h1>
+    <p class="lede">A quieter, more deliberate launch — editorial photography, a printed
+    brochure and luxury magazine placement, private showings by appointment, and a
+    marketing plan built for the buyer pool a $1M+ home actually sells to.</p>
+    <div class="btn-row"><a class="btn btn-primary" href="/contact.html">Request A Confidential Valuation</a></div>
   </div>
 </section>
 <section>
   <div class="wrap">
-    <span class="eyebrow">The Advantage You Deserve</span>
-    <h2 class="section-title">Sell With The Best Luxury Agent In Colorado</h2>
-    <p class="lede">Personalized pricing strategy and marketing built specifically for
-    estate homes, acreage, and architecturally significant properties — the kind of
-    listing a generalist approach undersells.</p>
+    <span class="eyebrow">Co-listed With Kendra Bajcar</span>
+    <h2 class="section-title">Two Agents, One Segment</h2>
+    <p class="lede">Every Signature Property Collection listing at $900,000 and above is
+    co-listed 50/50 with Kendra Bajcar. Not a team lead handing you off &mdash; two
+    RealTrends-verified agents whose entire focus is Northern Colorado&rsquo;s luxury
+    and acreage tier, together on your property.</p>
     <div class="grid-2" style="gap:40px;align-items:stretch">
-      <div class="card"><h3>Comprehensive Marketing</h3><p>Digital, print, and social
-      media strategies with premium placement on Zillow and Realtor.com.</p></div>
-      <div class="card"><h3>Photography &amp; Video</h3><p>High-resolution photography,
-      cinematic video tours, and drone footage.</p></div>
-      <div class="card"><h3>Virtual &amp; Physical Staging</h3><p>Professional staging
-      &mdash; virtual or hands-on interior design &mdash; to highlight your home's
-      potential and maximize buyer interest.</p></div>
-      <div class="card"><h3>Expert Negotiation</h3><p>Years of experience and negotiation
-      certifications working to get you top dollar.</p></div>
+      <div class="card"><h3>Editorial Photography &amp; Video</h3><p>Museum-quality stills
+      (30&ndash;40 images), cinematic video, and drone shot for your home specifically
+      &mdash; not a template applied to it.</p></div>
+      <div class="card"><h3>Printed Brochure &amp; Luxury Magazine</h3><p>A physical
+      brochure that photographs and reads at the level of the home, plus placement in
+      a luxury magazine reaching the buyer pool that actually transacts at this tier.</p></div>
+      <div class="card"><h3>Private Showings By Appointment</h3><p>Qualified buyers,
+      shown quietly. Open houses only when they serve the strategy for the specific
+      property &mdash; not because it is the default.</p></div>
+      <div class="card"><h3>Pre-Inspection &amp; Property Naming</h3><p>A pre-listing
+      inspection is standard, not an upgrade, and where the home warrants it we give
+      it a name that carries into the marketing.</p></div>
     </div>
+  </div>
+</section>
+<section class="tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">The Platinum Standard</span>
+    <h2 class="section-title">What Every Signature Listing Includes</h2>
+    <p class="lede">Platinum is the default for every $900K+ Signature Property Collection
+    listing &mdash; not an upgraded package you have to negotiate into. Everything below
+    is included:</p>
+    <div class="grid-3" style="gap:24px">
+      <div class="card"><h3>Editorial-quality photography (30&ndash;40 images) &amp; drone imagery</h3></div>
+      <div class="card"><h3>Cinematic listing video shot on the property</h3></div>
+      <div class="card"><h3>Property naming, when the home warrants it</h3></div>
+      <div class="card"><h3>Full professional staging, where needed</h3></div>
+      <div class="card"><h3>Printed luxury brochure &amp; magazine placement</h3></div>
+      <div class="card"><h3>Pre-listing inspection</h3></div>
+      <div class="card"><h3>Billboards on high-traffic Northern Colorado corridors</h3></div>
+      <div class="card"><h3>Targeted luxury broker &amp; buyer outreach</h3></div>
+      <div class="card"><h3>Private broker event on the property</h3></div>
+      <div class="card"><h3>Private showings by appointment</h3></div>
+      <div class="card"><h3>Concierge-level service through closing</h3></div>
+      <div class="card"><h3>Full Signature Property Collection branding</h3></div>
+    </div>
+    <p class="lede" style="margin-top:24px;font-size:.9em;opacity:.75"><em>Packages are
+    for Listing Brokerage and Listing Agent Fee Only.</em></p>
   </div>
 </section>
 """
@@ -7017,13 +7192,15 @@ def build_sellers():
   </div>
 </section>
 """
+    # 2026-08-23: FAQ swapped to Signature-specific set. The shared SELLERS_FAQ
+    # remains available for TLLSH-style pages and is deliberately unmodified.
     page(
         "Luxury Home Marketing & Selling in Northern Colorado | Signature Property Collection",
         "Sell an estate home or luxury property in Loveland, Berthoud, Masonville, or "
         "across the Larimer, Weld & Boulder County Front Range with cinematic marketing "
         "built for the high-end market.",
-        "/sellers.html", "Sell", body + _faq_block(SELLERS_FAQ)[0],
-        schema_extra=[_faq_block(SELLERS_FAQ)[1]],
+        "/sellers.html", "Sell", body + _faq_block(SELLERS_FAQ_SIGNATURE)[0],
+        schema_extra=[_faq_block(SELLERS_FAQ_SIGNATURE)[1]],
     )
 
 
@@ -10754,13 +10931,17 @@ def build_nav_pages():
     (see CITY_VIDEOS / HOME_TOUR_VIDEOS above) rather than a placeholder."""
 
     # ---- Relocation ----
+    # 2026-08-23 (luxury differentiation): process steps rewritten for the
+    # executive/luxury relocation audience — private tours, off-market
+    # inventory, jumbo-lender coordination, discreet negotiation. These do
+    # not overlap with the general-market relocation steps used on TLLSH.
     steps = [
-        ("01", "Initial Consultation", "We'll discuss your relocation needs, preferences, and goals to create a personalized plan tailored to your situation."),
-        ("02", "Explore Neighborhoods", "Get expert insight into Northern Colorado's top communities, schools, and amenities to find the right fit for your lifestyle."),
-        ("03", "Home Search & Virtual Tours", "Browse curated listings and take advantage of virtual or in-person tours, no matter where you're currently located."),
-        ("04", "Connect With Local Resources", f"Get access to {SITE['agent'].split()[0]}'s trusted network of lenders, movers, and contractors to ease your transition."),
-        ("05", "Navigate The Logistics", "From negotiations to paperwork, every detail is handled to ensure a smooth, stress-free transaction."),
-        ("06", "Settle Into Your New Home", "Support continues after the move, with tips, resources, and ongoing guidance to help you feel at home."),
+        ("01", "Confidential Consultation", "A private conversation about timing, discretion, corporate relocation package terms, and whether the search should include off-market inventory or run publicly. Nothing is listed anywhere until you decide it should be."),
+        ("02", "Estate-Tier Neighborhoods", "A short list of the communities that actually fit — Mariana Butte, Waterfront at Boyd Lake, the Pyrenees, Namaqua Hills, Kinston at Centerra, Estes Park's estate corridors, and Fort Collins acreage — mapped against your commute, schools, and privacy requirements."),
+        ("03", "Private Showings & Pre-Public Access", "Cinematic walkthroughs, live virtual showings for out-of-state buyers, and access to pocket and pre-MLS inventory when the fit warrants it. You see what belongs in your search, not everything in the price band."),
+        ("04", "Luxury Vendor Network", "Introductions to the specialists this level of transaction needs — jumbo and private-bank lenders, private moving crews, estate attorneys, well and septic consultants, wildfire and insurance advisors, and interior designers who know the local trades."),
+        ("05", "Discreet Negotiation", "Estate-tier offers written with the leverage the market actually gives you — including seller-carry structures, sale-contingent bridges when your current home is in another market, and appraisal strategy when the comp set is thin."),
+        ("06", "Concierge Handoff", "A single point of contact from first call through closing, and local introductions on your terms once you are here. The relationship does not end at the closing table — the network is the part that keeps working."),
     ]
     steps_html = "\n      ".join(
         f"""<div class="card"><h3>{n}. {esc(t)}</h3><p>{esc(d)}</p></div>""" for n, t, d in steps
@@ -10824,16 +11005,19 @@ def build_nav_pages():
   <div class="wrap grid-2">
     <div>
       <h2 class="section-title">Start Your Relocation</h2>
-      <p class="lede">Moving from out of state or just across town &mdash; tell us where
-      you're coming from and what matters most, and {esc(SITE['agent'].split()[0])} will
-      personally reach out to help you plan the move.</p>
+      <p class="lede">Tell us where you&rsquo;re coming from, when you need to be in,
+      and whether the search should stay confidential. {esc(SITE['agent'].split()[0])}
+      or Kendra will reach out personally &mdash; not a coordinator.</p>
     </div>
     {_tool_lead_form("relocation", "Start Your Relocation",
         '<input type="text" name="moving_from" placeholder="Moving From (city, state)">')}
   </div>
 </section>
 """
-    body += _faq_block(RELOCATION_FAQ)[0]
+    # 2026-08-23 (luxury differentiation): FAQ swapped to the Signature-specific
+    # set — the shared RELOCATION_FAQ remains available for TLLSH-style pages
+    # and is deliberately not modified.
+    body += _faq_block(RELOCATION_FAQ_SIGNATURE)[0]
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Relocation", None)])
     page(
         "Executive & Luxury Relocation to Northern Colorado | Signature Property Collection",
@@ -10841,7 +11025,7 @@ def build_nav_pages():
         "executives, out-of-state buyers, and families moving into the estate and "
         "acreage tier.",
         "/relocation.html", None, body,
-        schema_extra=[breadcrumbs, _faq_block(RELOCATION_FAQ)[1]],
+        schema_extra=[breadcrumbs, _faq_block(RELOCATION_FAQ_SIGNATURE)[1]],
     )
 
     # ---- Expired Listings ----
