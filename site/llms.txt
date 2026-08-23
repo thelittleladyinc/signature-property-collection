@@ -11,9 +11,6 @@
 - [About Christine Gwinnup](/about.html)
 - [Buy A Home](/buyers.html)
 - [Sell A Home](/sellers.html)
-- [What Your Neighborhood Is Already Worth To You](/seller-local-proof.html)
-- [Testimonials](/testimonials.html)
-- [Contact](/contact.html)
 
 ## Counties served
 
@@ -22,9 +19,7 @@
 - [Windsor, Larimer County](/communities/larimer/windsor.html)
 
 ## Free guides
-- [11 Tips To Buy Like A Pro | Signature Property Collection](/guides/buy-like-a-pro.html)
-- [The Definitive Guide To Upsizing Into A New Home | Signature Property Collection](/guides/upsizing-into-a-new-home.html)
-- [Unlocking Maximum Value From Your Home Sale | Signature Property Collection](/guides/sell-your-home-fast.html)
+
 
 ## Market guides
 - [Selling A Luxury Home In Northern Colorado: What The 2026 Market Actually Rewards](/guides/selling-a-luxury-home-northern-colorado-2026.html)
@@ -52,20 +47,9 @@
 - [The Psychology Of Pricing: Why $2,495,000 Beats $2,500,000 In Luxury Real Estate](/blog/psychology-of-pricing-luxury-homes-northern-colorado.html) — 2025-08-04
 
 ## Tools & services
-- [Search Homes — Live IRES MLS Listings](/search-homes.html)
-- [Explore Northern Colorado — Christine Gwinnup's Interactive Map: Her Listings, Local Spots With Videos, Sold Homes, 3D Terrain](/explore.html)
-- [Current Listings — Christine Gwinnup's Own Active Inventory With Video Tours](/current-listings.html)
 - [Relocation Services](/relocation.html)
-- [Free Home Valuation](/free-home-valuation.html)
-- [Mortgage Calculator](/mortgage-calculator.html)
-- [Past Sales](/past-sales.html)
-- [Lifestyle Home Search](/lifestyle-search.html)
-- [Sold Homes Map — Christine Gwinnup's Track Record, Mapped](/sold-homes-map.html)
 - [Northern Colorado Homes Over $1 Million — Who Buys, Who Sells, What They Search](/luxury-market.html)
-- [Press & Recognition — Christine Gwinnup's Verified Credentials](/press-recognition.html)
 - [The Concierge Experience](/concierge-experience.html)
-- [Listing Video Portfolio](/listing-video-portfolio.html)
-- [Expired Listings](/expired-listings.html)
 - [Blog RSS Feed](/feed.xml)
 
 ## Why choose Signature Property Collection

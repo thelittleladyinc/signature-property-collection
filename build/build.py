@@ -3630,6 +3630,58 @@ PRUNED_TO_TLLSH = frozenset([
     "/communities/index.html",
 ])
 
+# 2026-08-23. Second wave of two-brand consolidation. The prune above moved
+# 46 general-market TOWN pages off Signature entirely. But a deeper duplicate
+# audit showed 25 more Signature pages -- tools (mortgage calculator, home
+# search, sold-homes map), general-audience guides (buyers guide, sellers
+# guide, retirement, upsizing, land development), and shared hubs
+# (testimonials, past sales, contact) -- were 90%+ text-identical to their
+# TLLSH counterparts. Google was seeing the same content on two domains and
+# picking whichever one it liked, splitting authority both ways.
+#
+# The fix here is different from the prune: these pages STAY LIVE on Signature
+# (they're linked from luxury pages, they're referenced by ads, and a visitor
+# arriving from a Signature URL should not be bounced to a different brand).
+# Instead we declare TLLSH as the canonical version. Signature keeps the URL
+# working, but Google consolidates its ranking signals onto the TLLSH copy.
+# When we later rewrite one of these for luxury-specific copy we remove it
+# from this set and it earns its own ranking independently.
+#
+# The 5 pages we did NOT put in this set are the ones already positioned for
+# luxury or ready to be: /about, /buyers, /sellers, /relocation, and
+# /northern-colorado-market-report -- each has distinct titles/H1s already
+# and is a candidate for a proper luxury rewrite.
+CROSS_BRAND_CANONICAL_TO_TLLSH = frozenset([
+    # Tools with no luxury variant
+    "/mortgage-calculator.html",
+    "/search-homes.html",
+    "/sold-homes-map.html",
+    "/lifestyle-search.html",
+    "/current-listings.html",
+    "/free-home-valuation.html",
+    "/seller-local-proof.html",
+    "/listing-video-portfolio.html",
+    # Hubs that are aggregations
+    "/testimonials.html",
+    "/press-recognition.html",
+    "/past-sales.html",
+    "/expired-listings.html",
+    "/explore.html",
+    "/contact.html",
+    # General-audience guides that read identical on both sites
+    "/guides/buyers-guide.html",
+    "/guides/sellers-guide.html",
+    "/guides/buy-like-a-pro.html",
+    "/guides/sell-your-home-fast.html",
+    "/guides/upsizing-into-a-new-home.html",
+    "/downsizing-in-northern-colorado.html",
+    "/guides/best-places-to-retire-in-northern-colorado.html",
+    "/guides/cost-to-develop-raw-land-colorado.html",
+    "/guides/multi-generational-homes-northern-colorado.html",
+    "/guides/northern-colorado-relocation-guide.html",
+    "/how-to-choose-a-real-estate-agent.html",
+])
+
 
 # 2026-08-20 (mobile PSI 84, "render-blocking requests, est. 1,550 ms"): the
 # stylesheet was the ONLY render-blocking request left after the font
@@ -3657,6 +3709,12 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
     # version of itself -- used for towns that straddle two counties and so
     # legitimately have two URLs built from the same source facts.
     canonical = SITE["domain"] + (canonical_path or path)
+    # 2026-08-23: 25 general-audience pages (tools, hubs, guides) are 90%+
+    # text-identical to their TLLSH copies. Point Google at the TLLSH version
+    # so ranking signals consolidate onto one URL instead of splitting between
+    # domains. See CROSS_BRAND_CANONICAL_TO_TLLSH at module scope for the list.
+    if canonical_path is None and path in CROSS_BRAND_CANONICAL_TO_TLLSH:
+        canonical = _TLLSH_URL + path
     # 2026-08-18: was logo-full.png — a 1400x523 wide logo on TRANSPARENT
     # ground, which share platforms crop unpredictably and render on whatever
     # background they like (black in iMessage dark mode). og-card.png is a
@@ -12767,12 +12825,19 @@ def build_redirects_and_meta():
     _self_canonical = []
     _non_canonical = set()
     _pruned_excluded = 0
+    _cross_canonical_excluded = 0
     for _p in paths:
         # The 46 pruned community pages force-301 to TLLSH. Listing them in the
         # sitemap tells Google two contradictory things ("crawl this" +
         # "actually it redirects"), so exclude them here.
         if _p in PRUNED_TO_TLLSH:
             _pruned_excluded += 1
+            continue
+        # 2026-08-23: pages that declare TLLSH as canonical also should not go
+        # in Signature's sitemap. Submitting a URL that canonicalises elsewhere
+        # is a Search Console warning ("Alternate page with proper canonical").
+        if _p in CROSS_BRAND_CANONICAL_TO_TLLSH:
+            _cross_canonical_excluded += 1
             continue
         _f = os.path.join(OUT, _p.lstrip("/"))
         _canon = None
@@ -12787,6 +12852,8 @@ def build_redirects_and_meta():
         _self_canonical.append(_p)
     if _pruned_excluded:
         print(f"  sitemap: excluded {_pruned_excluded} pruned URLs (301 to TLLSH)")
+    if _cross_canonical_excluded:
+        print(f"  sitemap: excluded {_cross_canonical_excluded} cross-brand-canonical URLs (→ TLLSH)")
     _sitemap_paths = _self_canonical
 
     urls = "\n".join(
@@ -12867,7 +12934,8 @@ def build_redirects_and_meta():
     # exists for the force-301 to fire against) but must never be submitted
     # for indexing.
     unlisted = sorted(on_disk - listed - {"/404.html"} - NOINDEX_PATHS
-                      - _non_canonical - PRUNED_TO_TLLSH)
+                      - _non_canonical - PRUNED_TO_TLLSH
+                      - CROSS_BRAND_CANONICAL_TO_TLLSH)
     stale = sorted(listed - on_disk)
     if unlisted:
         print(f"  ! sitemap: {len(unlisted)} built page(s) NOT in the sitemap "
@@ -13161,7 +13229,14 @@ def build_llms_txt(paths):
         if CITY_DATA_SLUG.get(city) in CITY_CONTENT
         and f"/communities/{c['slug']}/{_city_url_slug(CITY_DATA_SLUG[city])}.html" not in PRUNED_TO_TLLSH
     )
-    guide_lines = "\n".join(f"- [{title}]({p})" for _, p, title, _ in GUIDE_PAGES)
+    # Same rule as cities/counties: don't list a guide in llms.txt if the page
+    # canonicalises to TLLSH. An AI answer engine that follows the link ends
+    # up citing a page that itself says "the real one is over here".
+    guide_lines = "\n".join(
+        f"- [{title}]({p})"
+        for _, p, title, _ in GUIDE_PAGES
+        if p not in CROSS_BRAND_CANONICAL_TO_TLLSH
+    )
     market_topic_lines = "\n".join(
         f"- [{t['title']}](/guides/{t['slug']}.html)" for t in MARKET_TOPIC_PAGES
     )
@@ -13172,24 +13247,32 @@ def build_llms_txt(paths):
         suffix = f" — {p['date']}" if p.get("date") else ""
         return f"- [{p['title']}](/blog/{p['slug']}.html){suffix}"
     blog_lines = "\n".join(_blog_line(p) for p in BLOG)
-    tool_lines = "\n".join([
-        "- [Search Homes — Live IRES MLS Listings](/search-homes.html)",
-        f"- [Explore Northern Colorado — {SITE['agent']}'s Interactive Map: Her Listings, "
-        "Local Spots With Videos, Sold Homes, 3D Terrain](/explore.html)",
-        f"- [Current Listings — {SITE['agent']}'s Own Active Inventory With Video Tours](/current-listings.html)",
-        "- [Relocation Services](/relocation.html)",
-        "- [Free Home Valuation](/free-home-valuation.html)",
-        "- [Mortgage Calculator](/mortgage-calculator.html)",
-        "- [Past Sales](/past-sales.html)",
-        "- [Lifestyle Home Search](/lifestyle-search.html)",
-        f"- [Sold Homes Map — {SITE['agent']}'s Track Record, Mapped](/sold-homes-map.html)",
-        "- [Northern Colorado Homes Over $1 Million — Who Buys, Who Sells, What They Search](/luxury-market.html)",
-        f"- [Press & Recognition — {SITE['agent']}'s Verified Credentials](/press-recognition.html)",
-        "- [The Concierge Experience](/concierge-experience.html)",
-        "- [Listing Video Portfolio](/listing-video-portfolio.html)",
-        "- [Expired Listings](/expired-listings.html)",
-        "- [Blog RSS Feed](/feed.xml)",
-    ])
+    # 2026-08-23: this list used to include every tool + hub. Now it only
+    # lists the ones we consider Signature-native. Pages that canonicalise to
+    # TLLSH (mortgage calc, sold-homes-map, testimonials, etc.) get filtered
+    # so llms.txt doesn't advertise pages that point elsewhere for authority.
+    _tool_candidates = [
+        ("- [Search Homes — Live IRES MLS Listings](/search-homes.html)", "/search-homes.html"),
+        (f"- [Explore Northern Colorado — {SITE['agent']}'s Interactive Map: Her Listings, "
+         "Local Spots With Videos, Sold Homes, 3D Terrain](/explore.html)", "/explore.html"),
+        (f"- [Current Listings — {SITE['agent']}'s Own Active Inventory With Video Tours](/current-listings.html)", "/current-listings.html"),
+        ("- [Relocation Services](/relocation.html)", "/relocation.html"),
+        ("- [Free Home Valuation](/free-home-valuation.html)", "/free-home-valuation.html"),
+        ("- [Mortgage Calculator](/mortgage-calculator.html)", "/mortgage-calculator.html"),
+        ("- [Past Sales](/past-sales.html)", "/past-sales.html"),
+        ("- [Lifestyle Home Search](/lifestyle-search.html)", "/lifestyle-search.html"),
+        (f"- [Sold Homes Map — {SITE['agent']}'s Track Record, Mapped](/sold-homes-map.html)", "/sold-homes-map.html"),
+        ("- [Northern Colorado Homes Over $1 Million — Who Buys, Who Sells, What They Search](/luxury-market.html)", "/luxury-market.html"),
+        (f"- [Press & Recognition — {SITE['agent']}'s Verified Credentials](/press-recognition.html)", "/press-recognition.html"),
+        ("- [The Concierge Experience](/concierge-experience.html)", "/concierge-experience.html"),
+        ("- [Listing Video Portfolio](/listing-video-portfolio.html)", "/listing-video-portfolio.html"),
+        ("- [Expired Listings](/expired-listings.html)", "/expired-listings.html"),
+        ("- [Blog RSS Feed](/feed.xml)", "/feed.xml"),
+    ]
+    tool_lines = "\n".join(
+        line for line, path in _tool_candidates
+        if path not in CROSS_BRAND_CANONICAL_TO_TLLSH
+    )
     faq_lines = "\n\n".join(f"**{q}**\n{a}" for q, a in HOME_FAQ)
     content = f"""# {SITE['name']}
 
@@ -13204,9 +13287,6 @@ def build_llms_txt(paths):
 - [About {SITE['agent']}](/about.html)
 - [Buy A Home](/buyers.html)
 - [Sell A Home](/sellers.html)
-- [What Your Neighborhood Is Already Worth To You](/seller-local-proof.html)
-- [Testimonials](/testimonials.html)
-- [Contact](/contact.html)
 
 ## Counties served
 {county_lines}
