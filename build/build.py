@@ -6217,8 +6217,9 @@ def build_city_pages():
       <span class="eyebrow" style="color:var(--dusty-rose)">See It For Yourself</span>
       <h2 class="section-title">{esc(vid_title)}</h2>
       <p class="lede">A real video tour from {esc(SITE['agent'])}'s own YouTube channel.</p>
-      <div class="btn-row" style="justify-content:flex-start;margin-top:16px">
-        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/listing-video-portfolio.html">More Video Tours &rarr;</a>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:16px;gap:12px;flex-wrap:wrap">
+        <a class="btn" style="background:#141415;color:#fff" href="/luxury-home-tours.html">See The Luxury Portfolio &rarr;</a>
+        <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/listing-video-portfolio.html">All Video Tours &rarr;</a>
       </div>
     </div>
   </div>
@@ -10677,9 +10678,10 @@ def build_luxury_market():
         <p class="video-embed-caption" style="color:#e8e5e0">Weld County acreage — 4,200 sq ft on
         4+ acres in Nunn.</p></div>
     </div>
-    <div class="btn-row" style="margin-top:28px">
-      <a class="btn" style="background:#B86F7A;color:#F8F6F4" href="{LUXURY_PLAYLIST_URL}"
-         target="_blank" rel="noopener">Watch All 14 Luxury Home Tours &rsaquo;</a>
+    <div class="btn-row" style="margin-top:28px;gap:12px;flex-wrap:wrap">
+      <a class="btn" style="background:#B86F7A;color:#F8F6F4" href="/luxury-home-tours.html">See All 14 Luxury Tours &rsaquo;</a>
+      <a class="btn btn-outline" style="border-color:#e8e5e0;color:#e8e5e0" href="{LUXURY_PLAYLIST_URL}"
+         target="_blank" rel="noopener">Watch On YouTube</a>
     </div>
   </div>
 </section>
@@ -10707,6 +10709,220 @@ def build_luxury_market():
         schema_extra=[breadcrumbs, faq_schema, _luxury_playlist_schema()],
     )
 
+
+# ----------------------------------------------- LUXURY HOME TOURS HUB ----
+# 2026-08-23 (Wave 5 P1 #3). Curated video-portfolio landing page for every
+# tour in LUXURY_PLAYLIST_VIDEOS. Anchor URL for sitemap-videos.xml so the 14
+# luxury videos on this site concentrate ranking signal on ONE canonical
+# 'here is Christine's luxury video work' destination instead of being
+# scattered across community pages that also compete for other queries.
+#
+# Not to be confused with /listing-video-portfolio.html which is a general-
+# market video page canonical-to-TLLSH (mixed general + luxury videos, wrong
+# brand fit). This page is luxury-only and lives natively on Signature.
+
+def build_luxury_home_tours():
+    # Grouped luxury playlist videos. Same 14 VIDs from LUXURY_PLAYLIST_VIDEOS
+    # but re-arranged into three curated sections (playlist order is
+    # tours-first-then-context, this repackages it as three storylines).
+    signature_property_tours = [
+        ("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado",
+         "Nunn, Colorado", "The estate on 4+ acres that sets the tone for what a Signature listing looks like."),
+        ("PxB2iHNqT74", "Luxury Home Tour in Erie Colorado — Signature Property Listing",
+         "Erie, Colorado", "A recent Signature Property Collection listing filmed for the buyer who wants to see the full space before flying in."),
+        ("dqPsEqR55Wk", "913 Green Mountain Dr, Erie — Signature Property",
+         "Erie, Colorado", "Address-specific tour — the kind of video buyers watch three times before scheduling a showing."),
+        ("K2XYDr2cgYU", "What Makes a Home Luxurious? — Colliers Hill Erie Luxury Home",
+         "Erie, Colorado", "Christine walks through the finishes, layout, and lot decisions that separate a $700K home from a luxury one."),
+    ]
+    featured_property_tours = [
+        ("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland",
+         "Olde Course, Loveland", "The Olde Course property that's featured on Christine's dedicated Loveland-Olde-Course page."),
+        ("Dr5RN8_VfbU", "Custom Ranch Home with 4,000+ Sq Ft You Won't Believe",
+         "Northern Colorado", "Single-level ranch on acreage — the layout most Northern Colorado luxury buyers ask for by name."),
+        ("kAr4BH8C-JA", "4,200 Sq Ft Home on 4+ Acres in Nunn, Colorado",
+         "Nunn, Colorado", "The acreage tour that shows what actual room-to-breathe looks like north of Fort Collins."),
+        ("-i3DOTQ5zN4", "MillCreek Open House Tour",
+         "MillCreek Community", "An open-house walkthrough filmed the day of the event."),
+    ]
+    community_and_lifestyle = [
+        ("Jz4kQHtpfzM", "Why Loveland Buyers Love The Olde Course",
+         "Olde Course, Loveland", "Community context for the golf-course tour above — the neighborhood story behind the property."),
+        ("JFfx8G9OxP0", "Why Everyone Loves Living in Erie Colorado",
+         "Erie, Colorado", "The town-scale story behind Signature's Erie tours."),
+        ("YvIPzWebofA", "Is This The Best Lake In Fort Collins?",
+         "Fort Collins, Colorado", "Northern Colorado lifestyle — the amenities luxury buyers actually use, not just the ones agents put on brochures."),
+        ("nqPzw2QUjzA", "Sweetheart Winery — One Reason I Moved Back To Loveland",
+         "Loveland, Colorado", "Christine's own 'why here' story, filmed on location."),
+        ("2mr0--sAM7s", "Devil's Backbone — Three Things To Know Before You Hike",
+         "Loveland, Colorado", "The trailhead every Loveland buyer eventually asks about."),
+        ("2jNGXw5lzAM", "I Moved Away From Loveland, CO... And Here's Why I'm Back",
+         "Loveland, Colorado", "The full context piece — 27 years of Northern Colorado in one video."),
+    ]
+
+    def _section(heading, blurb, videos):
+        cards = []
+        for vid, title, location, caption in videos:
+            cards.append(f"""
+      <article class="lht-card">
+        <div class="video-embed">
+          <button type="button" class="yt-facade" data-yt="{vid}" data-yt-title="{esc(title)}"
+            aria-label="Play video: {esc(title)}" onclick="window.__ytPlay(this)">
+            <img src="https://i.ytimg.com/vi/{vid}/hqdefault.jpg" alt="" loading="lazy" width="480" height="360">
+          </button>
+        </div>
+        <div class="lht-card-body">
+          <p class="lht-loc">{esc(location)}</p>
+          <h3 class="lht-title">{esc(title)}</h3>
+          <p class="lht-caption">{esc(caption)}</p>
+        </div>
+      </article>""")
+            _EMBED_TITLES.setdefault(vid, title)
+        return f"""
+<section class="lht-section">
+  <div class="wrap">
+    <h2>{esc(heading)}</h2>
+    <p class="lht-section-blurb">{esc(blurb)}</p>
+    <div class="lht-grid">
+      {''.join(cards)}
+    </div>
+  </div>
+</section>"""
+
+    body = f"""
+<style>
+.lht-hero {{ background: linear-gradient(135deg, #141415 0%, #2a2a2c 100%); color: #f5f5f5; padding: 4rem 0; }}
+.lht-hero .wrap {{ max-width: 900px; }}
+.lht-hero .eyebrow {{ color: #B86F7A; font-size: .85rem; letter-spacing: .2em; text-transform: uppercase; font-weight: 600; margin-bottom: 1rem; }}
+.lht-hero h1 {{ color: #fff; font-size: clamp(2rem, 4.5vw, 3.25rem); line-height: 1.1; margin: 0 0 1.25rem; }}
+.lht-hero .lede {{ color: #d4d4d6; font-size: 1.15rem; line-height: 1.6; max-width: 780px; }}
+.lht-playlist {{ background: #f8f8f8; padding: 3rem 0; }}
+.lht-playlist .wrap {{ max-width: 900px; text-align: center; }}
+.lht-playlist h2 {{ margin-top: 0; }}
+.lht-playlist iframe {{ width: 100%; max-width: 800px; aspect-ratio: 16/9; border: 0; border-radius: 8px; box-shadow: 0 10px 30px rgba(20,20,21,.15); }}
+.lht-section {{ padding: 3.5rem 0; }}
+.lht-section:nth-child(even) {{ background: #fafafa; }}
+.lht-section h2 {{ font-size: clamp(1.5rem, 3vw, 2.15rem); margin: 0 0 .75rem; }}
+.lht-section-blurb {{ color: #555; font-size: 1.05rem; margin: 0 0 2rem; max-width: 720px; }}
+.lht-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.75rem; }}
+.lht-card {{ background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 14px rgba(20,20,21,.08); transition: transform .2s, box-shadow .2s; }}
+.lht-card:hover {{ transform: translateY(-2px); box-shadow: 0 8px 24px rgba(20,20,21,.12); }}
+.lht-card .video-embed {{ margin: 0; }}
+.lht-card-body {{ padding: 1.25rem; }}
+.lht-loc {{ color: #B86F7A; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; margin: 0 0 .5rem; }}
+.lht-title {{ font-size: 1.1rem; line-height: 1.35; margin: 0 0 .5rem; color: #141415; }}
+.lht-caption {{ color: #555; font-size: .95rem; line-height: 1.5; margin: 0; }}
+.lht-cta {{ background: #141415; color: #f5f5f5; padding: 4rem 0; text-align: center; }}
+.lht-cta .wrap {{ max-width: 720px; }}
+.lht-cta h2 {{ color: #fff; margin: 0 0 1rem; }}
+.lht-cta p {{ color: #d4d4d6; font-size: 1.1rem; margin: 0 0 1.75rem; }}
+.lht-cta .btn {{ background: #B86F7A; color: #fff; border: 0; padding: .85rem 2rem; border-radius: 4px; text-decoration: none; font-weight: 600; display: inline-block; }}
+.lht-cta .btn:hover {{ background: #a05e69; }}
+</style>
+
+<section class="lht-hero">
+  <div class="wrap">
+    <p class="eyebrow">Video Library · YouTube 1,980 subscribers</p>
+    <h1>Every luxury home tour Christine has published</h1>
+    <p class="lede">Real video work from Christine Gwinnup's own YouTube channel &mdash; the property
+    tours, community walk-throughs, and lifestyle pieces that make up the Signature Property Collection
+    portfolio in Northern Colorado. Filmed by Christine herself, not by a marketing agency guessing at
+    what a Larimer or Weld County luxury buyer wants to see.</p>
+  </div>
+</section>
+
+<section class="lht-playlist">
+  <div class="wrap">
+    <h2>Watch the full luxury playlist</h2>
+    <p style="color:#555;margin:.5rem 0 1.5rem">Fourteen videos, in order, from property tours through
+    the Northern Colorado lifestyle that surrounds them.</p>
+    <iframe src="https://www.youtube-nocookie.com/embed/videoseries?list={LUXURY_PLAYLIST_ID}"
+      title="Luxury Home Tours in NoCo — full playlist"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen loading="lazy"></iframe>
+    <p style="color:#555;font-size:.9rem;margin:1rem 0 0">
+      Or <a href="{LUXURY_PLAYLIST_URL}" target="_blank" rel="noopener" style="color:#B86F7A;text-decoration:underline">
+      watch on YouTube &rarr;</a>
+    </p>
+  </div>
+</section>
+
+{_section(
+  "Signature Property Collection listings",
+  "Recent and past Signature listings filmed at listing time — the actual homes Christine represented, presented the way buyers want to see them before they schedule a showing.",
+  signature_property_tours,
+)}
+
+{_section(
+  "Featured property tours",
+  "Homes filmed for context — showing what a specific price band, layout, or community actually looks like in Northern Colorado.",
+  featured_property_tours,
+)}
+
+{_section(
+  "The Northern Colorado lifestyle",
+  "The towns, trails, and reasons people move here. Community context that makes the property tours above make sense to a buyer coming in from out of state.",
+  community_and_lifestyle,
+)}
+
+<section class="lht-cta">
+  <div class="wrap">
+    <h2>Want a tour like this for your own listing?</h2>
+    <p>Professional video is standard on every Signature Property Collection luxury listing &mdash;
+    filmed by Christine herself, published to her YouTube channel, distributed through the same
+    portfolio you just watched.</p>
+    <a href="/contact.html" class="btn">Request a listing consultation &rarr;</a>
+  </div>
+</section>
+"""
+
+    # Combined ItemList schema for the whole page — 14 luxury videos as a
+    # CreativeWorkSeries with the playlist URL as identifier. Individual
+    # VideoObject nodes will be auto-emitted by the second-pass injector
+    # for each data-yt facade above.
+    itemlist_items = []
+    for i, (vid, title, _loc, _cap) in enumerate(
+        signature_property_tours + featured_property_tours + community_and_lifestyle,
+        start=1,
+    ):
+        itemlist_items.append({
+            "@type": "ListItem",
+            "position": i,
+            "url": f"https://www.youtube.com/watch?v={vid}",
+            "name": title,
+        })
+    luxury_hub_schema = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "@id": f"{SITE['domain']}/luxury-home-tours.html#itemlist",
+        "name": "Northern Colorado Luxury Home Tours by Christine Gwinnup",
+        "description": (
+            "Curated video portfolio of luxury home tours, community context, "
+            "and lifestyle content covering Loveland, Fort Collins, Erie, "
+            "Windsor, Nunn, Berthoud, and the Northern Colorado luxury market."
+        ),
+        "numberOfItems": len(itemlist_items),
+        "itemListOrder": "ItemListOrderAscending",
+        "url": f"{SITE['domain']}/luxury-home-tours.html",
+        "isPartOf": {"@id": YOUTUBE_CHANNEL_URL + "#channel"},
+        "provider": {"@id": ORG_ID},
+        "creator": {"@id": AGENT_ID},
+        "itemListElement": itemlist_items,
+    }
+
+    breadcrumbs = _breadcrumb_schema([
+        ("Home", "/"),
+        ("Luxury Home Tours", None),
+    ])
+
+    page(
+        f"Northern Colorado Luxury Home Tours | Video Portfolio | Signature Property Collection",
+        f"Every luxury home tour, community walk-through, and Northern Colorado lifestyle "
+        f"video Christine Gwinnup has published — filmed by her own team for Signature "
+        f"Property Collection listings in Loveland, Fort Collins, Erie, Windsor, and beyond.",
+        "/luxury-home-tours.html", None, body,
+        schema_extra=[breadcrumbs, json.dumps(luxury_hub_schema), _luxury_playlist_schema()],
+    )
 
 # --------------------------------------------------------- SOLD MAP ----
 # 2026-08-13 (Christine's request): "map my sold listings and their videos
@@ -13392,6 +13608,7 @@ def build_redirects_and_meta():
               "/past-sales.html", "/mortgage-calculator.html",
               "/search-homes.html", "/current-listings.html", "/explore.html",
               "/sold-homes-map.html", "/luxury-market.html",
+              "/luxury-home-tours.html",
               "/press-recognition.html", "/concierge-experience.html",
               "/how-to-choose-a-real-estate-agent.html",
               "/downsizing-in-northern-colorado.html",
@@ -14284,6 +14501,7 @@ if __name__ == "__main__":
     build_blog()
     build_rss_feed()
     build_luxury_market()
+    build_luxury_home_tours()
     build_sold_homes_map()
     write_sold_homes_function_data()
     write_local_spots_function_data()
