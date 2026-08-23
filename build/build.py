@@ -3495,6 +3495,66 @@ def _breadcrumb_schema(items):
     return json.dumps({"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": els})
 
 
+# Wave 5 P0.2 — luxury playlist as a queryable ItemList so an answer engine
+# reading Signature can recognize the 14 luxury video tours as one collection
+# rooted at Christine's YouTube channel, and follow the link to see the rest.
+# Google's Video sitemap doesn't require this; ItemList inside JSON-LD is what
+# lets a page like /luxury-market.html signal "there is a curated series here,
+# it lives at this YouTube playlist URL." Items are video URLs (watch pages),
+# same shape as the Google reference example for ItemList of videos.
+LUXURY_PLAYLIST_ID = "PLI7Irt7kHOmeM8LcyfV4R4GSDHAJkRvyC"
+LUXURY_PLAYLIST_URL = f"https://www.youtube.com/playlist?list={LUXURY_PLAYLIST_ID}"
+# Ordered luxury-tier videos on Christine's channel — the same 14 that make up
+# the "Luxury Home Tours in NoCo" playlist (source-of-truth: YouTube Data API,
+# session 2026-08-23). Tour-first, then context/lifestyle videos.
+LUXURY_PLAYLIST_VIDEOS = [
+    ("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado"),
+    ("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland Colorado"),
+    ("Dr5RN8_VfbU", "Custom Ranch Home with 4000+ Sq Ft You Won't Believe"),
+    ("K2XYDr2cgYU", "What Makes a Home Luxurious? — Colliers Hill Erie CO Luxury Home"),
+    ("PxB2iHNqT74", "Luxury Home Tour in Erie Colorado — Signature Property Listing by Christine Gwinnup"),
+    ("kAr4BH8C-JA", "4,200 Sq Ft Home on 4+ Acres in Nunn, Colorado"),
+    ("Jz4kQHtpfzM", "Why Loveland Buyers Love The Olde Course — Colorado Golf Living"),
+    ("JFfx8G9OxP0", "Why Everyone Loves Living in Erie Colorado"),
+    ("YvIPzWebofA", "Is This The Best Lake In Fort Collins?"),
+    ("nqPzw2QUjzA", "Sweetheart Winery — One Reason I Moved Back To Loveland"),
+    ("2mr0--sAM7s", "Devil's Backbone — Three Things To Know Before You Hike"),
+    ("2jNGXw5lzAM", "I Moved Away From Loveland, CO... And Here's Why I'm Back"),
+    ("dqPsEqR55Wk", "913 Green Mountain Dr, Erie — Signature Property"),
+    ("-i3DOTQ5zN4", "MillCreek Open House Tour"),
+]
+
+
+def _luxury_playlist_schema():
+    """ItemList JSON-LD naming Christine's Luxury Home Tours playlist and its
+    videos. Emitted on pages that curate luxury video content (homepage +
+    /luxury-market.html) so the playlist is discoverable as a collection, not
+    just as isolated VideoObject blocks the auto-emitter produces per embed."""
+    els = []
+    for i, (vid, title) in enumerate(LUXURY_PLAYLIST_VIDEOS, start=1):
+        els.append({
+            "@type": "ListItem",
+            "position": i,
+            "url": f"https://www.youtube.com/watch?v={vid}",
+            "name": title,
+        })
+    data = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": "Luxury Home Tours in Northern Colorado",
+        "description": (
+            "Video tours of luxury homes across Northern Colorado hosted by "
+            f"{SITE['agent']} — estate homes, acreage, golf-course frontage, "
+            "and custom builds from Loveland to Erie."
+        ),
+        "url": LUXURY_PLAYLIST_URL,
+        "numberOfItems": len(els),
+        "itemListOrder": "https://schema.org/ItemListOrderAscending",
+        "itemListElement": els,
+    }
+    return json.dumps(data, indent=None)
+
+
 def _schema_scripts(schema_extra):
     """schema_extra: '' | a raw JSON-LD string | a list of raw JSON-LD
     strings. Each gets its own <script> tag — never nested."""
@@ -4423,6 +4483,39 @@ def build_home():
     </div>
   </div>
 </section>
+
+<!-- Wave 5 P0.2: featured luxury video tours on the homepage. Three real
+     tours from Christine's Luxury Home Tours playlist — the ones that show a
+     $1M+ home in this market, not lifestyle context. The playlist link at the
+     bottom points at the same YouTube collection the ItemList schema names,
+     so both a human and an answer engine see "there is a whole series here." -->
+<section class="section-dark tight">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Video Tours — Watch The Homes</span>
+    <h2 class="section-title" style="color:#fff">Featured Luxury Home Tours</h2>
+    <p class="lede" style="color:#e8e5e0;max-width:780px">Cinematic tours of real Northern Colorado
+    luxury homes — shot by our team, hosted by {SITE['agent'].split()[0]}. A $1.35M small-town
+    estate, a golf-course dream home on The Olde Course, and a custom ranch you have to see to
+    believe.</p>
+    <div class="video-grid" style="grid-template-columns:repeat(3,1fr);margin-top:28px">
+      <div>{_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado")}
+        <p class="video-embed-caption" style="color:#e8e5e0">Erie — 913 Green Mountain Dr, one of
+        Christine's own Signature listings. Full cinematic tour.</p></div>
+      <div>{_yt_embed("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland Colorado")}
+        <p class="video-embed-caption" style="color:#e8e5e0">The Olde Course — what golf-course
+        luxury actually looks like from the back patio in Loveland.</p></div>
+      <div>{_yt_embed("Dr5RN8_VfbU", "Custom Ranch Home with 4000+ Sq Ft You Won't Believe")}
+        <p class="video-embed-caption" style="color:#e8e5e0">A 4,000+ sq ft custom ranch — the
+        kind of home Northern Colorado's foothills quietly hides.</p></div>
+    </div>
+    <div class="btn-row" style="margin-top:36px">
+      <a class="btn" style="background:#B86F7A;color:#F8F6F4" href="{LUXURY_PLAYLIST_URL}"
+         target="_blank" rel="noopener">Watch The Full Luxury Playlist On YouTube &rsaquo;</a>
+      <a class="btn btn-outline" style="border-color:#F8F6F4;color:#F8F6F4"
+         href="/luxury-market.html">Explore The Luxury Market &rarr;</a>
+    </div>
+  </div>
+</section>
 """
     body += _instagram_feed_section()
     faq_html, faq_schema = _faq_block(HOME_FAQ)
@@ -4449,7 +4542,7 @@ def build_home():
         "Denver north to the Wyoming line. 250+ homes sold, 5-star rated on Google.",
         "/index.html", None, body, extra,
         schema_extra=[faq_schema, _organization_schema(), _website_schema(),
-                      _homepage_review_schema()],
+                      _homepage_review_schema(), _luxury_playlist_schema()],
     )
 
 
@@ -8944,6 +9037,34 @@ def build_loveland_luxury_page():
         {"cities": "loveland"},
         empty_note="the luxury market here moves quickly,",
     )
+    # Wave 5 P0.2: three Loveland-relevant videos off the luxury playlist —
+    # the two Olde Course tours (Mariana Butte is on the page; The Olde Course
+    # is the sister municipal course, both name-checked in the copy) and the
+    # "Moved back to Loveland" piece that ties the page to Christine's own
+    # relocation story.
+    loveland_videos_html = f"""
+<section class="tight section-dark">
+  <div class="wrap">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">From Christine's Channel</span>
+    <h2 class="section-title" style="color:#fff">Loveland Luxury, On Video</h2>
+    <div class="video-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div>{_yt_embed("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland Colorado")}
+        <p class="video-embed-caption" style="color:#e8e5e0">The Olde Course — what a Loveland
+        golf-course home looks like inside.</p></div>
+      <div>{_yt_embed("Jz4kQHtpfzM", "Why Loveland Buyers Love The Olde Course")}
+        <p class="video-embed-caption" style="color:#e8e5e0">The Olde Course neighborhood and
+        why buyers keep choosing it, in under a minute.</p></div>
+      <div>{_yt_embed("2jNGXw5lzAM", "I Moved Away From Loveland, CO... And Here's Why I'm Back")}
+        <p class="video-embed-caption" style="color:#e8e5e0">Christine's own move-back story —
+        the honest case for planting roots here.</p></div>
+    </div>
+    <div class="btn-row" style="margin-top:28px">
+      <a class="btn" style="background:#B86F7A;color:#F8F6F4" href="{LUXURY_PLAYLIST_URL}"
+         target="_blank" rel="noopener">Watch The Full Luxury Playlist &rsaquo;</a>
+    </div>
+  </div>
+</section>
+"""
     body = f"""
 <section class="hero" style="padding:90px 0 60px">
   <div class="wrap">
@@ -8959,6 +9080,7 @@ def build_loveland_luxury_page():
     {feed_html}
   </div>
 </section>
+{loveland_videos_html}
 <section>
   <div class="wrap" style="max-width:780px">
     {body_html}
@@ -8976,7 +9098,7 @@ def build_loveland_luxury_page():
         "Every active $950K+ listing in Loveland, live from IRES — lakefront on Boyd Lake, Mariana Butte "
         "golf homes, foothills acreage, and Centerra custom builds, with a local luxury specialist.",
         "/loveland-luxury-homes.html", None, body,
-        schema_extra=[faq_schema],
+        schema_extra=[faq_schema, _luxury_playlist_schema()],
     )
 
 
@@ -9009,6 +9131,18 @@ def build_money_pages():
             "feed_id": "fort_collins_luxury_feed",
             "feed_params": {"cities": "fort collins"},
             "feed_heading": "Every Active Luxury Listing In Fort Collins Right Now",
+            # Wave 5 P0.2: pull one Fort Collins-shot video off the luxury
+            # playlist onto this money page. Only one true-Fort-Collins video
+            # exists in the luxury playlist (the Horsetooth-adjacent lake
+            # piece); pairing it with the small-town Erie tour would be
+            # dishonest here — that home is not in Fort Collins.
+            "videos_eyebrow": "From Christine's Channel",
+            "videos_heading": "Fort Collins, On Video",
+            "videos": [
+                ("YvIPzWebofA", "Is This The Best Lake In Fort Collins?",
+                 "Christine on one of the west-side lakes that shapes Fort Collins luxury — "
+                 "the water and foothills story a listing sheet can't tell."),
+            ],
             "paragraphs": [
                 "Where Fort Collins Luxury Actually Lives",
                 "Old Town first: the historic blocks near downtown carry homes a century old that have been "
@@ -9120,6 +9254,13 @@ def build_money_pages():
                 ("N57_J3llZCQ", "45 Acres + 40x60 Heated Shop | Custom Colorado Ranch (No HOA)",
                  "How Christine markets an acreage listing — a real tour she filmed for a 45-acre ranch with a "
                  "heated shop and no HOA."),
+                # Wave 5 P0.2: added the Nunn 4+ acre tour — same page-topic
+                # (Weld County acreage), same voice, and it slots naturally
+                # into the "where the horse properties are" paragraph that
+                # already names Nunn.
+                ("kAr4BH8C-JA", "4,200 Sq Ft Home on 4+ Acres in Nunn, Colorado",
+                 "A 4,200 sq ft home on 4+ acres in Nunn — the Weld County acreage market the paragraph "
+                 "above names, in a real tour."),
             ],
             "paragraphs": [
                 "The Three Questions That Decide Every Horse Property",
@@ -9186,6 +9327,8 @@ def build_money_pages():
             "feed_id": "golf_towns_feed",
             "feed_params": {"cities": "loveland,windsor,berthoud,timnath,erie,fort collins"},
             "feed_heading": "Live Luxury Listings Across The Golf Towns",
+            "videos_eyebrow": "From Christine's Channel",
+            "videos_heading": "Golf-Course Living, On Video",
             "videos": [
                 ("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland Colorado",
                  "Christine tours a home on The Olde Course — what golf-course living in Loveland actually "
@@ -9638,16 +9781,26 @@ def build_money_pages():
                                       empty_note="this market moves quickly,")
         videos_html = ""
         if pg.get("videos"):
+            # Wave 5 P0.2: video section heading is now per-page. Horse
+            # property still says "Ag & Acreage, Straight Talk On Video" (that
+            # is the truth for that page); other money pages get their own
+            # heading so the section reads honestly instead of copy-pasting
+            # the equestrian framing onto a Fort Collins luxury page.
+            vids = pg["videos"]
+            video_count = len(vids)
+            cols = 2 if video_count <= 2 else 3
             cards = "\n      ".join(
                 f'<div>{_yt_embed(vid, vtitle)}<p class="video-embed-caption">{esc(vcap)}</p></div>'
-                for vid, vtitle, vcap in pg["videos"]
+                for vid, vtitle, vcap in vids
             )
+            videos_heading = pg.get("videos_heading", "Ag &amp; Acreage, Straight Talk On Video")
+            videos_eyebrow = pg.get("videos_eyebrow", "From Christine's Channel")
             videos_html = f"""
 <section class="tight">
   <div class="wrap">
-    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">From Christine's Channel</span>
-    <h2 class="section-title">Ag &amp; Acreage, Straight Talk On Video</h2>
-    <div class="video-grid" style="grid-template-columns:repeat(2,1fr)">
+    <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">{videos_eyebrow}</span>
+    <h2 class="section-title">{videos_heading}</h2>
+    <div class="video-grid" style="grid-template-columns:repeat({cols},1fr)">
       {cards}
     </div>
   </div>
@@ -10402,6 +10555,37 @@ def build_luxury_market():
 
 {faq_html}
 
+<!-- Wave 5 P0.2: the video section on /luxury-market.html. This page's job
+     is to describe the $1M+ market as a whole and route buyers/sellers into
+     a conversation, so the video block is a real cross-section — an in-town
+     luxury tour, a golf-course tour, and an acreage tour — with the playlist
+     link for anyone who wants the rest. Paired with the ItemList schema
+     below so an answer engine can see the whole curated series. -->
+<section class="tight section-dark">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">From Christine's Channel</span>
+    <h2 class="section-title" style="color:#fff">The Luxury Market, On Video</h2>
+    <p class="lede" style="color:#e8e5e0;max-width:780px">A cross-section of the $1M+ market
+    across Northern Colorado: an in-town estate tour, a golf-course home, and a Weld County
+    acreage tour — three distinct slices of the same tier, filmed by our team.</p>
+    <div class="video-grid" style="grid-template-columns:repeat(3,1fr);margin-top:24px">
+      <div>{_yt_embed("e-_3Qs3liQ0", "Inside a $1.35M Luxury Home in Small-Town Colorado")}
+        <p class="video-embed-caption" style="color:#e8e5e0">Erie — 913 Green Mountain Dr. A
+        Signature listing, tour top-to-bottom.</p></div>
+      <div>{_yt_embed("2WJPuQvlhxM", "The Ultimate Golf Course Dream Home Tour in Loveland Colorado")}
+        <p class="video-embed-caption" style="color:#e8e5e0">The Olde Course — what golf-course
+        luxury looks like in Loveland.</p></div>
+      <div>{_yt_embed("kAr4BH8C-JA", "4,200 Sq Ft Home on 4+ Acres in Nunn, Colorado")}
+        <p class="video-embed-caption" style="color:#e8e5e0">Weld County acreage — 4,200 sq ft on
+        4+ acres in Nunn.</p></div>
+    </div>
+    <div class="btn-row" style="margin-top:28px">
+      <a class="btn" style="background:#B86F7A;color:#F8F6F4" href="{LUXURY_PLAYLIST_URL}"
+         target="_blank" rel="noopener">Watch All 14 Luxury Home Tours &rsaquo;</a>
+    </div>
+  </div>
+</section>
+
 <section class="tight">
   <div class="wrap" style="max-width:720px">
     <span class="eyebrow" style="color:var(--dusty-rose)">No Obligation</span>
@@ -10422,7 +10606,7 @@ def build_luxury_market():
         f"for, and how {SITE['agent']} handles luxury, acreage, and equestrian property across "
         f"Larimer, Weld, and Boulder counties.",
         "/luxury-market.html", None, body,
-        schema_extra=[breadcrumbs, faq_schema],
+        schema_extra=[breadcrumbs, faq_schema, _luxury_playlist_schema()],
     )
 
 
