@@ -4232,7 +4232,19 @@ def page(title, description, path, active, body, extra_head="", schema_extra="",
     # fixed page by page. A video whose title we somehow don't know is skipped
     # rather than given a made-up description -- an untitled entry would trade one
     # Search Console warning for a worse problem.
-    _embedded = re.findall(r"youtube-nocookie\.com/embed/([A-Za-z0-9_-]{6,})", body)
+    #
+    # 2026-08-23 fix: the detector used to look for `youtube-nocookie.com/embed/`
+    # in the rendered body, but every video on the site now goes through
+    # _yt_embed(), which renders a `yt-facade` button whose `data-yt="VIDEO_ID"`
+    # attribute is the ONLY thing in the initial HTML -- the iframe URL only
+    # materialises after a click. That silently disabled auto-schema on ~20+
+    # videos across the site (Search Console showed 43 videos with "missing
+    # description" as a result). Match the facade attribute AND the legacy
+    # iframe path (for any raw-iframe hold-outs), then de-dupe by video id.
+    _embedded = (
+        re.findall(r'data-yt="([A-Za-z0-9_-]{6,})"', body)
+        + re.findall(r"youtube-nocookie\.com/embed/([A-Za-z0-9_-]{6,})", body)
+    )
     if _embedded:
         _described = set()
         for _s in _existing:
