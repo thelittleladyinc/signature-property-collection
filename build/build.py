@@ -3680,6 +3680,11 @@ CROSS_BRAND_CANONICAL_TO_TLLSH = frozenset([
     "/guides/multi-generational-homes-northern-colorado.html",
     "/guides/northern-colorado-relocation-guide.html",
     "/how-to-choose-a-real-estate-agent.html",
+    # Legal boilerplate — same policy language, only brand name in body differs.
+    # 99% and 95% textually identical on 2026-08-23 audit. Cross-canonicalize
+    # so ranking signals consolidate onto one URL.
+    "/privacy-policy.html",
+    "/accessibility.html",
 ])
 
 
