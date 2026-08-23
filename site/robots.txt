@@ -37,3 +37,4 @@ Allow: /
 Disallow: /.netlify/functions/
 
 Sitemap: https://signaturepropertycollection.com/sitemap.xml
+Sitemap: https://signaturepropertycollection.com/sitemap-videos.xml
