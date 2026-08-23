@@ -12756,16 +12756,21 @@ def build_redirects_and_meta():
     # that other one" in the same breath. That is the mixed signal that lands a page
     # in "Duplicate, Google chose a different canonical", and it was doing it to the
     # one town this site has two pages for.
+    # 2026-08-23 REGRESSION FIX. `paths` is used BOTH to build the sitemap AND
+    # (further down) by the AgentFire block that generates trailing-slash/bare
+    # URL variants for every canonical page. If we mutate `paths` here to drop
+    # pruned pages, the AgentFire block never generates the /communities/weld/greeley/
+    # and /communities/weld/greeley variants -- which meant those URLs stopped
+    # redirecting to TLLSH and started 200'ing directly off the .html file (via
+    # Netlify's default trailing-slash resolution). Answer: build a sitemap-only
+    # view (`_sitemap_paths`) and leave `paths` untouched for the redirect code.
     _self_canonical = []
     _non_canonical = set()
     _pruned_excluded = 0
     for _p in paths:
-        # 2026-08-23. The 46 pruned community pages force-301 to TLLSH now.
-        # Listing them in the sitemap tells Google two contradictory things
-        # ("crawl this" + "actually it redirects"), which Search Console flags
-        # as "submitted URL redirects" and which slows the authority transfer.
-        # Exclude before the canonical check so we don't also print 46 lines
-        # of noise about it.
+        # The 46 pruned community pages force-301 to TLLSH. Listing them in the
+        # sitemap tells Google two contradictory things ("crawl this" +
+        # "actually it redirects"), so exclude them here.
         if _p in PRUNED_TO_TLLSH:
             _pruned_excluded += 1
             continue
@@ -12782,7 +12787,7 @@ def build_redirects_and_meta():
         _self_canonical.append(_p)
     if _pruned_excluded:
         print(f"  sitemap: excluded {_pruned_excluded} pruned URLs (301 to TLLSH)")
-    paths = _self_canonical
+    _sitemap_paths = _self_canonical
 
     urls = "\n".join(
         f"  <url><loc>{SITE['domain']}{p}</loc><lastmod>{_lastmod(p)}</lastmod>"
@@ -12798,7 +12803,7 @@ def build_redirects_and_meta():
         # is the part it can actually read, and it is the same text shown on the page.
         + _sitemap_location_image(p)
         + "</url>"
-        for p in paths if p not in NOINDEX_PATHS
+        for p in _sitemap_paths if p not in NOINDEX_PATHS
     )
     _age = _market_report_age_days(MARKET_REPORT)
     if _age is None:
@@ -12854,13 +12859,13 @@ def build_redirects_and_meta():
         "/" + os.path.relpath(f, OUT).replace(os.sep, "/")
         for f in _glob.glob(os.path.join(OUT, "**", "*.html"), recursive=True)
     }
-    listed = set(paths)
-    # A page excluded just above for naming a different canonical is not a
-    # missing page -- reporting it as one would make this guard cry wolf on
-    # every single build, which is how a load-bearing guard stops being read.
-    # Same for pages that are deliberately pruned to TLLSH: they still get
-    # built on disk (so the .html exists for the force-301 to fire against)
-    # but must never be submitted for indexing.
+    listed = set(_sitemap_paths)
+    # A page excluded above for naming a different canonical is not a missing
+    # page -- reporting it would make this guard cry wolf on every build,
+    # which is how a load-bearing guard stops being read. Same for pages
+    # deliberately pruned to TLLSH: they still get built on disk (so the .html
+    # exists for the force-301 to fire against) but must never be submitted
+    # for indexing.
     unlisted = sorted(on_disk - listed - {"/404.html"} - NOINDEX_PATHS
                       - _non_canonical - PRUNED_TO_TLLSH)
     stale = sorted(listed - on_disk)
