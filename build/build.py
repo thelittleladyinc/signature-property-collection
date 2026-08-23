@@ -3558,6 +3558,79 @@ def _fit_description(desc):
 NOINDEX_PATHS = {"/thank-you.html"}
 
 
+# 2026-08-22. Signature is a luxury-only brand; these general-market community
+# pages duplicate the same URLs on thelittleladysellshomes.com. build_redirects()
+# force-301s them all to TLLSH so external links land on the surviving copy, and
+# the sitemap generator below reads this set to STOP submitting them.
+#
+# Leaving pruned URLs in the sitemap sends Google mixed signals: "please crawl
+# this" + "actually, it 301s to TLLSH now". Search Console flags that as
+# "submitted URL redirects" coverage warnings and it slows the transfer of
+# authority. Removing them from the sitemap makes the migration clean.
+#
+# NOTE: the pages still ship on disk (their .html files still get built);
+# they just don't get submitted for indexing. The force-301 in _redirects is
+# what actually redirects any live traffic.
+_TLLSH_URL = "https://www.thelittleladysellshomes.com"
+PRUNED_TO_TLLSH = frozenset([
+    # Larimer County (8 general-market pages -- Loveland luxury subdivisions
+    # and the 4 luxury landing pages stay on Signature)
+    "/communities/larimer.html",
+    "/communities/larimer/fort-collins.html",
+    "/communities/larimer/loveland.html",
+    "/communities/larimer/berthoud.html",
+    "/communities/larimer/masonville.html",
+    "/communities/larimer/timnath.html",
+    "/communities/larimer/wellington.html",
+    "/communities/larimer/red-feather-lakes.html",
+    "/communities/larimer/estes-park.html",
+    # Weld County (county hub + all 16 towns)
+    "/communities/weld.html",
+    "/communities/weld/greeley.html",
+    "/communities/weld/windsor.html",
+    "/communities/weld/severance.html",
+    "/communities/weld/eaton.html",
+    "/communities/weld/ault.html",
+    "/communities/weld/johnstown.html",
+    "/communities/weld/milliken.html",
+    "/communities/weld/firestone.html",
+    "/communities/weld/frederick.html",
+    "/communities/weld/dacono.html",
+    "/communities/weld/fort-lupton.html",
+    "/communities/weld/mead.html",
+    "/communities/weld/erie.html",
+    "/communities/weld/nunn.html",
+    "/communities/weld/pierce.html",
+    "/communities/weld/carr.html",
+    # Boulder + sub-towns
+    "/communities/boulder.html",
+    "/communities/boulder/boulder.html",
+    "/communities/boulder/lafayette.html",
+    "/communities/boulder/longmont.html",
+    "/communities/boulder/louisville.html",
+    "/communities/boulder/lyons.html",
+    "/communities/boulder/nederland.html",
+    # Broomfield
+    "/communities/broomfield.html",
+    "/communities/broomfield/broomfield.html",
+    # Denver
+    "/communities/denver.html",
+    "/communities/denver/denver.html",
+    # Adams / Jefferson / Arapahoe
+    "/communities/adams.html",
+    "/communities/jefferson.html",
+    "/communities/arapahoe.html",
+    # Morgan + sub-towns
+    "/communities/morgan.html",
+    "/communities/morgan/brush.html",
+    "/communities/morgan/fort-morgan.html",
+    "/communities/morgan/log-lane-village.html",
+    "/communities/morgan/wiggins.html",
+    # Communities index picker itself
+    "/communities/index.html",
+])
+
+
 # 2026-08-20 (mobile PSI 84, "render-blocking requests, est. 1,550 ms"): the
 # stylesheet was the ONLY render-blocking request left after the font
 # self-hosting -- 9KB gzipped, but on slow 4G one full round trip the phone
@@ -12685,7 +12758,17 @@ def build_redirects_and_meta():
     # one town this site has two pages for.
     _self_canonical = []
     _non_canonical = set()
+    _pruned_excluded = 0
     for _p in paths:
+        # 2026-08-23. The 46 pruned community pages force-301 to TLLSH now.
+        # Listing them in the sitemap tells Google two contradictory things
+        # ("crawl this" + "actually it redirects"), which Search Console flags
+        # as "submitted URL redirects" and which slows the authority transfer.
+        # Exclude before the canonical check so we don't also print 46 lines
+        # of noise about it.
+        if _p in PRUNED_TO_TLLSH:
+            _pruned_excluded += 1
+            continue
         _f = os.path.join(OUT, _p.lstrip("/"))
         _canon = None
         if os.path.exists(_f):
@@ -12697,6 +12780,8 @@ def build_redirects_and_meta():
             _non_canonical.add(_p)
             continue
         _self_canonical.append(_p)
+    if _pruned_excluded:
+        print(f"  sitemap: excluded {_pruned_excluded} pruned URLs (301 to TLLSH)")
     paths = _self_canonical
 
     urls = "\n".join(
@@ -12773,7 +12858,11 @@ def build_redirects_and_meta():
     # A page excluded just above for naming a different canonical is not a
     # missing page -- reporting it as one would make this guard cry wolf on
     # every single build, which is how a load-bearing guard stops being read.
-    unlisted = sorted(on_disk - listed - {"/404.html"} - NOINDEX_PATHS - _non_canonical)
+    # Same for pages that are deliberately pruned to TLLSH: they still get
+    # built on disk (so the .html exists for the force-301 to fire against)
+    # but must never be submitted for indexing.
+    unlisted = sorted(on_disk - listed - {"/404.html"} - NOINDEX_PATHS
+                      - _non_canonical - PRUNED_TO_TLLSH)
     stale = sorted(listed - on_disk)
     if unlisted:
         print(f"  ! sitemap: {len(unlisted)} built page(s) NOT in the sitemap "
@@ -12863,11 +12952,19 @@ def build_redirects_and_meta():
     if os.path.exists(_moved_path):
         with open(_moved_path) as _f:
             _moved_slugs = set(json.load(_f))
+    # 2026-08-23: also short-circuit redirects whose target is in the prune
+    # list. Otherwise those become two-hop chains (e.g. /50842-county-road-33
+    # 301 -> /communities/weld/nunn.html 301! -> https://tllsh/...); Google
+    # follows single hops without fuss but chains get devalued as "redirect
+    # ladders" and add pointless latency.
+    def _rewrite(_new):
+        if _new.startswith("/blog/") and _new[len("/blog/"):-len(".html")] in _moved_slugs:
+            return f"{_TLLSH_URL}{_new}"
+        if _new in PRUNED_TO_TLLSH:
+            return f"{_TLLSH_URL}{_new}"
+        return _new
     _legacy_url_redirects = {
-        _old: (f"https://www.thelittleladysellshomes.com{_new}"
-               if _new.startswith("/blog/") and _new[len("/blog/"):-len(".html")] in _moved_slugs
-               else _new)
-        for _old, _new in LEGACY_URL_REDIRECTS.items()
+        _old: _rewrite(_new) for _old, _new in LEGACY_URL_REDIRECTS.items()
     }
 
     _bad_targets = []
@@ -12900,64 +12997,9 @@ def build_redirects_and_meta():
     # Force overrides file precedence -- the redirect wins regardless of what
     # is on disk. Once the pages are actually removed from `paths`, the force
     # flag can come off.
-    _TLLSH = "https://www.thelittleladysellshomes.com"
-    _PRUNE_TO_TLLSH = [
-        # Larimer County (8)
-        "/communities/larimer.html",
-        "/communities/larimer/fort-collins.html",
-        "/communities/larimer/loveland.html",
-        "/communities/larimer/berthoud.html",
-        "/communities/larimer/masonville.html",
-        "/communities/larimer/timnath.html",
-        "/communities/larimer/wellington.html",
-        "/communities/larimer/red-feather-lakes.html",
-        "/communities/larimer/estes-park.html",
-        # Weld County (16)
-        "/communities/weld.html",
-        "/communities/weld/greeley.html",
-        "/communities/weld/windsor.html",
-        "/communities/weld/severance.html",
-        "/communities/weld/eaton.html",
-        "/communities/weld/ault.html",
-        "/communities/weld/johnstown.html",
-        "/communities/weld/milliken.html",
-        "/communities/weld/firestone.html",
-        "/communities/weld/frederick.html",
-        "/communities/weld/dacono.html",
-        "/communities/weld/fort-lupton.html",
-        "/communities/weld/mead.html",
-        "/communities/weld/erie.html",
-        "/communities/weld/nunn.html",
-        "/communities/weld/pierce.html",
-        "/communities/weld/carr.html",
-        # Boulder + sub-towns
-        "/communities/boulder.html",
-        "/communities/boulder/boulder.html",
-        "/communities/boulder/lafayette.html",
-        "/communities/boulder/longmont.html",
-        "/communities/boulder/louisville.html",
-        "/communities/boulder/lyons.html",
-        "/communities/boulder/nederland.html",
-        # Broomfield
-        "/communities/broomfield.html",
-        "/communities/broomfield/broomfield.html",
-        # Denver
-        "/communities/denver.html",
-        "/communities/denver/denver.html",
-        # Adams / Jefferson / Arapahoe
-        "/communities/adams.html",
-        "/communities/jefferson.html",
-        "/communities/arapahoe.html",
-        # Morgan + sub-towns
-        "/communities/morgan.html",
-        "/communities/morgan/brush.html",
-        "/communities/morgan/fort-morgan.html",
-        "/communities/morgan/log-lane-village.html",
-        "/communities/morgan/wiggins.html",
-        # Communities index (the general county picker itself)
-        "/communities/index.html",
-    ]
-    redirect_lines += [f"{p}  {_TLLSH}{p}  301!" for p in _PRUNE_TO_TLLSH]
+    # Source of truth for the prune list lives at module scope (PRUNED_TO_TLLSH)
+    # so build_sitemap() reads the same set and stops submitting these URLs.
+    redirect_lines += [f"{p}  {_TLLSH_URL}{p}  301!" for p in sorted(PRUNED_TO_TLLSH)]
 
     # ---- Legacy AgentFire/WordPress URL reclamation (2026-08-14) ----
     #
@@ -12976,7 +13018,6 @@ def build_redirects_and_meta():
     # after the explicit LEGACY_URL_REDIRECTS above (which are hand-curated
     # and must win) and before the catch-all pattern at the end.
     seen_targets = {ln.split()[0] for ln in redirect_lines}
-    _prune_set = set(_PRUNE_TO_TLLSH)                # short-circuit lookup
     legacy_lines = []
     for p in paths:
         if p == "/index.html":
@@ -12989,7 +13030,7 @@ def build_redirects_and_meta():
         # otherwise every old inbound link becomes a two-hop chain
         # (/foo/ -> /foo.html -> https://tllsh/foo.html). Netlify tolerates it
         # but Google prefers a single 301.
-        _pruned_target = f"{_TLLSH}{p}" if p in _prune_set else p
+        _pruned_target = f"{_TLLSH_URL}{p}" if p in PRUNED_TO_TLLSH else p
         for old in (slug + "/", slug):
             if old not in seen_targets:
                 # 301! — the bang FORCES the redirect. Without it these rules were
@@ -13100,11 +13141,20 @@ def build_llms_txt(paths):
     Digital Takeover site. Nothing exotic: just a clear, honest summary of
     who this is, what's true about the business, and where to find things —
     the kind of source text an AI model can quote directly and correctly."""
-    county_lines = "\n".join(f"- [{c['name']}](/communities/{c['slug']}.html)" for c in COUNTIES)
+    # 2026-08-23: llms.txt is the AI-crawler equivalent of the sitemap, so it
+    # follows the same prune rule -- pages that force-301 to TLLSH must not
+    # be listed here either, or an AI answer engine will cite the redirected
+    # URL and then follow it, wasting a fetch and diluting the brand.
+    county_lines = "\n".join(
+        f"- [{c['name']}](/communities/{c['slug']}.html)"
+        for c in COUNTIES
+        if f"/communities/{c['slug']}.html" not in PRUNED_TO_TLLSH
+    )
     city_lines = "\n".join(
         f"- [{city}, {c['name']}](/communities/{c['slug']}/{_city_url_slug(CITY_DATA_SLUG[city])}.html)"
         for c in COUNTIES for city in c["cities"]
         if CITY_DATA_SLUG.get(city) in CITY_CONTENT
+        and f"/communities/{c['slug']}/{_city_url_slug(CITY_DATA_SLUG[city])}.html" not in PRUNED_TO_TLLSH
     )
     guide_lines = "\n".join(f"- [{title}]({p})" for _, p, title, _ in GUIDE_PAGES)
     market_topic_lines = "\n".join(

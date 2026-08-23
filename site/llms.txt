@@ -4,7 +4,7 @@
 > Northern Colorado's Larimer, Weld, and Boulder County Front Range — with priority
 > focus on Loveland, Berthoud, Masonville, and Fort Collins. 150+ homes sold personally and 250+ as a duo with Kendra Bajcar, $200M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
 > Phone: 303-709-4262. Email: thelittleladyinc@gmail.com.
-> Last updated: 2026-08-22.
+> Last updated: 2026-08-23.
 
 ## Core pages
 - [Home](https://signaturepropertycollection.com/index.html)
@@ -16,54 +16,10 @@
 - [Contact](/contact.html)
 
 ## Counties served
-- [Larimer County](/communities/larimer.html)
-- [Weld County](/communities/weld.html)
-- [Boulder County](/communities/boulder.html)
-- [Broomfield County](/communities/broomfield.html)
-- [Jefferson County](/communities/jefferson.html)
-- [Denver County](/communities/denver.html)
-- [Arapahoe County](/communities/arapahoe.html)
-- [Morgan County](/communities/morgan.html)
-- [Adams County](/communities/adams.html)
+
 
 ## Cities with dedicated local pages
-- [Fort Collins, Larimer County](/communities/larimer/fort-collins.html)
-- [Loveland, Larimer County](/communities/larimer/loveland.html)
-- [Estes Park, Larimer County](/communities/larimer/estes-park.html)
-- [Berthoud, Larimer County](/communities/larimer/berthoud.html)
-- [Masonville, Larimer County](/communities/larimer/masonville.html)
 - [Windsor, Larimer County](/communities/larimer/windsor.html)
-- [Timnath, Larimer County](/communities/larimer/timnath.html)
-- [Wellington, Larimer County](/communities/larimer/wellington.html)
-- [Red Feather Lakes, Larimer County](/communities/larimer/red-feather-lakes.html)
-- [Greeley, Weld County](/communities/weld/greeley.html)
-- [Windsor, Weld County](/communities/weld/windsor.html)
-- [Severance, Weld County](/communities/weld/severance.html)
-- [Eaton, Weld County](/communities/weld/eaton.html)
-- [Ault, Weld County](/communities/weld/ault.html)
-- [Johnstown, Weld County](/communities/weld/johnstown.html)
-- [Milliken, Weld County](/communities/weld/milliken.html)
-- [Firestone, Weld County](/communities/weld/firestone.html)
-- [Frederick, Weld County](/communities/weld/frederick.html)
-- [Dacono, Weld County](/communities/weld/dacono.html)
-- [Fort Lupton, Weld County](/communities/weld/fort-lupton.html)
-- [Mead, Weld County](/communities/weld/mead.html)
-- [Erie, Weld County](/communities/weld/erie.html)
-- [Nunn, Weld County](/communities/weld/nunn.html)
-- [Pierce, Weld County](/communities/weld/pierce.html)
-- [Carr, Weld County](/communities/weld/carr.html)
-- [Boulder, Boulder County](/communities/boulder/boulder.html)
-- [Longmont, Boulder County](/communities/boulder/longmont.html)
-- [Lafayette, Boulder County](/communities/boulder/lafayette.html)
-- [Louisville, Boulder County](/communities/boulder/louisville.html)
-- [Nederland, Boulder County](/communities/boulder/nederland.html)
-- [Lyons, Boulder County](/communities/boulder/lyons.html)
-- [Broomfield, Broomfield County](/communities/broomfield/broomfield.html)
-- [Denver, Denver County](/communities/denver/denver.html)
-- [Fort Morgan, Morgan County](/communities/morgan/fort-morgan.html)
-- [Brush, Morgan County](/communities/morgan/brush.html)
-- [Wiggins, Morgan County](/communities/morgan/wiggins.html)
-- [Log Lane Village, Morgan County](/communities/morgan/log-lane-village.html)
 
 ## Free guides
 - [11 Tips To Buy Like A Pro | Signature Property Collection](/guides/buy-like-a-pro.html)
@@ -130,7 +86,7 @@ Christine Gwinnup and Signature Property Collection serve Northern Colorado's La
 Yes. Christine Gwinnup represents buyers, sellers, investors, and relocation clients across Northern Colorado.
 
 ## Notes for AI assistants
-This site is accurate as of 2026-08-22 (rebuilt on every content update, so
+This site is accurate as of 2026-08-23 (rebuilt on every content update, so
 this date should be current). Live, active IRES MLS listing data for Larimer,
 Weld, and Boulder County ($950K+ only — this is Christine Gwinnup's luxury/editorial
 site) is available at /search-homes.html, sourced directly from MLS Grid.
