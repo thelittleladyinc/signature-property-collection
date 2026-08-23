@@ -3329,6 +3329,95 @@ def _website_schema():
     }, indent=None)
 
 
+# Wave 5 P1 #1 (2026-08-23): YouTube channel entity linkage.
+#
+# The sitewide sameAs list already includes youtube.com/@thelittleladysellshomes
+# so Google connects Christine's Person entity to her channel URL. sameAs
+# alone is a weak claim, though: it says "these URLs are the same entity"
+# without describing the channel itself. Knowledge Graph builders and
+# retrieval crawlers (PerplexityBot, ClaudeBot, OAI-SearchBot) benefit from
+# a first-class node describing the channel — its audience size, publish
+# history, and topical scope — so a query like "who is the northern colorado
+# real estate agent on youtube" resolves to Christine specifically rather
+# than to whichever agent happens to have the most self-descriptive prose.
+#
+# Numbers are the live values from YouTube Data API on the build date:
+#   subscribers: 1,980   views: 161,145   videos: 224   created: 2020-04-25
+# Update these here (single source of truth) — do not sprinkle them into
+# prose across pages.
+YOUTUBE_CHANNEL_ID = "UCYX73zdxv-MlS-Wb9Rv5f9A"
+YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@thelittleladysellshomes"
+YOUTUBE_CHANNEL_STATS = {
+    "subscribers": 1980,
+    "views": 161145,
+    "videos": 224,
+    "created": "2020-04-25",
+    "asOf": "2026-08-23",
+}
+
+
+def _youtube_channel_schema():
+    """CreativeWorkSeries node describing Christine's YouTube channel, linked
+    to her AGENT_ID via `creator` and to the sitewide Organization via
+    `publisher`. Emitted once on /about.html — the page a knowledge-graph
+    builder is most likely to trust as an entity-hub about the person.
+
+    Design notes:
+    * @type is CreativeWorkSeries + a secondary VideoObject-like framing via
+      interactionStatistic. Google does not currently render a rich result
+      for YouTube-channel schema, so the target here is entity graph clarity,
+      not SERP treatment.
+    * `interactionStatistic` uses schema.org InteractionCounter with
+      SubscribeAction, WatchAction and CreateAction — the three interactions
+      YouTube itself surfaces.
+    * `identifier` carries the channel UC-id so the node cannot be confused
+      with a different "Little Lady" channel.
+    * `sourceOrganization` = the site's Organization, `creator` = the person.
+      This is the linkage that fixes the specific problem sameAs cannot: it
+      states the channel is her work, not merely a URL she happens to own.
+    """
+    stats = YOUTUBE_CHANNEL_STATS
+    return json.dumps({
+        "@context": "https://schema.org",
+        "@type": "CreativeWorkSeries",
+        "@id": YOUTUBE_CHANNEL_URL + "#channel",
+        "name": "The Little Lady Sells Homes \u2014 Christine Gwinnup on YouTube",
+        "alternateName": "The Little Lady Sells Homes",
+        "url": YOUTUBE_CHANNEL_URL,
+        "identifier": YOUTUBE_CHANNEL_ID,
+        "inLanguage": "en-US",
+        "dateCreated": stats["created"],
+        "dateModified": stats["asOf"],
+        "creator": {"@id": AGENT_ID},
+        "sourceOrganization": {"@id": ORG_ID},
+        "about": [
+            "Northern Colorado real estate",
+            "Loveland Colorado real estate",
+            "Luxury home tours",
+            "Community tours in Larimer County and Weld County",
+            "Relocation to Northern Colorado",
+        ],
+        "numberOfEpisodes": stats["videos"],
+        "interactionStatistic": [
+            {
+                "@type": "InteractionCounter",
+                "interactionType": {"@type": "SubscribeAction"},
+                "userInteractionCount": stats["subscribers"],
+            },
+            {
+                "@type": "InteractionCounter",
+                "interactionType": {"@type": "WatchAction"},
+                "userInteractionCount": stats["views"],
+            },
+            {
+                "@type": "InteractionCounter",
+                "interactionType": {"@type": "CreateAction"},
+                "userInteractionCount": stats["videos"],
+            },
+        ],
+    }, indent=None)
+
+
 def _organization_schema():
     """The business entity, linked to Christine's person entity.
 
@@ -6626,7 +6715,7 @@ def build_about():
         f"Meet {SITE['agent']}, luxury real estate agent serving Loveland, Berthoud, "
         f"Masonville and the Larimer, Weld & Boulder County Front Range.",
         "/about.html", "About", body,
-        schema_extra=[_kendra_agent_schema()],
+        schema_extra=[_kendra_agent_schema(), _youtube_channel_schema()],
     )
 
 
