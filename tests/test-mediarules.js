@@ -253,8 +253,11 @@ const RESOLVE_OPTS = {
     check("every URL handed to a download is then marked used",
       /await markUrlUsed\(store, listingId, index\)/.test(body),
       "an unmarked URL gets replayed to the next visitor and fails by definition");
+    // 2026-08-24: the retry carries the allowResolve gate too — a WARM listing
+    // still gets its one fresh-URL retry; a cold one never resolves at all
+    // (see tests/test-coldgate.js for the gate itself).
     check("a failed CACHED url is retried once with a fresh one",
-      /resolvePhotoUrl\(listingId, index, store, token, true\)/.test(body),
+      /resolvePhotoUrl\(listingId, index, store, token, true, allowResolve\)/.test(body),
       "otherwise a spent URL is indistinguishable from a dead photo");
     check("but a 429 is never retried",
       /status !== 429/.test(body),

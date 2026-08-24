@@ -33,7 +33,17 @@ function load(blobs, fetchImpl) {
 }
 
 function store(seed = {}) {
-  const data = new Map(Object.entries(seed));
+  // 2026-08-24: every scenario here describes a WARM listing — one this site is
+  // allowed to resolve live. Cold listings no longer reach any of these paths:
+  // they get a `cold_backfill_pending` placeholder without a single MLS Grid
+  // request (the fan-out fix; see resolvePhotoUrl in listing-photo.js and
+  // tests/test-coldgate.js). Seeding the listing as Christine's own is the
+  // warmth that doesn't short-circuit the photo store the way a stored cover
+  // would.
+  const data = new Map(Object.entries({
+    "mine-listings.json": [{ listingId: ID }],
+    ...seed,
+  }));
   return {
     get: async (k) => (data.has(k) ? data.get(k) : null),
     setJSON: async (k, v) => { data.set(k, v); },

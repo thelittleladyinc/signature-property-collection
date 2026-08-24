@@ -35,6 +35,42 @@ const { recordMlsCall, recordMlsBytes, checkMlsQuota, bytesFromResponse , paceMl
 
 const PHOTO_URL_CACHE_PREFIX = "photo-urls/";
 
+// ---- DEMAND QUEUE: which cold listings visitors actually asked for ---------
+// 2026-08-24. listing-photo.js no longer resolves photos live for a listing
+// whose cover this site doesn't hold (that on-demand fan-out was 552 of the
+// 1,000 requests in the account's own usage log, and every burst second — four
+// cold listings from four IPs resolving in the same instant). Instead a cold
+// request leaves a note here, and the backfill drains these FIRST, before its
+// price-ordered walk of the catalogue — so a listing someone genuinely wanted
+// is stored within a backfill cycle instead of whenever the cursor reaches it.
+// Best-effort in both directions: a lost note costs backfill priority, never a
+// photo; the listing is still reached by the full catalogue walk.
+const PHOTO_DEMAND_PREFIX = "photo-demand/";
+
+async function recordPhotoDemand(store, listingId) {
+  if (!store || !listingId) return;
+  await store.setJSON(`${PHOTO_DEMAND_PREFIX}${listingId}.json`, { at: Date.now() })
+    .catch(() => {});
+}
+
+async function listPhotoDemand(store, limit) {
+  try {
+    const listing = await store.list({ prefix: PHOTO_DEMAND_PREFIX });
+    return (listing && listing.blobs ? listing.blobs : [])
+      .map((b) => b.key.slice(PHOTO_DEMAND_PREFIX.length).replace(/\.json$/, ""))
+      .filter(Boolean)
+      .slice(0, typeof limit === "number" ? limit : 100);
+  } catch (err) {
+    console.warn("listPhotoDemand failed:", err && err.message);
+    return [];
+  }
+}
+
+async function clearPhotoDemand(store, listingId) {
+  if (!store || !listingId) return;
+  await store.delete(`${PHOTO_DEMAND_PREFIX}${listingId}.json`).catch(() => {});
+}
+
 // ---- WHERE THIS SITE'S OWN COPY OF A PHOTO LIVES ------------------------
 // 2026-08-18: these three moved here from listing-photo.js because three separate
 // files now need to agree about them, and "agree" was previously enforced by a
@@ -700,6 +736,10 @@ async function fetchMediaResponse(url, token, timeoutMs, store) {
 module.exports = {
   writeCachedPhoto,
   PHOTO_URL_CACHE_PREFIX,
+  PHOTO_DEMAND_PREFIX,
+  recordPhotoDemand,
+  listPhotoDemand,
+  clearPhotoDemand,
   PHOTO_CACHE_PREFIX,
   PHOTO_CACHE_MAX_INDEX,
   photoCacheKey,

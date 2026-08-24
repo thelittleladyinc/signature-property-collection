@@ -436,7 +436,20 @@ exports.handler = async (event) => {
     // Deliberately NOT fire-and-forget: a Netlify container can freeze the moment
     // it returns, so work nobody waits for is work that only sometimes happens.
     // Waiting a bounded amount is honest; waiting indefinitely was not.
-    const PREWARM_DEADLINE_MS = 700;
+    // 2026-08-24: the deadline was 700ms, which quietly disabled the prewarm.
+    // paceMlsCall (added 08-18, AFTER the 700ms was chosen) starts every MLS
+    // call with a random 0-1800ms de-synchronization delay -- so the prewarm
+    // lost the race to its own pacer's jitter more often than not, before
+    // making any request at all. Worse, timeoutMs was set to the same 700ms and
+    // used as the fetch abort, so a prewarm that DID start usually aborted
+    // mid-request: a spent MLS Grid request that cached nothing. The account's
+    // usage log showed the result -- only ~20 of 1,000 requests were batched
+    // multi-id resolves; the rest were the per-listing fan-out the prewarm
+    // exists to prevent. The deadline now clears the jitter ceiling plus a
+    // realistic fetch, and the resolve keeps its own full timeout. This
+    // matters MORE now that listing-photo.js refuses to resolve cold listings:
+    // for a page of never-seen cards, the prewarm is what puts photos on it.
+    const PREWARM_DEADLINE_MS = 3000;
     let prewarmOutcome = "completed";
     await Promise.race([
       prewarmPhotoUrls(page, {
@@ -444,7 +457,6 @@ exports.handler = async (event) => {
         token: process.env.MLSGRID_API_TOKEN,
         baseUrl: BASE_URL,
         selectFields: SELECT_FIELDS,
-        timeoutMs: PREWARM_DEADLINE_MS,
       }),
       new Promise((resolve) => setTimeout(() => {
         prewarmOutcome = `gave up after ${PREWARM_DEADLINE_MS}ms — photos resolve on demand`;
