@@ -64,7 +64,7 @@ const { getBlobStore, BASE_URL, SELECT_FIELDS, MINE_LISTINGS_KEY } = require("./
 const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
   isMediaThrottled, setMediaCooldown, usableUrl, markUrlUsed,
-  PHOTO_CACHE_MAX_INDEX, photoCacheKey, writeCachedPhoto,
+  PHOTO_CACHE_MAX_INDEX, photoCacheKey, writeCachedPhoto, recordPhotoDemand,
 } = require("./lib/_media");
 const { checkMlsQuota, recordMlsBytes } = require("./lib/_mls-usage");
 // NOT required at module load. lib/_cloudinary.js pulls in the Cloudinary SDK, and
@@ -254,6 +254,12 @@ const PLACEHOLDER_TTL = {
   too_large: 3600,
   bad_id: 86400,
   not_configured: 60,
+  // Cold listing: this site doesn't hold the cover yet and deliberately made NO
+  // MLS Grid request (see the 2026-08-24 fan-out fix). The demand note this
+  // request left moves the listing to the front of the backfill queue, so a few
+  // minutes is the honest retry window -- long enough not to drip, short enough
+  // that the photo appears soon after the backfill stores it.
+  cold_backfill_pending: 300,
 };
 
 // image_http_error splits on the status: a 403 is usually an expired signature and
@@ -363,6 +369,13 @@ const EXPLANATIONS = {
     "ceiling is about 4.4 MB. Full-resolution aerials and scanned plat maps — common on land " +
     "listings — routinely exceed it while ordinary house photos don't.",
   exception: "The function threw. Check the Netlify function logs for this request.",
+  cold_backfill_pending: "This listing's photos aren't in this site's own store yet, and the " +
+    "on-demand path no longer asks MLS Grid for cold listings (that fan-out was the source of " +
+    "the account's rate-limit warnings — see the 2026-08-24 note at resolvePhotoUrl). This " +
+    "request left a demand note, which puts the listing at the FRONT of the cover backfill " +
+    "queue; the photo appears on its own once the backfill stores it, usually within the next " +
+    "backfill cycle. If this persists for days, check that sync-listings and the overnight " +
+    "photo-backfill are actually running.",
 };
 
 
@@ -383,7 +396,18 @@ const EXPLANATIONS = {
 //
 // `force` skips the cache entirely -- used for the one retry after a cached URL
 // fails, which is the case that used to be indistinguishable from a rate limit.
-async function resolvePhotoUrl(listingId, index, store, token, force) {
+//
+// `allowResolve` (2026-08-24) is the fan-out fix. The account's own usage log
+// showed 552 of 1,000 requests were THIS path resolving cold listings live --
+// one MLS Grid call per first-ever view, across a 15,471-listing catalogue,
+// and every burst second was four of them from four different IPs. paceMlsCall
+// cannot hold that herd (it proceeds unpaced after PACE_MAX_WAITS, by design),
+// so the resolve is simply not made from the visitor path any more unless the
+// listing is WARM: its cover is already in the photo store (someone browsed it,
+// or the backfill reached it), or it is one of Christine's own. A cold listing
+// gets whatever the URL cache already holds, or a short-lived placeholder plus
+// a demand note that moves it to the front of the backfill queue.
+async function resolvePhotoUrl(listingId, index, store, token, force, allowResolve) {
   const cached = force ? null : await readCachedUrls(store, listingId);
   const cachedUrl = cached ? usableUrl(cached, index) : null;
   const cachedCount = cached ? cached.urls.length : 0;
@@ -396,6 +420,13 @@ async function resolvePhotoUrl(listingId, index, store, token, force) {
   // re-asking is exactly the drip EMPTY_CACHE_TTL_MS exists to stop.
   if (cached && cached.fresh && !cachedCount) {
     return { url: null, urlCount: 0, fromCache: true, throttledUntil: null };
+  }
+
+  // Cold listing: no live resolve. A stale-but-unspent URL is still worth a
+  // try (MLS Grid's own window is an hour and ours is five minutes); otherwise
+  // the caller serves a placeholder and the backfill fills the store instead.
+  if (!allowResolve) {
+    return { url: cachedUrl, urlCount: cachedCount, fromCache: true, throttledUntil: null, cold: !cachedUrl };
   }
 
   // Respects the sync's suspension flag AND the photo-specific cooldown, and
@@ -491,8 +522,36 @@ exports.handler = async (event) => {
     const token = process.env.MLSGRID_API_TOKEN;
     if (!token) return placeholder("not_configured", debug, { listingId });
 
-    let resolved = await resolvePhotoUrl(listingId, index, store, token);
+    // WARM OR COLD. A live MLS Grid resolve is allowed only for a listing this
+    // site already knows: her own, or one whose cover the photo store holds
+    // (browsed before, or reached by the backfill). Everything else is served
+    // from whatever the URL cache has -- and if that is nothing, a placeholder
+    // plus a demand note, NOT a resolve. This is the 2026-08-24 fan-out fix:
+    // the on-demand cold resolve was 552 of 1,000 requests in the account's own
+    // usage log and the source of every burst-second warning. The cover probe
+    // is one blob read, paid only on requests that would otherwise consider a
+    // resolve -- the stored-copy fast path above returns long before this.
+    //
+    // ?debug=1 bypasses the gate, same as it bypasses every cache: its whole
+    // charter is to describe the LIVE fetch, and answering "why is this photo
+    // grey" with "we didn't ask" would hide exactly what is being investigated.
+    // Debug is a hand-typed URL, not a traffic pattern -- the fan-out this gate
+    // exists to stop cannot arrive through it.
+    const mine = await mineListingIds(store);
+    let allowResolve = debug || mine.has(listingId);
+    if (!allowResolve) {
+      const cover = await readCachedPhoto(store, listingId, 0);
+      allowResolve = !!cover;
+    }
+
+    let resolved = await resolvePhotoUrl(listingId, index, store, token, false, allowResolve);
     const { throttledUntil, urlCount } = resolved;
+    if (resolved.cold) {
+      await recordPhotoDemand(store, listingId);
+      return await servedOrPlaceholder(store, listingId, index, "cold_backfill_pending", debug, {
+        listingId, index, urlCount,
+      });
+    }
     if (throttledUntil && !resolved.url) {
       return await servedOrPlaceholder(store, listingId, index, "throttled", debug, {
         listingId, index, retryAfterSeconds: Math.max(1, Math.ceil((throttledUntil - Date.now()) / 1000)),
@@ -558,10 +617,10 @@ exports.handler = async (event) => {
     // excluded deliberately -- retrying into a rate limit is what kept the limit
     // alive in the first place -- and so is a live-resolved URL, which has no better
     // version to fetch.
-    const worthRetrying = resolved.fromCache &&
+    const worthRetrying = allowResolve && resolved.fromCache &&
       (!attempt || !attempt.res || (!attempt.res.ok && attempt.res.status !== 429));
     if (worthRetrying) {
-      const fresh = await resolvePhotoUrl(listingId, index, store, token, true);
+      const fresh = await resolvePhotoUrl(listingId, index, store, token, true, allowResolve);
       if (fresh.url && fresh.url !== resolved.url) {
         console.warn(`listing-photo: ${listingId}/${index} cached URL failed ` +
           `(${(attempt && attempt.res && attempt.res.status) || "no response"}); retrying with a freshly resolved one`);

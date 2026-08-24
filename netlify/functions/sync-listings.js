@@ -78,6 +78,7 @@ const { recordMlsCall, checkMlsQuota, pruneUsage, bytesFromResponse } = require(
 const {
   invalidatePhotoCache, resolveMediaFor, readCachedUrls, usableUrl, markUrlUsed,
   fetchMediaResponse, writeCachedPhoto, photoCacheKey, isThrottled, isMediaThrottled,
+  listPhotoDemand, clearPhotoDemand,
 } = require("./lib/_media");
 const { drainFailedPushes } = require("./lib/_lofty");
 
@@ -1315,12 +1316,20 @@ exports.handler = async () => {
         !(await isThrottled(store)) && !(await isMediaThrottled(store)) &&
         Date.now() - startedAt < TIME_BUDGET_MS) {
       try {
-        // 2026-08-19: 6 -> 18 at Christine's ok — covers everything in ~2 days
-        // instead of a week. Still under 1% of the hourly request budget, and
-        // the DEADLINE below is the real governor: the run stores as many as
-        // fit before 21s elapsed and stops, so Netlify's 30s ceiling holds
-        // whatever the cap says.
-        const BACKFILL_PER_RUN = 18;
+        // 2026-08-19: 6 -> 18 at Christine's ok. 2026-08-24: 18 -> 24, and the
+        // resolves are now BATCHED — one `in`-filter API call covers up to 24
+        // listings (resolveMediaFor already speaks that shape for the prewarm)
+        // instead of one call per listing, so a full run costs ~25 requests
+        // where the old loop cost ~36 for fewer covers. The DEADLINE below is
+        // still the real governor: the run stores as many as fit before 21s
+        // elapsed and stops, so Netlify's 30s ceiling holds whatever the cap
+        // says. The heavy lifting for the whole 15,000-listing catalogue lives
+        // in photo-backfill-background.js (kicked overnight, below) — this
+        // 30-minute loop is what keeps DEMANDED listings fast during the day:
+        // listing-photo.js no longer resolves cold listings live (the fan-out
+        // fix, same date); it leaves a photo-demand/ note instead, and those
+        // notes are served FIRST here, ahead of the price-ordered walk.
+        const BACKFILL_PER_RUN = 24;
         const BACKFILL_DEADLINE_MS = 21000; // total elapsed; worst case stays under Netlify's 30s
         const BACKFILL_MAX_CHECKS = 90;     // existence checks are cheap but not free
         const candidates = Object.values(listingsById)
@@ -1328,46 +1337,106 @@ exports.handler = async () => {
           .sort((a, b) => (b.price || 0) - (a.price || 0));
         let cursor = Number(state.backfillCursor || 0);
         if (cursor >= candidates.length) cursor = 0; // wrapped: start a fresh pass
+
+        // Visitors first. A demand note is a real person (or a real crawl) who
+        // just saw a placeholder; the cursor's next price band is nobody in
+        // particular. Notes for listings no longer in the catalogue are cleared
+        // rather than retried forever.
+        const wanted = [];
+        const known = new Set(candidates.map((c) => c.listingId));
+        for (const id of await listPhotoDemand(store, BACKFILL_PER_RUN)) {
+          if (!known.has(id)) { await clearPhotoDemand(store, id); continue; }
+          wanted.push(id);
+        }
+
         let checks = 0;
-        while (coversBackfilled < BACKFILL_PER_RUN &&
+        const toStore = [];
+        for (const id of wanted) {
+          if (toStore.length >= BACKFILL_PER_RUN) break;
+          checks += 1;
+          const existing = await store.get(photoCacheKey(id, 0), { type: "json" }).catch(() => null);
+          if (existing && (existing.b64 || existing.redirectUrl)) { await clearPhotoDemand(store, id); continue; }
+          toStore.push(id);
+        }
+        while (toStore.length < BACKFILL_PER_RUN &&
                cursor < candidates.length &&
                checks < BACKFILL_MAX_CHECKS &&
                Date.now() - startedAt < BACKFILL_DEADLINE_MS) {
           const cand = candidates[cursor];
           cursor += 1;
           checks += 1;
+          if (toStore.includes(cand.listingId)) continue;
           const existing = await store.get(photoCacheKey(cand.listingId, 0), { type: "json" })
             .catch(() => null);
           if (existing && (existing.b64 || existing.redirectUrl)) continue; // already ours
+          toStore.push(cand.listingId);
+        }
+
+        // One batched resolve for every listing that still needs a URL, then
+        // the downloads one at a time through the same paced gate as always.
+        const needResolve = [];
+        for (const id of toStore) {
+          if (!usableUrl(await readCachedUrls(store, id), 0)) needResolve.push(id);
+        }
+        if (needResolve.length) {
+          await resolveMediaFor(needResolve, {
+            store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS, timeoutMs: MLS_FETCH_TIMEOUT_MS,
+          });
+        }
+        for (const id of toStore) {
+          if (Date.now() - startedAt > BACKFILL_DEADLINE_MS) break;
           try {
-            const urls = usableUrl(await readCachedUrls(store, cand.listingId), 0)
-              ? await readCachedUrls(store, cand.listingId)
-              : await resolveMediaFor([cand.listingId],
-                  { store, token, baseUrl: BASE_URL, selectFields: SELECT_FIELDS, timeoutMs: MLS_FETCH_TIMEOUT_MS })
-                  .then(() => readCachedUrls(store, cand.listingId));
-            const url = usableUrl(urls, 0);
+            const url = usableUrl(await readCachedUrls(store, id), 0);
             if (!url) continue;
             const res = await fetchMediaResponse(url, token, MLS_FETCH_TIMEOUT_MS, store);
-            await markUrlUsed(store, cand.listingId, 0);
+            await markUrlUsed(store, id, 0);
             if (!res || !res.ok) continue;
             const buf = Buffer.from(await res.arrayBuffer());
             const ctype = String((res.headers && res.headers.get && res.headers.get("content-type")) || "");
             if (!ctype.startsWith("image/") || buf.length < 2048) continue;
             if (buf.length > 4400000) continue; // oversize: leave to the on-demand Cloudinary path
-            await writeCachedPhoto(store, cand.listingId, 0, buf, ctype);
+            await writeCachedPhoto(store, id, 0, buf, ctype);
+            await clearPhotoDemand(store, id);
             coversBackfilled += 1;
           } catch (err) {
-            console.warn(`sync-listings: backfill failed for ${cand.listingId}: ${err && err.message}`);
+            console.warn(`sync-listings: backfill failed for ${id}: ${err && err.message}`);
           }
         }
         state.backfillCursor = cursor;
         state.totalBackfillCandidates = candidates.length;
         if (coversBackfilled || checks) {
-          console.log(`sync-listings: cover backfill — ${coversBackfilled} stored, cursor at ${cursor}/${candidates.length}.`);
+          console.log(`sync-listings: cover backfill — ${coversBackfilled} stored ` +
+            `(${wanted.length} demanded), cursor at ${cursor}/${candidates.length}.`);
         }
       } catch (err) {
         console.warn(`sync-listings: cover backfill skipped: ${err && err.message}`);
       }
+    }
+
+    // ---- Overnight catalogue walk: hand the big job to the background fn ----
+    // 2026-08-24. The loop above fills ~24 covers per half hour — right for
+    // demand, hopeless for a 15,000-listing catalogue (~10 days). The walk of
+    // everything lives in photo-backfill-background.js, a Netlify BACKGROUND
+    // function with a 15-minute budget, and this scheduled run is its clock:
+    // during the overnight window (roughly 1-5 AM Mountain, when nothing else
+    // is spending the account's budget) each sync run fires it and moves on.
+    // The background function brings its own lock, quota checks and request
+    // cap, so double-kicks and daytime kicks are cheap no-ops. Fire-and-wait-
+    // briefly: a background function answers 202 immediately, so awaiting the
+    // POST costs milliseconds and confirms the kick actually left the building.
+    try {
+      const utcHour = new Date().getUTCHours();
+      const OVERNIGHT_UTC_HOURS = [7, 8, 9, 10, 11]; // 1-5 AM MDT / 12-4 AM MST
+      const siteUrl = process.env.URL;
+      if (siteUrl && OVERNIGHT_UTC_HOURS.includes(utcHour) && !httpErrorOccurred) {
+        const kick = await fetch(`${siteUrl}/.netlify/functions/photo-backfill-background`, {
+          method: "POST",
+          signal: AbortSignal.timeout(5000),
+        }).catch((err) => ({ status: 0, err }));
+        console.log(`sync-listings: overnight backfill kick -> HTTP ${kick.status || "failed"}`);
+      }
+    } catch (err) {
+      console.warn(`sync-listings: overnight backfill kick failed: ${err && err.message}`);
     }
   } catch (err) {
     // The budget tripping mid-run is a deliberate stop, not a fault. Recording it
