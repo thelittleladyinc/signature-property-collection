@@ -11,18 +11,18 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://www.thelittleladysellshomes.com/guides/upsizing-into-a-new-home.html">
 <meta property="og:image" content="https://signaturepropertycollection.com/assets/img/og-card.png">
-<meta property="og:updated_time" content="2026-08-23">
+<meta property="og:updated_time" content="2026-08-24">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="The Definitive Guide To Upsizing Into A New Home">
 <meta name="twitter:description" content="What to know before you upsize — from telling NEED apart from WANT to timing your sale and your next purchase.">
-<meta name="last-modified" content="2026-08-23">
+<meta name="last-modified" content="2026-08-24">
 <link rel="icon" href="/assets/img/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#141415">
-<!-- Self-hosted fonts (2026-08-20, see the header in build/assets/css/style.b4afa78c.css).
+<!-- Self-hosted fonts (2026-08-20, see the header in build/assets/css/style.deff6785.css).
      Only the two faces that render above-the-fold text (hero serif, body sans)
      are preloaded: preloading all ten would crowd the CSS on slow links.
      `crossorigin` is required on font preloads even same-origin, or the
@@ -136,7 +136,14 @@
   --font-serif: 'Libre Baskerville', Georgia, serif;
   --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-  --max-width: 1280px;
+  /* 2026-08-23 (Christine, luxury air): bumped from 1280 to 1360 to match
+     the wider centered-content standard used by Compass (1440) and Sotheby's
+     (1400). At 1360 the site still fits cleanly on a 1440-viewport laptop
+     with ~40px gutters, but on a 1920+ desktop the extra 80px keeps grids
+     from feeling cramped. Paired with a clamped .wrap padding below so the
+     horizontal breathing room scales with viewport width for a proper
+     luxury air-around-content feel. */
+  --max-width: 1360px;
 }
 
 * { box-sizing: border-box; }
@@ -184,7 +191,10 @@ body {
 }
 img { max-width: 100%; display: block; }
 a { color: inherit; text-decoration: none; }
-.wrap { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+/* 2026-08-23 (Christine, luxury air): padding was a flat 24px which felt
+   tight on wider screens. Clamp lets it grow to 48px on desktop for a
+   proper luxury air-around-content feel while staying tight on phones. */
+.wrap { max-width: var(--max-width); margin: 0 auto; padding: 0 clamp(20px, 4vw, 48px); }
 
 /* ---------- Header ---------- */
 .site-header {
@@ -1551,7 +1561,7 @@ h2.widget-title {
 @media (max-width: 760px) { .town-gallery { grid-template-columns: 1fr; gap: 20px; } }
 </style>
 
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "@id": "https://signaturepropertycollection.com/#christine-gwinnup", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/", "image": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "thelittleladyinc@gmail.com", "priceRange": "$$$$", "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "08:00", "closes": "20:00"}], "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Morgan County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady", "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390", "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2", "https://christinegwinnup.lpt.com/", "https://www.thelittleladysellshomes.com/"], "knowsAbout": ["Luxury real estate", "Relocation to Northern Colorado", "Acreage and horse property", "Downsizing", "Estate homes", "New construction", "Land development", "Multi-generational homes", "Retirement relocation", "Expired listings", "Home valuation", "Real estate negotiation"], "dateModified": "2026-08-23", "geo": {"@type": "GeoCoordinates", "latitude": 40.3978, "longitude": -105.075}, "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "RealEstateAgent", "@id": "https://signaturepropertycollection.com/#christine-gwinnup", "name": "Christine Gwinnup", "url": "https://signaturepropertycollection.com/", "image": "https://signaturepropertycollection.com/assets/img/logo-full.png", "telephone": "303-709-4262", "email": "thelittleladyinc@gmail.com", "priceRange": "$$$$", "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "08:00", "closes": "20:00"}], "worksFor": {"@type": "Organization", "name": "LPT Realty"}, "areaServed": [{"@type": "AdministrativeArea", "name": "Adams County"}, {"@type": "AdministrativeArea", "name": "Arapahoe County"}, {"@type": "AdministrativeArea", "name": "Boulder County"}, {"@type": "AdministrativeArea", "name": "Broomfield County"}, {"@type": "AdministrativeArea", "name": "Denver County"}, {"@type": "AdministrativeArea", "name": "Jefferson County"}, {"@type": "AdministrativeArea", "name": "Larimer County"}, {"@type": "AdministrativeArea", "name": "Morgan County"}, {"@type": "AdministrativeArea", "name": "Weld County"}], "sameAs": ["https://www.facebook.com/thelittleladysellshomes/", "https://www.instagram.com/thelittleladysellshomes/", "https://www.linkedin.com/in/thelittleladysellshomes/", "https://www.youtube.com/@thelittleladysellshomes", "https://www.tiktok.com/@thelittleladysellshomes", "https://www.pinterest.com/THELITTLELADYSELLSHOMES/", "https://www.zillow.com/profile/TheLittleLady", "https://www.bbb.org/us/co/loveland/profile/real-estate-agent/christine-gwinnup-the-little-lady-sells-homes-0805-46149390", "https://www.yelp.com/biz/christine-gwinnup-the-little-lady-sells-homes-loveland-2", "https://christinegwinnup.lpt.com/", "https://www.thelittleladysellshomes.com/"], "knowsAbout": ["Luxury real estate", "Relocation to Northern Colorado", "Acreage and horse property", "Downsizing", "Estate homes", "New construction", "Land development", "Multi-generational homes", "Retirement relocation", "Expired listings", "Home valuation", "Real estate negotiation"], "dateModified": "2026-08-24", "geo": {"@type": "GeoCoordinates", "latitude": 40.3978, "longitude": -105.075}, "address": {"@type": "PostalAddress", "streetAddress": "2411 Glade Rd", "addressLocality": "Loveland", "addressRegion": "CO", "postalCode": "80538", "addressCountry": "US"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://signaturepropertycollection.com/index.html"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://signaturepropertycollection.com/guides/buyers-guide.html"}, {"@type": "ListItem", "position": 3, "name": "The Definitive Guide To Upsizing Into A New Home"}]}</script>
 
 

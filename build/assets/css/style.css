@@ -96,7 +96,14 @@
   --font-serif: 'Libre Baskerville', Georgia, serif;
   --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-  --max-width: 1280px;
+  /* 2026-08-23 (Christine, luxury air): bumped from 1280 to 1360 to match
+     the wider centered-content standard used by Compass (1440) and Sotheby's
+     (1400). At 1360 the site still fits cleanly on a 1440-viewport laptop
+     with ~40px gutters, but on a 1920+ desktop the extra 80px keeps grids
+     from feeling cramped. Paired with a clamped .wrap padding below so the
+     horizontal breathing room scales with viewport width for a proper
+     luxury air-around-content feel. */
+  --max-width: 1360px;
 }
 
 * { box-sizing: border-box; }
@@ -144,7 +151,10 @@ body {
 }
 img { max-width: 100%; display: block; }
 a { color: inherit; text-decoration: none; }
-.wrap { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+/* 2026-08-23 (Christine, luxury air): padding was a flat 24px which felt
+   tight on wider screens. Clamp lets it grow to 48px on desktop for a
+   proper luxury air-around-content feel while staying tight on phones. */
+.wrap { max-width: var(--max-width); margin: 0 auto; padding: 0 clamp(20px, 4vw, 48px); }
 
 /* ---------- Header ---------- */
 .site-header {
