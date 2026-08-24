@@ -43,7 +43,20 @@ check("the town is written into the Lofty note", /Saw the local-proof numbers fo
 
 // Reachable, not orphaned.
 check("linked from the sellers page", /seller-local-proof/.test(fs.readFileSync(`${ROOT}/site/sellers.html`, "utf8")));
-check("in the sitemap", /seller-local-proof/.test(fs.readFileSync(`${ROOT}/site/sitemap.xml`, "utf8")));
+// 2026-08-24: this asserted the page was IN Signature's sitemap. It no longer
+// is, on purpose — /seller-local-proof.html joined CROSS_BRAND_CANONICAL_TO_TLLSH
+// on 2026-08-23 (its canonical points at thelittleladysellshomes.com, and
+// submitting a URL that canonicalises elsewhere is a Search Console warning).
+// The page must still be LIVE and reachable here; its sitemap home is TLLSH's.
+// So the test now pins the whole arrangement instead of half of it.
+const buildSrc = fs.readFileSync(`${ROOT}/build/build.py`, "utf8");
+const crossBrandBlock = (buildSrc.match(/CROSS_BRAND_CANONICAL_TO_TLLSH = frozenset\(\[[\s\S]*?\]\)/) || [""])[0];
+check("declared cross-brand canonical to TLLSH", /"\/seller-local-proof\.html"/.test(crossBrandBlock));
+check("the built page's canonical points at TLLSH",
+  /rel="canonical" href="https:\/\/www\.thelittleladysellshomes\.com\/seller-local-proof/.test(
+    fs.readFileSync(`${ROOT}/site/seller-local-proof.html`, "utf8")));
+check("deliberately OUT of Signature's sitemap (it canonicalises elsewhere)",
+  !/seller-local-proof/.test(fs.readFileSync(`${ROOT}/site/sitemap.xml`, "utf8")));
 check("no unrendered template braces leaked", !/\{\{|\}\}|\{esc\(/.test(html.replace(/\{\{/g, "")) || !/\{esc\(/.test(html));
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
 process.exit(failures ? 1 : 0);
