@@ -3919,6 +3919,7 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
 <link rel="preconnect" href="https://www.youtube-nocookie.com" crossorigin>
 <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
 {'<link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>' if GA_MEASUREMENT_ID else ''}
+{'<link rel="preconnect" href="https://connect.facebook.net" crossorigin>' if META_PIXEL_ID else ''}
 <link rel="dns-prefetch" href="https://www.youtube.com">
 <style>{_inline_css()}</style>
 {'<meta name="robots" content="noindex, follow">' if path in NOINDEX_PATHS else ''}
@@ -3926,6 +3927,7 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
 {_schema_scripts(schema_extra)}
 {_gsc_verification_tag()}
 {_analytics_tag()}
+{_meta_pixel_tag()}
 {canonical_extra}
 </head>"""
 
@@ -4238,6 +4240,22 @@ def _auto_breadcrumbs(title, path):
 GA_MEASUREMENT_ID = (os.environ.get("GA_MEASUREMENT_ID") or "").strip()
 
 
+# 2026-08-24 (Christine: rebuilding retargeting from scratch after past Meta
+# issues -- ONE shared pixel 785995940287531 across TLLSH + Signature +
+# OwnInNoCo so every visitor is retargetable from every brand, and the
+# audience grows 3x faster than three separate pixels ever would).
+#
+# Same env-var pattern as GA_MEASUREMENT_ID above and for the same reasons:
+# not a secret, but hardcoding it would pollute the pixel from every branch
+# preview and fork. Absent the variable this emits nothing -- no PageView,
+# no Lead event, no fbevents.js byte on the wire.
+#
+# Format-validated below (15-16 digit numeric string) so a typo fails the
+# build instead of shipping a silently-broken pixel and looking to Christine
+# like "nobody visited."
+META_PIXEL_ID = (os.environ.get("META_PIXEL_ID") or "").strip()
+
+
 # 2026-08-16 (Christine: "I would like to have mroe tapable links for my phone
 # number - whatever is the best roi - then we need a click to schedule with calendly
 # - make it easy to get ahold of me through email or phone or text").
@@ -4382,6 +4400,52 @@ def _analytics_tag():
         "function gtag(){{dataLayer.push(arguments);}}"
         "gtag('js',new Date());"
         f"gtag('config','{gid}');</script>".replace("{{", "{").replace("}}", "}")
+    )
+
+
+def _meta_pixel_tag():
+    """The Meta Pixel snippet, or "" when META_PIXEL_ID isn't set.
+
+    Emits base pixel + PageView + a delegated submit listener that fires
+    the Lead event on any <form class="lead-form"> (matches the site's
+    existing lead forms without touching a single one of them), and a
+    Contact event on the [data-contact] taps the mobile action bar already
+    ships. Same env-gate philosophy as _analytics_tag(): if the variable
+    is unset, this function emits nothing -- no fbevents.js byte on the
+    wire, no noscript beacon, no listeners.
+    """
+    if not META_PIXEL_ID:
+        return ""
+    if not re.fullmatch(r"\d{15,16}", META_PIXEL_ID):
+        raise SystemExit(
+            f"META_PIXEL_ID={META_PIXEL_ID!r} is not a Meta Pixel ID.\n"
+            "It must be a 15-16 digit numeric string "
+            "(Meta Events Manager -> Data Sources -> your pixel -> ID)."
+        )
+    pid = META_PIXEL_ID
+    return (
+        "<script>"
+        "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){"
+        "n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};"
+        "if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';"
+        "n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;"
+        "s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}"
+        "(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');"
+        f"fbq('init','{pid}');fbq('track','PageView');"
+        "document.addEventListener('submit',function(e){"
+        "var f=e.target;"
+        "if(f&&f.classList&&f.classList.contains('lead-form')){"
+        "fbq('track','Lead',{form_name:f.getAttribute('name')||'unknown'});"
+        "}},{capture:true,passive:true});"
+        "document.addEventListener('click',function(e){"
+        "var a=e.target&&e.target.closest&&e.target.closest('[data-contact]');"
+        "if(a)fbq('track','Contact',{method:a.getAttribute('data-contact')});"
+        "},{passive:true});"
+        "</script>\n"
+        "<noscript>"
+        f'<img height="1" width="1" style="display:none" '
+        f'src="https://www.facebook.com/tr?id={pid}&ev=PageView&noscript=1"/>'
+        "</noscript>"
     )
 
 
