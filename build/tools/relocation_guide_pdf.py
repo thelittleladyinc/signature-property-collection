@@ -251,7 +251,7 @@ def build():
     st.append(P(f"{esc(b.SITE['name'])} · {esc(b.SITE['brokerage'])}", "cover_sub"))
     st.append(Spacer(1, 0.22 * inch))
     st.append(P(f"{town_total} towns, {len(counties)} counties, "
-                f"Denver north to the Wyoming line", "cover_sub"))
+                f"Denver north through Larimer and Weld counties", "cover_sub"))
     st.append(NextPageTemplate("body"))
     st.append(PageBreak())
 

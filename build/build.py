@@ -4138,7 +4138,7 @@ def footer_html():
         <p style="max-width:340px;color:rgba(255,255,255,.7);line-height:1.6">
           {SITE['agent']} &middot; {SITE['brokerage']}<br>
           Luxury homes, acreage and estate property across Northern Colorado &mdash;
-          Denver north to the Wyoming line.
+          Denver north through Larimer and Weld counties.
         </p>
       </div>
       <div>
@@ -4502,9 +4502,9 @@ def build_home():
     <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Turning Dreams Into Addresses</span>
     <h1>Luxury Real Estate Across Northern Colorado</h1>
     <p class="lede">{SITE['agent']} represents estate homes, acreage, and architecturally
-    significant properties across Northern Colorado — Denver north to the Wyoming line.
-    Loveland, Fort Collins, Berthoud, Windsor, Greeley, Boulder County and every town
-    in between.</p>
+    significant properties across Northern Colorado — Denver north through Larimer
+    and Weld counties. Loveland, Fort Collins, Berthoud, Windsor, Greeley, Boulder
+    County and every town in between.</p>
     <div class="btn-row">
       <a class="btn btn-primary" href="/buyers.html">Find Your Home</a>
       <a class="btn btn-outline" href="/sellers.html">List With Us</a>
@@ -4634,10 +4634,13 @@ def build_home():
         # The description is the line Google prints, and it was describing a fraction
         # of the business. Now: what she does, where, and the phrase she uses herself.
         # Written to fit DESC_BUDGET (160) on purpose: the first draft ran to 217 and
-        # _fit_description trimmed off "Denver north to the Wyoming line", which was
-        # the whole point of rewriting it.
+        # _fit_description trimmed off "Denver north through Larimer and Weld counties",
+        # which was the whole point of rewriting it.
+        # 2026-08-24: dropped "to the Wyoming line" phrasing after Christine let her
+        # Wyoming license lapse; the new phrasing anchors to the Colorado counties she
+        # is actually licensed in.
         "Christine Gwinnup sells luxury homes and acreage across Northern Colorado, "
-        "Denver north to the Wyoming line. 250+ homes sold, 5-star rated on Google.",
+        "Denver north through Larimer and Weld counties. 250+ homes sold, 5-star rated on Google.",
         "/index.html", None, body, extra,
         schema_extra=[faq_schema, _organization_schema(), _website_schema(),
                       _homepage_review_schema(), _luxury_playlist_schema()],
@@ -7770,7 +7773,7 @@ def build_guides():
         RELOCATION_GUIDE_PATH,
         "Free Northern Colorado Relocation Guide | Signature Property Collection",
         "A free relocation guide to Northern Colorado — how the towns from Denver north "
-        "to the Wyoming line actually differ on schools, commute, price and pace.",
+        "through Larimer and Weld counties actually differ on schools, commute, price and pace.",
         "Moving To Northern Colorado",
         "The Northern Colorado Relocation Guide",
         ["How the towns actually differ — Loveland, Fort Collins, Berthoud, Windsor, "
