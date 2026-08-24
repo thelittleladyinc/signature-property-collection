@@ -7564,6 +7564,73 @@ def _guide_body_html(paragraphs):
     return "\n      ".join(parts)
 
 
+def _signature_buyers_guide_sections():
+    return [
+        {"h2": "The Luxury Market Behaves Differently", "paragraphs": [
+            "The Northern Colorado luxury market \u2014 $1M and up in Loveland, Fort Collins, Windsor, and Estes Park, and the acreage in between \u2014 does not move like the general market. Inventory turns slower (60\u2013180 days on market is normal, not a signal to lowball), buyer pools are national rather than local, and the transaction is more likely to hinge on unique factors (private wells, water rights, wildfire mitigation, architectural detail, view corridors) than on price-per-square-foot.",
+            "What that means for a buyer: the tour list is shorter, the diligence is longer, and the offer strategy is different. A generalist agent working the mid-market can miss the details that make or break a $2M transaction \u2014 which is why the luxury tier has a dedicated designation (Certified Luxury Home Marketing Specialist / CLHMS) and its own referral networks.",
+        ]},
+        {"h2": "Financing At The Luxury Tier", "paragraphs": [
+            "Jumbo territory in Larimer and Weld counties starts around $766,550 for a single-family in 2026, and above roughly $1.15M you are almost certainly in a super-jumbo or portfolio product. Rates on jumbo loans track the ten-year treasury more than the retail 30-year, reserves requirements are stiffer (6\u201312 months of PITI in liquid assets), and underwriting is manual, not automated \u2014 which means slower.",
+            "Where the pricing lives: private-banking relationships (JPM Private Bank, BOK Private Wealth, Merrill Private Client, US Bank Private Wealth), portfolio lenders (First Republic historically, some regional Colorado banks), and specialty jumbo desks at the national brokers. Rates and fees can vary a full point across these on the same loan; get Loan Estimates from at least three.",
+            "Cash offers still win close ties. On a $2M transaction with 20% down, financing $1.6M, the seller may still prefer an all-cash close 30 days out over a jumbo close at 45 days. If you have the liquidity, an all-cash close and a delayed-financing arrangement (Fannie's cash-out refinance within 6 months) can be structured to preserve your investable capital while giving the seller the certainty they want.",
+        ]},
+        {"h2": "Where The Real Off-Market Inventory Lives", "paragraphs": [
+            "The luxury tier has real pre-market and pocket-listing activity in a way the general market does not. Reasons: sellers at this price point often want privacy (celebrity, business exit, divorce), want to avoid the days-on-market clock, or want to soft-launch to gauge pricing before officially listing. Real pocket inventory in NoCo is a small number of properties at any moment \u2014 five to fifteen, depending on the season \u2014 and it moves through a small network of luxury-designated agents.",
+            "How I actually access it: the CLHMS network (roughly 3,000 designees nationwide, small local chapter), the Institute for Luxury Home Marketing member roster, direct relationships with the other five or six agents actively working the NoCo luxury tier, and the LPT Realty luxury division. When a buyer engages me at this tier, one of the first calls I make is to that network to describe what you are looking for.",
+            "What to be skeptical of: any agent claiming a large private-listing book without a CLHMS designation, verifiable network affiliation, or specific transaction history in the price range you are shopping.",
+        ]},
+        {"h2": "Due Diligence For The Luxury Tier", "paragraphs": [
+            "Inspection at $1M+ is not a two-hour general walk-through. On a substantial property, expect: a full general inspection ($700\u2013$1,200), a licensed structural engineer for anything with expansive-soil concerns or unusual construction ($800\u2013$2,500), a licensed HVAC specialist for multi-zone or geothermal systems ($400\u2013$800), sewer scope for anything older ($200\u2013$500), radon and mold testing ($400\u2013$800), and often a specialist for pools, wells, septic, and any specialty features (wine cellar humidity, indoor water features).",
+            "Water is the number one line item that surprises out-of-state luxury buyers. In Colorado, water rights are decoupled from land \u2014 owning the property does not automatically mean owning the water on or under it. Wells have permits (recorded with the Colorado Division of Water Resources); ditch shares are separate legal instruments; augmentation plans are required for many domestic wells. Ask specifically: what is the water right, is it decreed, what is the annual acre-foot allocation, and how does it convey.",
+            "Wildfire mitigation and defensible space: any foothills or mountain property (Estes area, Buckhorn Canyon, Big Thompson Canyon, north Larimer) will be in a WUI (wildland-urban interface) zone. Insurance carriers are pulling out or requiring specific mitigation before they'll write. Get a homeowners insurance quote in hand before you write the offer \u2014 on a $2M+ property in a WUI zone, the annual premium can be $15K\u2013$40K, and that materially changes your carrying cost.",
+        ]},
+        {"h2": "Writing The Luxury Offer", "paragraphs": [
+            "Price is one term of many. On a luxury transaction, what materially differentiates two offers: earnest money (1\u20135% is normal at this tier), close date (30\u201345 days standard, faster on cash), financing type and lender name (a jumbo pre-approval from a private bank the seller has heard of beats an anonymous online lender at the same rate), appraisal contingency (waived or capped, common at this tier), inspection objection window (5\u20137 days is aggressive but not unusual), and any post-close occupancy the seller might want.",
+            "What I do differently on a luxury offer: I write a cover letter that speaks to the seller's specific situation (understood from listing-agent conversations, not from social media stalking), I attach the buyer's pre-approval from a named institution the seller will recognize, I include proof of liquid funds for close plus reserves, and I preemptively address whatever the property's obvious diligence issue is (water rights, HOA, wildfire) so the seller sees the offer is coming from an informed buyer, not a discovery-phase tourist.",
+            "On appraisal gap: on a stretch offer where the price beats recent comps, some buyers cover the appraisal gap in cash to remove that contingency. On a $2M offer, a $100K appraisal gap coverage is meaningful. Whether to include it depends on how much comp support the price has \u2014 which is where a CLHMS agent's comp analysis actually earns the fee.",
+        ]},
+        {"h2": "What This Looks Like With Me", "paragraphs": [
+            "Christine Gwinnup McClellan \u2014 RealTrends Verified in the top 0.5% of Realtors nationwide, Certified Luxury Home Marketing Specialist (CLHMS), Certified Real Estate Negotiator (CREN), Colorado Real Estate Network member, and 27 years working Northern Colorado. Signature Property Collection is the luxury brand; the same working relationship serves buyers in the mid-market under the sister brand.",
+            "Bold marketing, strategic pricing, fierce negotiation \u2014 at every price point.",
+            "The first conversation costs nothing and commits you to nothing. <a href=\"tel:3037094262\">Call or text 303-709-4262</a> \u2014 that is Christine's own line, not an office queue.",
+        ]},
+    ]
+
+
+def _signature_sellers_guide_sections():
+    return [
+        {"h2": "Pricing Luxury \u2014 Why The Wrong Number Costs 8\u201312%", "paragraphs": [
+            "At the luxury tier, an overpriced listing does not sit for two extra weeks and close for 2% under a correct number. It sits for six months, cycles through two or three price reductions, and closes 8\u201312% below what a correctly-priced version would have brought. The buyer pool is smaller, more informed, and more patient \u2014 they watch the days-on-market clock and they price a stale listing accordingly.",
+            "How I actually price a luxury listing: three passes. Closed comps in the last 12 months (not 90 days \u2014 the volume is too thin for a 90-day sample), adjusted for square footage, lot, view, condition, and architectural pedigree. Active competition today, including how yours compares on the specific luxury features (water rights, view corridors, primary suite layout, kitchen tier, garage count, outbuildings). And the ceiling test \u2014 the highest recent close and whether there is a specific, defensible reason yours can beat it.",
+            "What I will not do: promise a price to win the listing. If two luxury agents give you dramatically different numbers, one of them is buying the listing. Ask each for the closed comps that support the price, in writing, with the specific adjustments they made.",
+        ]},
+        {"h2": "Presentation \u2014 What Actually Sells The Property", "paragraphs": [
+            "A luxury photo shoot is not a real estate photographer with a wide-angle lens. It is an architectural photographer, a full lighting kit, sometimes a second day for twilight, staging or de-staging as needed, and 60\u2013100 finished images \u2014 not the 25\u201330 the MLS accepts. Budget $1,500\u2013$4,000 for photography alone on a $1M+ property.",
+            "Video is not optional at this tier. A cinematic walk-through with drone opens, integrated lifestyle footage, and a proper narrative arc runs $2,500\u2013$8,000. On a $2M+ listing this is a standard line item in the marketing budget. Buyers at this price point make the initial cut from video and photos, not the listing text.",
+            "Staging: a partially or fully staged luxury property closes faster and for a higher number in every study I have seen. Costs run $3,000\u2013$15,000 depending on scale. On a home that has been de-personalized post-move, this is often the highest-return marketing dollar in the entire budget.",
+            "Print still matters at this tier. A single-property brochure, mailed to the CLHMS national network in the buyer-source regions we've identified, plus a listing in the appropriate luxury print channel, plus the digital placements. This is not a website-only sale.",
+        ]},
+        {"h2": "The Luxury Marketing Plan", "paragraphs": [
+            "What the marketing plan actually includes on a Signature Property Collection listing: professional architectural photography, cinematic walkthrough video with drone, twilight photography, staging consultation, a dedicated single-property website (custom domain, tracked), print collateral for the CLHMS network mail-out, targeted digital ads (Facebook, Instagram, Google) keyed to the buyer-source zip codes for your specific property type and price point, syndication to Zillow Premier, Realtor.com, and every relevant luxury portal (Mansion Global, Sotheby's, Christie's International Real Estate reciprocal if applicable), and coordinated open-house programming with the local luxury broker network.",
+            "The buyer-source analysis is where a luxury marketing plan differs most from a mid-market one. On a $2.5M Loveland foothills property, the buyer is probably coming from California, Texas, or a metro Denver relocation \u2014 not from Fort Collins. The digital spend has to be pointed at the right geography, and the print has to reach the right desks. That analysis is part of the pre-listing work.",
+        ]},
+        {"h2": "Buyer Qualification At The Luxury Tier", "paragraphs": [
+            "At $1M+, a pre-approval letter from a big-box online lender is not the same signal as a pre-approval from a private-banking relationship. Both may qualify the buyer numerically; only one signals that the buyer has the reserves, the relationship, and the intent to close. I ask (through the buyer's agent, appropriately) about the specific institution, the loan officer, and the buyer's history with that institution before I recommend accepting an offer or moving to counter.",
+            "Cash offers get verified. \u201cCash\u201d without recent statements, a written proof of funds from the bank or brokerage holding the funds, and a specific plan for wiring \u2014 the earnest money and the balance \u2014 is a claim, not a fact. I verify.",
+        ]},
+        {"h2": "Inspection And Appraisal Objections At The Luxury Tier", "paragraphs": [
+            "The inspection is more extensive at this tier, and the objection list is longer. My playbook: sort into three buckets \u2014 must-address (safety, structural, discoverable defects), reasonable-to-address (major mechanicals with documented issues), and no-way (cosmetic, wear-and-tear, code updates on grandfathered items). A luxury inspection objection asking for pool coping to be replaced is a wish-list item; one asking for the primary bath's discovered water damage to be remediated is a must-address.",
+            "On appraisal at the luxury tier: appraisers who work in this price range are a smaller pool, and the appraisal contingency is more often waived or capped. When a low appraisal comes back on a luxury property, I have a rebuttal package ready \u2014 recent comps, the specific adjustments, and any pending sales that would move the number \u2014 to submit for a reconsideration of value. This works more often than the industry average because the appraiser at this tier is more receptive to well-supported argument.",
+        ]},
+        {"h2": "What This Looks Like With Me", "paragraphs": [
+            "Christine Gwinnup McClellan \u2014 RealTrends Verified in the top 0.5% of Realtors nationwide, Certified Luxury Home Marketing Specialist (CLHMS), Certified Real Estate Negotiator (CREN), Colorado Real Estate Network member, and 27 years listing luxury property in Loveland, Fort Collins, Windsor, and Estes Park. Signature Property Collection is the dedicated luxury brand.",
+            "Bold marketing, strategic pricing, fierce negotiation \u2014 at every price point.",
+            "The first conversation costs nothing and commits you to nothing. <a href=\"tel:3037094262\">Call or text 303-709-4262</a> \u2014 that is Christine's own line, not an office queue.",
+        ]},
+    ]
+
+
 def build_guides():
     for data_key, path, title, description in GUIDE_PAGES:
         g = GUIDES.get(data_key)
@@ -7590,7 +7657,7 @@ def build_guides():
     # Lead-capture landing pages (mirror the live site's PDF-download offers,
     # wired to the same Netlify Forms pattern as /contact.html for now).
     def _lead_guide(path, title, description, kicker, headline, bullets, form_name=None,
-                    lede=None):
+                    lede=None, content_sections=None):
         # 2026-08-13 fix: this used to derive the form name from the path
         # via `path.strip('/').replace('/', '-')`, which for
         # "/guides/buyers-guide.html" produces "guides-buyers-guide.html"
@@ -7636,31 +7703,56 @@ def build_guides():
   </div>
 </section>
 """
+        if content_sections:
+            body += "\n<section>\n  <div class=\"wrap\" style=\"max-width:780px\">\n"
+            for sec in content_sections:
+                if sec.get('h2'):
+                    body += f"    <h2 class=\"section-title\">{esc(sec['h2'])}</h2>\n"
+                if sec.get('h3'):
+                    body += f"    <h3>{esc(sec['h3'])}</h3>\n"
+                for para in sec.get('paragraphs', []):
+                    body += f"    <p>{para}</p>\n"
+                if sec.get('list'):
+                    body += "    <ul>\n"
+                    for item in sec['list']:
+                        body += f"      <li>{item}</li>\n"
+                    body += "    </ul>\n"
+            body += "    <div class=\"btn-row\" style=\"justify-content:flex-start;margin-top:40px\">\n"
+            body += f"      <a class=\"btn btn-dark\" href=\"/contact.html\">Talk To {esc(SITE['agent'].split()[0])} Directly</a>\n"
+            body += "    </div>\n  </div>\n</section>\n"
         page(title, description, path, None, body)
 
     _lead_guide(
         "/guides/buyers-guide.html",
-        "Free Buyer's Guide | Signature Property Collection",
-        "Get our free Buyer's Guide packed with pro strategies for finding your dream "
-        "home in Northern Colorado.",
-        "Buy Like A Pro", "Free Buyer's Guide",
-        ["Leverage the internet for first-to-know listings, private deals, and custom alerts",
-         "Find the right lender — and get the best mortgage terms with ease",
-         "Make the perfect offer — often the first is the one that wins",
-         "Negotiate closing costs so the seller covers key expenses"],
+        "The Luxury Buyer's Guide | Signature Property Collection",
+        "A working guide for luxury home buyers in Northern Colorado \u2014 how the "
+        "$1M+ market actually moves in Loveland, Fort Collins, Windsor and Estes Park.",
+        "For The Luxury Buyer", "The Luxury Buyer's Guide",
+        ["How the $1M+ NoCo market works differently from the general market",
+         "Jumbo lender selection, private banking, and cash-position strategy",
+         "Where the real off-market inventory lives \u2014 pocket listings and pre-market",
+         "How to write a luxury offer that competes without leaving money on the table",
+         "Due diligence for the luxury tier \u2014 inspection specialists, water rights, permitting",
+         "Wells, septic, wildfire, and the Colorado-specific line items that hit at scale"],
         form_name="buyers-guide",
+        lede="For buyers shopping the Northern Colorado luxury market \u2014 the $1M to $5M+ tier in Loveland, Fort Collins, Windsor, Estes Park, and the surrounding foothills. What actually decides these transactions, from a Certified Luxury Home Marketing Specialist who has closed them for 27 years.",
+        content_sections=_signature_buyers_guide_sections(),
     )
     _lead_guide(
         "/guides/sellers-guide.html",
-        "Free Seller's Guide | Signature Property Collection",
-        "Unlock home selling success with our free guide — staging, pricing, and "
-        "attracting buyers fast.",
-        "Pre-Listing Guide", "Free Seller's Guide",
-        ["Stage your home for maximum appeal",
-         "Avoid common mistakes sellers make",
-         "Understand pricing strategies that work",
-         "Attract the right buyers quickly"],
+        "The Luxury Seller's Guide | Signature Property Collection",
+        "A working guide for luxury home sellers in Northern Colorado \u2014 pricing, "
+        "presentation, and the marketing that actually moves $1M+ homes.",
+        "For The Luxury Seller", "The Luxury Seller's Guide",
+        ["Pricing luxury \u2014 why the wrong number costs 8\u201312%, not 2\u20133%",
+         "Presentation \u2014 what a luxury photo shoot, video, and staging actually costs and earns",
+         "The luxury marketing plan \u2014 print, digital, single-property site, and the CLHMS network",
+         "Buyer qualification at the luxury tier \u2014 who tours and who writes",
+         "Offer strategy \u2014 what to negotiate besides price on a luxury transaction",
+         "Inspection and appraisal at $1M+ \u2014 what changes, what doesn't"],
         form_name="sellers-guide",
+        lede="For homeowners preparing to list at the luxury tier in Northern Colorado \u2014 $1M and up, in Loveland, Fort Collins, Windsor, Estes Park, and the foothills. What separates a luxury listing that sells at a strong number from one that sits for a year.",
+        content_sections=_signature_sellers_guide_sections(),
     )
     # 2026-08-16 (competitive audit, potterealty.com): the one thing the competing
     # NoCo site does that this one did not. His entire homepage funnels to a single
@@ -8064,7 +8156,7 @@ MARKET_TOPIC_PAGES = [
                 "Colorado retirement communities and what makes each one a fit.",
         "intro": "Northern Colorado has become one of the most searched retirement "
                   "destinations in the Mountain West — abundant sunshine, outdoor "
-                  "access from world-class trails to Rocky Mountain National Park, a "
+                  "access from serious hiking trails right up into Rocky Mountain National Park, a "
                   "cost of living that meaningfully undercuts Denver and Boulder, and "
                   "strong healthcare infrastructure. But \"NoCo\" isn't one thing — "
                   "it's a collection of communities, each with a distinct character, "
@@ -9252,7 +9344,7 @@ def build_money_pages():
                 "before you fall for one. South, the Harmony corridor's newer executive neighborhoods put you "
                 "close to the tech employers and the airport run.",
                 "Weighing Fort Collins Against Its Neighbors",
-                "Plenty of buyers at this level are deciding between Fort Collins and somewhere quieter — "
+                "Many buyers at this level are deciding between Fort Collins and somewhere quieter — "
                 "[Windsor's newer construction](/windsor-luxury-homes.html), [Loveland's lakes and foothills]"
                 "(/loveland-luxury-homes.html), or Timnath a few minutes east. The honest comparison is in "
                 "[the town-by-town guide](/blog/moving-to-northern-colorado-which-town-actually-fits.html), and "
