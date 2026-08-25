@@ -141,16 +141,37 @@ exports.handler = async (event) => {
     return null;
   }
 
-  // The first night's post-mortem (status blob, 2026-08-25 11:30 UTC): the
-  // walker made TWO requests and stopped on "media host 429". The likely chain:
-  // the priciest listings — the walk's first candidates — carry STALE prewarmed
-  // URL-cache entries from luxury-search traffic, a stale signed URL gets
-  // refused by the media host, and one refusal aborted the entire night. Two
-  // rules fixed that: the walker only trusts FRESH cache entries (stale means
-  // resolve again — one batched request buys 24 certainly-live URLs), and a
-  // 429 pauses and continues instead of aborting, giving up only after three
-  // in a row (a real rate limit repeats; a spent-URL artifact doesn't).
-  let consecutive429 = 0;
+  // Post-mortems, three runs deep (2026-08-25). Run 1 stopped after TWO
+  // requests on a single media-host 429; the "resilient" rewrite (fresh URLs
+  // only, three-strikes) stopped just as fast on "three consecutive 429s".
+  // The live debug that settled it: the walk's head — the priciest listings,
+  // identical every run — carries media the host REFUSES persistently (404
+  // anonymously, 429 with auth, on freshly resolved URLs), while a mid-market
+  // listing's cover downloaded fine at the same moment. So the refusals are
+  // properties of specific listings, not of the account, and any
+  // consecutive-429 rule just measures how much poison sits at the head of
+  // the queue before giving up the night.
+  //
+  // The rules that actually fit the evidence:
+  //   - A listing whose download fails gets a SKIP note for a few days; the
+  //     walk moves on and stops re-paying for the same dead media every run.
+  //   - A 429 costs that listing its turn plus a short polite pause — never
+  //     the night.
+  //   - The night ends on the signals that mean something account-wide: the
+  //     ORGANIC path's media cooldown (set by listing-photo.js when real
+  //     visitor traffic gets 429s — this walker never sets it), the quota
+  //     guard, the request cap, and the clock.
+  const SKIP_PREFIX = "photo-skip/";
+  const SKIP_TTL_MS = 3 * 24 * 3600_000;
+  const skipKey = (id) => `${SKIP_PREFIX}${id}.json`;
+  async function isSkipped(id) {
+    const note = await store.get(skipKey(id), { type: "json" }).catch(() => null);
+    return !!(note && typeof note.at === "number" && Date.now() - note.at < SKIP_TTL_MS);
+  }
+  async function writeSkip(id, why) {
+    summary.skipped = (summary.skipped || 0) + 1;
+    await store.setJSON(skipKey(id), { at: Date.now(), why }).catch(() => {});
+  }
 
   async function freshUrl(id) {
     const cached = await readCachedUrls(store, id);
@@ -175,35 +196,49 @@ exports.handler = async (event) => {
       if (stop) return stop;
       try {
         const url = await freshUrl(id);
-        if (!url) continue;
+        if (!url) {
+          // Resolved and still no usable URL: nothing to download tonight, and
+          // nothing will change by tomorrow's identical attempt. Skip-note it.
+          await writeSkip(id, "no usable url after resolve");
+          await clearPhotoDemand(store, id);
+          continue;
+        }
         const attempt = await fetchMediaResponse(url, token, FETCH_TIMEOUT_MS, store);
         await markUrlUsed(store, id, 0);
         summary.requests += (attempt && Array.isArray(attempt.attempts) && attempt.attempts.length) || 1;
+        // The demand note did its job either way: we tried. If the listing
+        // heals, the next visitor's placeholder re-notes it.
+        await clearPhotoDemand(store, id);
         if (attempt && attempt.res && attempt.res.status === 429) {
-          consecutive429 += 1;
+          summary.total429 = (summary.total429 || 0) + 1;
           summary.last429At = new Date().toISOString();
-          if (consecutive429 >= 3) return "three consecutive media-host 429s — stopping for the night";
-          // A background function has time to be polite: honor Retry-After
-          // (capped), then move on to the NEXT listing rather than replaying
-          // this one into the same refusal.
+          await writeSkip(id, "media host 429");
           const ra = Number(attempt.res.headers && attempt.res.headers.get && attempt.res.headers.get("retry-after"));
-          const waitMs = Math.min(Math.max(isFinite(ra) && ra > 0 ? ra * 1000 : 30_000, 15_000), 120_000);
-          console.warn(`photo-backfill: media 429 on ${id} — pausing ${Math.round(waitMs / 1000)}s (${consecutive429}/3)`);
+          const waitMs = Math.min(Math.max(isFinite(ra) && ra > 0 ? ra * 1000 : 5_000, 5_000), 30_000);
+          console.warn(`photo-backfill: media 429 on ${id} — skip-noted, pausing ${Math.round(waitMs / 1000)}s`);
           await new Promise((r) => setTimeout(r, waitMs));
           continue;
         }
-        consecutive429 = 0;
-        if (!attempt || !attempt.res || !attempt.res.ok) continue;
+        if (!attempt || !attempt.res || !attempt.res.ok) {
+          await writeSkip(id, `download failed (${(attempt && attempt.res && attempt.res.status) || "no response"})`);
+          continue;
+        }
         const buf = Buffer.from(await attempt.res.arrayBuffer());
         const ctype = String((attempt.res.headers && attempt.res.headers.get && attempt.res.headers.get("content-type")) || "");
-        if (!ctype.startsWith("image/") || buf.length < 2048 || buf.length > 4400000) continue;
+        if (!ctype.startsWith("image/") || buf.length < 2048 || buf.length > 4400000) {
+          await writeSkip(id, `unusable body (${ctype || "no type"}, ${buf.length} bytes)`);
+          continue;
+        }
         await writeCachedPhoto(store, id, 0, buf, ctype);
-        await clearPhotoDemand(store, id);
         summary.stored += 1;
       } catch (err) {
         console.warn(`photo-backfill: ${id} failed: ${err && err.message}`);
       }
     }
+    // Between batches: if REAL visitor traffic is being rate-limited (the
+    // cooldown this walker never sets), the account is actually in trouble —
+    // that is the one 429 signal worth ending the night over.
+    if (await isMediaThrottled(store)) return "organic media cooldown active — stopping for the night";
     return null;
   }
 
@@ -218,6 +253,10 @@ exports.handler = async (event) => {
       const existing = await store.get(photoCacheKey(id, 0), { type: "json" }).catch(() => null);
       if (existing && (existing.b64 || existing.redirectUrl)) {
         await clearPhotoDemand(store, id);
+        if (onDone) onDone(id);
+        continue;
+      }
+      if (await isSkipped(id)) {
         if (onDone) onDone(id);
         continue;
       }
