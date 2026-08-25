@@ -155,15 +155,24 @@ const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures+
       /photo-backfill-kick\.json/.test(usageSrc) && /photo-backfill-status\.json/.test(usageSrc) &&
         /photo-backfill-cursor\.json/.test(usageSrc));
 
-    // First-night post-mortem (2026-08-25): the walker stopped after TWO
-    // requests on a single media-host 429 — a stale prewarmed URL on the
-    // priciest listing, not a real rate limit — and the whole night was lost.
+    // Post-mortems, three runs deep (2026-08-25): the walk's head — the same
+    // priciest listings every run — carries media the host refuses
+    // persistently (404 anon / 429 auth on fresh URLs) while mid-market
+    // covers download fine, so per-listing refusals must be skipped, not
+    // treated as an account signal. See the doctrine comment in the walker.
     check("walker trusts only FRESH url-cache entries",
       /cached && cached\.fresh\) \? usableUrl/.test(bgSrc),
-      "a stale prewarmed URL gets refused and used to abort the night");
-    check("one media 429 pauses and continues; only three in a row stop the night",
-      /consecutive429 >= 3/.test(bgSrc) && /three consecutive media-host 429s/.test(bgSrc) &&
-        /consecutive429 = 0/.test(bgSrc));
+      "a stale prewarmed URL gets refused and misread as a rate limit");
+    check("a failing listing gets a skip note instead of costing the night",
+      /photo-skip\//.test(bgSrc) && /writeSkip/.test(bgSrc) && /isSkipped/.test(bgSrc));
+    check("skip notes expire — dead media gets another chance in a few days",
+      /SKIP_TTL_MS = 3 \* 24/.test(bgSrc));
+    check("a per-listing 429 never ends the night",
+      !/consecutive429/.test(bgSrc) && /skip-noted, pausing/.test(bgSrc));
+    check("the night ends on the ORGANIC cooldown — the signal the walker never sets itself",
+      /organic media cooldown active/.test(bgSrc) && /isMediaThrottled\(store\)/.test(bgSrc));
+    check("a demand note is cleared once an attempt has been made",
+      /The demand note did its job either way/.test(bgSrc));
     check("the sync's backfill also refuses stale urls",
       /backfillFreshUrl/.test(syncSrc));
   }
