@@ -65,37 +65,53 @@ const OVERNIGHT_UTC_HOURS = [7, 8, 9, 10, 11];
 const RESOLVE_BATCH = 24;
 const FETCH_TIMEOUT_MS = 8000;
 
-exports.handler = async () => {
+exports.handler = async (event) => {
   const startedAt = Date.now();
   const store = getBlobStore(getStore, BLOB_STORE_NAME);
   const token = process.env.MLSGRID_API_TOKEN;
   const summary = { startedAt: new Date().toISOString(), stored: 0, requests: 0, stopped: null };
+  // 2026-08-25: writing STATUS on every exit meant any stray daytime POST
+  // (this endpoint is public, like every function) overwrote the last real
+  // run's outcome with "outside the overnight window" — destroying exactly
+  // the record needed to debug why the first night produced no walk. Now
+  // only a run that got past the window check records its outcome.
+  let recordStatus = false;
 
   async function finish(reason) {
     summary.stopped = reason;
     summary.finishedAt = new Date().toISOString();
-    await store.setJSON(STATUS_KEY, summary).catch(() => {});
+    if (recordStatus) await store.setJSON(STATUS_KEY, summary).catch(() => {});
     console.log(`photo-backfill: ${summary.stored} cover(s) stored, ~${summary.requests} request(s), stopped: ${reason}`);
     return { statusCode: 200, body: reason };
   }
 
   if (!token) return finish("no token configured");
-  if (!OVERNIGHT_UTC_HOURS.includes(new Date().getUTCHours())) {
+  // ?force=1 bypasses ONLY the window check — for a supervised daytime test
+  // run. Everything that actually protects the account (lock, quota guard,
+  // pace gate, request cap, 429 stop) still applies, so the worst a stranger
+  // can do with it is run the backfill early at its normal bounded pace.
+  const force = !!(event && event.queryStringParameters && event.queryStringParameters.force === "1");
+  if (!force && !OVERNIGHT_UTC_HOURS.includes(new Date().getUTCHours())) {
     return finish("outside the overnight window");
   }
+  recordStatus = true;
+  summary.forced = force;
 
-  // The lock. Blobs has no atomic compare-and-set, so two simultaneous kicks
-  // can both pass this check — the pace gate and quota guard bound the damage,
-  // and the sync only kicks once per half hour anyway.
+  if (await isThrottled(store) || await isMediaThrottled(store)) {
+    return finish("MLS Grid cooldown active");
+  }
+
+  // The lock — taken only after the cheap exits above, so a run that bows out
+  // in its first second doesn't hold the door shut for 20 minutes against the
+  // next kick (the first night's likeliest silent failure mode). Blobs has no
+  // atomic compare-and-set, so two simultaneous kicks can both pass this
+  // check — the pace gate and quota guard bound the damage, and the sync only
+  // kicks once per half hour anyway.
   const lock = await store.get(LOCK_KEY, { type: "json" }).catch(() => null);
   if (lock && typeof lock.until === "number" && lock.until > Date.now()) {
     return finish("another run holds the lock");
   }
   await store.setJSON(LOCK_KEY, { until: Date.now() + LOCK_MS }).catch(() => {});
-
-  if (await isThrottled(store) || await isMediaThrottled(store)) {
-    return finish("MLS Grid cooldown active");
-  }
 
   const listingsById = await store.get(LISTINGS_KEY, { type: "json" }).catch(() => null);
   if (!listingsById) return finish("no catalogue stored yet");

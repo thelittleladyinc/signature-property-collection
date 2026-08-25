@@ -1413,31 +1413,6 @@ exports.handler = async () => {
       }
     }
 
-    // ---- Overnight catalogue walk: hand the big job to the background fn ----
-    // 2026-08-24. The loop above fills ~24 covers per half hour — right for
-    // demand, hopeless for a 15,000-listing catalogue (~10 days). The walk of
-    // everything lives in photo-backfill-background.js, a Netlify BACKGROUND
-    // function with a 15-minute budget, and this scheduled run is its clock:
-    // during the overnight window (roughly 1-5 AM Mountain, when nothing else
-    // is spending the account's budget) each sync run fires it and moves on.
-    // The background function brings its own lock, quota checks and request
-    // cap, so double-kicks and daytime kicks are cheap no-ops. Fire-and-wait-
-    // briefly: a background function answers 202 immediately, so awaiting the
-    // POST costs milliseconds and confirms the kick actually left the building.
-    try {
-      const utcHour = new Date().getUTCHours();
-      const OVERNIGHT_UTC_HOURS = [7, 8, 9, 10, 11]; // 1-5 AM MDT / 12-4 AM MST
-      const siteUrl = process.env.URL;
-      if (siteUrl && OVERNIGHT_UTC_HOURS.includes(utcHour) && !httpErrorOccurred) {
-        const kick = await fetch(`${siteUrl}/.netlify/functions/photo-backfill-background`, {
-          method: "POST",
-          signal: AbortSignal.timeout(5000),
-        }).catch((err) => ({ status: 0, err }));
-        console.log(`sync-listings: overnight backfill kick -> HTTP ${kick.status || "failed"}`);
-      }
-    } catch (err) {
-      console.warn(`sync-listings: overnight backfill kick failed: ${err && err.message}`);
-    }
   } catch (err) {
     // The budget tripping mid-run is a deliberate stop, not a fault. Recording it
     // as "exception: ..." would put a red row on site-health for the guard doing
@@ -1496,6 +1471,46 @@ exports.handler = async () => {
     `${staleListingsRefreshed} stale listing(s) refreshed, ` +
     `${newlyDiscoveredByOffice} newly discovered via office-wide lookup.`
   );
+
+  // ---- Overnight catalogue walk: hand the big job to the background fn ----
+  // 2026-08-24. The per-run backfill fills ~24 covers per half hour — right
+  // for demand, hopeless for a 15,000-listing catalogue. The walk of
+  // everything lives in photo-backfill-background.js, a Netlify BACKGROUND
+  // function with a 15-minute budget, and this scheduled run is its clock:
+  // during the overnight window (roughly 1-5 AM Mountain) each sync run fires
+  // it and moves on. The background function brings its own lock, quota
+  // checks and request cap, so double-kicks are cheap no-ops.
+  //
+  // 2026-08-25, after the first night produced NO walk and no way to tell
+  // why: (1) this block used to sit at the END of the main try{}, so any
+  // crawl exception skipped it silently — it now runs after the state save,
+  // where nothing upstream can cancel it; (2) process.env.URL was the only
+  // way to find ourselves, and if it is absent in the scheduled-function
+  // runtime the kick silently never happened — there is a hardcoded fallback
+  // now; (3) every in-window attempt writes its outcome to a blob that
+  // mls-usage.js exposes, so "did the kick fire, and what did it say" is a
+  // question a URL can answer instead of a Netlify-logs archaeology dig.
+  try {
+    const utcHour = new Date().getUTCHours();
+    const OVERNIGHT_UTC_HOURS = [7, 8, 9, 10, 11]; // 1-5 AM MDT / 12-4 AM MST
+    const siteUrl = process.env.URL || process.env.DEPLOY_PRIME_URL ||
+      "https://signaturepropertycollection.com";
+    if (OVERNIGHT_UTC_HOURS.includes(utcHour) && !httpErrorOccurred) {
+      const kick = await fetch(`${siteUrl}/.netlify/functions/photo-backfill-background`, {
+        method: "POST",
+        signal: AbortSignal.timeout(5000),
+      }).catch((err) => ({ status: 0, err }));
+      await store.setJSON("photo-backfill-kick.json", {
+        at: new Date().toISOString(),
+        siteUrl,
+        httpStatus: kick.status || 0,
+        error: kick.err ? String(kick.err && kick.err.message) : null,
+      }).catch(() => {});
+      console.log(`sync-listings: overnight backfill kick -> HTTP ${kick.status || "failed"}`);
+    }
+  } catch (err) {
+    console.warn(`sync-listings: overnight backfill kick failed: ${err && err.message}`);
+  }
 
   return { statusCode: 200, body: "ok" };
 };
