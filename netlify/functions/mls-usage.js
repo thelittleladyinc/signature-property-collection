@@ -96,6 +96,23 @@ exports.handler = async (event) => {
     };
     if (params.hours === "1" || params.verbose === "1") body.hourly = q.hours || [];
 
+    // The overnight cover backfill, made inspectable from a URL (2026-08-25:
+    // the first night produced no walk and the only evidence lived in Netlify
+    // function logs nobody can reach from here). Three small blobs: the last
+    // kick sync-listings attempted, the last real run's outcome, and where the
+    // catalogue walk's cursor sits. All best-effort — their absence is itself
+    // the answer "it never ran".
+    const [kick, run, cursor] = await Promise.all([
+      store.get("photo-backfill-kick.json", { type: "json" }).catch(() => null),
+      store.get("photo-backfill-status.json", { type: "json" }).catch(() => null),
+      store.get("photo-backfill-cursor.json", { type: "json" }).catch(() => null),
+    ]);
+    body.overnightBackfill = {
+      lastKick: kick || "never recorded — sync-listings has not fired one since this field shipped",
+      lastRun: run || "never recorded — the walker has not run past its window check yet",
+      cursor: cursor || null,
+    };
+
     return {
       statusCode: 200,
       headers: {

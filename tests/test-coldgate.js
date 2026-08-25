@@ -133,6 +133,27 @@ const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures+
     check("walker downloads go through the shared paced media fetch",
       /fetchMediaResponse\(/.test(bgSrc),
       "fetchMediaResponse carries paceMlsCall and the usage log — raw fetch would be invisible");
+
+    // 2026-08-25, after the first night produced no walk and no evidence:
+    check("walker takes the lock only AFTER the cheap exits",
+      bgSrc.indexOf("MLS Grid cooldown active") < bgSrc.indexOf("await store.setJSON(LOCK_KEY"),
+      "a run that bows out in a second must not hold the door for 20 minutes");
+    check("?force=1 bypasses only the window check",
+      /force && !OVERNIGHT_UTC_HOURS/.test(bgSrc) || /!force && !OVERNIGHT_UTC_HOURS/.test(bgSrc));
+    check("a window-rejected poke cannot overwrite the last real run's status",
+      /recordStatus/.test(bgSrc) &&
+        bgSrc.indexOf("recordStatus = true") > bgSrc.indexOf("outside the overnight window"));
+    check("the kicker runs after the state save, outside the main try",
+      syncSrc.indexOf("photo-backfill-background") > syncSrc.indexOf("await store.setJSON(SYNC_STATE_KEY"),
+      "at the end of the main try{}, any crawl exception skipped it silently");
+    check("the kicker has a hardcoded site-URL fallback",
+      /process\.env\.URL \|\| process\.env\.DEPLOY_PRIME_URL \|\|\s*\n?\s*"https:\/\/signaturepropertycollection\.com"/.test(syncSrc));
+    check("every in-window kick records its outcome",
+      /photo-backfill-kick\.json/.test(syncSrc));
+    const usageSrc = fs.readFileSync(path.join(ROOT, "netlify", "functions", "mls-usage.js"), "utf8");
+    check("mls-usage exposes kick, run, and cursor for the backfill",
+      /photo-backfill-kick\.json/.test(usageSrc) && /photo-backfill-status\.json/.test(usageSrc) &&
+        /photo-backfill-cursor\.json/.test(usageSrc));
   }
 
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
