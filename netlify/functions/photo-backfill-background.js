@@ -141,12 +141,28 @@ exports.handler = async (event) => {
     return null;
   }
 
+  // The first night's post-mortem (status blob, 2026-08-25 11:30 UTC): the
+  // walker made TWO requests and stopped on "media host 429". The likely chain:
+  // the priciest listings — the walk's first candidates — carry STALE prewarmed
+  // URL-cache entries from luxury-search traffic, a stale signed URL gets
+  // refused by the media host, and one refusal aborted the entire night. Two
+  // rules fixed that: the walker only trusts FRESH cache entries (stale means
+  // resolve again — one batched request buys 24 certainly-live URLs), and a
+  // 429 pauses and continues instead of aborting, giving up only after three
+  // in a row (a real rate limit repeats; a spent-URL artifact doesn't).
+  let consecutive429 = 0;
+
+  async function freshUrl(id) {
+    const cached = await readCachedUrls(store, id);
+    return (cached && cached.fresh) ? usableUrl(cached, 0) : null;
+  }
+
   async function storeBatch(ids) {
     const quota = await checkMlsQuota(store);
     if (quota.blocked) return `quota guard: ${quota.reason}`;
     const needResolve = [];
     for (const id of ids) {
-      if (!usableUrl(await readCachedUrls(store, id), 0)) needResolve.push(id);
+      if (!(await freshUrl(id))) needResolve.push(id);
     }
     if (needResolve.length) {
       summary.requests += 1;
@@ -158,14 +174,25 @@ exports.handler = async (event) => {
       const stop = outOfBudget();
       if (stop) return stop;
       try {
-        const url = usableUrl(await readCachedUrls(store, id), 0);
+        const url = await freshUrl(id);
         if (!url) continue;
         const attempt = await fetchMediaResponse(url, token, FETCH_TIMEOUT_MS, store);
         await markUrlUsed(store, id, 0);
         summary.requests += (attempt && Array.isArray(attempt.attempts) && attempt.attempts.length) || 1;
         if (attempt && attempt.res && attempt.res.status === 429) {
-          return "media host 429 — stopping for the night";
+          consecutive429 += 1;
+          summary.last429At = new Date().toISOString();
+          if (consecutive429 >= 3) return "three consecutive media-host 429s — stopping for the night";
+          // A background function has time to be polite: honor Retry-After
+          // (capped), then move on to the NEXT listing rather than replaying
+          // this one into the same refusal.
+          const ra = Number(attempt.res.headers && attempt.res.headers.get && attempt.res.headers.get("retry-after"));
+          const waitMs = Math.min(Math.max(isFinite(ra) && ra > 0 ? ra * 1000 : 30_000, 15_000), 120_000);
+          console.warn(`photo-backfill: media 429 on ${id} — pausing ${Math.round(waitMs / 1000)}s (${consecutive429}/3)`);
+          await new Promise((r) => setTimeout(r, waitMs));
+          continue;
         }
+        consecutive429 = 0;
         if (!attempt || !attempt.res || !attempt.res.ok) continue;
         const buf = Buffer.from(await attempt.res.arrayBuffer());
         const ctype = String((attempt.res.headers && attempt.res.headers.get && attempt.res.headers.get("content-type")) || "");

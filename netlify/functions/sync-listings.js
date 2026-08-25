@@ -1374,9 +1374,18 @@ exports.handler = async () => {
 
         // One batched resolve for every listing that still needs a URL, then
         // the downloads one at a time through the same paced gate as always.
+        // FRESH entries only (2026-08-25): a stale prewarmed URL is refused by
+        // the media host more often than not, and the first night showed the
+        // priciest listings — the walk's first candidates — all carry stale
+        // entries from luxury-search traffic. Resolving again costs 1/24th of
+        // a request per listing and buys a certainly-live URL.
+        const backfillFreshUrl = async (id) => {
+          const cached = await readCachedUrls(store, id);
+          return (cached && cached.fresh) ? usableUrl(cached, 0) : null;
+        };
         const needResolve = [];
         for (const id of toStore) {
-          if (!usableUrl(await readCachedUrls(store, id), 0)) needResolve.push(id);
+          if (!(await backfillFreshUrl(id))) needResolve.push(id);
         }
         if (needResolve.length) {
           await resolveMediaFor(needResolve, {
@@ -1386,7 +1395,7 @@ exports.handler = async () => {
         for (const id of toStore) {
           if (Date.now() - startedAt > BACKFILL_DEADLINE_MS) break;
           try {
-            const url = usableUrl(await readCachedUrls(store, id), 0);
+            const url = await backfillFreshUrl(id);
             if (!url) continue;
             const res = await fetchMediaResponse(url, token, MLS_FETCH_TIMEOUT_MS, store);
             await markUrlUsed(store, id, 0);

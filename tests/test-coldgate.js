@@ -154,6 +154,18 @@ const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures+
     check("mls-usage exposes kick, run, and cursor for the backfill",
       /photo-backfill-kick\.json/.test(usageSrc) && /photo-backfill-status\.json/.test(usageSrc) &&
         /photo-backfill-cursor\.json/.test(usageSrc));
+
+    // First-night post-mortem (2026-08-25): the walker stopped after TWO
+    // requests on a single media-host 429 — a stale prewarmed URL on the
+    // priciest listing, not a real rate limit — and the whole night was lost.
+    check("walker trusts only FRESH url-cache entries",
+      /cached && cached\.fresh\) \? usableUrl/.test(bgSrc),
+      "a stale prewarmed URL gets refused and used to abort the night");
+    check("one media 429 pauses and continues; only three in a row stop the night",
+      /consecutive429 >= 3/.test(bgSrc) && /three consecutive media-host 429s/.test(bgSrc) &&
+        /consecutive429 = 0/.test(bgSrc));
+    check("the sync's backfill also refuses stale urls",
+      /backfillFreshUrl/.test(syncSrc));
   }
 
   console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
