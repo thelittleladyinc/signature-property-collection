@@ -77,15 +77,50 @@ const SELECT_FIELDS = [
   "CoListAgentFullName", "ModificationTimestamp", "MlgCanView",
 ].join(",");
 
-// Every status either search mode ever needs (mine=true shows Active +
-// under-contract; the public search shows Active only) — replicating this
-// combined set covers both without needing two separate synced copies.
+// Every status either search mode ever needs — replicating this combined
+// set covers both without needing two separate synced copies.
 // Sold/Closed is deliberately never included here, so it's never even
 // pulled into storage in the first place — the strictest possible version
 // of "no sold/closed data" compliance.
-const REPLICATED_STATUSES = ["Active", "Active Under Contract", "Pending"];
-const MINE_STATUSES = ["Active", "Active Under Contract", "Pending"];
-const PUBLIC_STATUSES = ["Active"];
+//
+// 2026-09-01: "Coming Soon" added to all three. Christine reported a real
+// listing of her own (357 Blue Azurite) that was entered in IRES and never
+// appeared on either site, and asked whether that was because it wasn't
+// active yet or because something wasn't automated. It was the former, and
+// it was this list: Coming Soon is its own RESO StandardStatus, it was in
+// none of these three sets, so sync-listings.js discarded the record at the
+// door (see the REPLICATED_STATUSES checks there) and neither search mode
+// could have returned it even if it had been stored. Nothing was broken —
+// the filter simply never anticipated the status.
+//
+// Included in PUBLIC_STATUSES as well as MINE_STATUSES per Christine's
+// explicit decision on 2026-09-01 (she was asked, and chose her own
+// listings AND the public IDX search). Worth confirming with IRES that
+// Coming Soon may be displayed via IDX on this feed; if they say no, the
+// one-line revert is to drop it from PUBLIC_STATUSES only, which leaves her
+// own listings unaffected.
+const REPLICATED_STATUSES = ["Active", "Active Under Contract", "Pending", "Coming Soon"];
+const MINE_STATUSES = ["Active", "Active Under Contract", "Pending", "Coming Soon"];
+const PUBLIC_STATUSES = ["Active", "Coming Soon"];
+
+// The statuses this feed is PROVEN to accept inside an OData $filter —
+// every one of them has been running in production since 2026-08-12.
+//
+// This is deliberately NOT the same list as REPLICATED_STATUSES, and the
+// difference is the whole point. This feed has a documented history of
+// 400ing on field/value names that look perfectly standard (see the four
+// consecutive $select rejections above), and a 400 on a status clause
+// would take out the crawl that fetches EVERY listing, not just the new
+// status. Sending only proven values keeps that risk at zero.
+//
+// Coming Soon still reaches storage without being in this list: the
+// incremental pass filters on ModificationTimestamp alone (no status
+// clause at all — see the 2026-08-13 prune-fix comment in sync-listings.js),
+// so any Coming Soon listing whose timestamp advances comes back and is
+// then accepted by REPLICATED_STATUSES. discoverListingsByOffice() does try
+// the wider list first for speed, and falls back to this one if MLS Grid
+// rejects it.
+const FILTER_STATUSES = ["Active", "Active Under Contract", "Pending"];
 
 const AGENT_SURNAME = (process.env.LISTING_AGENT_SURNAME || "gwinnup").toLowerCase();
 const LUXURY_PRICE_FLOOR = 950000;
@@ -582,6 +617,7 @@ module.exports = {
   BASE_URL,
   SELECT_FIELDS,
   REPLICATED_STATUSES,
+  FILTER_STATUSES,
   MINE_STATUSES,
   PUBLIC_STATUSES,
   AGENT_SURNAME,

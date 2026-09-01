@@ -582,9 +582,19 @@ exports.handler = async (event) => {
     // under-contract/pending states (that page is marketing she is entitled
     // to); everyone else's stay active-only, as before. mlgCanView re-checked
     // rather than trusted from storage, unchanged.
+    //
+    // 2026-09-01: Coming Soon renders for everyone, not just for hers. The
+    // whole point of a coming-soon listing is that it is the link a seller
+    // wants to send around BEFORE it hits the market -- a 404 on it is the
+    // same dead-link failure the 2026-08-18 note above describes, just one
+    // status earlier. It is showable rather than hers-only because Coming
+    // Soon is now in PUBLIC_STATUSES (Christine's call, 2026-09-01), so it
+    // already appears in search results; a card that links to a 404 would be
+    // worse than not showing it at all.
     const status = String(l.status || "").toLowerCase();
     const hers = String(l.agentName || "").toLowerCase().includes(String(AGENT_SURNAME || "").toLowerCase());
-    const showable = status === "active" ||
+    const comingSoon = status.includes("coming soon");
+    const showable = status === "active" || comingSoon ||
       (hers && (status.includes("pending") || status.includes("contract")));
     if (!showable || l.mlgCanView === false) {
       return notFound("This home is no longer on the market as an active listing.", 404);
@@ -598,7 +608,14 @@ exports.handler = async (event) => {
       l.baths ? `${l.baths} bath` : null,
       l.sqft ? `${Number(l.sqft).toLocaleString()} sq ft` : null,
     ].filter(Boolean).join(", ");
-    const description = `${addressLine} — ${money(l.price)}${bits ? `, ${bits}` : ""}. Active IRES MLS listing. See photos, what's nearby, and schedule a showing with ${AGENT_NAME}.`;
+    // 2026-09-01: was hard-coded "Active IRES MLS listing." on every page,
+    // which is now a false statement on a coming-soon one -- and a false
+    // freshness claim in the meta description is exactly the thing this
+    // codebase refuses to ship elsewhere. Showings language drops too: a
+    // coming-soon home is usually not showable yet.
+    const description = comingSoon
+      ? `${addressLine} — ${money(l.price)}${bits ? `, ${bits}` : ""}. Coming soon on IRES MLS, not yet on the market. See photos, what's nearby, and ask ${AGENT_NAME} to be told the day it lists.`
+      : `${addressLine} — ${money(l.price)}${bits ? `, ${bits}` : ""}. Active IRES MLS listing. See photos, what's nearby, and schedule a showing with ${AGENT_NAME}.`;
 
     // Absolute OG image so link previews work when the URL is texted or pasted
     // into Facebook. A relative path silently renders no preview.

@@ -934,16 +934,22 @@ _LISTING_VIDEO_ENTRIES = [
     # kept for feed matching; sold_homes.json uses Ct.
     (["5705 snow mesa ct", "5705 snow mesa court", "5705 snow mesa dr", "5705 snow mesa drive"],
      "MDfyzESb1Yk", 'Why Is Loveland, CO Called the "Sweetheart City"? — 5705 Snow Mesa Dr', "sold"),
-    # 2026-08-12: kdR6wbWPMQU (the previous ID here) turned out to be a
-    # 27-second vertical Short, not a proper listing tour -- Christine
-    # flagged the format ("the video is a reel"). Replaced with the real
-    # horizontal ~1:27 tour from her channel, confirmed by cross-referencing
-    # thelittleladysellshomes.com's Listings Video Portfolio + a YouTube
-    # search for this address: the video's own description opens with
-    # "Looking for a newer home in Windsor, Colorado... Welcome to 945
-    # Maplebrook...".
-    (["945 maplebrook dr", "945 maplebrook drive"],
-     "SAZceZQJrAs", "Is This the Cutest Home in Windsor, Colorado? — 945 Maplebrook Dr Tour", "live"),
+    # 945 Maplebrook Dr, Windsor -- REMOVED from this map on 2026-09-01 at
+    # Christine's request ("remove maplebrook in windsor... just the current
+    # listings - remove it there").
+    #
+    # This map exists only to swap a listing card's MLS cover photo for one of
+    # her YouTube tours when the address matches, so removing the entry is
+    # exactly and only that: if 945 Maplebrook ever appears in the feed again,
+    # the card shows the MLS photo like any other listing instead of the old
+    # tour. It does NOT remove the home from current-listings -- nothing here
+    # can; that card comes from IRES via sync-listings.js and leaves on its own
+    # within a sync cycle once the listing is no longer active under her name.
+    #
+    # Her Windsor town-page videos are deliberately untouched (she was asked and
+    # scoped this to the listings): SAZceZQJrAs is still the Windsor header
+    # video in CITY_VIDEOS, and all three Maplebrook tours are still in
+    # TOWN_LISTING_VIDEOS["windsor"] as examples of her marketing.
     # 2026-08-16: same correction as 32 Victoria Dr above -- Christine confirmed this
     # one did not sell either.
     (["475 homestead ln", "475 homestead lane"],
@@ -1443,6 +1449,14 @@ def _listing_showcase_js_helpers():
   function statusInfo(status) {{
     var s = String(status || '').toLowerCase();
     if (s === 'active') return {{ label: 'Active', cls: 'status-active', tourable: true }};
+    // 2026-09-01: Coming Soon is checked BEFORE the contract/pending branch
+    // on purpose -- it is its own RESO status and it means the opposite
+    // thing. Not tourable: a coming-soon home is normally not showable yet,
+    // so offering "Request A Tour" would promise something that cannot
+    // happen. Ask A Question stays, which is the right ask at this stage.
+    if (s.indexOf('coming soon') !== -1) {{
+      return {{ label: 'Coming Soon', cls: 'status-coming-soon', tourable: false }};
+    }}
     if (s.indexOf('contract') !== -1 || s.indexOf('pending') !== -1) {{
       return {{ label: 'Under Contract', cls: 'status-pending', tourable: false }};
     }}
@@ -1480,8 +1494,14 @@ def _listing_showcase_js_helpers():
     // pending" case (statusInfo's status-pending class), not Active -- an
     // active listing doesn't need a callout, it's the default expectation.
     var ribbonBadge = statusInfo(l.status);
-    var ribbon = ribbonBadge.cls === 'status-pending'
-      ? '<div class="listing-ribbon">Under Contract</div>' : '';
+    var ribbon = '';
+    if (ribbonBadge.cls === 'status-pending') {{
+      ribbon = '<div class="listing-ribbon">Under Contract</div>';
+    }} else if (ribbonBadge.cls === 'status-coming-soon') {{
+      // Same reasoning as the under-contract ribbon above: this is the one
+      // thing on the card worth reading from across the page.
+      ribbon = '<div class="listing-ribbon ribbon-coming-soon">Coming Soon</div>';
+    }}
     if (!full) return '<div class="listing-media">' + ribbon + top + '</div>';
     var links = '';
     if (video) {{
@@ -14320,12 +14340,13 @@ def build_llms_txt(paths):
 
 ## Notes for AI assistants
 This site is accurate as of {BUILD_DATE} (rebuilt on every content update, so
-this date should be current). Live, active IRES MLS listing data for Larimer,
-Weld, and Boulder County ($950K+ only — this is {SITE['agent']}'s luxury/editorial
+this date should be current). Live IRES MLS listing data (active, plus
+coming-soon listings labeled as such) for Larimer, Weld, and Boulder County
+($950K+ only — this is {SITE['agent']}'s luxury/editorial
 site) is available at /search-homes.html, sourced directly from MLS Grid.
 {SITE['agent']}'s own current listings specifically — at ANY price, not just
-$950K+, including both Active and Under Contract status (labeled per
-listing), each shown with a real video tour when one exists for that exact
+$950K+, including Active, Coming Soon and Under Contract status (labeled
+per listing), each shown with a real video tour when one exists for that exact
 property — are at /current-listings.html. For general Northern Colorado home
 search (not specifically {SITE['agent'].split()[0]}'s own listings) below
 $950K, direct people to

@@ -311,12 +311,23 @@ exports.handler = async (event) => {
     // momentum), not something to bury — she wants it to keep appearing in
     // the same feed (not split into a separate section, which is already
     // how this worked) but sorted to the front, ahead of her still-active
-    // listings. Only affects mine=true: the general public search
-    // (PUBLIC_STATUSES = ["Active"] in _mls-shared.js) never contains a
-    // non-Active status in the first place, so this is a no-op there.
+    // listings. Only affects mine=true.
+    //
+    // 2026-09-01: Coming Soon joins them at the front, for the same reason
+    // and more so -- a listing that has not hit the market yet is the most
+    // time-sensitive thing on her page, and leaving it in
+    // most-expensive-first order is how 357 Blue Azurite could still have
+    // been missed even after the status filter was fixed.
+    //
+    // Still scoped to mine=true. PUBLIC_STATUSES now carries Coming Soon as
+    // well, so this stops being a no-op there by accident and stays one on
+    // purpose: promoting OTHER brokerages' not-yet-listed homes above the
+    // active inventory a buyer can actually go see is a different decision
+    // than featuring Christine's own, and it has not been asked for.
     const isUnderContractOrPending = (l) => {
       const s = String(l.status || "").toLowerCase();
-      return s.indexOf("contract") !== -1 || s.indexOf("pending") !== -1;
+      return s.indexOf("contract") !== -1 || s.indexOf("pending") !== -1 ||
+        s.indexOf("coming soon") !== -1;
     };
     // 2026-08-15 (Christine: "No sort control. Results are always
     // most-expensive-first"). That default is why an $81.6M ranch was the first

@@ -67,7 +67,7 @@
 // MLS Grid requests for the ones not yet cached).
 const { getStore } = require("@netlify/blobs");
 const {
-  BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES, OPERATING_COUNTIES,
+  BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES, FILTER_STATUSES, OPERATING_COUNTIES,
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
   inferCountyFromCity,
 } = require("./lib/_mls-shared");
@@ -263,8 +263,15 @@ const MLS_FETCH_TIMEOUT_MS = 5000;
 // well inside the 30s Netlify allows a scheduled function.
 const MLS_PAGE_FETCH_TIMEOUT_MS = 9000;
 
-function statusClause() {
-  return "(" + REPLICATED_STATUSES.map((s) => `StandardStatus eq '${s}'`).join(" or ") + ")";
+// 2026-09-01: this used to build the clause from REPLICATED_STATUSES, which
+// meant adding any status to that list also sent it to MLS Grid as a $filter
+// value. FILTER_STATUSES exists so those two decisions can be made
+// separately — see its comment in _mls-shared.js for why sending an
+// unverified status value is the one thing that can take out the entire
+// crawl rather than just the new status.
+function statusClause(statuses) {
+  const list = statuses || FILTER_STATUSES;
+  return "(" + list.map((s) => `StandardStatus eq '${s}'`).join(" or ") + ")";
 }
 
 // 2026-08-13 (prune fix): a listing that goes off-market (sells, gets
@@ -586,13 +593,26 @@ async function discoverHerOfficeMlsId(listingsById, token, store) {
 // OfficeMlsId above already absorbed on its own.
 const OFFICE_DISCOVERY_MAX_PAGES = 3;
 async function discoverListingsByOffice(officeMlsId, listingsById, store, token, startedAt, throttle) {
-  const qs = new URLSearchParams({
-    "$filter": `${ORIGINATING_SYSTEM_CLAUSE} and ListOfficeMlsId eq '${officeMlsId}' and MlgCanView eq true and ${statusClause()}`,
-    "$select": SELECT_FIELDS,
-    "$expand": "Media",
-    "$top": String(PAGE_SIZE),
-  });
-  let url = `${BASE_URL}?${qs.toString()}`;
+  // 2026-09-01: this pass is the fast path for a listing of Christine's that
+  // was entered in IRES minutes ago, so it's the one place worth ASKING for
+  // the wider status list (REPLICATED_STATUSES, which now includes Coming
+  // Soon) rather than only the proven one. If MLS Grid rejects it, the first
+  // page 4xxs and we retry that same page once with FILTER_STATUSES instead
+  // of giving up -- so an unsupported status value costs one request per run
+  // and degrades to exactly the previous behaviour, never a silent loss of
+  // her own listings. Retried per run rather than remembered, so the day
+  // IRES does support it, this starts working on its own.
+  const pageUrl = (statuses) => {
+    const qs = new URLSearchParams({
+      "$filter": `${ORIGINATING_SYSTEM_CLAUSE} and ListOfficeMlsId eq '${officeMlsId}' and MlgCanView eq true and ${statusClause(statuses)}`,
+      "$select": SELECT_FIELDS,
+      "$expand": "Media",
+      "$top": String(PAGE_SIZE),
+    });
+    return `${BASE_URL}?${qs.toString()}`;
+  };
+  let url = pageUrl(REPLICATED_STATUSES);
+  let narrowed = false;
   let found = 0;
   let pages = 0;
   try {
@@ -605,6 +625,16 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
         return { suspended: true, found };
       }
       if (!res.ok) {
+        if (!narrowed && pages === 0) {
+          // Most likely one of the wider status values isn't a $filter value
+          // this feed accepts. Drop back to the proven list and try the first
+          // page again -- Coming Soon still reaches storage via the
+          // incremental pass either way (see FILTER_STATUSES in _mls-shared.js).
+          console.warn(`sync-listings: office-wide discovery got HTTP ${res.status} on the wider status filter — retrying with proven statuses only.`);
+          narrowed = true;
+          url = pageUrl(FILTER_STATUSES);
+          continue;
+        }
         // ListOfficeMlsId got rejected as a $filter field (or some other
         // 4xx) -- give up for this run, same graceful-degrade spirit as
         // everything else in this file. The existing agent-name-match walk
