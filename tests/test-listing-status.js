@@ -31,6 +31,14 @@ const LIVE = {
     id: "IRE900002", address: "2 Sold Ave", city: "Windsor", state: "CO",
     price: 600000, status: "Closed", photos: [],
   },
+  // 2026-09-01: a coming-soon listing is precisely the link a seller wants to
+  // send around BEFORE it hits the market, so a 404 on it is the same dead-link
+  // failure the 2026-08-18 under-contract note describes, one status earlier.
+  IRE900004: {
+    id: "IRE900004", address: "357 Blue Azurite", city: "Loveland", state: "CO",
+    price: 1200000, status: "Coming Soon", beds: 4, baths: 3, sqft: 3000,
+    agentName: "Christine Gwinnup", photos: [],
+  },
 };
 
 // store: a function returning the fake store, so each case can fail differently.
@@ -63,6 +71,15 @@ const okStore = () => ({
   check("a sold listing is 404, not 5xx", res.statusCode === 404, String(res.statusCode));
   res = await load(okStore)({ queryStringParameters: { id: "!!bad!!" } });
   check("a malformed id is 404, not 5xx", res.statusCode === 404, String(res.statusCode));
+
+  // --- coming soon renders, and says so rather than claiming to be active ---
+  res = await load(okStore)({ queryStringParameters: { id: "IRE900004" } });
+  check("a coming-soon listing renders 200, not 404", res.statusCode === 200,
+    String(res.statusCode));
+  check("and says coming soon on the page", /coming soon/i.test(res.body || ""));
+  check("and never calls itself an active listing",
+    !/Active IRES MLS listing/.test(res.body || ""),
+    "the meta description would be making a false freshness claim");
 
   // --- the actual finding: a Blobs outage must be 503, not 500 -------------
   const downStore = () => ({
