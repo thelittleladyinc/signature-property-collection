@@ -1076,6 +1076,43 @@ exports.handler = async () => {
     .filter((l) => l.listingId && isHerListing(l) && !isFullyCached(l))
     .map((l) => l.listingId);
 
+  // 2026-09-15 (945 Maplebrook Dr, Windsor -- withdrawn in IRES, still showing
+  // "Active" on the public site with all 47 of its photos cached).
+  //
+  // The pass below exists to CACHE PHOTOS, so it only ever looked at listings
+  // whose photos were still pending. The moment one of Christine's listings
+  // finished caching, it became invisible to every per-listing path: gone from
+  // herPendingIds, and otherwise reachable only by the refresh sweep at the
+  // bottom of this file -- REFRESH_SWEEP_BATCH_SIZE = 5 per run, which is about
+  // 42 days to cycle ~20,000 records. The incremental crawl is still the primary
+  // pruner and is correct (see the 2026-08-13 prune-fix note above), but nothing
+  // bounded how long one of HER listings could sit stale, and hers are where it
+  // matters most: it is her own marketing, and publishing a withdrawn listing as
+  // Active is an IDX accuracy problem, not a cosmetic one.
+  //
+  // So re-verify a couple of her already-cached listings every run, oldest-checked
+  // first. refreshOneListing stamps photosRefreshedAt on every successful refresh
+  // whether or not a photo was actually re-fetched, so that field already means
+  // "when we last confirmed this against MLS" and no new state is needed. It also
+  // already deletes a record whose status has left REPLICATED_STATUSES -- so this
+  // is the entire fix: a withdrawal now disappears within an hour or two instead
+  // of up to 42 days.
+  //
+  // Deliberately small. She has ~10 listings, so 2 per run re-verifies each one
+  // roughly every 75 minutes at a cost of ~192 requests/day against a 40,000/day
+  // limit, and every one goes through the same throttle() gate -- so it cannot
+  // move the 2 rps sustained average that the 2026-08-01 suspension fired on.
+  const HER_STATUS_CHECKS_PER_RUN = 2;
+  const herStatusCheckIds = Object.values(listingsById)
+    .filter((l) => l.listingId && isHerListing(l) && isFullyCached(l))
+    .sort((a, b) => {
+      const at = a.photosRefreshedAt ? Date.parse(a.photosRefreshedAt) : 0;
+      const bt = b.photosRefreshedAt ? Date.parse(b.photosRefreshedAt) : 0;
+      return at - bt;                            // oldest-verified first
+    })
+    .slice(0, HER_STATUS_CHECKS_PER_RUN)
+    .map((l) => l.listingId);
+
   // 2026-08-16, FOUND BY AUDIT and this is the real bug behind a symptom nobody
   // had explained: her /status showed "Last ran 5 minute(s) ago" with
   // lastRunPagesFetched 0 and lastRunRecordsSeen 0, and an initial catalog crawl
@@ -1138,6 +1175,31 @@ exports.handler = async () => {
       if (result.cached) coverPhotosCached += (result.photosCached || 1);
     } catch (err) {
       console.warn(`sync-listings: priority pass failed for ${listingId}: ${err && err.message}`);
+    }
+  }
+
+  // Status re-verification for her ALREADY-cached listings (see herStatusCheckIds
+  // above). This deliberately runs even when Cloudinary is misconfigured: it
+  // touches no photos, so the reason the caching pass above gets skipped does not
+  // apply to it -- and a broken image CDN must never be the reason a withdrawn
+  // listing keeps showing as Active.
+  for (const listingId of herStatusCheckIds) {
+    if (Date.now() - startedAt > priorityCutoff) break;
+    await throttle();
+    try {
+      const result = await refreshOneListing(listingId, listingsById, store, token, startedAt, throttle);
+      if (result.suspended) {
+        lastRunError = "MLS Grid 429: rate limited during her-listing status check — suspension circuit breaker opened for 5 minutes";
+        console.error(`sync-listings: ${lastRunError}`);
+        httpErrorOccurred = true;
+        break;
+      }
+      if (result.removed) {
+        console.log(`sync-listings: ${listingId} has left the replicated status set ` +
+          `(withdrawn/expired/sold/not viewable) — removed from storage.`);
+      }
+    } catch (err) {
+      console.warn(`sync-listings: status check failed for ${listingId}: ${err && err.message}`);
     }
   }
 
