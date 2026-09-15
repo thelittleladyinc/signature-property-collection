@@ -36,6 +36,7 @@ set -uo pipefail   # NOT -e: every failure here is handled explicitly below.
 PY="${PYTHON_BIN:-python3}"
 BUILD="${BUILD_SCRIPT:-build/build.py}"
 REQS="${REQS_FILE:-requirements.txt}"
+FRESHNESS="${FRESHNESS_SCRIPT:-build/postprocess_freshness.py}"
 
 echo "--- netlify-build: using PY=$PY BUILD=$BUILD"
 
@@ -81,6 +82,18 @@ fi
 # --- 3. The actual build. A failure HERE is a real defect: fail the deploy. --
 echo "--- netlify-build: regenerating site/ from $BUILD"
 if "$PY" "$BUILD"; then
+  # 2026-09-15: build.py stamps today's date into every page, so a deploy that
+  # changed one listing told Google all 117 pages were edited today -- and a
+  # deploy that changed nothing said the same. This puts the previous date back
+  # on any page whose content did not actually change. It only ever rewrites
+  # date fields, so a failure here cannot corrupt a page; if it does fail, say
+  # so and publish anyway rather than lose a good build over a meta tag.
+  if "$PY" "$FRESHNESS"; then
+    :
+  else
+    echo "!! netlify-build: $FRESHNESS failed. Publishing the build anyway --"
+    echo "!! the pages are correct, their modified dates are just optimistic."
+  fi
   echo "--- netlify-build: build OK, publishing freshly generated site/"
   exit 0
 fi
