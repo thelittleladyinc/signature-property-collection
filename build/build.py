@@ -4449,13 +4449,17 @@ def _analytics_tag():
 def _meta_pixel_tag():
     """The Meta Pixel snippet, or "" when META_PIXEL_ID isn't set.
 
-    Emits base pixel + PageView + a delegated submit listener that fires
-    the Lead event on any <form class="lead-form"> (matches the site's
-    existing lead forms without touching a single one of them), and a
-    Contact event on the [data-contact] taps the mobile action bar already
-    ships. Same env-gate philosophy as _analytics_tag(): if the variable
-    is unset, this function emits nothing -- no fbevents.js byte on the
-    wire, no noscript beacon, no listeners.
+    Emits base pixel + PageView on every page, and a Contact event on the
+    [data-contact] taps the mobile action bar already ships. Same env-gate
+    philosophy as _analytics_tag(): if the variable is unset, this function
+    emits nothing -- no fbevents.js byte on the wire, no noscript beacon,
+    no listeners.
+
+    2026-09-24: this used to fire Lead from a delegated submit listener on
+    any <form class="lead-form">. A browser submit is not a lead -- it fired
+    even when the send failed or was rejected. Lead now fires only on the
+    thank-you page, behind the same one-time submit marker as GA4's
+    generate_lead (see the thank-you body).
     """
     if not META_PIXEL_ID:
         return ""
@@ -4475,11 +4479,6 @@ def _meta_pixel_tag():
         "s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}"
         "(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');"
         f"fbq('init','{pid}');fbq('track','PageView');"
-        "document.addEventListener('submit',function(e){"
-        "var f=e.target;"
-        "if(f&&f.classList&&f.classList.contains('lead-form')){"
-        "fbq('track','Lead',{form_name:f.getAttribute('name')||'unknown'});"
-        "}},{capture:true,passive:true});"
         "document.addEventListener('click',function(e){"
         "var a=e.target&&e.target.closest&&e.target.closest('[data-contact]');"
         "if(a)fbq('track','Contact',{method:a.getAttribute('data-contact')});"
@@ -13590,6 +13589,10 @@ def build_legal():
     var fireLead = function () {{
       if (typeof window.gtag === "function") {{
         window.gtag("event", "generate_lead", {{ form_name: confirmed }});
+      }}
+      /* Meta's Lead lives here, behind the same gate -- never on a submit. */
+      if (typeof window.fbq === "function") {{
+        window.fbq("track", "Lead", {{ form_name: confirmed }});
       }}
     }};
     if (confirmed) {{

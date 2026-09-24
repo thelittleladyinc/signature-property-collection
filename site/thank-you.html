@@ -1767,6 +1767,10 @@ window.__ytPlay = function (b) {
       if (typeof window.gtag === "function") {
         window.gtag("event", "generate_lead", { form_name: confirmed });
       }
+      /* Meta's Lead lives here, behind the same gate -- never on a submit. */
+      if (typeof window.fbq === "function") {
+        window.fbq("track", "Lead", { form_name: confirmed });
+      }
     };
     if (confirmed) {
       if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fireLead);

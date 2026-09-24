@@ -153,6 +153,9 @@ for (const form of ["contact", "luxury-market", "free-home-valuation"]) {
   const g = ga(leadEvents(`?from=${form}`, store));
   check(`successful ${form} arrival emits one attributed GA lead`,
     g.length === 1 && g[0][2] === "generate_lead" && g[0][3].form_name === form);
+  const m = leadEvents(`?from=${form}`, makeStorage(mark(form))).filter((e) => e[0] === "meta");
+  check(`successful ${form} arrival emits one Meta Lead`,
+    m.length === 1 && m[0][1] === "track" && m[0][2] === "Lead" && m[0][3].form_name === form);
   check(`a refresh after the ${form} arrival counts nothing`,
     leadEvents(`?from=${form}`, store).length === 0);
 }
@@ -163,6 +166,15 @@ const noMarker = withForms.filter((f) => !fs.readFileSync(f, "utf8").includes("s
 check(`every lead-form page (${withForms.length}) leaves the submit marker`,
   withForms.length > 0 && noMarker.length === 0,
   noMarker.slice(0, 3).map((f) => path.relative(ROOT, f)).join(", "));
+
+// Meta Lead must never fire from a submit listener or a click -- only from the
+// gated thank-you script above.
+const pixelSrc = buildPy.slice(buildPy.indexOf("def _meta_pixel_tag"), buildPy.indexOf("def page("));
+check("the pixel snippet does not fire Lead on submit", !/'Lead'/.test(pixelSrc));
+const leadOutsideTy = pages.filter((f) => !f.endsWith("thank-you.html")
+  && /fbq\(\s*['"]track['"]\s*,\s*['"]Lead['"]/.test(fs.readFileSync(f, "utf8")));
+check("no page other than thank-you fires a Meta Lead", leadOutsideTy.length === 0,
+  leadOutsideTy.slice(0, 3).map((f) => path.relative(ROOT, f)).join(", "));
 
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
 process.exit(failures ? 1 : 0);
