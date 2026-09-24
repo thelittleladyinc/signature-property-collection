@@ -117,5 +117,52 @@ check("the lead event is guarded on gtag existing",
 check("the lead event carries the form name, not just a bare count",
   /"generate_lead"[\s\S]{0,80}form_name/.test(ty));
 
+// --- a thank-you visit is a lead only after a real submit -----------------------
+// 2026-09-24. The page used to fire generate_lead on EVERY load, even with no ?from=.
+// The form page now leaves a one-time marker in sessionStorage on a real submit; the
+// thank-you page consumes it. Run the shipped script against a fake window.
+const vm = require("vm");
+const tyScripts = [...ty.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+const leadScript = tyScripts.find((s) => s.includes('"generate_lead"'));
+function makeStorage(initial) {
+  const data = Object.assign({}, initial || {});
+  return { getItem: (k) => (k in data ? data[k] : null),
+    setItem: (k, v) => { data[k] = String(v); }, removeItem: (k) => { delete data[k]; } };
+}
+const mark = (form, ageMs = 2000) =>
+  ({ spc_lead_submit: JSON.stringify({ form, t: Date.now() - ageMs }) });
+function leadEvents(search, storage = makeStorage(), analytics = true) {
+  const events = [];
+  const window = { location: { search }, sessionStorage: storage,
+    ...(analytics ? { gtag: (...a) => events.push(["ga", ...a]),
+      fbq: (...a) => events.push(["meta", ...a]) } : {}) };
+  vm.runInNewContext(leadScript, { URLSearchParams, JSON, Date, window,
+    location: window.location, document: { getElementById: () => null } });
+  return events;
+}
+const ga = (ev) => ev.filter((e) => e[0] === "ga");
+check("direct thank-you visits do not count as leads", leadEvents("").length === 0);
+check("?from= without a real submit does not count (shared link / direct visit)",
+  leadEvents("?from=contact").length === 0);
+check("a submit of a DIFFERENT form does not count for this one",
+  leadEvents("?from=contact", makeStorage(mark("luxury-market"))).length === 0);
+check("a stale submit marker does not count",
+  leadEvents("?from=contact", makeStorage(mark("contact", 2 * 60 * 60 * 1000))).length === 0);
+for (const form of ["contact", "luxury-market", "free-home-valuation"]) {
+  const store = makeStorage(mark(form));
+  const g = ga(leadEvents(`?from=${form}`, store));
+  check(`successful ${form} arrival emits one attributed GA lead`,
+    g.length === 1 && g[0][2] === "generate_lead" && g[0][3].form_name === form);
+  check(`a refresh after the ${form} arrival counts nothing`,
+    leadEvents(`?from=${form}`, store).length === 0);
+}
+check("thank-you works when analytics is unavailable",
+  leadEvents("?from=contact", makeStorage(mark("contact")), false).length === 0);
+const withForms = pages.filter((f) => /action="\/thank-you\.html\?from=/.test(fs.readFileSync(f, "utf8")));
+const noMarker = withForms.filter((f) => !fs.readFileSync(f, "utf8").includes("spc_lead_submit"));
+check(`every lead-form page (${withForms.length}) leaves the submit marker`,
+  withForms.length > 0 && noMarker.length === 0,
+  noMarker.slice(0, 3).map((f) => path.relative(ROOT, f)).join(", "));
+
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
 process.exit(failures ? 1 : 0);
