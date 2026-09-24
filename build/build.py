@@ -4363,6 +4363,29 @@ def _contact_bar():
 </script>"""
 
 
+# 2026-09-24: the thank-you page counted a lead on ANY visit -- even with no ?from=
+# at all -- so a direct visit, a shared or bookmarked thank-you URL, a refresh and a
+# back-button return were all "leads". The form page now leaves a one-time marker in
+# THIS tab's sessionStorage when a lead form is really submitted, and the thank-you
+# page consumes it (see the conversion script in the thank-you body). Form name +
+# time only, never a field value. Bubble phase, so a submit that the form's own
+# handler cancelled is not marked. Keyed off the action URL because that is what
+# carries ?from=, and the thank-you page compares the two.
+LEAD_SUBMIT_KEY = "spc_lead_submit"
+
+
+def _lead_submit_marker():
+    return (
+        "<script>document.addEventListener('submit',function(e){"
+        "var f=e.target;if(e.defaultPrevented||!f||!f.getAttribute)return;"
+        "var m=/\\/thank-you\\.html\\?from=([^&#]+)/.exec(f.getAttribute('action')||'');"
+        "if(!m)return;"
+        f"try{{sessionStorage.setItem('{LEAD_SUBMIT_KEY}',"
+        "JSON.stringify({form:decodeURIComponent(m[1]),t:Date.now()}));}catch(_){}"
+        "});</script>"
+    )
+
+
 # 2026-08-16. Her Search Console already lists signaturepropertycollection.com, but
 # under "Not verified" -- and as a DOMAIN property, which Google only verifies by DNS
 # TXT record. Her first Verify attempt failed for exactly that reason: no record had
@@ -4426,13 +4449,17 @@ def _analytics_tag():
 def _meta_pixel_tag():
     """The Meta Pixel snippet, or "" when META_PIXEL_ID isn't set.
 
-    Emits base pixel + PageView + a delegated submit listener that fires
-    the Lead event on any <form class="lead-form"> (matches the site's
-    existing lead forms without touching a single one of them), and a
-    Contact event on the [data-contact] taps the mobile action bar already
-    ships. Same env-gate philosophy as _analytics_tag(): if the variable
-    is unset, this function emits nothing -- no fbevents.js byte on the
-    wire, no noscript beacon, no listeners.
+    Emits base pixel + PageView on every page, and a Contact event on the
+    [data-contact] taps the mobile action bar already ships. Same env-gate
+    philosophy as _analytics_tag(): if the variable is unset, this function
+    emits nothing -- no fbevents.js byte on the wire, no noscript beacon,
+    no listeners.
+
+    2026-09-24: this used to fire Lead from a delegated submit listener on
+    any <form class="lead-form">. A browser submit is not a lead -- it fired
+    even when the send failed or was rejected. Lead now fires only on the
+    thank-you page, behind the same one-time submit marker as GA4's
+    generate_lead (see the thank-you body).
     """
     if not META_PIXEL_ID:
         return ""
@@ -4452,11 +4479,6 @@ def _meta_pixel_tag():
         "s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}"
         "(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');"
         f"fbq('init','{pid}');fbq('track','PageView');"
-        "document.addEventListener('submit',function(e){"
-        "var f=e.target;"
-        "if(f&&f.classList&&f.classList.contains('lead-form')){"
-        "fbq('track','Lead',{form_name:f.getAttribute('name')||'unknown'});"
-        "}},{capture:true,passive:true});"
         "document.addEventListener('click',function(e){"
         "var a=e.target&&e.target.closest&&e.target.closest('[data-contact]');"
         "if(a)fbq('track','Contact',{method:a.getAttribute('data-contact')});"
@@ -4529,6 +4551,7 @@ def page(title, description, path, active, body, extra_head="", schema_extra="",
 </main>
 {footer_html()}
 {_contact_bar()}
+{_lead_submit_marker()}
 {_qr_share_modal(path)}
 {_scroll_reveal_script()}
 </body>
@@ -13550,9 +13573,31 @@ def build_legal():
        GA4's generate_lead with the form name attached, so the landing-page report
        shows which page a lead actually came from instead of a flat total.
        Guarded on gtag existing, because analytics is optional here -- with
-       GA_MEASUREMENT_ID unset the page still works and simply counts nothing. */
-    if (typeof window.gtag === "function") {{
-      window.gtag("event", "generate_lead", {{ form_name: from || "unknown" }});
+       GA_MEASUREMENT_ID unset the page still works and simply counts nothing.
+       2026-09-24: only a visit that follows a real submit of that same form in
+       this tab counts. The marker left by _lead_submit_marker() is consumed
+       here, so a direct visit, a shared link or a refresh counts nothing. */
+    var confirmed = "";
+    try {{
+      var mark = JSON.parse(window.sessionStorage.getItem("{LEAD_SUBMIT_KEY}") || "null");
+      window.sessionStorage.removeItem("{LEAD_SUBMIT_KEY}");
+      if (from && mark && mark.form === from && Date.now() - mark.t < 1800000) confirmed = from;
+    }} catch (_) {{ /* no storage: count nothing rather than guess */ }}
+    window.__spcConfirmedLead = confirmed;
+    /* Fired once the page has parsed, so a tag injected at the end of <body>
+       (Netlify snippet injection) has defined gtag by then. */
+    var fireLead = function () {{
+      if (typeof window.gtag === "function") {{
+        window.gtag("event", "generate_lead", {{ form_name: confirmed }});
+      }}
+      /* Meta's Lead lives here, behind the same gate -- never on a submit. */
+      if (typeof window.fbq === "function") {{
+        window.fbq("track", "Lead", {{ form_name: confirmed }});
+      }}
+    }};
+    if (confirmed) {{
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fireLead);
+      else fireLead();
     }}
   }} catch (e) {{ /* default copy stands */ }}
 }})();

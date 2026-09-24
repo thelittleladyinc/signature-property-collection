@@ -3394,6 +3394,7 @@ window.__ytPlay = function (b) {
   }, { passive: true });
 })();
 </script>
+<script>document.addEventListener('submit',function(e){var f=e.target;if(e.defaultPrevented||!f||!f.getAttribute)return;var m=/\/thank-you\.html\?from=([^&#]+)/.exec(f.getAttribute('action')||'');if(!m)return;try{sessionStorage.setItem('spc_lead_submit',JSON.stringify({form:decodeURIComponent(m[1]),t:Date.now()}));}catch(_){}});</script>
 <div class="lb-overlay" id="qr-overlay" role="dialog" aria-modal="true" aria-labelledby="qr-heading"
   onclick="if (event.target === this) this.classList.remove('open')">
   <div class="lb-box" style="text-align:center;max-width:340px">
