@@ -24,27 +24,50 @@ function fmtPrice(p) {
   return typeof p === "number" ? "$" + p.toLocaleString() : "Price on request";
 }
 
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+}
+
+// Who sent it, on every alert: Colorado wants the brokerage on advertising,
+// and Christine asked for her phone and site on everything. No street
+// address (she does not publish one); ALERT_MAILING_ADDRESS, when set, adds
+// the postal line CAN-SPAM asks of commercial email.
+function footerHtml(alert) {
+  const postal = String(process.env.ALERT_MAILING_ADDRESS || "").trim();
+  return `<p style="color:#999;font-size:12px;margin-top:28px;line-height:1.5">` +
+    `You asked for these alerts on my website.<br>` +
+    `Christine Gwinnup · LPT Realty · <a href="tel:+13037094262" style="color:#999">303-709-4262</a> · ` +
+    `<a href="${SITE}" style="color:#999">signaturepropertycollection.com</a><br>` +
+    (postal ? `${esc(postal)}<br>` : "") +
+    `Listing information from IRES MLS, deemed reliable but not guaranteed. Equal Housing Opportunity.<br>` +
+    `<a href="${SITE}/.netlify/functions/area-alerts?unsub=${encodeURIComponent(alert.id)}" ` +
+    `style="color:#999">Unsubscribe</a></p>`;
+}
+
 function emailHtml(alert, listings) {
   const rows = listings.slice(0, MAX_LISTINGS_PER_EMAIL).map((l) =>
     `<p style="margin:0 0 14px"><a href="${SITE}/listing/${encodeURIComponent(l.listingId)}" ` +
     `style="color:#B86F7A;font-weight:bold;text-decoration:none">${fmtPrice(l.price)} — ` +
-    `${l.address || ""}, ${l.city || ""}</a><br>` +
+    `${esc(l.address)}, ${esc(l.city)}</a><br>` +
     `<span style="color:#555;font-size:13px">${l.beds ?? "?"} bd · ${l.baths ?? "?"} ba` +
-    (l.sqft ? ` · ${Number(l.sqft).toLocaleString()} sqft` : "") + `</span></p>`
+    (l.sqft ? ` · ${Number(l.sqft).toLocaleString()} sqft` : "") + `</span>` +
+    // IDX: the listing brokerage/agent per listing, same line as the listing pages.
+    (l.agentName ? `<br><span style="color:#888;font-size:11px">Listing courtesy of ${esc(l.agentName)}` +
+      `${l.officeName ? `, ${esc(l.officeName)}` : ""}.</span>` : "") +
+    `</p>`
   ).join("");
   const more = listings.length > MAX_LISTINGS_PER_EMAIL
     ? `<p>…and ${listings.length - MAX_LISTINGS_PER_EMAIL} more.</p>` : "";
   return `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;padding:24px">
-<h2 style="font-weight:normal">New in ${alert.label}</h2>
+<h2 style="font-weight:normal">New in ${esc(alert.label)}</h2>
 <p style="color:#555">Homes that just listed in the area you drew on my map
-(${alert.cities.join(", ")}):</p>
+(${esc(alert.cities.join(", "))}):</p>
 ${rows}${more}
 <p><a href="${SITE}/explore.html" style="color:#B86F7A">See them on the map</a></p>
-<p style="color:#999;font-size:12px;margin-top:28px">You asked for these alerts on
-signaturepropertycollection.com. — Christine Gwinnup, The Little Lady Sells Homes<br>
-<a href="${SITE}/.netlify/functions/area-alerts?unsub=${encodeURIComponent(alert.id)}"
-style="color:#999">Unsubscribe</a></p></div>`;
+${footerHtml(alert)}</div>`;
 }
+
+exports.emailHtml = emailHtml; // for tests
 
 exports.handler = async () => {
   try {
