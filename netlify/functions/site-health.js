@@ -456,10 +456,10 @@ function ageNote(v) {
   };
 }
 
-// Christine's own business address (SITE['address'] in build.py) and a point in
-// Loveland — real inputs, so a success genuinely proves the API works rather
-// than proving a placeholder round-trips.
-const GEOCODE_PROBE_ADDRESS = "2411 Glade Rd, Loveland, CO";
+// A real place and a point in Loveland — real inputs, so a success genuinely
+// proves the API works rather than proving a placeholder round-trips.
+// 2026-09-26: no longer her street address; she does not publish it anywhere.
+const GEOCODE_PROBE_ADDRESS = "Loveland, CO";
 const PLACES_PROBE_LATLNG = "40.3978,-105.0748";
 
 // Probes the two Google APIs this site actually uses. Returns a plain,
