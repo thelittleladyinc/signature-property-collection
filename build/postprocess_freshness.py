@@ -79,7 +79,28 @@ def _blank(text: str) -> str:
     (except the lead-submit marker, which is ignored -- see _LEAD_MARKER)."""
     for pattern, _ in DATE_FIELDS:
         text = pattern.sub(lambda m: m.group(1) + PLACEHOLDER + m.group(3), text)
-    return _LEAD_MARKER.sub("", text)
+    return _normalize_business_address(_LEAD_MARKER.sub("", text))
+
+
+# 2026-09-26: Christine's street address was removed from every page (footer,
+# Contact card, RealEstateAgent schema, the June market-report sign-off). That is
+# a sitewide contact-detail swap, not an edit to any page's content, so it must
+# not re-date every page. The old and new renderings collapse to one token for
+# the comparison only; the page written out is always the fresh build. Positional
+# date restoration stays safe because no date field is touched here.
+_OLD_ADDRESS = r"2411 Glade Rd, Loveland, CO 80538"
+_NEW_NAP = (r"Christine Gwinnup (?:&middot;|·) LPT Realty (?:&middot;|·) "
+            r"303-709-4262 (?:&middot;|·) Serving Northern Colorado")
+
+
+def _normalize_business_address(text: str) -> str:
+    text = re.sub(rf"(?:{_OLD_ADDRESS}|{_NEW_NAP})(?=</li>|</p>)", "BUSINESS_NAP", text)
+    # The June 2026 luxury report's scraped email sign-off (build/data/blog.json).
+    text = re.sub(r"· (?:2411 Glade Road, Loveland CO 80538|Serving Northern Colorado)(?=</h2>)",
+                  "BUSINESS_NAP", text)
+    text = re.sub(r'"streetAddress"\s*:\s*"2411 Glade Rd"\s*,\s*', "", text)
+    text = re.sub(r'("addressRegion"\s*:\s*"CO")\s*,\s*"postalCode"\s*:\s*"80538"', r"\1", text)
+    return text
 
 
 def _restore(fresh: str, committed: str) -> str:

@@ -405,23 +405,24 @@ SITE = {
     # cannot vanish with a Netlify setting. The env var still overrides, which is
     # what makes it safe to test a different link on a branch deploy.
     "schedule_url": "https://calendly.com/thelittleladysellshomes/30min",
-    # Business address, confirmed by Christine 2026-08-11 (cross-checked
-    # against her public Yelp business listing, which lists this same
-    # address for "Christine Gwinnup - The Little Lady Sells Homes") — used
-    # in the RealEstateAgent/LocalBusiness schema below and on Contact/
-    # footer for NAP (name/address/phone) consistency, a real local-SEO
-    # ranking factor.
+    # 2026-09-26 (Christine): her street/mailing address is NOT published
+    # anywhere on the site -- no footer, no contact block, no schema
+    # streetAddress/postalCode. Colorado advertising rules require the
+    # brokerage name (LPT Realty), not an address, so every place that used
+    # to print the address now prints the service-area line instead. The
+    # schema keeps a city/region-only PostalAddress (valid for a service-area
+    # business) alongside areaServed. Do not add a street back without
+    # asking her.
     "address": {
-        "street": "2411 Glade Rd",
         "city": "Loveland",
         "state": "CO",
-        "zip": "80538",
     },
+    "service_area": "Serving Northern Colorado",
     # 2026-08-14: geo coordinates feed local-pack relevance and were missing
     # from every RealEstateAgent node on the site. These are LOVELAND
     # CITY-LEVEL coordinates, deliberately not a precise rooftop geocode of
-    # 2411 Glade Rd -- that address is residential, and publishing exact
-    # rooftop coordinates for a home isn't something to do without asking.
+    # her business address -- that address is residential and unpublished, and
+    # exact rooftop coordinates for a home are not something to publish.
     # City-level is accurate, honest, and sufficient for a service-area
     # business. Replace with a precise geocode only if Christine moves to a
     # commercial address and wants it pinpointed.
@@ -956,8 +957,7 @@ _LISTING_VIDEO_ENTRIES = [
      "6Hrdv6LZIDM", "Tour This Stunning Johnstown Home — 475 Homestead Ln (Johnstown Farms)", "not-sold"),
     # Confirmed 2026-08-11 (after an earlier back-and-forth): 913 Green
     # Mountain Dr, Erie was a real past CLIENT sale (Christine represented
-    # the seller), not her own home — 2411 Glade Rd, Loveland is her
-    # business address instead (see SITE['address']). Belongs here as
+    # the seller), not her own home. Belongs here as
     # "sold" so it correctly appears in the "How I Sold These Homes"
     # showcase on past-sales.html.
     (["913 green mountain dr", "913 green mountain drive"],
@@ -3255,15 +3255,7 @@ def _real_estate_agent_schema():
     if SITE.get("hours"):
         data["openingHoursSpecification"] = SITE["hours"]
     if SITE.get("address"):
-        a = SITE["address"]
-        data["address"] = {
-            "@type": "PostalAddress",
-            "streetAddress": a["street"],
-            "addressLocality": a["city"],
-            "addressRegion": a["state"],
-            "postalCode": a["zip"],
-            "addressCountry": "US",
-        }
+        data["address"] = _schema_postal_address()
     return json.dumps(data, indent=None)
 
 
@@ -3298,15 +3290,7 @@ def _kendra_agent_schema():
         "dateModified": BUILD_DATE,
     }
     if SITE.get("address"):
-        a = SITE["address"]
-        data["address"] = {
-            "@type": "PostalAddress",
-            "streetAddress": a["street"],
-            "addressLocality": a["city"],
-            "addressRegion": a["state"],
-            "postalCode": a["zip"],
-            "addressCountry": "US",
-        }
+        data["address"] = _schema_postal_address()
     return json.dumps(data, indent=None)
 
 
@@ -3478,15 +3462,7 @@ def _organization_schema():
         ),
     }
     if SITE.get("address"):
-        a = SITE["address"]
-        data["address"] = {
-            "@type": "PostalAddress",
-            "streetAddress": a["street"],
-            "addressLocality": a["city"],
-            "addressRegion": a["state"],
-            "postalCode": a["zip"],
-            "addressCountry": "US",
-        }
+        data["address"] = _schema_postal_address()
     return json.dumps(data, indent=None)
 
 
@@ -4205,7 +4181,7 @@ def footer_html():
           <li><a href="tel:{esc(_phone_digits())}" data-contact="call">{SITE['phone']}</a></li>
           <li><a href="sms:{esc(_phone_digits())}" data-contact="text">Text {esc(SITE['phone'])}</a></li>
           <li><a href="mailto:{esc(SITE['email'])}" data-contact="email">{SITE['email']}</a></li>
-          {f'<li>{esc(SITE["address"]["street"])}, {esc(SITE["address"]["city"])}, {esc(SITE["address"]["state"])} {esc(SITE["address"]["zip"])}</li>' if SITE.get('address') else ''}
+          <li>{_service_area_line()}</li>
           {social_links}
         </ul>
       </div>
@@ -4299,6 +4275,26 @@ META_PIXEL_ID = (os.environ.get("META_PIXEL_ID") or "").strip()
 # simply does not render when neither is set -- a schedule button that 404s is worse
 # than no schedule button.
 SCHEDULE_URL = (os.environ.get("CALENDLY_URL") or SITE.get("schedule_url") or "").strip()
+
+
+def _schema_postal_address():
+    """City/region-only PostalAddress. Never a street or ZIP: Christine does not
+    publish her street/mailing address (2026-09-26). See SITE["address"]."""
+    a = SITE["address"]
+    return {
+        "@type": "PostalAddress",
+        "addressLocality": a["city"],
+        "addressRegion": a["state"],
+        "addressCountry": "US",
+    }
+
+
+def _service_area_line():
+    """The line shown wherever her street address used to be (footer, Contact):
+    name, brokerage, phone, service area. HTML-escaped, joined by middle dots."""
+    return " &middot; ".join(esc(x) for x in (
+        SITE["agent"], SITE["brokerage"], SITE["phone"],
+        SITE.get("service_area", "Serving Northern Colorado")))
 
 
 def _phone_digits():
@@ -7629,7 +7625,7 @@ def build_contact():
       <h2 class="article-subhead">Contact Information</h2>
       <p><a href="tel:{esc(_phone_digits())}" data-contact="call">{SITE['phone']}</a><br>
       <a href="sms:{esc(_phone_digits())}" data-contact="text">Text {esc(SITE['phone'])}</a><br>
-      <a href="mailto:{esc(SITE['email'])}" data-contact="email">{SITE['email']}</a>{f"<br>{esc(SITE['address']['street'])}, {esc(SITE['address']['city'])}, {esc(SITE['address']['state'])} {esc(SITE['address']['zip'])}" if SITE.get('address') else ''}</p>
+      <a href="mailto:{esc(SITE['email'])}" data-contact="email">{SITE['email']}</a><br>{_service_area_line()}</p>
       {_schedule_button_html()}
       <h3 style="margin-top:24px">What Happens Next</h3>
       <p>Every message here comes straight to {esc(SITE['agent'].split()[0])} — expect a
