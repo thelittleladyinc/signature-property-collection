@@ -4559,6 +4559,39 @@ def page(title, description, path, active, body, extra_head="", schema_extra="",
     print("wrote", path)
 
 
+# ---- Recently sold & open houses (2026-09-27) ----------------------------
+#
+# A strip fed from Listing Engine's listing-events feed through
+# netlify/functions/recent-activity.js, which alone holds LISTING_FEED_KEY --
+# the browser only ever sees the public-safe cards that function rebuilds.
+#
+# It ships HIDDEN with an empty list. recent-activity.js fills it and unhides
+# it only when there is at least one card, so an empty feed, an unset key or a
+# sleeping API all look the same to a visitor: the section is simply not there.
+# Nothing is reserved, and the strip sits below the fold, so filling it in
+# cannot shove the content someone is reading.
+#
+# Copy is facts only (address, town, price with an honest label, beds/baths/
+# sqft, dates) -- no adjectives about the homes or who they suit, and no
+# "I sold" claim: a card says a home closed, not who represented whom.
+RECENT_ACTIVITY_ENDPOINT = "/.netlify/functions/recent-activity"
+
+
+def _recent_activity_strip(section_class="tight"):
+    return f"""
+<section class="{section_class} recent-activity" id="recent-activity" hidden
+         data-recent-activity="{RECENT_ACTIVITY_ENDPOINT}" aria-labelledby="recent-activity-title">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Latest Activity</span>
+    <h2 class="section-title" id="recent-activity-title">Recently Sold &amp; Open Houses</h2>
+    <p class="lede">Upcoming open houses and homes that recently closed.</p>
+    <ul class="ra-grid" role="list"></ul>
+  </div>
+</section>
+<script src="/assets/js/recent-activity.js" defer></script>
+"""
+
+
 # ---------------------------------------------------------------- HOME ----
 def build_home():
     county_btns = "\n        ".join(
@@ -4633,6 +4666,7 @@ def build_home():
     </div>
   </div>
 </section>
+{_recent_activity_strip()}
 
 <section class="section-dark">
   <div class="wrap communities-layout">
