@@ -1525,3 +1525,28 @@ h2.widget-title {
 .town-gallery img { width: 100%; border-radius: 4px; box-shadow: 0 10px 30px rgba(20,20,21,.10); display: block; }
 .town-gallery figcaption { margin-top: 9px; font-size: .85rem; line-height: 1.5; color: var(--slate-soft); }
 @media (max-width: 760px) { .town-gallery { grid-template-columns: 1fr; gap: 20px; } }
+
+/* Recently sold & open houses (2026-09-27). Filled from Listing Engine by
+   recent-activity.js and hidden until it has at least one card, so an empty
+   feed costs no space. Same card language as .card: white ground, slate
+   hairline, rose top rule; badges and fine print use the AA-checked tokens. */
+.recent-activity[hidden] { display: none; }
+.ra-grid { list-style: none; margin: 36px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+.ra-card { margin: 0; }
+.ra-link { display: flex; flex-direction: column; height: 100%; background: var(--white); color: var(--charcoal); text-decoration: none; border: 1px solid var(--hairline); border-top: 1px solid var(--hairline-rose); border-radius: 1px; transition: box-shadow .25s ease, border-color .25s ease; }
+a.ra-link:hover, a.ra-link:focus-visible { box-shadow: 0 20px 44px rgba(51,65,79,.08); border-color: var(--hairline-strong); border-top-color: var(--rose); }
+a.ra-link:focus-visible { outline: 2px solid var(--deep-mauve); outline-offset: 2px; }
+.ra-photo { aspect-ratio: 3 / 2; background: var(--cream); overflow: hidden; }
+.ra-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ra-body { padding: 18px 20px 22px; }
+.ra-badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; padding: 4px 9px; border-radius: 2px; }
+.ra-badge-sold { background: var(--charcoal); color: var(--white); }
+.ra-badge-open { background: var(--deep-mauve); color: var(--white); }
+.ra-when { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--slate); }
+.ra-address { margin: 8px 0 0; font-family: var(--font-serif); font-weight: 400; font-size: 19px; line-height: 1.3; }
+.ra-city, .ra-facts { margin: 4px 0 0; font-size: 13.5px; color: var(--slate-soft); }
+.ra-price { margin: 10px 0 0; font-size: 16px; font-weight: 600; color: var(--charcoal); }
+.ra-price-note { font-size: 12px; font-weight: 400; color: var(--slate-mist); }
+@media (max-width: 1000px) { .ra-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .ra-grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .ra-link { transition: none; } }
