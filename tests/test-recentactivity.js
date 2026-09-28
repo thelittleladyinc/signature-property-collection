@@ -61,7 +61,9 @@ async function call(env, events, opts = {}) {
 }
 
 (async () => {
-  const ENV = { LISTING_FEED_KEY: KEY, IDX_DISPLAY: "on" }; // IDX kill switch on (lib/_idx-display.js)
+  // IDX kill switch on (lib/_idx-display.js), and -- since 2026-09-28, while the
+  // listings come from Lofty -- the strip's own switch too (see stripAllowed()).
+  const ENV = { LISTING_FEED_KEY: KEY, IDX_DISPLAY: "on", RECENT_ACTIVITY_DISPLAY: "on" };
 
   console.log("\n1. No key, no call");
   {
@@ -89,6 +91,19 @@ async function call(env, events, opts = {}) {
     const off = JSON.parse((await RA.handler({}, {}, { env: { LISTING_FEED_KEY: KEY }, now: () => NOW + 1000 })).body);
     check("switching off hides an already-cached list at once", on.items.length === 1 && off.items.length === 0,
       `${on.items.length} then ${off.items.length}`);
+  }
+
+  console.log("\n1c. Her Lofty listings switched on does not switch this strip on");
+  {
+    const lofty = { LISTING_FEED_KEY: KEY, IDX_DISPLAY: "on" };
+    const { res, body } = await call(lofty, [ev(1, "just_sold")]);
+    check("IDX_DISPLAY=on alone, on Lofty -> empty (the events come from Listing Engine, not Lofty)",
+      res.statusCode === 200 && body.items.length === 0, res.body);
+    check("...and Listing Engine is never called", calls.length === 0, String(calls.length));
+    const own = await call({ ...lofty, RECENT_ACTIVITY_DISPLAY: "on" }, [ev(1, "just_sold")]);
+    check("RECENT_ACTIVITY_DISPLAY=on turns it on", own.body.items.length === 1, own.res.body);
+    const grid = await call({ ...lofty, LISTINGS_SOURCE: "mlsgrid" }, [ev(1, "just_sold")]);
+    check("with LISTINGS_SOURCE=mlsgrid it follows IDX_DISPLAY alone, as before", grid.body.items.length === 1, grid.res.body);
   }
 
   console.log("\n2. The request");

@@ -100,6 +100,10 @@ is gone.
   pages fall back to their written copy. (Possible later: counts per town from
   Lofty's search `totalCount`.)
 - The legal page and disclaimers no longer name MLS Grid while Lofty is the source.
+- **The "Recently sold & open houses" strip** (`recent-activity.js`) reads Listing
+  Engine, which records those events from the IRES feed through MLS Grid — not
+  from Lofty. So turning `IDX_DISPLAY` on for her Lofty listings does not turn it
+  on: on Lofty it also needs `RECENT_ACTIVITY_DISPLAY=on`, Christine's call.
 
 ## Showing listings: the IDX display switch
 
