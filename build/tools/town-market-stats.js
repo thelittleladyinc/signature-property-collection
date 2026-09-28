@@ -47,7 +47,9 @@
 const fs = require("fs");
 const path = require("path");
 
-const { getBlobStore, BLOB_STORE_NAME, LISTINGS_KEY } = require("../../netlify/functions/lib/_mls-shared.js");
+const {
+  getBlobStore, BLOB_STORE_NAME, LISTINGS_KEY, LISTINGS_SOURCE,
+} = require("../../netlify/functions/lib/_mls-shared.js");
 
 // Below this many active listings in a town we publish nothing. See the
 // compliance note above -- this is a privacy/IDX floor, not a cosmetic one.
@@ -87,6 +89,18 @@ function listingsFromBlob(raw) {
 }
 
 async function main() {
+  // 2026-09-28: with Lofty as the listing source the site stores Christine's own
+  // listings and nobody else's (netlify/functions/lib/_lofty-listings.js) -- the
+  // whole-market copy these figures were computed from no longer exists. A
+  // "median" of her dozen listings would be published as the town's market, so
+  // this writes nothing; the figures already committed age out on build.py's
+  // 21-day rule and the town pages fall back to their qualitative copy.
+  // Exit 0: nothing is broken, and a red X every Monday and Thursday would
+  // train everyone to ignore the job.
+  if (LISTINGS_SOURCE === "lofty") {
+    console.log("Listings come from Lofty (Christine's own only) — no whole-market copy to compute town figures from. Not writing a file.");
+    return;
+  }
   if (!process.env.BLOBS_SITE_ID || !process.env.BLOBS_TOKEN) {
     console.error("!! BLOBS_SITE_ID / BLOBS_TOKEN not set — cannot read the replicated");
     console.error("!! listings. Set both and re-run. Not writing a partial file.");

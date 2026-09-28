@@ -1720,10 +1720,9 @@ window.__ytPlay = function (b) {
            href="/search-homes.html?city=Loveland&subdivision=Lakes%20at%20Centerra">See All &amp; Refine This Search &rarr;</a>
       </div>
       <div class="mls-disclaimer">
-      <p><span class="mls-source-badge">Source: IRES MLS</span> — Listings courtesy of IRES MLS
-      as distributed by MLS Grid. Based on information submitted to MLS Grid as of
+      <p><span class="mls-source-badge">Source: IRES MLS</span> — Listings courtesy of IRES MLS. Based on information submitted to the MLS as of
       <span id="lakes_at_centerra_loveland_feed-fetched-at">page load</span>. All data is obtained from various sources and may
-      not have been verified by broker or MLS Grid. Supplied open house information is subject to
+      not have been verified by broker or MLS. Supplied open house information is subject to
       change without notice. All information should be independently reviewed and verified for
       accuracy. Properties may or may not be listed by the office/agent presenting the information.
       Some IDX listings have been excluded from this website. Offer of compensation is made only to
@@ -1739,7 +1738,7 @@ window.__ytPlay = function (b) {
 
   function idxOffHtml(data) {
     var url = (data && typeof data.searchUrl === 'string' && /^https?:\/\//i.test(data.searchUrl))
-      ? data.searchUrl : 'https://www.thelittleladysellshomes.com';
+      ? data.searchUrl : '/search-homes.html';
     var msg = (data && typeof data.message === 'string' && data.message) || 'Search homes on my home-search site';
     var e = function (s) {
       return String(s).replace(/[&<>"']/g, function (c) {

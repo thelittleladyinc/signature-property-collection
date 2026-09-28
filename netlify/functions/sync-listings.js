@@ -69,7 +69,7 @@ const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES, FILTER_STATUSES, OPERATING_COUNTIES,
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
-  inferCountyFromCity,
+  inferCountyFromCity, hasEquestrianKeywords, LISTINGS_SOURCE,
 } = require("./lib/_mls-shared");
 const {
   cachePhotoToCloudinary, isCloudinaryConfigured, isOnCurrentCloud, deliveryUrl,
@@ -81,6 +81,7 @@ const {
   listPhotoDemand, clearPhotoDemand,
 } = require("./lib/_media");
 const { drainFailedPushes } = require("./lib/_lofty");
+const { runMineSync } = require("./lib/_lofty-listings");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
 // her own listings are still all serving raw MLS Grid URLs. cacheCoverPhoto
@@ -695,29 +696,8 @@ async function discoverListingsByOffice(officeMlsId, listingsById, store, token,
 //
 // Christine's own listings are never slimmed, so nothing about her own
 // inventory, photos or galleries is affected.
-// Equine words that mean the property is actually set up for horses, not just
-// rural. "horse" on its own is intentionally excluded: "horseshoe" shows up in
-// street and subdivision names all over Northern Colorado ("Horseshoe Lake",
-// "Horseshoe Bend"), so it's matched as "horse property"/"horses" instead.
-const EQUESTRIAN_STRONG = [
-  "horse property", "horses allowed", "horses welcome", "zoned for horses",
-  "horse setup", "horse facility", "horse barn", "horse arena", "equestrian",
-  "loafing shed", "riding arena", "round pen", "stalls", "corral",
-  "tack room", "hay barn", "irrigated pasture",
-];
-// These only count when paired with one of the words below, since a "barn" or
-// "pasture" by itself describes most acreage out here.
-const EQUESTRIAN_WEAK = ["barn", "pasture", "paddock", "outbuildings"];
-const EQUESTRIAN_WEAK_PARTNER = ["horse", "equine", "livestock", "stall", "arena"];
-
-function hasEquestrianKeywords(remarksLower) {
-  if (!remarksLower) return false;
-  if (EQUESTRIAN_STRONG.some((k) => remarksLower.includes(k))) return true;
-  if (EQUESTRIAN_WEAK.some((k) => remarksLower.includes(k))) {
-    return EQUESTRIAN_WEAK_PARTNER.some((k) => remarksLower.includes(k));
-  }
-  return false;
-}
+// The equestrian keyword rules moved to _mls-shared.js (hasEquestrianKeywords) on
+// 2026-09-28 so the Lofty sync applies exactly the same ones.
 
 // 2026-08-18. listing-photo.js now keeps this site's own permanent copy of every
 // photo a page renders, which is what MLS Grid's documentation asks for ("You must
@@ -949,7 +929,39 @@ function nextLastSuccessAt(prevState, outcome, nowIso) {
 }
 exports.nextLastSuccessAt = nextLastSuccessAt; // for tests
 
+// ---- 2026-09-28: Lofty is the listing source now ---------------------------
+// When LISTINGS_SOURCE is "lofty" (the default -- see _mls-shared.js) this
+// schedule stops talking to MLS Grid entirely: no crawl, no photo caching, no
+// backfill. It keeps the one job that was never about MLS Grid (retrying queued
+// website leads into Lofty) and refreshes Christine's own listings from Lofty
+// (lib/_lofty-listings.js runMineSync -- two requests). The home search for
+// every other listing is her Lofty site's job now (lib/_home-search.js).
+// Everything below this function is the MLS Grid path, untouched, for
+// LISTINGS_SOURCE=mlsgrid.
+async function loftyScheduledRun() {
+  const store = getBlobStore(getStore);
+  const apiKey = process.env.LOFTY_API_KEY;
+  try {
+    const drained = await drainFailedPushes(store, apiKey);
+    if (drained.attempted) {
+      console.log(`sync-listings: retried ${drained.attempted} queued Lofty lead(s), ` +
+        `${drained.recovered} recovered, ${drained.stillQueued} still queued.`);
+    }
+  } catch (err) {
+    console.error("sync-listings: Lofty queue drain failed (ignored):", err && err.message);
+  }
+  if (!apiKey) {
+    console.error("sync-listings: LOFTY_API_KEY not set, so her listings can't be refreshed.");
+    return { statusCode: 200, body: "no Lofty key configured" };
+  }
+  const result = await runMineSync({ store, apiKey });
+  console.log("sync-listings (Lofty):", JSON.stringify(result).slice(0, 1500));
+  return { statusCode: 200, body: "ok" };
+}
+
 exports.handler = async () => {
+  if (LISTINGS_SOURCE === "lofty") return loftyScheduledRun();
+
   // MLS_DISABLED (see lib/_mls-usage.js) also stops this run: checkMlsQuota()
   // below reports it as blocked before a single MLS Grid request is made.
   const token = process.env.MLSGRID_API_TOKEN;

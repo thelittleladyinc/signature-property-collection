@@ -1709,7 +1709,7 @@ window.__ytPlay = function (b) {
     <div>
       <div class="card">
         <h3>Homes &amp; Real Estate in Fort Collins</h3>
-        <p>Browse live, active IRES MLS listings in Fort Collins below — updated in real time, not a stale snapshot — or reach out and we'll send you a curated list matched to what you're looking for.</p>
+        <p>Search every active Fort Collins listing below — it opens my home search, live from the MLS — or reach out and we'll send you a curated list matched to what you're looking for.</p>
       </div>
     </div>
   </div>
@@ -1745,10 +1745,9 @@ window.__ytPlay = function (b) {
   <div class="wrap">
     <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
     <h2 class="section-title">Search Homes In Fort Collins</h2>
-    <p class="lede">Every active Fort Collins listing from IRES MLS, any price range —
-    updated every 15 minutes, not a stale snapshot. Filter by price, beds, and baths
-    below, or <a href="/search-homes.html?cities=Fort%20Collins%2CLoveland%2CEstes%20Park%2CBerthoud%2CMasonville%2CWindsor%2CTimnath%2CWellington%2CLaporte%2CRed%20Feather%20Lakes" style="text-decoration:underline">search
-    all of Larimer County at once</a>.</p>
+    <p class="lede">Every Fort Collins home for sale, at any price, on my home search — live from
+    the MLS. Set your price, beds and baths below and tap Search Homes, or
+    <a href="/search-homes.html?cities=Fort%20Collins%2CLoveland%2CEstes%20Park%2CBerthoud%2CMasonville%2CWindsor%2CTimnath%2CWellington%2CLaporte%2CRed%20Feather%20Lakes" style="text-decoration:underline">search all of Larimer County at once</a>.</p>
     <div class="fs-widget">
     <form id="fs-fort-collins-form">
       <input type="hidden" name="city" value="Fort Collins">
@@ -1854,10 +1853,9 @@ window.__ytPlay = function (b) {
       <button type="button" id="fs-fort-collins-load-more" class="btn btn-outline" style="border-color:#141415;color:#141415;cursor:pointer;display:none">Load More Listings</button>
     </div>
     <div class="mls-disclaimer">
-      <p><span class="mls-source-badge">Source: IRES MLS</span> — Listings courtesy of IRES MLS
-      as distributed by MLS Grid. Based on information submitted to MLS Grid as of
+      <p><span class="mls-source-badge">Source: IRES MLS</span> — Listings courtesy of IRES MLS. Based on information submitted to the MLS as of
       <span id="fs-fort-collins-fetched-at">page load</span>. All data is obtained from various sources and may
-      not have been verified by broker or MLS Grid. Supplied open house information is subject to
+      not have been verified by broker or MLS. Supplied open house information is subject to
       change without notice. All information should be independently reviewed and verified for
       accuracy. Properties may or may not be listed by the office/agent presenting the information.
       Some IDX listings have been excluded from this website. Offer of compensation is made only to
@@ -2599,6 +2597,10 @@ window.__ytPlay = function (b) {
   //     quick checkbox clicks collapse into one request.
   var inflight = null;
   var autoTimer = null;
+  // 2026-09-28: on Lofty, listings-search answers a public search with where to
+  // find it (reason "home_search": her Lofty home search, same filters). A
+  // filter change shows that as a button; tapping Search Homes goes straight there.
+  var goOnHandoff = false;
   var resultCache = {};
   var resultCacheKeys = [];
   var CACHE_TTL_MS = 2 * 60 * 1000;
@@ -2606,7 +2608,7 @@ window.__ytPlay = function (b) {
 
   function idxOffHtml(data) {
     var url = (data && typeof data.searchUrl === 'string' && /^https?:\/\//i.test(data.searchUrl))
-      ? data.searchUrl : 'https://www.thelittleladysellshomes.com';
+      ? data.searchUrl : '/search-homes.html';
     var msg = (data && typeof data.message === 'string' && data.message) || 'Search homes on my home-search site';
     var e = function (s) {
       return String(s).replace(/[&<>"']/g, function (c) {
@@ -2618,6 +2620,11 @@ window.__ytPlay = function (b) {
 
   function renderResults(data, fetchedAt) {
     if (data.idxUnavailable) {
+      if (goOnHandoff && data.reason === 'home_search' && /^https?:\/\//i.test(String(data.searchUrl || ''))) {
+        goOnHandoff = false;
+        window.location.href = data.searchUrl;
+        return;
+      }
       statusEl.innerHTML = idxOffHtml(data);
       loadMoreBtn.style.display = 'none';
       return;
@@ -2685,6 +2692,7 @@ window.__ytPlay = function (b) {
   // Change a filter and the results just follow -- the Search Homes button
   // still works, but nobody has to find it.
   function autoSearch() {
+    goOnHandoff = false;
     clearTimeout(autoTimer);
     autoTimer = setTimeout(function () { runSearch(true); }, 350);
   }
@@ -2741,6 +2749,7 @@ window.__ytPlay = function (b) {
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     clearTimeout(autoTimer);
+    goOnHandoff = true;
     runSearch(true);
   });
   // 2026-08-18: every control in the form now auto-runs the search on change --

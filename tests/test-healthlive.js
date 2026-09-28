@@ -29,6 +29,9 @@
 //   3. A summary row at the top names everything that is not live, and how to
 //      make it live. One click, not five rows of date arithmetic.
 //   4. A FRESH failure still fails. Staleness must never become an excuse.
+// 2026-09-28: this suite pins the MLS Grid path, which stays in the code as the
+// switch-back (LISTINGS_SOURCE=mlsgrid). The Lofty path is test-lofty-source.js.
+process.env.LISTINGS_SOURCE = "mlsgrid";
 const path = require("path");
 const ROOT = path.resolve(__dirname, "..");
 const FN_DIR = path.join(ROOT, "netlify", "functions");

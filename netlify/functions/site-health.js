@@ -40,8 +40,11 @@
 // works.
 const { getStore } = require("@netlify/blobs");
 const {
-  SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS,
+  SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS, LISTINGS_SOURCE,
 } = require("./lib/_mls-shared");
+const { isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH } = require("./lib/_lofty-listings");
+const { homeSearchUrl } = require("./lib/_home-search");
+const { idxGate } = require("./lib/_idx-display");
 const { isCloudinaryConfigured, cloudinaryCredentials } = require("./lib/_cloudinary");
 const {
   resolveMediaFor, fetchMediaResponse, looksPresigned, isThrottled, markUrlUsed,
@@ -66,7 +69,9 @@ const LOFTY_CHECK_KEY = "lofty-key-check.json";
 const LOFTY_LEAD_CHECK_KEY = "lofty-lead-check.json";
 // Must match TRIGGER_TAG in submission-created.js.
 const LOFTY_TRIGGER_TAG = "Hot Lead - Website";
-const PHOTO_CHECK_KEY = "photo-pipeline-check.json";
+// 2026-09-28: the Lofty photo check keeps its own verdict, so an old MLS Grid
+// photo verdict can never be shown as if it described Lofty's image server.
+const PHOTO_CHECK_KEY = LISTINGS_SOURCE === "lofty" ? "lofty-photo-check.json" : "photo-pipeline-check.json";
 const CLOUDINARY_CHECK_KEY = "cloudinary-usage-check.json";
 
 // MUST MATCH the cron in netlify.toml's [functions."sync-listings"] block.
@@ -95,6 +100,103 @@ const SYNC_LATE_AFTER_MINUTES = SYNC_INTERVAL_MINUTES * 2 + 5;
 // asked why a lead never reached Lofty, and without this the only way to test
 // the key was to generate another real lead.
 const LOFTY_ME_URL = "https://api.lofty.com/v1.0/me";
+
+// ---- 2026-09-28: Lofty as the listing source -------------------------------
+// The photo check for Lofty: fetch one of Christine's cover photos from Lofty's
+// image server at card size, exactly as a buyer's browser would. No MLS Grid
+// call, and one small request, so it follows the same ?probe=1 rules as the rest.
+async function probeLoftyPhoto(mineListings) {
+  const out = { checkedAt: new Date().toISOString() };
+  const first = (Array.isArray(mineListings) ? mineListings : []).find((l) => l && isLoftyPhoto(l.photo));
+  if (!first) {
+    out.ok = false;
+    out.detail = "None of Christine's listings has a Lofty photo stored yet — the Lofty refresh has not finished a run.";
+    return out;
+  }
+  const url = sizedPhoto(first.photo, CARD_PHOTO_WIDTH);
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const type = String((res.headers && res.headers.get && res.headers.get("content-type")) || "");
+    const bytes = res.ok ? (await res.arrayBuffer()).byteLength : 0;
+    out.ok = res.ok && type.startsWith("image/");
+    out.detail = out.ok
+      ? `Working — ${first.listingId}'s cover came back from Lofty's image server as a ${Math.round(bytes / 1024)}KB card-size photo.`
+      : `Lofty's image server answered HTTP ${res.status}${type ? ` (${type})` : ""} for ${first.listingId}'s cover.`;
+  } catch (err) {
+    out.ok = false;
+    out.detail = `Could not reach Lofty's image server for ${first.listingId}: ${err && err.message}`;
+  }
+  return out;
+}
+
+// The listing rows when Lofty is the source. Same questions the MLS Grid rows
+// answered -- is it running, did it fail, is her inventory there -- asked of the
+// 30-minute refresh of her own listings (lib/_lofty-listings.js runMineSync).
+function loftyListingRows(state, mineListings, now, alertCount) {
+  const rows = [];
+  const lastRunAt = state && state.lastRunAt ? Date.parse(state.lastRunAt) : null;
+  const minutes = lastRunAt ? Math.round((now - lastRunAt) / 60000) : null;
+  rows.push({
+    name: "Your listings refreshing from Lofty on schedule",
+    ok: minutes !== null && minutes < SYNC_LATE_AFTER_MINUTES,
+    detail: lastRunAt
+      ? `Last refreshed ${minutes} minute(s) ago (every ${SYNC_INTERVAL_MINUTES} minutes; ` +
+        "POST /.netlify/functions/refresh-my-listings to refresh now)."
+      : "Has never run yet.",
+  });
+  // IDX asks for data no more than 12 hours old, so that is where this goes red.
+  const okAt = state && state.lastSuccessAt ? Date.parse(state.lastSuccessAt) : null;
+  const hoursSince = okAt ? (now - okAt) / 3600000 : null;
+  rows.push({
+    name: "Your listings confirmed by Lofty within 12 hours",
+    ok: hoursSince !== null && hoursSince < 12,
+    detail: okAt
+      ? `Lofty last gave a complete answer ${hoursSince < 1 ? `${Math.round(hoursSince * 60)} minute(s)` : `${hoursSince.toFixed(1)} hour(s)`} ago.` +
+        (state && state.lastRunAnswer && state.lastRunAnswer !== "ok"
+          ? ` The latest run's answer was "${state.lastRunAnswer}", so the last good set was kept.` : "")
+      : "Lofty hasn't given a complete answer yet, so the 12-hour freshness rule holds her listings back.",
+  });
+  rows.push({
+    name: "No Lofty errors on last run",
+    ok: !state || !state.lastRunError,
+    detail: (state && state.lastRunError) || "none",
+  });
+  const mineCount = Array.isArray(mineListings) ? mineListings.length : 0;
+  const nonMls = state && Array.isArray(state.herNonMlsListings) ? state.herNonMlsListings : [];
+  rows.push({
+    name: "Christine's own listings found",
+    ok: mineCount > 0,
+    detail: `${mineCount} listing(s) on the site` +
+      (state && state.skippedNotHers ? `; ${state.skippedNotHers} more from Lofty's "my listings" don't carry her name as agent or co-agent, so they aren't shown` : "") +
+      (nonMls.length ? `. Also in Lofty but not on the MLS, so not shown here: ${nonMls.join("; ")}` : ""),
+  });
+  const withDetails = (Array.isArray(mineListings) ? mineListings : []).filter((l) => l && l.detailsFor).length;
+  rows.push({
+    optional: true,
+    name: "Descriptions and full galleries loaded (optional)",
+    ok: withDetails === mineCount,
+    detail: withDetails === mineCount
+      ? "All loaded."
+      : `${mineCount - withDetails} of ${mineCount} listing(s) still show only a cover photo — the next refresh retries.`,
+  });
+  rows.push({
+    optional: true,
+    name: "Home search goes to Lofty (optional)",
+    ok: true,
+    detail: `Every "Search Homes" on this site opens ${homeSearchUrl({})} (with the visitor's towns and ` +
+      "filters). Change it with IDX_SEARCH_URL in Netlify.",
+  });
+  if (alertCount) {
+    rows.push({
+      optional: true,
+      name: "Map new-home alerts paused (optional)",
+      ok: true,
+      detail: `${alertCount} sign-up(s) from before the switch are saved but no longer emailed — this site ` +
+        "only holds your own listings now. New sign-ups are sent to your home search to save a search there.",
+    });
+  }
+  return rows;
+}
 
 // 2026-08-15 (Christine: "i dont kmow what the problem is - the pics still arent
 // showing", with her own Current Listings page showing a grey box on every card
@@ -549,7 +651,9 @@ exports.handler = async (event) => {
     }),
     freshen(cachedPhotoCheck, {
       enabled: true, force: wantsProbe, store, key: PHOTO_CHECK_KEY,
-      probe: () => probePhotoPipeline(mine, process.env.MLSGRID_API_TOKEN),
+      probe: () => (LISTINGS_SOURCE === "lofty"
+        ? probeLoftyPhoto(mine)
+        : probePhotoPipeline(mine, process.env.MLSGRID_API_TOKEN)),
     }),
     freshen(cachedCloudCheck, {
       enabled: isCloudinaryConfigured(), force: wantsProbe, store, key: CLOUDINARY_CHECK_KEY,
@@ -636,7 +740,12 @@ exports.handler = async (event) => {
     };
   }
 
-  const checks = [
+  let areaAlertCount = 0;
+  if (LISTINGS_SOURCE === "lofty") {
+    const listed = await getBlobStore(getStore, "area-alerts").list().catch(() => null);
+    areaAlertCount = ((listed && listed.blobs) || []).length;
+  }
+  const checks = LISTINGS_SOURCE === "lofty" ? loftyListingRows(state, mineListings, now, areaAlertCount) : [
     {
       name: "Sync running on schedule",
       ok: !isSuspended && minutesSinceLastRun !== null && minutesSinceLastRun < SYNC_LATE_AFTER_MINUTES,
@@ -774,6 +883,28 @@ exports.handler = async (event) => {
     },
   ];
 
+  // 2026-09-28: whether visitors actually SEE listings. The IDX kill switch
+  // (lib/_idx-display.js) can hold them back while every row above is green, so
+  // this row says so plainly. Optional: display off is a decision, not a fault.
+  {
+    const gate = idxGate({ state });
+    const why = {
+      disabled: `OFF — IDX_DISPLAY isn't set to "on", so the search, listing pages, map pins and photos ` +
+        `show nothing and visitors are pointed to ${gate.searchUrl}. Set IDX_DISPLAY=on in Netlify to show them.`,
+      no_sync_record: "Held back — no complete refresh has been recorded yet, so the 12-hour freshness rule can't be met.",
+      stale: `Held back — the last complete refresh was ${gate.ageHours} hour(s) ago, past the 12-hour IDX limit.`,
+    };
+    const what = LISTINGS_SOURCE === "lofty" ? "your own listings are showing, from Lofty" : "listings are showing, from MLS Grid";
+    checks.push({
+      optional: true,
+      name: "Listings shown on the website (optional)",
+      ok: gate.allowed,
+      detail: gate.allowed
+        ? `ON — ${what}; last complete refresh ${gate.lastSuccessAt}.`
+        : (why[gate.reason] || `Held back (${gate.reason}).`),
+    });
+  }
+
   // Google Maps: three separate rows, because "the key is set" and "the two
   // APIs it needs are enabled" fail independently and have different fixes.
   const googleAge = ageNote(google);
@@ -823,9 +954,11 @@ exports.handler = async (event) => {
     ok: !photoCheck || photoAge.stale ? true : !!photoCheck.ok,
     detail: photoCheck
       ? photoAge.warning + photoAge.when + photoCheck.detail
-      : "Not tested yet — add ?probe=1 to this page's URL to walk the whole photo chain " +
-        "(resolve the MLS media URLs, then actually fetch one) and see which step fails. " +
-        "Note this one spends the MLS Grid quota shared with your other two apps.",
+      : (LISTINGS_SOURCE === "lofty"
+        ? "Not tested yet — add ?probe=1 to this page's URL to fetch one of Christine's cover photos from Lofty's image server."
+        : "Not tested yet — add ?probe=1 to this page's URL to walk the whole photo chain " +
+          "(resolve the MLS media URLs, then actually fetch one) and see which step fails. " +
+          "Note this one spends the MLS Grid quota shared with your other two apps."),
   });
   // 2026-08-17. This row read as a live verdict and was not one. cloudCheck comes
   // out of Blobs and is only re-probed when ?probe=1 is passed AND the cached copy

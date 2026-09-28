@@ -45,7 +45,7 @@
 const { getStore } = require("@netlify/blobs");
 const {
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, matchesQuery, getBlobStore,
-  BASE_URL, SELECT_FIELDS,
+  BASE_URL, SELECT_FIELDS, LISTINGS_SOURCE,
 } = require("./lib/_mls-shared");
 const { prewarmPhotoUrls } = require("./lib/_media");
 const { idxGate, unavailablePayload, UNAVAILABLE_CACHE_CONTROL } = require("./lib/_idx-display");
@@ -63,6 +63,38 @@ function idxUnavailable(gate) {
       "X-Robots-Tag": "noindex",
     },
     body: JSON.stringify(unavailablePayload(gate, { photos: [] })),
+  };
+}
+const {
+  isLoftyPhoto, sizedPhoto, isHers, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
+} = require("./lib/_lofty-listings");
+const { homeSearchUrl, homeSearchLabel } = require("./lib/_home-search");
+
+// 2026-09-28 (Christine, approving it: "lets do it!!!"): with Lofty as the
+// source, this site keeps HER listings and her Lofty site does the home search
+// for everything else -- it was the faster of the two from click to data. So a
+// search that is not for her listings is answered with where to find it: the
+// same filters on her Lofty site (lib/_home-search.js), in the shape every
+// widget on the site already renders as a button (idxUnavailable + searchUrl +
+// message). No storage is read and nothing about any listing leaves here.
+function homeSearchHandoff(params) {
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": UNAVAILABLE_CACHE_CONTROL,
+      "X-Robots-Tag": "noindex",
+    },
+    body: JSON.stringify({
+      error: "not_configured",
+      idxUnavailable: true,
+      reason: "home_search",
+      message: homeSearchLabel(params),
+      searchUrl: homeSearchUrl(params),
+      listings: [],
+      totalCount: 0,
+      photos: [],
+    }),
   };
 }
 
@@ -157,7 +189,7 @@ function knownPhotoCount(listing) {
   return listing.photo ? 1 : 0;
 }
 
-function photoUrlFor(listing, index) {
+function photoUrlFor(listing, index, width) {
   const i = index || 0;
   const rehosted = Array.isArray(listing.cloudinaryPhotos) ? listing.cloudinaryPhotos[i] : null;
   if (isRehosted(rehosted)) return rehosted;
@@ -166,6 +198,11 @@ function photoUrlFor(listing, index) {
     ? listing.photo
     : (Array.isArray(listing.photos) ? listing.photos[i] : null);
   if (isRehosted(stored)) return stored;
+  // 2026-09-28: a Lofty listing's photo lives on Lofty's image server, at a
+  // stable address that resizes on request -- so it goes straight to the
+  // browser, at the size the slot needs (~30KB for a card, where MLS Grid
+  // handed every card a 1-3MB original). No function call, no rate limit.
+  if (isLoftyPhoto(stored)) return sizedPhoto(stored, width || CARD_PHOTO_WIDTH);
   if (!listing.listingId) return null;
   // Genuinely no photos? Don't send a URL that can only render a placeholder.
   // Asked of the SAME count the card displays, so the two can never contradict
@@ -178,7 +215,7 @@ function galleryUrlsFor(listing) {
   const count = knownPhotoCount(listing);
   const urls = [];
   for (let i = 0; i < count; i += 1) {
-    const url = photoUrlFor(listing, i);
+    const url = photoUrlFor(listing, i, LARGE_PHOTO_WIDTH);
     if (url) urls.push(url);
   }
   return urls;
@@ -225,13 +262,17 @@ function timer() {
 }
 
 exports.handler = async (event) => {
+  const params = (event && event.queryStringParameters) || {};
+  // Lofty: anything but her own listings is her Lofty site's to show.
+  if (LISTINGS_SOURCE === "lofty" && params.mine !== "true" && !params.listingId) {
+    return homeSearchHandoff(params);
+  }
   // Before touching storage at all: with display off there is nothing to read.
   const switchGate = idxGate({ skipFreshness: true });
   if (!switchGate.allowed) return idxUnavailable(switchGate);
 
   const timing = timer();
   const store = getBlobStore(getStore);
-  const params = event.queryStringParameters || {};
   const top = Math.min(parseInt(params.top, 10) || 12, 24);
   const skip = Math.max(parseInt(params.skip, 10) || 0, 0);
   const mine = params.mine === "true";
@@ -308,7 +349,8 @@ exports.handler = async (event) => {
     // current-listings.html's mine=true cards), so this stays a tiny,
     // cheap lookup even though it's written generically.
     if (params.listingId) {
-      const listing = listingsById[params.listingId];
+      const found = listingsById[params.listingId];
+      const listing = LISTINGS_SOURCE === "lofty" && found && !isHers(found) ? null : found;
       if (!listing) {
         return {
           statusCode: 200,
@@ -423,7 +465,7 @@ exports.handler = async (event) => {
       // above for how the full gallery is fetched, only when needed.
       const {
         listingKey, modificationTimestamp, mlgCanView, photos,
-        cloudinaryPhotos, cloudinaryPhoto, ...publicFields
+        cloudinaryPhotos, cloudinaryPhoto, source, detailsFor, ...publicFields
       } = l;
       return {
         ...publicFields,
@@ -490,18 +532,24 @@ exports.handler = async (event) => {
     // for a page of never-seen cards, the prewarm is what puts photos on it.
     const PREWARM_DEADLINE_MS = 3000;
     let prewarmOutcome = "completed";
-    await Promise.race([
-      prewarmPhotoUrls(page, {
-        store,
-        token: process.env.MLSGRID_API_TOKEN,
-        baseUrl: BASE_URL,
-        selectFields: SELECT_FIELDS,
-      }),
-      new Promise((resolve) => setTimeout(() => {
-        prewarmOutcome = `gave up after ${PREWARM_DEADLINE_MS}ms — photos resolve on demand`;
-        resolve();
-      }, PREWARM_DEADLINE_MS)),
-    ]);
+    if (LISTINGS_SOURCE === "lofty") {
+      // Lofty photo URLs are stable and already on the cards: nothing to resolve,
+      // and this site must not call MLS Grid once it has switched away from it.
+      prewarmOutcome = "not needed (Lofty photos)";
+    } else {
+      await Promise.race([
+        prewarmPhotoUrls(page, {
+          store,
+          token: process.env.MLSGRID_API_TOKEN,
+          baseUrl: BASE_URL,
+          selectFields: SELECT_FIELDS,
+        }),
+        new Promise((resolve) => setTimeout(() => {
+          prewarmOutcome = `gave up after ${PREWARM_DEADLINE_MS}ms — photos resolve on demand`;
+          resolve();
+        }, PREWARM_DEADLINE_MS)),
+      ]);
+    }
 
     timing.mark("prewarm", prewarmOutcome);
 

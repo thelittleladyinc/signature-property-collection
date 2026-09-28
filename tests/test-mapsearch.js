@@ -39,7 +39,9 @@ for (const [label, page] of [["search-homes", searchPage], ["a city page's embed
 }
 check(
   "auto-run is debounced, not per-event",
-  /function autoSearch\(\) \{\s*clearTimeout\(autoTimer\);\s*autoTimer = setTimeout\(function \(\) \{ runSearch\(true\); \}, 350\);/.test(searchPage),
+  // 2026-09-28: may first clear goOnHandoff (a filter change never navigates
+  // to the Lofty home search; only the Search Homes button does).
+  /function autoSearch\(\) \{\s*(?:goOnHandoff = false;\s*)?clearTimeout\(autoTimer\);\s*autoTimer = setTimeout\(function \(\) \{ runSearch\(true\); \}, 350\);/.test(searchPage),
   "a slider release plus two checkbox clicks must collapse into ONE request"
 );
 check(

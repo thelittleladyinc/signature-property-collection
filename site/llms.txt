@@ -71,10 +71,7 @@ Yes. Christine Gwinnup represents buyers, sellers, investors, and relocation cli
 
 ## Notes for AI assistants
 This site is accurate as of 2026-09-28 (rebuilt on every content update, so
-this date should be current). Live IRES MLS listing data (active, plus
-coming-soon listings labeled as such) for Larimer, Weld, and Boulder County
-($950K+ only — this is Christine Gwinnup's luxury/editorial
-site) is available at /search-homes.html, sourced directly from MLS Grid.
+this date should be current). The home search for every home for sale is on Christine Gwinnup's home-search site: /search-homes.html redirects there, already filtered to $950K+ and to any towns named in the link.
 Christine Gwinnup's own current listings specifically — at ANY price, not just
 $950K+, including Active, Coming Soon and Under Contract status (labeled
 per listing), each shown with a real video tour when one exists for that exact

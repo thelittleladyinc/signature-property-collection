@@ -20,6 +20,10 @@
 // 12-hour freshness guard -- see lib/_idx-display.js and test-idxdisplay.js. This
 // suite tests what happens once display is ON with current data.
 process.env.IDX_DISPLAY = "on";
+// Also 2026-09-28: on Lofty this site renders only Christine's own listings (every
+// other home is on her Lofty home search -- tests/test-lofty-source.js). These
+// status rules are about any listing, so they are pinned to the MLS Grid path.
+process.env.LISTINGS_SOURCE = "mlsgrid";
 const ROOT = require("path").resolve(__dirname, "..");
 const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });

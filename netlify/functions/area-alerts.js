@@ -15,8 +15,18 @@
 // directly (its _sig-proxy pass-through doesn't forward POST bodies), and an
 // alert signup is public-facing by nature -- rate of abuse is bounded by the
 // one-email-per-address dedupe below and Resend's own limits.
+//
+// 2026-09-28: with Lofty as the listing source this site no longer holds every
+// listing -- only Christine's own (lib/_lofty-listings.js) -- so it cannot tell
+// anyone when a new home lists in their area. A new sign-up is answered with
+// where to set that up instead: her Lofty home search for the same towns, where
+// "Save Search" sends Lofty's own alerts (the route this site already chose for
+// saved searches on 2026-08-15, see submission-created.js). Nothing is stored,
+// so nobody is promised an email that will never come. Alerts saved before the
+// switch are kept, untouched, and area-alerts-run.js pauses them.
 const { getStore } = require("@netlify/blobs");
-const { getBlobStore } = require("./lib/_mls-shared");
+const { getBlobStore, LISTINGS_SOURCE } = require("./lib/_mls-shared");
+const { homeSearchUrl } = require("./lib/_home-search");
 
 const STORE_NAME = "area-alerts";
 const MAX_CITIES = 25;
@@ -43,6 +53,22 @@ exports.handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") {
       return { statusCode: 204, headers: CORS, body: "" };
+    }
+    if (event.httpMethod === "POST" && LISTINGS_SOURCE === "lofty") {
+      let body;
+      try { body = JSON.parse(event.body || "{}"); } catch { return json(400, { error: "bad json" }); }
+      const cities = (Array.isArray(body.cities) ? body.cities : [])
+        .map((c) => String(c || "").trim()).filter(Boolean).slice(0, MAX_CITIES);
+      const query = { cities: cities.join(",") };
+      if (Number.isFinite(+body.minPrice) && +body.minPrice > 0) query.minPrice = String(+body.minPrice);
+      else query.noFloor = "true";
+      if (Number.isFinite(+body.maxPrice) && +body.maxPrice > 0) query.maxPrice = String(+body.maxPrice);
+      return json(200, {
+        ok: false,
+        error: "moved",
+        message: "New-home alerts are on my home search now: open it, then tap Save Search.",
+        searchUrl: homeSearchUrl(query),
+      });
     }
     const store = getBlobStore(getStore, STORE_NAME);
 
