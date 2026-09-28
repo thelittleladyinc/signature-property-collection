@@ -381,8 +381,48 @@ const OPERATING_COUNTIES = new Set(
 );
 
 const BLOB_STORE_NAME = "mls-listings";
-const LISTINGS_KEY = "listings.json";
-const SYNC_STATE_KEY = "sync-state.json";
+
+// ---- WHERE THE LISTINGS COME FROM (2026-09-28) ---------------------------
+// Christine: "I need the backend of my websites to link to Lofty's API for the
+// listings and searches on my website ... I need them switched to Lofty" -- and,
+// after an MLS Grid email about the feed that morning, "I'd rather just switch
+// to Lofty".
+//
+// The whole site reads ONE catalogue (listings + her own listings + sync state)
+// through the three key constants below, so choosing the source here switches
+// every reader at once: search, current listings, listing pages, the map, area
+// alerts, the town-page market figures and /status.
+//
+// The Lofty copy lives under its OWN keys in the same store, deliberately:
+//   - the MLS Grid copy is left exactly where it was, so switching back is one
+//     environment variable (LISTINGS_SOURCE=mlsgrid) and a redeploy, with no
+//     re-crawl and nothing to restore;
+//   - a deploy preview can build and check the Lofty catalogue while the live
+//     site keeps reading the MLS Grid one -- Blobs stores are shared across
+//     deploys, so writing Lofty data under the old keys from a preview would
+//     have changed the live site before anyone looked at it.
+// Everything else in this store (lead-push records, photo caches, usage logs)
+// is untouched by the switch.
+//
+// Lofty is the default because Christine chose it and does not set env vars
+// herself ("im not going to set it", 2026-08-15) -- same reasoning as
+// DEFAULT_OPERATING_COUNTIES above.
+const LISTINGS_SOURCE = String(process.env.LISTINGS_SOURCE || "lofty").trim().toLowerCase() === "mlsgrid"
+  ? "mlsgrid"
+  : "lofty";
+const MLSGRID_KEYS = {
+  LISTINGS_KEY: "listings.json",
+  SYNC_STATE_KEY: "sync-state.json",
+  MINE_LISTINGS_KEY: "mine-listings.json",
+};
+const LOFTY_KEYS = {
+  LISTINGS_KEY: "lofty-listings.json",
+  SYNC_STATE_KEY: "lofty-sync-state.json",
+  MINE_LISTINGS_KEY: "lofty-mine-listings.json",
+};
+const ACTIVE_KEYS = LISTINGS_SOURCE === "lofty" ? LOFTY_KEYS : MLSGRID_KEYS;
+const LISTINGS_KEY = ACTIVE_KEYS.LISTINGS_KEY;
+const SYNC_STATE_KEY = ACTIVE_KEYS.SYNC_STATE_KEY;
 // 2026-08-13 (performance fix): a small, pre-filtered copy of ONLY
 // Christine's own listings (typically 5-10 records), maintained by
 // sync-listings.js alongside the full LISTINGS_KEY blob. Every mine=true
@@ -395,7 +435,42 @@ const SYNC_STATE_KEY = "sync-state.json";
 // general public luxury search (mine not set) and as a one-time fallback
 // if this key hasn't been computed yet (e.g. right after this deploy,
 // before sync-listings.js's first run since the update).
-const MINE_LISTINGS_KEY = "mine-listings.json";
+const MINE_LISTINGS_KEY = ACTIVE_KEYS.MINE_LISTINGS_KEY;
+
+// ---- Listing-description keyword flags ------------------------------------
+// Moved here from sync-listings.js on 2026-09-28 so the Lofty sync applies the
+// exact same rules; the reasoning is unchanged and kept with them.
+//
+// Equine words that mean the property is actually set up for horses, not just
+// rural. "horse" on its own is intentionally excluded: "horseshoe" shows up in
+// street and subdivision names all over Northern Colorado ("Horseshoe Lake",
+// "Horseshoe Bend"), so it's matched as "horse property"/"horses" instead.
+const EQUESTRIAN_STRONG = [
+  "horse property", "horses allowed", "horses welcome", "zoned for horses",
+  "horse setup", "horse facility", "horse barn", "horse arena", "equestrian",
+  "loafing shed", "riding arena", "round pen", "stalls", "corral",
+  "tack room", "hay barn", "irrigated pasture",
+];
+// These only count when paired with one of the words below, since a "barn" or
+// "pasture" by itself describes most acreage out here.
+const EQUESTRIAN_WEAK = ["barn", "pasture", "paddock", "outbuildings"];
+const EQUESTRIAN_WEAK_PARTNER = ["horse", "equine", "livestock", "stall", "arena"];
+
+function hasEquestrianKeywords(remarksLower) {
+  if (!remarksLower) return false;
+  if (EQUESTRIAN_STRONG.some((k) => remarksLower.includes(k))) return true;
+  if (EQUESTRIAN_WEAK.some((k) => remarksLower.includes(k))) {
+    return EQUESTRIAN_WEAK_PARTNER.some((k) => remarksLower.includes(k));
+  }
+  return false;
+}
+
+// Same three phrases matchesQuery() and slimForStorage() have always used.
+function hasWaterfrontKeywords(remarksLower) {
+  if (!remarksLower) return false;
+  return remarksLower.includes("riverfront") || remarksLower.includes("river frontage") ||
+    remarksLower.includes("waterfront");
+}
 
 // Netlify's docs promise getStore(name) auto-configures itself with no
 // setup inside any Netlify Function — but in production here it actually
@@ -623,12 +698,17 @@ module.exports = {
   AGENT_SURNAME,
   LUXURY_PRICE_FLOOR,
   BLOB_STORE_NAME,
+  LISTINGS_SOURCE,
+  MLSGRID_KEYS,
+  LOFTY_KEYS,
   LISTINGS_KEY,
   SYNC_STATE_KEY,
   MINE_LISTINGS_KEY,
   CO_CITY_COUNTY,
   OPERATING_COUNTIES,
   inferCountyFromCity,
+  hasEquestrianKeywords,
+  hasWaterfrontKeywords,
   mapListing,
   matchesQuery,
 };

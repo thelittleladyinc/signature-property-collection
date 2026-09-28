@@ -60,7 +60,10 @@
 //      rate -- a dead photo re-asking MLS Grid every five minutes, forever, from
 //      every CDN edge, feeding the 429s that then grey out photos which work.
 const { getStore } = require("@netlify/blobs");
-const { getBlobStore, BASE_URL, SELECT_FIELDS, MINE_LISTINGS_KEY } = require("./lib/_mls-shared");
+const { getBlobStore, BASE_URL, SELECT_FIELDS, MINE_LISTINGS_KEY, LISTINGS_SOURCE } = require("./lib/_mls-shared");
+const {
+  isLoftyPhoto, sizedPhoto, galleryFor, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
+} = require("./lib/_lofty-listings");
 const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
   isMediaThrottled, setMediaCooldown, usableUrl, markUrlUsed,
@@ -484,6 +487,21 @@ function photoTimer() {
   };
 }
 
+// Her own listings carry their whole gallery; anyone else's comes from Lofty on
+// demand (one call, then cached for six hours). The 8MB catalogue is never read
+// here -- a single photo request must not cost a second and a half.
+async function loftyPhotoFor(store, listingId, index) {
+  const mine = await store.get(MINE_LISTINGS_KEY, { type: "json" }).catch(() => null);
+  const hers = Array.isArray(mine) ? mine.find((x) => x && x.listingId === listingId) : null;
+  if (hers) {
+    const own = index === 0 ? hers.photo : (Array.isArray(hers.photos) ? hers.photos[index] : null);
+    if (isLoftyPhoto(own)) return own;
+  }
+  const photos = await galleryFor(store, listingId, { apiKey: process.env.LOFTY_API_KEY });
+  const url = Array.isArray(photos) ? photos[index] : null;
+  return isLoftyPhoto(url) ? url : null;
+}
+
 exports.handler = async (event) => {
   const timing = photoTimer();
   const params = (event && event.queryStringParameters) || {};
@@ -506,6 +524,32 @@ exports.handler = async (event) => {
     const index = Math.max(0, parseInt(params.i, 10) || 0);
 
     const store = getBlobStore(getStore, BLOB_STORE_NAME);
+
+    // ---- LOFTY (2026-09-28) --------------------------------------------------
+    // With Lofty as the source, a photo link is answered by pointing the browser
+    // at Lofty's image server -- a stable address that resizes on request --
+    // never with a copy this site stored from MLS Grid, and never by calling MLS
+    // Grid. Cards and listing pages already carry the direct URL; this path is
+    // for old links, shared links and anything else that asks by listing id.
+    if (LISTINGS_SOURCE === "lofty") {
+      const url = await loftyPhotoFor(store, listingId, index);
+      const allowed = [300, 600, 800, 1024, 1200];
+      const asked = parseInt(params.w, 10);
+      const width = allowed.includes(asked) ? asked : (index === 0 ? LARGE_PHOTO_WIDTH : CARD_PHOTO_WIDTH);
+      if (debug) {
+        return {
+          statusCode: 200,
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+          body: JSON.stringify({ source: "lofty", listingId, index, width, url: url ? sizedPhoto(url, width) : null }),
+        };
+      }
+      if (!url) return placeholder("no_media", false, { listingId, index, urlCount: 0 });
+      return {
+        statusCode: 302,
+        headers: { Location: sizedPhoto(url, width), "Cache-Control": "public, max-age=86400" },
+        body: "",
+      };
+    }
 
     // ---- OUR OWN COPY FIRST -------------------------------------------------
     // 2026-08-17. This check used to live only on the FAILURE paths, so a photo we

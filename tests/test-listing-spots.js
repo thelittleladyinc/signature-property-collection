@@ -11,6 +11,7 @@ process.env.IDX_DISPLAY = "on";
 const ROOT = require("path").resolve(__dirname, "..");
 const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
+const KEYS = require(`${FN_DIR}/lib/_mls-shared.js`);
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
 
@@ -25,8 +26,10 @@ function load(city) {
   require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, exports: {
     getStore: () => ({
       // listings.json is a MAP keyed by listing id, not an array.
-      get: async (k) => (k === "listings.json" ? { IRE123: listing(city) }
-        : k === "sync-state.json" ? { lastRunAt: "2026-08-16T00:00:00Z", lastSuccessAt: new Date().toISOString() } : null),
+      // 2026-09-28: the key names come from _mls-shared.js, so this follows the
+      // page to whichever source (Lofty or MLS Grid) it is reading.
+      get: async (k) => (k === KEYS.LISTINGS_KEY ? { IRE123: listing(city) }
+        : k === KEYS.SYNC_STATE_KEY ? { lastRunAt: "2026-08-16T00:00:00Z", lastSuccessAt: new Date().toISOString() } : null),
     }),
   } };
   for (const k of Object.keys(require.cache)) {

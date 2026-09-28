@@ -33,15 +33,24 @@ const { getStore } = require("@netlify/blobs");
 const fs = require("fs");
 const path = require("path");
 const {
-  LISTINGS_KEY, SYNC_STATE_KEY, getBlobStore, AGENT_SURNAME,
+  LISTINGS_KEY, SYNC_STATE_KEY, getBlobStore, AGENT_SURNAME, LISTINGS_SOURCE,
 } = require("./lib/_mls-shared");
+const {
+  isLoftyPhoto, sizedPhoto, galleryFor, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
+} = require("./lib/_lofty-listings");
 // How many photos this page may render is not a design choice on its own: every
 // photo shown beyond what listing-photo.js stores is re-downloaded from MLS Grid
 // on every view that misses a CDN edge, forever. The two numbers have to be the
 // same number, so they are literally the same number. See lib/_media.js.
 const { PHOTO_CACHE_MAX_INDEX } = require("./lib/_media");
 const { idxGate } = require("./lib/_idx-display");
-const GALLERY_PHOTOS = PHOTO_CACHE_MAX_INDEX + 1;
+// 2026-09-28: with Lofty the gallery is no longer a cost to ration -- its photos
+// are stable, resized, CDN-served URLs that never touch MLS Grid or this site's
+// functions -- so a buyer sees the whole set instead of "ask for the full set".
+const GALLERY_PHOTOS = LISTINGS_SOURCE === "lofty" ? 30 : PHOTO_CACHE_MAX_INDEX + 1;
+// How long the page waits on Lofty for another brokerage's gallery before
+// rendering with the cover alone. The gallery is cached for six hours after.
+const GALLERY_WAIT_MS = 2500;
 
 const SHELL_PATH = path.join(__dirname, "lib", "_listing-page-shell.html");
 const SITE_DOMAIN = "https://signaturepropertycollection.com";
@@ -120,13 +129,16 @@ function money(n) {
   return "$" + Number(n).toLocaleString("en-US");
 }
 
-function photoUrl(listing, i) {
+function photoUrl(listing, i, width) {
   const rehosted = Array.isArray(listing.cloudinaryPhotos) ? listing.cloudinaryPhotos[i] : null;
   if (typeof rehosted === "string" && rehosted.indexOf("res.cloudinary.com") !== -1) return rehosted;
   if (i === 0 && typeof listing.cloudinaryPhoto === "string" &&
       listing.cloudinaryPhoto.indexOf("res.cloudinary.com") !== -1) {
     return listing.cloudinaryPhoto;
   }
+  // 2026-09-28: Lofty photos go straight to the browser, sized for the slot.
+  const stored = i === 0 ? listing.photo : (Array.isArray(listing.photos) ? listing.photos[i] : null);
+  if (isLoftyPhoto(stored)) return sizedPhoto(stored, width || (i === 0 ? LARGE_PHOTO_WIDTH : CARD_PHOTO_WIDTH));
   return `/.netlify/functions/listing-photo?id=${encodeURIComponent(listing.listingId)}&i=${i}`;
 }
 
@@ -134,6 +146,21 @@ function photoCount(listing) {
   if (Array.isArray(listing.photos) && listing.photos.length) return listing.photos.length;
   if (typeof listing.photoCount === "number") return listing.photoCount;
   return listing.photo ? 1 : 0;
+}
+
+// Another brokerage's listing is stored with its cover and a photo COUNT only
+// (the catalogue would be ~80MB with every gallery in it), so its gallery is
+// fetched from Lofty when its page is opened. Bounded: past GALLERY_WAIT_MS the
+// page renders with the cover alone rather than keep a buyer waiting.
+async function withGallery(store, l) {
+  if (LISTINGS_SOURCE !== "lofty" || !l || !isLoftyPhoto(l.photo)) return l;
+  if (Array.isArray(l.photos) && l.photos.length) return l;
+  if (!(photoCount(l) > 1)) return l;
+  const photos = await Promise.race([
+    galleryFor(store, l.listingId, { apiKey: process.env.LOFTY_API_KEY }).catch(() => []),
+    new Promise((resolve) => setTimeout(() => resolve([]), GALLERY_WAIT_MS)),
+  ]);
+  return photos && photos.length ? { ...l, photos, photoCount: photos.length } : l;
 }
 
 function isHers(listing) {
@@ -153,12 +180,16 @@ function render(shellHtml, fields) {
 // Rule 26 disclaimer -- same content as _mls_disclaimer_html() in build.py.
 // Duplicated in wording only because this page is assembled server-side; if the
 // legal text ever changes, change it in both places (build.py is the original).
+// 2026-09-28: MLS Grid is named only while it is the source. Its attribution
+// line ("as distributed by MLS Grid") is an MLS Grid licence requirement, and
+// printing it over data that no longer comes from MLS Grid would be false.
 function disclaimerHtml(fetchedAt) {
+  const viaGrid = LISTINGS_SOURCE === "mlsgrid";
   return `<div class="mls-disclaimer">
-      <p><span class="mls-source-badge">Source: IRES MLS</span> &mdash; Listings courtesy of IRES MLS
-      as distributed by MLS Grid. Based on information submitted to MLS Grid as of
+      <p><span class="mls-source-badge">Source: IRES MLS</span> &mdash; Listings courtesy of IRES MLS${viaGrid ? `
+      as distributed by MLS Grid` : ""}. Based on information submitted to ${viaGrid ? "MLS Grid" : "the MLS"} as of
       ${esc(fetchedAt || "page load")}. All data is obtained from various sources and may not have
-      been verified by broker or MLS Grid. Supplied open house information is subject to change
+      been verified by broker or ${viaGrid ? "MLS Grid" : "MLS"}. Supplied open house information is subject to change
       without notice. All information should be independently reviewed and verified for accuracy.
       Properties may or may not be listed by the office/agent presenting the information. Some IDX
       listings have been excluded from this website. Offer of compensation is made only to
@@ -216,11 +247,15 @@ function listingBody(l, fetchedAt) {
       // photo is a live MLS Grid fetch. Photo 0 keeps a real src (it is the
       // page's main image); the rest carry data-src and are drained two at a
       // time by the pacer in the script block below.
-      Array.from({ length: Math.min(count, GALLERY_PHOTOS) }, (_, i) =>
-        i === 0
-          ? `<img src="${esc(photoUrl(l, i))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}">`
-          : `<img data-src="${esc(photoUrl(l, i))}" alt="${esc(addressLine)} &mdash; photo ${i + 1}" style="background:#eee">`
-      ).join("") +
+      Array.from({ length: Math.min(count, GALLERY_PHOTOS) }, (_, i) => {
+        const src = photoUrl(l, i, CARD_PHOTO_WIDTH);
+        // Lofty's CDN has no per-second limit to pace for, so its photos load
+        // natively; anything served through listing-photo keeps the pacer.
+        if (i === 0 || isLoftyPhoto(src)) {
+          return `<img src="${esc(src)}"${i ? ' loading="lazy"' : ""} alt="${esc(addressLine)} &mdash; photo ${i + 1}">`;
+        }
+        return `<img data-src="${esc(src)}" alt="${esc(addressLine)} &mdash; photo ${i + 1}" style="background:#eee">`;
+      }).join("") +
       (count > GALLERY_PHOTOS ? `<p class="fs-advanced-note">Showing ${GALLERY_PHOTOS} of ${count} photos &mdash;
        <a href="/contact.html" style="text-decoration:underline">ask for the full set</a>.</p>` : "") +
       `</div>`
@@ -625,7 +660,7 @@ exports.handler = async (event) => {
     const freshGate = idxGate({ state });
     if (!freshGate.allowed) return idxPage(freshGate);
 
-    const l = listings && listings[id];
+    let l = listings && listings[id];
     if (!l) {
       return notFound("This listing isn’t in our current feed — it may have sold or been withdrawn.", 404);
     }
@@ -648,13 +683,17 @@ exports.handler = async (event) => {
     // already appears in search results; a card that links to a 404 would be
     // worse than not showing it at all.
     const status = String(l.status || "").toLowerCase();
-    const hers = String(l.agentName || "").toLowerCase().includes(String(AGENT_SURNAME || "").toLowerCase());
+    // 2026-09-28: was agentName only, so an under-contract listing where she is
+    // the CO-agent (several of hers are co-listed with Kendra) 404'd here while
+    // every other part of the site counted it as hers. isHers() checks both.
+    const hers = isHers(l);
     const comingSoon = status.includes("coming soon");
     const showable = status === "active" || comingSoon ||
       (hers && (status.includes("pending") || status.includes("contract")));
     if (!showable || l.mlgCanView === false) {
       return notFound("This home is no longer on the market as an active listing.", 404);
     }
+    l = await withGallery(getBlobStore(getStore, "mls-listings"), l);
 
     const canonical = `${SITE_DOMAIN}/listing/${encodeURIComponent(id)}`;
     const addressLine = [l.address, l.city, l.state].filter(Boolean).join(", ");

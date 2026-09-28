@@ -14,6 +14,9 @@
 //
 // This runs the real handler against a fake blob store with EVERY network call
 // failing, which is the case that was silently discarding the work.
+// 2026-09-28: this suite pins the MLS Grid path, which stays in the code as the
+// switch-back (LISTINGS_SOURCE=mlsgrid). The Lofty path is test-lofty-source.js.
+process.env.LISTINGS_SOURCE = "mlsgrid";
 const fs = require("fs");
 const path = require("path");
 const ROOT = path.resolve(__dirname, "..");

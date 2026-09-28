@@ -45,8 +45,13 @@ function load(name) {
 const bundle = ["isRehosted", "knownPhotoCount", "photoUrlFor", "galleryUrlsFor"].map(load);
 check("all four photo functions found", bundle.every(Boolean),
   "the source shape changed — read this file before assuming it is stale");
+// 2026-09-28: photoUrlFor now also serves Lofty photos directly, sized for the
+// slot, so the extracted functions are given the same helpers the module imports.
+const LOFTY = require(path.join(ROOT, "netlify", "functions", "lib", "_lofty-listings.js"));
 const { photoUrlFor, galleryUrlsFor, knownPhotoCount } =
-  new Function(`${bundle.join("\n")}\nreturn { photoUrlFor, galleryUrlsFor, knownPhotoCount };`)();
+  new Function("LOFTY",
+    "const { isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH } = LOFTY;\n" +
+    `${bundle.join("\n")}\nreturn { photoUrlFor, galleryUrlsFor, knownPhotoCount };`)(LOFTY);
 
 const ID = "IRE1059948";  // her Greeley listing — the card that went grey
 
@@ -102,6 +107,22 @@ check("knownPhotoCount is the single definition",
   (SRC.match(/typeof listing\.photoCount === "number"/g) || []).length +
   (SRC.match(/typeof l\.photoCount === "number"/g) || []).length === 1,
   "the count rule is written out more than once — they will drift apart again");
+
+// --- 2026-09-28: Lofty photos go straight to the browser, sized for the slot.
+const loftyCover = "https://img.chime.me/image/fs01/mls-listing/20260827/21/original_IRE1000031-fc14584b.jpeg";
+const loftyGallery = [
+  "https://img.chime.me/image/fs01/mls-listing/20260828/6/w600_original_IRE1060846-a.jpeg",
+  "https://img.chime.me/image/fs01/mls-listing/20260828/6/w600_original_IRE1060846-b.jpeg",
+];
+check("a Lofty cover is served directly at card size (600px), not through listing-photo",
+  photoUrlFor({ listingId: "IRE1000031", photo: loftyCover, photoCount: 4 }, 0) ===
+    "https://img.chime.me/image/fs01/mls-listing/20260827/21/w600_original_IRE1000031-fc14584b.jpeg");
+check("a Lofty gallery is served at 1200px for the lightbox",
+  galleryUrlsFor({ listingId: "IRE1060846", photo: loftyGallery[0], photos: loftyGallery })
+    .every((u) => u.indexOf("/w1200_original_IRE1060846-") !== -1));
+check("another brokerage's Lofty listing with only a count still asks listing-photo for photo 2",
+  photoUrlFor({ listingId: "IRE1000031", photo: loftyCover, photoCount: 4 }, 2) ===
+    "/.netlify/functions/listing-photo?id=IRE1000031&i=2");
 
 console.log(failures === 0 ? "All checks passed" : `${failures} check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

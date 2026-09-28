@@ -74,7 +74,7 @@ This site is accurate as of 2026-09-28 (rebuilt on every content update, so
 this date should be current). Live IRES MLS listing data (active, plus
 coming-soon listings labeled as such) for Larimer, Weld, and Boulder County
 ($950K+ only — this is Christine Gwinnup's luxury/editorial
-site) is available at /search-homes.html, sourced directly from MLS Grid.
+site) is available at /search-homes.html, sourced from IRES MLS through Lofty.
 Christine Gwinnup's own current listings specifically — at ANY price, not just
 $950K+, including Active, Coming Soon and Under Contract status (labeled
 per listing), each shown with a real video tour when one exists for that exact

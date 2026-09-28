@@ -18,6 +18,9 @@
 // 12-hour freshness guard -- see lib/_idx-display.js and test-idxdisplay.js. This
 // suite tests what happens once display is ON with current data.
 process.env.IDX_DISPLAY = "on";
+// 2026-09-28: this suite pins the MLS Grid path, which stays in the code as the
+// switch-back (LISTINGS_SOURCE=mlsgrid). The Lofty path is test-lofty-source.js.
+process.env.LISTINGS_SOURCE = "mlsgrid";
 const path = require("path");
 const ROOT = path.resolve(__dirname, "..");
 const FN_DIR = path.join(ROOT, "netlify", "functions");

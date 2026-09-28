@@ -45,7 +45,7 @@
 const { getStore } = require("@netlify/blobs");
 const {
   LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, matchesQuery, getBlobStore,
-  BASE_URL, SELECT_FIELDS,
+  BASE_URL, SELECT_FIELDS, LISTINGS_SOURCE,
 } = require("./lib/_mls-shared");
 const { prewarmPhotoUrls } = require("./lib/_media");
 const { idxGate, unavailablePayload, UNAVAILABLE_CACHE_CONTROL } = require("./lib/_idx-display");
@@ -65,6 +65,9 @@ function idxUnavailable(gate) {
     body: JSON.stringify(unavailablePayload(gate, { photos: [] })),
   };
 }
+const {
+  isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
+} = require("./lib/_lofty-listings");
 
 // ---- THE CATALOGUE, PARSED ONCE PER CONTAINER ---------------------------
 // 2026-08-18 (Christine: "it just runs so slow ... what if we just brought in a
@@ -157,7 +160,7 @@ function knownPhotoCount(listing) {
   return listing.photo ? 1 : 0;
 }
 
-function photoUrlFor(listing, index) {
+function photoUrlFor(listing, index, width) {
   const i = index || 0;
   const rehosted = Array.isArray(listing.cloudinaryPhotos) ? listing.cloudinaryPhotos[i] : null;
   if (isRehosted(rehosted)) return rehosted;
@@ -166,6 +169,11 @@ function photoUrlFor(listing, index) {
     ? listing.photo
     : (Array.isArray(listing.photos) ? listing.photos[i] : null);
   if (isRehosted(stored)) return stored;
+  // 2026-09-28: a Lofty listing's photo lives on Lofty's image server, at a
+  // stable address that resizes on request -- so it goes straight to the
+  // browser, at the size the slot needs (~30KB for a card, where MLS Grid
+  // handed every card a 1-3MB original). No function call, no rate limit.
+  if (isLoftyPhoto(stored)) return sizedPhoto(stored, width || CARD_PHOTO_WIDTH);
   if (!listing.listingId) return null;
   // Genuinely no photos? Don't send a URL that can only render a placeholder.
   // Asked of the SAME count the card displays, so the two can never contradict
@@ -178,7 +186,7 @@ function galleryUrlsFor(listing) {
   const count = knownPhotoCount(listing);
   const urls = [];
   for (let i = 0; i < count; i += 1) {
-    const url = photoUrlFor(listing, i);
+    const url = photoUrlFor(listing, i, LARGE_PHOTO_WIDTH);
     if (url) urls.push(url);
   }
   return urls;
@@ -423,7 +431,7 @@ exports.handler = async (event) => {
       // above for how the full gallery is fetched, only when needed.
       const {
         listingKey, modificationTimestamp, mlgCanView, photos,
-        cloudinaryPhotos, cloudinaryPhoto, ...publicFields
+        cloudinaryPhotos, cloudinaryPhoto, source, detailsFor, ...publicFields
       } = l;
       return {
         ...publicFields,
@@ -490,18 +498,24 @@ exports.handler = async (event) => {
     // for a page of never-seen cards, the prewarm is what puts photos on it.
     const PREWARM_DEADLINE_MS = 3000;
     let prewarmOutcome = "completed";
-    await Promise.race([
-      prewarmPhotoUrls(page, {
-        store,
-        token: process.env.MLSGRID_API_TOKEN,
-        baseUrl: BASE_URL,
-        selectFields: SELECT_FIELDS,
-      }),
-      new Promise((resolve) => setTimeout(() => {
-        prewarmOutcome = `gave up after ${PREWARM_DEADLINE_MS}ms — photos resolve on demand`;
-        resolve();
-      }, PREWARM_DEADLINE_MS)),
-    ]);
+    if (LISTINGS_SOURCE === "lofty") {
+      // Lofty photo URLs are stable and already on the cards: nothing to resolve,
+      // and this site must not call MLS Grid once it has switched away from it.
+      prewarmOutcome = "not needed (Lofty photos)";
+    } else {
+      await Promise.race([
+        prewarmPhotoUrls(page, {
+          store,
+          token: process.env.MLSGRID_API_TOKEN,
+          baseUrl: BASE_URL,
+          selectFields: SELECT_FIELDS,
+        }),
+        new Promise((resolve) => setTimeout(() => {
+          prewarmOutcome = `gave up after ${PREWARM_DEADLINE_MS}ms — photos resolve on demand`;
+          resolve();
+        }, PREWARM_DEADLINE_MS)),
+      ]);
+    }
 
     timing.mark("prewarm", prewarmOutcome);
 

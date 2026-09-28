@@ -39,7 +39,8 @@ const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures+
   check("missing Resend key is not counted as a failure",
     !reds.some((n) => /email/i.test(n)), "red rows: " + reds.join(", "));
   check("only the empty-stub rows are red",
-    reds.every((n) => /Sync running|own listings|Cloudinary configured/.test(n)), reds.join(", "));
+    // 2026-09-28: under Lofty the empty-stub rows are the Lofty refresh rows.
+    reds.every((n) => /Sync running|Listings refreshing from Lofty|re-read from Lofty|own listings|Cloudinary configured/.test(n)), reds.join(", "));
   const lofty = p.checks.find((c) => c.name === "Your Lofty notification will fire");
   check("the Lofty route is the one reported green", lofty && lofty.ok === true);
   const html = await require(`${FN_DIR}/site-health.js`).handler({ queryStringParameters: {} });

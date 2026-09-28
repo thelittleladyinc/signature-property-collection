@@ -36,7 +36,7 @@
 // reads and no MLS Grid requests.
 const { getStore } = require("@netlify/blobs");
 const {
-  getBlobStore, BASE_URL, SELECT_FIELDS, LISTINGS_KEY,
+  getBlobStore, BASE_URL, SELECT_FIELDS, LISTINGS_KEY, LISTINGS_SOURCE,
 } = require("./lib/_mls-shared");
 const {
   resolveMediaFor, readCachedUrls, usableUrl, markUrlUsed, fetchMediaResponse,
@@ -66,6 +66,10 @@ const RESOLVE_BATCH = 24;
 const FETCH_TIMEOUT_MS = 8000;
 
 exports.handler = async (event) => {
+  // 2026-09-28: this walk stores MLS Grid photos. With Lofty as the source there
+  // is nothing to store -- Lofty's image server holds every photo at a stable,
+  // resizable address -- and nothing here may call MLS Grid any more.
+  if (LISTINGS_SOURCE === "lofty") return { statusCode: 200, body: "" };
   const startedAt = Date.now();
   const store = getBlobStore(getStore, BLOB_STORE_NAME);
   const token = process.env.MLSGRID_API_TOKEN;

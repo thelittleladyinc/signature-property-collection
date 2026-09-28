@@ -55,7 +55,9 @@ check(
   const pageSrc = fs.readFileSync(path.join(ROOT, "netlify", "functions", "listing-page.js"), "utf8");
   check(
     "listing-page.js derives its gallery size from the same constant",
-    /GALLERY_PHOTOS\s*=\s*PHOTO_CACHE_MAX_INDEX \+ 1/.test(pageSrc) &&
+    // 2026-09-28: the MLS Grid branch must still be the cache bound; the Lofty branch
+    // is free to be larger because Lofty's CDN photos never touch MLS Grid.
+    /GALLERY_PHOTOS\s*=\s*(?:LISTINGS_SOURCE === "lofty" \? \d+ : )?PHOTO_CACHE_MAX_INDEX \+ 1/.test(pageSrc) &&
       /Math\.min\(count, GALLERY_PHOTOS\)/.test(pageSrc),
     "a hardcoded 12 here is a photo re-downloaded from MLS Grid on every view"
   );

@@ -111,12 +111,13 @@ check(
 // ---- the listing detail page ----------------------------------------------
 check(
   "the detail gallery's FIRST photo keeps a real src (it is the page's main image)",
-  /i === 0\n\s*\? `<img src=/.test(listingPage),
+  // 2026-09-28: Lofty photos (CDN, no rate limit) also load natively; the rest are paced.
+  /if \(i === 0 \|\| isLoftyPhoto\(src\)\) \{\n\s*return `<img src=/.test(listingPage),
   "pacing the hero would delay the largest contentful paint for no rps benefit — it is one request"
 );
 check(
   "every other gallery photo is data-src and paced",
-  /: `<img data-src=/.test(listingPage) && /_pqActive < 2/.test(listingPage)
+  /return `<img data-src=/.test(listingPage) && /_pqActive < 2/.test(listingPage)
 );
 check(
   "the detail page's pacer self-starts (no pacePhotos() caller exists there)",

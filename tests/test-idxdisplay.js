@@ -5,6 +5,9 @@
 // This suite pins the rule end to end: with IDX_DISPLAY anything but "on" (the
 // default), no stored listing, pin, photo or alert email leaves the site -- and
 // when it is switched back on, nothing older than 12 hours is served either.
+// 2026-09-28: this suite pins the MLS Grid path (the gate is shared; the Lofty
+// path's use of it is covered in test-lofty-source.js).
+process.env.LISTINGS_SOURCE = "mlsgrid";
 const path = require("path");
 const fs = require("fs");
 const ROOT = path.resolve(__dirname, "..");

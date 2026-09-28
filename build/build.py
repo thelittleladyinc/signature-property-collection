@@ -1637,16 +1637,31 @@ def _paced_photo_js():
 """
 
 
+# 2026-09-28: where the live listings come from -- Lofty unless LISTINGS_SOURCE
+# says "mlsgrid". Must agree with LISTINGS_SOURCE in
+# netlify/functions/lib/_mls-shared.js, which the functions read at runtime.
+LISTINGS_SOURCE = "mlsgrid" if (os.environ.get("LISTINGS_SOURCE") or "").strip().lower() == "mlsgrid" else "lofty"
+_VIA_GRID = LISTINGS_SOURCE == "mlsgrid"
+
+
 def _mls_disclaimer_html(fetched_at_id="mls-fetched-at"):
-    """The MLS Grid IDX Rule 26 disclaimer block, shared by every page that
-    displays live MLS Grid data (search-homes.html and current-listings.html)
-    so the required legal text only has to be kept correct in one place.
+    """The IDX Rule 26 disclaimer block, shared by every page that displays live
+    IRES data (search-homes.html and current-listings.html) so the required legal
+    text only has to be kept correct in one place.
+
+    2026-09-28: MLS Grid is named only while it is the source. "As distributed by
+    MLS Grid" is MLS Grid's own licence requirement, and printing it over data
+    that now comes from IRES through Lofty would be false. The rest is the
+    standard IRES IDX text either way. Keep in step with disclaimerHtml() in
+    netlify/functions/listing-page.js.
     See https://www.mlsgrid.com/s/MLS-Grid-IDX-Rules.pdf ."""
+    via = "\n      as distributed by MLS Grid" if _VIA_GRID else ""
+    submitted_to = "MLS Grid" if _VIA_GRID else "the MLS"
+    verified_by = "MLS Grid" if _VIA_GRID else "MLS"
     return f"""<div class="mls-disclaimer">
-      <p><span class="mls-source-badge">Source: IRES MLS</span> — Listings courtesy of IRES MLS
-      as distributed by MLS Grid. Based on information submitted to MLS Grid as of
+      <p><span class="mls-source-badge">Source: IRES MLS</span> — Listings courtesy of IRES MLS{via}. Based on information submitted to {submitted_to} as of
       <span id="{fetched_at_id}">page load</span>. All data is obtained from various sources and may
-      not have been verified by broker or MLS Grid. Supplied open house information is subject to
+      not have been verified by broker or {verified_by}. Supplied open house information is subject to
       change without notice. All information should be independently reviewed and verified for
       accuracy. Properties may or may not be listed by the office/agent presenting the information.
       Some IDX listings have been excluded from this website. Offer of compensation is made only to
@@ -10453,7 +10468,7 @@ def build_blog():
     <span class="eyebrow" style="color:var(--dusty-rose)">Currently Listed</span>
     <h2 class="card-title" style="margin-top:6px">One Of {esc(SITE['agent'].split()[0])}'s Active Listings</h2>
     <div class="listing-grid" style="grid-template-columns:1fr;max-width:420px" id="listing-spotlight"></div>
-    <p class="search-status"><span class="mls-source-badge">Source: IRES MLS</span> via MLS Grid &middot;
+    <p class="search-status"><span class="mls-source-badge">Source: IRES MLS</span>{" via MLS Grid" if _VIA_GRID else ""} &middot;
     <a href="/current-listings.html" style="text-decoration:underline">See all current listings &amp; full disclaimer</a></p>
   </div>
 </section>
@@ -14457,7 +14472,7 @@ This site is accurate as of {BUILD_DATE} (rebuilt on every content update, so
 this date should be current). Live IRES MLS listing data (active, plus
 coming-soon listings labeled as such) for Larimer, Weld, and Boulder County
 ($950K+ only — this is {SITE['agent']}'s luxury/editorial
-site) is available at /search-homes.html, sourced directly from MLS Grid.
+site) is available at /search-homes.html, sourced {"directly from MLS Grid" if _VIA_GRID else "from IRES MLS through Lofty"}.
 {SITE['agent']}'s own current listings specifically — at ANY price, not just
 $950K+, including Active, Coming Soon and Under Contract status (labeled
 per listing), each shown with a real video tour when one exists for that exact

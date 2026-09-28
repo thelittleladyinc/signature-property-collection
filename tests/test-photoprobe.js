@@ -2,6 +2,9 @@
 // to run while throttled, because its own resolve + image fetch would add to the
 // very 429 it reports. 2026-08-16: Christine hit a 429 after several ?probe=1
 // refreshes and the page told her photos were broken. They weren't.
+// 2026-09-28: this suite pins the MLS Grid path, which stays in the code as the
+// switch-back (LISTINGS_SOURCE=mlsgrid). The Lofty path is test-lofty-source.js.
+process.env.LISTINGS_SOURCE = "mlsgrid";
 const ROOT = require("path").resolve(__dirname, "..");
 const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });

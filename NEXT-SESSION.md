@@ -1,5 +1,11 @@
 # Handoff — every known gap, as of 2026-08-17
 
+> **2026-09-28: listings now come from LOFTY, not MLS Grid.** Read
+> `docs/LOFTY-LISTINGS.md` first. Much of what follows (MLS Grid quotas, media
+> URLs, photo backfill, Cloudinary for her photos) describes the MLS Grid path,
+> which is still in the code as the switch-back (`LISTINGS_SOURCE=mlsgrid`) but
+> is not what the live site runs.
+
 Written at the end of a long session, for whoever picks this up next. Nothing here
 is speculation dressed as fact: where something is unverified it says so, and
 where I was wrong earlier it says that too.
