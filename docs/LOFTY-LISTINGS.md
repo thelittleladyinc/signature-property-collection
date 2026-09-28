@@ -81,6 +81,11 @@ is gone.
   riverfront / horse property (no Lofty filter), land / farm (labels didn't match).
 - A listing page for anyone else's listing is a 404 with a "Search Homes For Sale"
   button to her Lofty search (old links from the MLS Grid days land there).
+- **thelittleladysellshomes.com** does the same (its PR #45): its
+  `/search-homes.html` is a forced rewrite to its own `home-search.js`, a
+  pass-through to this site's with `noFloor=true` (that site searches every
+  price). Its widgets, listing pages and map already come through this site's
+  functions. Merge it only after this site's `home-search` function is live.
 
 ## What else changed with it
 
