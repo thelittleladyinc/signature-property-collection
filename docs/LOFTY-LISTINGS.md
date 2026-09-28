@@ -54,8 +54,9 @@ is gone.
 - **Photos**: `img.chime.me` — stable URLs that resize on request (`w600_`,
   `w1200_` …). Cards get 600px directly, galleries and heroes 1200px. Her listing
   pages show her whole gallery.
-- **No MLS Grid calls** anywhere on the Lofty path (pinned by
-  `tests/test-lofty-source.js`).
+- **No MLS Grid calls** on anything that shows listings (pinned by
+  `tests/test-lofty-source.js`). MLS Grid is still read in the background for the
+  town market figures — see below.
 
 ## The home search hand-off (`netlify/functions/lib/_home-search.js`)
 
@@ -74,8 +75,10 @@ is gone.
   (`["Loveland, CO"]`), `location.county`, `price` (`"950000,"`), `beds`, `baths`,
   `sqft`, `propertytype`. Loveland + $950K + 3 beds gave 95 homes, all matching.
 - **Kept**: the $950K floor unless a link says `noFloor=true` or names a minimum
-  (Signature stays a luxury search); with no town named, her operating counties
-  (her Lofty site's default search currently includes other states).
+  (Signature stays a luxury search). With no town named: **Larimer + Weld**
+  (Christine: "switch to loveland and noco specifically weld and larimer
+  counties") — her Lofty site's own default search includes other states.
+  `HOME_SEARCH_COUNTIES` (comma-separated) changes it.
 - **Not mapped, on purpose**: subdivision (Lofty wants the exact name — "Mariana"
   finds nothing, "Mariana Butte" does — so those searches open the whole town),
   riverfront / horse property (no Lofty filter), land / farm (labels didn't match).
@@ -94,11 +97,15 @@ is gone.
   the alerts). The alert endpoint answers any older copy of the map the same way.
   **Alerts saved before the switch are kept but no longer emailed** — `/status`
   counts them. Nobody was emailed about this; that's Christine's call.
-- **Town market figures** (`build/tools/town-market-stats.js`): computing a
-  "median" from her dozen listings would be wrong, so the job writes nothing on
-  Lofty. The committed figures age out on build.py's 21-day rule and the town
-  pages fall back to their written copy. (Possible later: counts per town from
-  Lofty's search `totalCount`.)
+- **Town market figures** (`build/tools/town-market-stats.js`) stay on MLS Grid.
+  Christine, later the same day: "use my mls grid for whatever we need to for all
+  of this — it wasn't shut off after all but speed made the difference". So
+  `sync-listings.js`, after refreshing her Lofty listings, runs the MLS Grid
+  replication as before, **under the MLS Grid keys only** (`listings.json`,
+  `sync-state.json`) — never what the site shows. The stats job reads that copy
+  and refuses to publish if it hasn't refreshed in 48 hours. `MLSGRID_MARKET_DATA=off`
+  stops the background run; `MLS_DISABLED=true` still stops every MLS Grid call.
+  `/status`: *Market data from MLS Grid refreshing*.
 - The legal page and disclaimers no longer name MLS Grid while Lofty is the source.
 - **The "Recently sold & open houses" strip** (`recent-activity.js`) reads Listing
   Engine, which records those events from the IRES feed through MLS Grid — not
@@ -138,8 +145,9 @@ follow that one variable. The MLS Grid path is unchanged and its tests still run
    listing marketing; worth confirming with Lofty/IRES anyway that using the
    Lofty API for it is fine by them. The whole-market display question went away
    with the whole-market copy.
-2. **MLS Grid data.** The old MLS Grid catalogue keys and stored MLS Grid photos
-   in Blobs are unused. If MLS Grid's termination notice requires deleting its
-   data, they can be removed — deliberately NOT done automatically.
+2. **MLS Grid.** PR #59 (the IDX kill switch) was written on the understanding
+   that the MLS Grid licence had been revoked; Christine said later on 2026-09-28
+   that the feed "wasn't shut off after all". Its copy is in use again, for the
+   town market figures only.
 3. **Coming Soon.** Lofty's "my listings" search returned Active, Under Contract
    and Pending in testing; if one of hers is Coming Soon, check it appears.
