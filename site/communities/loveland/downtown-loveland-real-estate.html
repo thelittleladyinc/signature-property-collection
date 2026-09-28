@@ -1754,7 +1754,7 @@ window.__ytPlay = function (b) {
 
   function idxOffHtml(data) {
     var url = (data && typeof data.searchUrl === 'string' && /^https?:\/\//i.test(data.searchUrl))
-      ? data.searchUrl : 'https://www.thelittleladysellshomes.com';
+      ? data.searchUrl : '/search-homes.html';
     var msg = (data && typeof data.message === 'string' && data.message) || 'Search homes on my home-search site';
     var e = function (s) {
       return String(s).replace(/[&<>"']/g, function (c) {

@@ -84,6 +84,13 @@
   // visible to her as buyer activity, so an empty area is a tracked lead
   // action instead of a dead end.
   var REALSCOUT_URL = 'https://christinegwinnup.realscout.com/agent/search';
+  // 2026-09-28: when the site's listings come from Lofty (build.py bakes
+  // window.SPC_HOME_SEARCH = 'lofty' next to the map), this site holds only
+  // Christine's own listings and her Lofty site is the home search. Then the
+  // "full MLS" link and the area alert both go there (/search-homes.html hands
+  // off to it with the same towns), instead of RealScout and this site's own
+  // alert emails, which can no longer see new listings.
+  var LOFTY_SEARCH = window.SPC_HOME_SEARCH === 'lofty';
   var DATA = { counties: null, towns: [], spots: [] };
   var map, spots = [], markers = [], soldMarkers = [], hoverPop = null, cardPop = null;
   var hoveredCounty = null, satOn = false, tiltOn = false, layerEventsBound = false;
@@ -1270,7 +1277,11 @@
     } else {
       html += '<p class="dr-line" style="width:100%"><i>Zoom closer to a town and tap Search This Area again.</i></p>';
     }
-    if (r.towns.length) {
+    if (r.towns.length && LOFTY_SEARCH) {
+      html += '<div class="dr-actions" style="margin-top:10px"><a href="/search-homes.html?' + q +
+        '&noFloor=true" style="width:100%;text-align:center">Save This Area On My Home Search &rsaquo;</a></div>' +
+        '<p class="dr-line" style="font-size:10.5px">Tap Save Search there and new homes here come to your inbox.</p>';
+    } else if (r.towns.length) {
       html += '<div class="dr-actions" style="margin-top:10px;gap:6px">' +
         '<input type="email" id="xm-alert-email" placeholder="you@email.com" ' +
           'style="flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid rgba(248,246,244,.3);' +
@@ -1282,8 +1293,10 @@
       // Only when the area came up empty: the full-MLS escape hatch, so a
       // thin-feed area (mountain towns especially) never reads as "no homes".
       (r.listings.length ? '' :
-        '<div class="dr-actions" style="margin-top:8px"><a href="' + REALSCOUT_URL +
-        '" target="_blank" rel="noopener" style="width:100%;text-align:center">' +
+        '<div class="dr-actions" style="margin-top:8px"><a href="' +
+        (LOFTY_SEARCH && r.towns.length ? '/search-homes.html?' + q + '&noFloor=true' : REALSCOUT_URL) +
+        '"' + (LOFTY_SEARCH && r.towns.length ? '' : ' target="_blank" rel="noopener"') +
+        ' style="width:100%;text-align:center">' +
         'Search The Full MLS With Christine &rsaquo;</a></div>') +
       // The lead net. Every portal map converts attention into contacts;
       // this one converts it into a conversation with the person who
@@ -1304,6 +1317,13 @@
           body: JSON.stringify({ email: email, cities: r.towns.map(function (t) { return t.name; }), label: title })
         }).then(function (resp) { return resp.json(); })
           .then(function (out) {
+            // The server moved alerts to her Lofty home search (area-alerts.js).
+            if (out && out.error === 'moved' && /^https?:\/\//i.test(String(out.searchUrl || ''))) {
+              msg.innerHTML = esc(out.message || 'New-home alerts are on my home search now.') +
+                ' <a href="' + esc(out.searchUrl) + '" style="text-decoration:underline">Open it &rsaquo;</a>';
+              alertBtn.disabled = false;
+              return;
+            }
             msg.textContent = out && out.ok
               ? 'Done \u2014 you\u2019ll get an email when something new lists here. Unsubscribe anytime from the email.'
               : 'Couldn\u2019t save that \u2014 try again in a moment.';

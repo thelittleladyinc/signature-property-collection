@@ -1707,7 +1707,7 @@ window.__ytPlay = function (b) {
     <div>
       <div class="card">
         <h3>Homes &amp; Real Estate in Lafayette</h3>
-        <p>Browse live, active IRES MLS listings in Lafayette below — updated in real time, not a stale snapshot — or reach out and we'll send you a curated list matched to what you're looking for.</p>
+        <p>Search every active Lafayette listing below — it opens my home search, live from the MLS — or reach out and we'll send you a curated list matched to what you're looking for.</p>
       </div>
     </div>
   </div>
@@ -1747,10 +1747,9 @@ window.__ytPlay = function (b) {
   <div class="wrap">
     <span class="eyebrow eyebrow-clear" style="color:var(--dusty-rose)">Live IRES MLS Inventory</span>
     <h2 class="section-title">Search Homes In Lafayette</h2>
-    <p class="lede">Every active Lafayette listing from IRES MLS, any price range —
-    updated every 15 minutes, not a stale snapshot. Filter by price, beds, and baths
-    below, or <a href="/search-homes.html?cities=Boulder%2CLongmont%2CLafayette%2CLouisville%2CSuperior%2CNederland%2CLyons%2CJamestown%2CWard" style="text-decoration:underline">search
-    all of Boulder County at once</a>.</p>
+    <p class="lede">Every Lafayette home for sale, at any price, on my home search — live from
+    the MLS. Set your price, beds and baths below and tap Search Homes, or
+    <a href="/search-homes.html?cities=Boulder%2CLongmont%2CLafayette%2CLouisville%2CSuperior%2CNederland%2CLyons%2CJamestown%2CWard" style="text-decoration:underline">search all of Boulder County at once</a>.</p>
     <div class="fs-widget">
     <form id="fs-lafayette-form">
       <input type="hidden" name="city" value="Lafayette">
@@ -2600,6 +2599,10 @@ window.__ytPlay = function (b) {
   //     quick checkbox clicks collapse into one request.
   var inflight = null;
   var autoTimer = null;
+  // 2026-09-28: on Lofty, listings-search answers a public search with where to
+  // find it (reason "home_search": her Lofty home search, same filters). A
+  // filter change shows that as a button; tapping Search Homes goes straight there.
+  var goOnHandoff = false;
   var resultCache = {};
   var resultCacheKeys = [];
   var CACHE_TTL_MS = 2 * 60 * 1000;
@@ -2607,7 +2610,7 @@ window.__ytPlay = function (b) {
 
   function idxOffHtml(data) {
     var url = (data && typeof data.searchUrl === 'string' && /^https?:\/\//i.test(data.searchUrl))
-      ? data.searchUrl : 'https://www.thelittleladysellshomes.com';
+      ? data.searchUrl : '/search-homes.html';
     var msg = (data && typeof data.message === 'string' && data.message) || 'Search homes on my home-search site';
     var e = function (s) {
       return String(s).replace(/[&<>"']/g, function (c) {
@@ -2619,6 +2622,11 @@ window.__ytPlay = function (b) {
 
   function renderResults(data, fetchedAt) {
     if (data.idxUnavailable) {
+      if (goOnHandoff && data.reason === 'home_search' && /^https?:\/\//i.test(String(data.searchUrl || ''))) {
+        goOnHandoff = false;
+        window.location.href = data.searchUrl;
+        return;
+      }
       statusEl.innerHTML = idxOffHtml(data);
       loadMoreBtn.style.display = 'none';
       return;
@@ -2686,6 +2694,7 @@ window.__ytPlay = function (b) {
   // Change a filter and the results just follow -- the Search Homes button
   // still works, but nobody has to find it.
   function autoSearch() {
+    goOnHandoff = false;
     clearTimeout(autoTimer);
     autoTimer = setTimeout(function () { runSearch(true); }, 350);
   }
@@ -2742,6 +2751,7 @@ window.__ytPlay = function (b) {
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     clearTimeout(autoTimer);
+    goOnHandoff = true;
     runSearch(true);
   });
   // 2026-08-18: every control in the form now auto-runs the search on change --

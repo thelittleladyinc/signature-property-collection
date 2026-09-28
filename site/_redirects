@@ -1,6 +1,9 @@
 /  /index.html  200
 /status  /.netlify/functions/site-health  200
 /site-health  /.netlify/functions/site-health  200
+/search-homes.html  /.netlify/functions/home-search  200!
+/search-homes/  /.netlify/functions/home-search  200!
+/search-homes  /.netlify/functions/home-search  200!
 /50842-county-road-33-nunn-co-80648/  https://www.thelittleladysellshomes.com/communities/weld/nunn.html  301
 /50842-county-road-33-nunn-co-80648  https://www.thelittleladysellshomes.com/communities/weld/nunn.html  301
 /475-homestead-ln-johnstown-co-80534/  https://www.thelittleladysellshomes.com/communities/weld/johnstown.html  301
@@ -371,8 +374,6 @@
 /past-sales  /past-sales.html  301!
 /mortgage-calculator/  /mortgage-calculator.html  301!
 /mortgage-calculator  /mortgage-calculator.html  301!
-/search-homes/  /search-homes.html  301!
-/search-homes  /search-homes.html  301!
 /current-listings/  /current-listings.html  301!
 /current-listings  /current-listings.html  301!
 /explore/  /explore.html  301!

@@ -1,22 +1,22 @@
-// Lofty as the listing source (2026-09-28) -- the whole path, against a fake Lofty.
+// Lofty as the listing source (2026-09-28) -- her own listings from Lofty, every
+// other search handed to her Lofty home search -- against a fake Lofty.
 //
 // Christine asked for the site's listings and searches to come from Lofty instead
-// of MLS Grid. The facts the code is built on were measured live through her own
-// key (see lib/_lofty-listings.js's header); this suite pins the BEHAVIOUR built on
-// them, with no network:
+// of MLS Grid, then approved the shape this suite pins ("lets do it!!!"): her
+// Lofty site does the home search (it was faster from click to data), and this
+// site keeps her own listings. No network:
 //
-//   - the refresh writes ONLY the Lofty keys, so the MLS Grid copy (and a switch
-//     back) is untouched;
-//   - a complete refresh replaces the catalogue (sold/withdrawn listings leave);
-//     a partial one only adds and updates, never removes on partial evidence --
-//     except her own listings, which are known exactly and leave at once;
-//   - only IRES records are published (her manual Lofty listing is reported, not
-//     shown); statuses outside the replicated set are refused;
-//   - other brokers' listings are slimmed to the fields the site uses, with the
-//     riverfront / horse-property flags read from the description first;
-//   - details are fetched once per version of a listing, not every refresh;
-//   - nothing on the Lofty path -- refresh, schedule, search, listing page, photo
-//     link, status page -- makes a single request to MLS Grid.
+//   - the 30-minute sync writes ONLY the Lofty keys (the MLS Grid copy, and a
+//     switch back, are untouched) and stores ONLY her listings -- two requests;
+//   - a complete answer replaces her set, so a withdrawn listing leaves at once;
+//   - a failed, partial or empty answer keeps the last good set, and an empty one
+//     is believed only after Lofty has said so for two hours;
+//   - a whole-market copy left by the earlier design is cut down to hers;
+//   - only IRES records are shown (her manual Lofty listing is reported, not
+//     shown); a "my listings" record without her name is not shown either;
+//   - a public search is answered with the same search on her Lofty site, and
+//     no page serves another brokerage's listing, photo or gallery;
+//   - nothing on the Lofty path makes a single request to MLS Grid.
 "use strict";
 process.env.LISTINGS_SOURCE = "lofty";
 
@@ -49,7 +49,7 @@ function rec(id, over) {
     listingStatus: "Active", price: 500000, bedrooms: 3, bathrooms: 2, sqft: 2000,
     streetAddress: `${id} Main St`, city: "Loveland", state: "CO", zipCode: "80537",
     propertyType: "Single Family Home", propertyTypeSecondary: "Single Family Residence",
-    agentName: "Someone Else", previewPicture: COVER(id), latitude: "40.39", longitude: "-105.07",
+    agentName: "Christine Gwinnup", previewPicture: COVER(id), latitude: "40.39", longitude: "-105.07",
     lastPrimaryChangeTime: "2026-09-28 10:00:00", mlsListDateLSort: 1787356800, builtYear: 2006,
     ...over,
   };
@@ -60,7 +60,7 @@ function reply(status, json) {
     json: async () => json, headers: { get: () => "application/json" } };
 }
 
-// A fake Lofty: counties -> records, "my" -> records, details by MLS id.
+// A fake Lofty: "my" -> records, details by MLS id. Any other search is a bug now.
 function fakeLofty(world) {
   const calls = [];
   const f = async (url, init) => {
@@ -70,18 +70,14 @@ function fakeLofty(world) {
     if (u.host === "img.chime.me") {
       return { ok: true, status: 200, headers: { get: () => "image/jpeg" }, arrayBuffer: async () => new ArrayBuffer(30000) };
     }
-    if (u.pathname.endsWith("/lofty-sync-background")) return { status: 202 };
     if (u.pathname === "/v2.0/listings/search") {
       const body = JSON.parse(init.body);
-      let pool;
-      if (body.searchScope === "my") {
-        pool = world.mine || [];
-      } else {
-        const county = body.filterConditions.location.county[0].split(",")[0];
-        if ((world.failing || []).includes(county)) return reply(500, { code: 1, message: "Lofty is down for this one" });
-        pool = (world.counties || {})[county] || [];
-        if (body.filterConditions.daysOnSite) pool = pool.filter((x) => x.__newToday);
+      if (body.searchScope !== "my") {
+        world.marketSearches = (world.marketSearches || 0) + 1;
+        return reply(500, { code: 1, message: "only her own listings should ever be asked for" });
       }
+      if (world.myFails) return reply(500, { code: 500, message: "Lofty is having a moment" });
+      const pool = world.mine || [];
       const size = body.pageSize;
       const items = pool.slice((body.pageNum - 1) * size, body.pageNum * size);
       return reply(200, { listing: items, metadata: {
@@ -89,6 +85,7 @@ function fakeLofty(world) {
       } });
     }
     if (u.pathname === "/v1.0/listing") {
+      if (world.detailsFail) return reply(500, { code: 500, message: "details are down" });
       const ids = String(u.searchParams.get("mlsListingIds") || "").split(",");
       world.detailCalls = (world.detailCalls || 0) + 1;
       world.detailIds = (world.detailIds || []).concat(ids);
@@ -110,246 +107,273 @@ function freshModules(store, fetchImpl) {
 }
 
 const noSleep = async () => {};
+const HOUR = 3600e3;
 
 (async () => {
   process.env.LOFTY_API_KEY = "test-key";
   delete process.env.MLSGRID_API_TOKEN;
 
   // ---------------------------------------------------------------------------
-  console.log("\n1. A complete refresh builds the Lofty catalogue and nothing else");
+  console.log("\n1. The sync stores her listings, and nothing else");
   const world = {
-    counties: {
-      Larimer: [
-        rec("IRE1000001", { propertyTypeSecondary: "Farm/Ranch" }),
-        rec("IRE1000002", { listingStatus: "Pending", city: "Fort Collins" }),
-        rec("IRE1000003", { listingStatus: "Sold" }),
-        rec("MANL999", { mlsOrgId: 0 }),
-      ],
-      Weld: [rec("IRE1000004", { city: "Greeley", agentName: "Kendra Bajcar", coAgentName: "Christine Gwinnup" })],
-    },
     mine: [
       rec("IRE1000004", { city: "Greeley", agentName: "Kendra Bajcar", coAgentName: "Christine Gwinnup" }),
-      rec("MANL1774145080001", { mlsOrgId: 0, agentName: "Christine Gwinnup", streetAddress: "1 Pocket Ln" }),
+      rec("IRE1000005", { listingStatus: "Pending", price: 1250000 }),
+      rec("IRE1000006", { listingStatus: "Sold" }),
+      rec("IRE1000007", { agentName: "A Teammate" }),
+      rec("MANL1774145080001", { mlsOrgId: 0, streetAddress: "1 Pocket Ln" }),
     ],
     details: {
-      IRE1000001: { mlsListingId: "IRE1000001", pictureList: [PIC("IRE1000001", 1), PIC("IRE1000001", 2), PIC("IRE1000001", 3)],
-        detailsDescribe: "Riverfront acreage, horse property with a loafing shed.", subDivisionName: "Airpark", county: "Larimer", agentOrgId: "IRE0FCOM" },
       IRE1000004: { mlsListingId: "IRE1000004", pictureList: [1, 2, 3, 4, 5].map((n) => PIC("IRE1000004", n)),
         detailsDescribe: "Christine's own listing, described in full.", subDivisionName: "Greeley Rural", county: "Weld", agentOrgId: "IRE07444" },
+      IRE1000005: { mlsListingId: "IRE1000005", pictureList: [PIC("IRE1000005", 1), PIC("IRE1000005", 2)],
+        detailsDescribe: "Riverfront, with a loafing shed.", subDivisionName: "Mariana Butte" },
     },
   };
   const sentinel = { IRE1: { listingId: "IRE1", source: "mlsgrid" } };
-  const store = makeStore({ "listings.json": sentinel, "sync-state.json": { lastRunAt: "x" }, "mine-listings.json": [] });
+  // What the earlier (whole-market) design left behind: someone else's listing.
+  const leftover = { IRE9999999: { listingId: "IRE9999999", agentName: "Someone Else", status: "Active" } };
+  const store = makeStore({
+    "listings.json": sentinel, "sync-state.json": { lastRunAt: "x" }, "mine-listings.json": [],
+    "lofty-listings.json": leftover,
+  });
   const fetch1 = fakeLofty(world);
   freshModules(store, fetch1);
   const L = require(`${FN_DIR}/lib/_lofty-listings.js`);
   const S = require(`${FN_DIR}/lib/_mls-shared.js`);
   check("the default source is Lofty", S.LISTINGS_SOURCE === "lofty");
   check("the site reads the Lofty keys", S.LISTINGS_KEY === "lofty-listings.json" && S.MINE_LISTINGS_KEY === "lofty-mine-listings.json");
+  check("the whole-market refresh is gone", !L.runFullCrawl && !L.runQuickPass && !L.scheduledTick && !L.galleryFor);
 
-  // Only operating counties are queried; this world has two with listings.
-  const r1 = await L.runFullCrawl({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {} });
+  let clock = Date.parse("2026-09-28T18:00:00Z");
+  const now = () => clock;
+  const run = (extra) => L.runMineSync({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {}, now, ...(extra || {}) });
+
+  const r1 = await run();
   const cat = store.data.get("lofty-listings.json") || {};
   const mine = store.data.get("lofty-mine-listings.json") || [];
   const state = store.data.get("lofty-sync-state.json") || {};
-  check("the refresh reports complete", r1.complete === true, JSON.stringify(r1.incomplete));
-  check("Active and Pending IRES listings are stored", !!cat.IRE1000001 && !!cat.IRE1000002 && !!cat.IRE1000004);
-  check("a Sold listing is refused", !cat.IRE1000003);
-  check("a non-MLS (manual) record is never published", !cat.MANL999 && !cat.MANL1774145080001);
-  check("her manual Lofty listing is reported in state instead",
-    (state.herNonMlsListings || []).some((x) => x.includes("MANL1774145080001")), JSON.stringify(state.herNonMlsListings));
+  check("the answer is accepted", r1.answer === "ok" && r1.accepted === true, JSON.stringify(r1));
+  check("her Active and Pending listings are stored (co-listed counts as hers)", !!cat.IRE1000004 && !!cat.IRE1000005);
+  check("a Sold listing is refused", !cat.IRE1000006);
+  check("a 'my listings' record without her name is not shown", !cat.IRE1000007 && state.skippedNotHers === 1, String(state.skippedNotHers));
+  check("her manual (non-MLS) listing is never published", !cat.MANL1774145080001);
+  check("...but is reported in state", (state.herNonMlsListings || []).some((x) => x.includes("MANL1774145080001")), JSON.stringify(state.herNonMlsListings));
+  check("the earlier whole-market copy is gone", !cat.IRE9999999 && Object.keys(cat).length === 2, Object.keys(cat).join(","));
+  check("the small copy is her whole set", mine.length === 2);
   check("the MLS Grid catalogue is untouched", JSON.stringify(store.data.get("listings.json")) === JSON.stringify(sentinel));
   check("the MLS Grid state is untouched", store.data.get("sync-state.json").lastRunAt === "x");
-  const a = cat.IRE1000001 || {};
-  check("listing ids keep MLS Grid's IRE form", a.listingId === "IRE1000001");
+  check("two requests: her listings, then their details", r1.requests === 2 && world.detailCalls === 1, `${r1.requests} / ${world.detailCalls}`);
+  check("no search of the whole market", !world.marketSearches);
+  const d = cat.IRE1000004 || {};
+  check("listing ids keep MLS Grid's IRE form", d.listingId === "IRE1000004");
   check("mapped fields: price, beds, baths, sqft, address, status",
-    a.price === 500000 && a.beds === 3 && a.baths === 2 && a.sqft === 2000 && a.address === "IRE1000001 Main St" && a.status === "Active");
-  check("coordinates arrive as numbers (MLS Grid never had them)", a.latitude === 40.39 && a.longitude === -105.07);
-  check("county comes from the county queried", a.county === "larimer" && (cat.IRE1000004 || {}).county === "weld");
-  check("subdivision from details", a.subdivision === "Airpark");
-  check("riverfront and horse-property flags read from the description", a.waterfront === true && a.equestrian === true);
-  check("another brokerage's description and gallery are not stored (slimmed)", a.remarks === undefined && a.photos === undefined);
-  check("...but its photo count is", a.photoCount === 3);
-  check("its cover is the stable Lofty URL", L.isLoftyPhoto(a.photo));
-  check("empty fields are not stored", !Object.values(a).some((v) => v === null));
+    d.price === 500000 && d.beds === 3 && d.baths === 2 && d.sqft === 2000 && d.address === "IRE1000004 Main St" && d.status === "Active");
+  check("coordinates arrive as numbers", d.latitude === 40.39 && d.longitude === -105.07);
+  check("her description and whole gallery are kept", /described in full/.test(d.remarks) && Array.isArray(d.photos) && d.photos.length === 5);
+  check("subdivision from details, county from the town", d.subdivision === "Greeley Rural" && d.county === "weld", `${d.subdivision} / ${d.county}`);
+  check("details are recorded against this version", d.detailsFor === d.modificationTimestamp);
+  check("its cover is the stable Lofty URL", L.isLoftyPhoto(d.photo));
+  check("empty fields are not stored", !Object.values(d).some((v) => v === null));
   const land = L.mapLoftyListing(rec("IRE1000099", { bedrooms: -1, bathrooms: -1, sqft: -1, builtYear: -1, price: 250000,
     propertyType: "Vacant Land", longitude: "-105.07" }), {});
   check("Lofty's -1 (not provided) becomes blank, so no card says \"-1 bd\"",
     land.beds === null && land.baths === null && land.sqft === null && land.yearBuilt === null, JSON.stringify(land));
   check("...while real values and negative longitudes are kept", land.price === 250000 && land.longitude === -105.07);
-  const d = cat.IRE1000004 || {};
-  check("her co-listed listing is hers", L.isHers(d));
-  check("hers keeps its full description and gallery", d.remarks && Array.isArray(d.photos) && d.photos.length === 5);
-  check("the small copy of hers is written", mine.length === 1 && mine[0].listingId === "IRE1000004");
-  check("state: complete, bootstrapped, per-county counts",
-    state.lastFullCrawlComplete === true && state.bootstrapped === true && state.byCounty.larimer === 2 && state.byCounty.weld === 1,
-    JSON.stringify(state.byCounty));
-  check("state: last COMPLETE refresh time recorded", !!state.lastCompleteFullCrawlAt);
-  check("state: lastSuccessAt (what the IDX 12-hour guard reads) is the complete refresh", state.lastSuccessAt === state.lastCompleteFullCrawlAt);
-  check("the lock is released", !!(store.data.get(L.CRAWL_LOCK_KEY) || {}).finishedAt);
+  check("state: accepted, bootstrapped, lastSuccessAt is this run",
+    state.lastRunAnswer === "ok" && state.bootstrapped === true && state.lastSuccessAt === new Date(clock).toISOString() && !state.lastRunError,
+    JSON.stringify(state));
   check("no request went to MLS Grid", !fetch1.calls.some((c) => c.includes("mlsgrid")));
 
   // ---------------------------------------------------------------------------
-  console.log("\n2. Details are fetched once per version, and the public URL can't be hammered");
-  const again = await L.runFullCrawl({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {} });
-  check("a refresh within 20 minutes of a complete one is refused", /less than 20 minutes/.test(String(again.skipped)));
-  world.detailIds = [];
-  await L.runFullCrawl({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {}, force: true });
-  check("unchanged listings are not re-detailed; hers always are",
-    world.detailIds.includes("IRE1000004") && !world.detailIds.includes("IRE1000001"), world.detailIds.join(","));
-  check("...and the flags survive being carried forward",
-    (store.data.get("lofty-listings.json").IRE1000001 || {}).equestrian === true);
-  world.counties.Larimer[0] = { ...world.counties.Larimer[0], lastPrimaryChangeTime: "2026-09-28 16:00:00", price: 475000 };
-  world.detailIds = [];
-  await L.runFullCrawl({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {}, force: true });
-  check("a changed listing IS re-detailed", world.detailIds.includes("IRE1000001"));
-  check("...and its new price is stored", store.data.get("lofty-listings.json").IRE1000001.price === 475000);
+  console.log("\n2. A listing she withdraws leaves at the next run");
+  world.mine = world.mine.filter((x) => x.mlsListingId !== "IRE1000005");
+  clock += 30 * 60e3;
+  await run();
+  check("the withdrawn listing is gone", !store.data.get("lofty-listings.json").IRE1000005);
+  check("...from the small copy too", !(store.data.get("lofty-mine-listings.json") || []).some((x) => x.listingId === "IRE1000005"));
 
   // ---------------------------------------------------------------------------
-  console.log("\n3. Complete refresh: a listing that left the market leaves the site");
-  world.counties.Larimer = world.counties.Larimer.filter((x) => x.mlsListingId !== "IRE1000002");
-  await L.runFullCrawl({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {}, force: true });
-  check("the pending listing that disappeared is gone", !store.data.get("lofty-listings.json").IRE1000002);
+  console.log("\n3. A failed read changes nothing but the error");
+  const before3 = JSON.stringify(store.data.get("lofty-listings.json"));
+  const success3 = store.data.get("lofty-sync-state.json").lastSuccessAt;
+  world.myFails = true;
+  clock += 30 * 60e3;
+  const r3 = await run();
+  world.myFails = false;
+  const st3 = store.data.get("lofty-sync-state.json");
+  check("reported as an error, not accepted", r3.answer === "error" && r3.accepted === false, JSON.stringify(r3));
+  check("her listings are kept exactly", JSON.stringify(store.data.get("lofty-listings.json")) === before3);
+  check("lastSuccessAt does not advance", st3.lastSuccessAt === success3 && st3.lastRunAt !== success3, `${st3.lastSuccessAt} / ${st3.lastRunAt}`);
+  check("Lofty's own words are on /status", /Lofty is having a moment/.test(String(st3.lastRunError)), st3.lastRunError);
 
   // ---------------------------------------------------------------------------
-  console.log("\n4. Partial refresh: adds and updates, never removes -- except her own");
-  const cat4 = store.data.get("lofty-listings.json");
-  cat4.IRE7777777 = { listingId: "IRE7777777", status: "Active", city: "Greeley", county: "weld", price: 1 };
-  cat4.IRE8888888 = { listingId: "IRE8888888", status: "Active", city: "Loveland", agentName: "Christine Gwinnup", price: 2 };
-  await store.setJSON("lofty-listings.json", cat4);
-  world.failing = ["Weld"];
-  // Run this refresh an hour "later" on its own clock. On a fast machine two
-  // refreshes can finish in the same millisecond, and then an unchanged
-  // lastSuccessAt and a new lastFullCrawlAt are the same string -- which is how
-  // the first version of the check below passed locally and failed in CI.
-  const successBefore = store.data.get("lofty-sync-state.json").lastSuccessAt;
-  const anHourLater = () => Date.now() + 60 * 60 * 1000;
-  const r4 = await L.runFullCrawl({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {}, force: true, now: anHourLater });
-  world.failing = [];
-  const after4 = store.data.get("lofty-listings.json");
-  check("the refresh reports partial", r4.complete === false && r4.incomplete.some((x) => /weld/i.test(x)), JSON.stringify(r4.incomplete));
-  check("a listing Lofty could not be asked about is kept", !!after4.IRE7777777);
-  check("her listing that Lofty no longer lists as hers is removed anyway", !after4.IRE8888888);
-  check("state says partial and names the county",
-    store.data.get("lofty-sync-state.json").lastFullCrawlComplete === false &&
-    /weld/i.test((store.data.get("lofty-sync-state.json").lastFullCrawlIncomplete || []).join(" ")));
-  check("the last COMPLETE time is kept from before", !!store.data.get("lofty-sync-state.json").lastCompleteFullCrawlAt);
-  const st4 = store.data.get("lofty-sync-state.json");
-  check("a partial refresh does not advance lastSuccessAt",
-    !!successBefore && st4.lastSuccessAt === successBefore && st4.lastFullCrawlAt !== successBefore,
-    `lastSuccessAt ${st4.lastSuccessAt}, before ${successBefore}, lastFullCrawlAt ${st4.lastFullCrawlAt}`);
-
-  // ---------------------------------------------------------------------------
-  console.log("\n5. The 30-minute quick pass");
-  world.counties.Larimer.push(rec("IRE1000009", { __newToday: true }));
-  // She has another listing still on the market, and IRE1000004 was withdrawn.
-  world.mine = world.mine.filter((x) => x.mlsListingId !== "IRE1000004")
-    .concat([rec("IRE1000010", { agentName: "Christine Gwinnup" })]);
-  await store.setJSON(L.CRAWL_LOCK_KEY, { startedAt: new Date().toISOString() });
-  const q0 = await L.runQuickPass({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep });
-  check("it stands aside while a full refresh holds the lock", /full refresh is running/.test(String(q0.skipped)));
-  await store.setJSON(L.CRAWL_LOCK_KEY, { startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() });
-  const q = await L.runQuickPass({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep });
-  const after5 = store.data.get("lofty-listings.json");
-  check("a listing that came on the market today is added", !!after5.IRE1000009 && q.added >= 1);
-  check("her withdrawn listing leaves within the half hour", !after5.IRE1000004);
-  check("...and her small copy follows", !(store.data.get("lofty-mine-listings.json") || []).some((x) => x.listingId === "IRE1000004"));
-  check("state records the quick pass", !!store.data.get("lofty-sync-state.json").lastQuickPassAt);
-  const cat5 = store.data.get("lofty-listings.json");
-  cat5.IRE5555555 = { listingId: "IRE5555555", status: "Active", city: "Loveland", agentName: "Christine Gwinnup", price: 3 };
-  await store.setJSON("lofty-listings.json", cat5);
+  console.log("\n4. An empty answer is believed only after two hours");
   const savedMine = world.mine;
   world.mine = [];
-  await L.runQuickPass({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep });
+  clock += 30 * 60e3;
+  const e1 = await run();
+  check("the first empty answer keeps her listings", e1.accepted === false && !!store.data.get("lofty-listings.json").IRE1000004);
+  check("...says why", /none of Christine's listings/.test(String(store.data.get("lofty-sync-state.json").lastRunError)));
+  const since = store.data.get("lofty-sync-state.json").emptyMineSince;
+  clock += HOUR;
+  await run();
+  check("still kept an hour later, and the clock did not restart",
+    !!store.data.get("lofty-listings.json").IRE1000004 && store.data.get("lofty-sync-state.json").emptyMineSince === since);
+  clock += HOUR + 60e3;
+  const e3 = await run();
+  check("after two hours of 'none', the site believes it", e3.accepted === true && Object.keys(store.data.get("lofty-listings.json")).length === 0);
+  check("...and that counts as a success (nothing stale is shown)",
+    store.data.get("lofty-sync-state.json").lastSuccessAt === new Date(clock).toISOString());
   world.mine = savedMine;
-  check("an EMPTY answer about her listings never wipes them (a glitch is likelier than zero)",
-    !!store.data.get("lofty-listings.json").IRE5555555);
+  clock += 30 * 60e3;
+  await run();
+  check("her listings come straight back with the next answer", !!store.data.get("lofty-listings.json").IRE1000004);
+  const fresh = makeStore({});
+  const e4 = await L.runMineSync({ store: fresh, apiKey: "k", fetchImpl: fakeLofty({ mine: [] }), sleepImpl: noSleep, log: () => {}, now });
+  check("with nothing stored, an empty answer is simply accepted", e4.accepted === true && !!fresh.data.get("lofty-sync-state.json").lastSuccessAt);
 
   // ---------------------------------------------------------------------------
-  console.log("\n6. The schedule starts a full refresh only when one is due");
-  const kicks = [];
-  const kickFetch = async (url, init) => { if (String(url).includes("lofty-sync-background")) kicks.push(url); return fetch1(url, init); };
-  const st = store.data.get("lofty-sync-state.json");
-  await store.setJSON("lofty-sync-state.json", { ...st, lastFullCrawlAt: new Date().toISOString(), lastFullCrawlComplete: true });
-  await L.scheduledTick({ store, apiKey: "test-key", siteUrl: "https://example.test", fetchImpl: kickFetch, sleepImpl: noSleep });
-  check("not due: no refresh started", kicks.length === 0);
-  const st2 = store.data.get("lofty-sync-state.json");
-  await store.setJSON("lofty-sync-state.json", { ...st2, lastFullCrawlAt: new Date(Date.now() - 3 * 3600e3).toISOString() });
-  await L.scheduledTick({ store, apiKey: "test-key", siteUrl: "https://example.test", fetchImpl: kickFetch, sleepImpl: noSleep });
-  check("due: the background refresh is started", kicks.length === 1 && kicks[0] === "https://example.test/.netlify/functions/lofty-sync-background");
-  check("...and the start request is recorded for /status", (store.data.get(L.CRAWL_KICK_KEY) || {}).httpStatus === 202);
+  console.log("\n5. Details: best effort, never fatal");
+  world.detailsFail = true;
+  world.mine = world.mine.concat([rec("IRE1000008", { price: 2100000 })]);
+  clock += 30 * 60e3;
+  const r5 = await run();
+  world.detailsFail = false;
+  const cat5 = store.data.get("lofty-listings.json");
+  check("a new listing still appears, with its cover", r5.accepted && !!cat5.IRE1000008 && L.isLoftyPhoto(cat5.IRE1000008.photo));
+  check("an unchanged listing keeps what the last details said", (cat5.IRE1000004.photos || []).length === 5 && !!cat5.IRE1000004.remarks);
+  check("the details failure is reported", /details: .*details are down/.test(String(store.data.get("lofty-sync-state.json").lastRunError)));
 
   // ---------------------------------------------------------------------------
-  check("a catalogue with no recorded success is due as soon as the 20-minute guard allows",
-    L.fullCrawlDue({ lastFullCrawlAt: new Date(Date.now() - 25 * 60e3).toISOString(), lastFullCrawlComplete: true }, Date.now()) === true &&
-    L.fullCrawlDue({ lastFullCrawlAt: new Date(Date.now() - 5 * 60e3).toISOString(), lastFullCrawlComplete: true }, Date.now()) === false);
+  console.log("\n6. A failed first run still cuts a whole-market copy down to hers");
+  const old = makeStore({ "lofty-listings.json": {
+    IRE1000004: { listingId: "IRE1000004", agentName: "Christine Gwinnup", status: "Active" },
+    IRE7777777: { listingId: "IRE7777777", agentName: "Someone Else", status: "Active" },
+  } });
+  const r6 = await L.runMineSync({ store: old, apiKey: "k", fetchImpl: fakeLofty({ myFails: true }), sleepImpl: noSleep, log: () => {}, now });
+  check("not accepted", r6.accepted === false);
+  check("but no other brokerage's listing is left to serve",
+    !old.data.get("lofty-listings.json").IRE7777777 && !!old.data.get("lofty-listings.json").IRE1000004);
 
-  console.log("\n7. The functions, end to end, with Lofty as the source");
-  // A catalogue with one of hers (full gallery) and one other brokerage's listing.
-  const hersRec = L.slimForStorage(L.applyDetails(L.mapLoftyListing(rec("IRE2000001", { agentName: "Christine Gwinnup" }), { county: "larimer" }),
-    { pictureList: [PIC("IRE2000001", 1), PIC("IRE2000001", 2)], detailsDescribe: "Hers." }));
-  const other = L.slimForStorage(L.applyDetails(L.mapLoftyListing(rec("IRE2000002", { price: 1500000 }), { county: "larimer" }),
-    { pictureList: [PIC("IRE2000002", 1), PIC("IRE2000002", 2), PIC("IRE2000002", 3)] }));
+  // ---------------------------------------------------------------------------
+  console.log("\n7. The by-hand refresh");
+  const siteStoreA = makeStore({});
+  freshModules(siteStoreA, fakeLofty({ mine: [rec("IRE3000001")], details: {} }));
+  const refresh = require(`${FN_DIR}/refresh-my-listings.js`).handler;
+  check("GET is refused", (await refresh({ httpMethod: "GET" })).statusCode === 405);
+  const rr1 = await refresh({ httpMethod: "POST" });
+  check("POST refreshes her listings now", rr1.statusCode === 200 && JSON.parse(rr1.body).hers === 1, rr1.body);
+  check("...and says nothing about the key or the listings themselves", !/test-key|IRE3000001/.test(rr1.body));
+  const rr2 = await refresh({ httpMethod: "POST" });
+  check("a second POST within a minute is refused", rr2.statusCode === 429 && /less than a minute/.test(rr2.body), rr2.body);
+
+  // ---------------------------------------------------------------------------
+  console.log("\n8. The functions, end to end");
+  const hersRec = L.slimForStorage(L.applyDetails(L.mapLoftyListing(rec("IRE2000001"), { county: "larimer" }),
+    { pictureList: [PIC("IRE2000001", 1), PIC("IRE2000001", 2), PIC("IRE2000001", 3)], detailsDescribe: "Hers." }));
+  // A stray other-brokerage record, as if something had written one: nothing may serve it.
+  const stray = L.slimForStorage(L.mapLoftyListing(rec("IRE2000002", { agentName: "Someone Else", price: 1500000 }), { county: "larimer" }));
   const siteStore = makeStore({
-    "lofty-listings.json": { IRE2000001: hersRec, IRE2000002: other },
+    "lofty-listings.json": { IRE2000001: hersRec, IRE2000002: stray },
     "lofty-mine-listings.json": [hersRec],
-    "lofty-sync-state.json": { lastRunAt: new Date().toISOString(), lastFullCrawlAt: new Date().toISOString(),
-      lastCompleteFullCrawlAt: new Date().toISOString(), lastSuccessAt: new Date().toISOString(),
-      lastFullCrawlComplete: true, byCounty: { larimer: 2 } },
+    "lofty-sync-state.json": { lastRunAt: new Date().toISOString(), lastSuccessAt: new Date().toISOString(), lastRunAnswer: "ok" },
+    "a-bWU": { id: "a-bWU", email: "me@example.com", cities: ["Loveland"] },
   });
-  const w7 = { details: { IRE2000002: { mlsListingId: "IRE2000002", pictureList: [PIC("IRE2000002", 1), PIC("IRE2000002", 2), PIC("IRE2000002", 3)] } } };
-  const fetch7 = fakeLofty(w7);
-  freshModules(siteStore, fetch7);
+  const w8 = { mine: [rec("IRE2000001")], details: {} };
+  const fetch8 = fakeLofty(w8);
 
-  // The IDX kill switch (lib/_idx-display.js) governs Lofty data exactly as it
-  // governed MLS Grid data: off unless IDX_DISPLAY is "on".
+  // Display switched OFF: her listings are held back; a public search still gets
+  // the hand-off (a link to her Lofty search is never listing data).
   delete process.env.IDX_DISPLAY;
-  const offRes = JSON.parse((await require(`${FN_DIR}/listings-search.js`).handler({ queryStringParameters: { noFloor: "true" } })).body);
-  check("display switched OFF: Lofty listings are held back too", offRes.idxUnavailable === true && offRes.totalCount === 0);
-  process.env.IDX_DISPLAY = "on";
-  freshModules(siteStore, fetch7);
+  freshModules(siteStore, fetch8);
+  let search = require(`${FN_DIR}/listings-search.js`).handler;
+  const offMine = JSON.parse((await search({ queryStringParameters: { mine: "true" } })).body);
+  check("display OFF: her listings are held back", offMine.idxUnavailable === true && offMine.reason === "disabled" && offMine.totalCount === 0);
+  const offPublic = JSON.parse((await search({ queryStringParameters: { city: "Loveland" } })).body);
+  check("display OFF: a public search still hands off to her Lofty search",
+    offPublic.reason === "home_search" && /theboldcollectivehomes\.com\/listing\?/.test(offPublic.searchUrl), offPublic.searchUrl);
 
-  const search = require(`${FN_DIR}/listings-search.js`).handler;
-  const sres = JSON.parse((await search({ queryStringParameters: { noFloor: "true" } })).body);
-  const card = (sres.listings || []).find((l) => l.listingId === "IRE2000002") || {};
-  check("search returns the Lofty listings", sres.totalCount === 2, JSON.stringify(sres).slice(0, 200));
+  process.env.IDX_DISPLAY = "on";
+  freshModules(siteStore, fetch8);
+  search = require(`${FN_DIR}/listings-search.js`).handler;
+  const sres = JSON.parse((await search({ queryStringParameters: { mine: "true" } })).body);
+  const card = (sres.listings || [])[0] || {};
+  check("her listings search returns hers only", sres.totalCount === 1 && card.listingId === "IRE2000001", JSON.stringify(sres).slice(0, 200));
   check("a card photo is Lofty's 600px image, straight to the browser",
-    /^https:\/\/img\.chime\.me\/.*\/w600_original_IRE2000002-cover\.jpeg$/.test(String(card.photo)), card.photo);
+    /^https:\/\/img\.chime\.me\/.*\/w600_original_IRE2000001-cover\.jpeg$/.test(String(card.photo)), card.photo);
   check("internal fields are not sent to browsers", card.source === undefined && card.detailsFor === undefined && card.listingKey === undefined);
+  const hand = JSON.parse((await search({ queryStringParameters: { cities: "loveland,berthoud", minPrice: "1200000", beds: "4" } })).body);
+  const cond = JSON.parse(new URL(hand.searchUrl).searchParams.get("condition"));
+  check("a public search hands off: no listings, a button, the same search on Lofty",
+    hand.idxUnavailable === true && hand.reason === "home_search" && hand.totalCount === 0 && (hand.listings || []).length === 0 &&
+    cond.location.city.join("|") === "Loveland, CO|Berthoud, CO" && cond.price === "1200000," && cond.beds === "4,", hand.searchUrl);
+  check("...labelled for what it is", /homes for sale in these towns from \$1\.2M/.test(hand.message), hand.message);
   const gal = JSON.parse((await search({ queryStringParameters: { listingId: "IRE2000001" } })).body);
-  check("her gallery is served at 1200px", (gal.photos || []).length === 2 && gal.photos.every((u) => u.includes("/w1200_original_")));
+  check("her gallery is served at 1200px", (gal.photos || []).length === 3 && gal.photos.every((u) => u.includes("/w1200_original_")));
+  const galOther = JSON.parse((await search({ queryStringParameters: { listingId: "IRE2000002" } })).body);
+  check("another brokerage's gallery is not served", galOther.error === "not_found", JSON.stringify(galOther));
 
   const page = require(`${FN_DIR}/listing-page.js`).handler;
-  const pres = await page({ path: "/listing/IRE2000002", queryStringParameters: { id: "IRE2000002" } });
-  check("a listing page renders", pres.statusCode === 200, String(pres.statusCode));
+  const pres = await page({ path: "/listing/IRE2000001", queryStringParameters: { id: "IRE2000001" } });
+  check("her listing page renders", pres.statusCode === 200, String(pres.statusCode));
   const disclaimer = (pres.body.match(/<div class="mls-disclaimer">[\s\S]*?<\/div>/) || [""])[0];
   check("its disclaimer no longer names MLS Grid", !!disclaimer && !/MLS Grid/.test(disclaimer) &&
     /Listings courtesy of IRES MLS/.test(disclaimer), disclaimer.slice(0, 200));
-  check("another brokerage's page shows its whole gallery, fetched from Lofty",
-    (pres.body.match(/img\.chime\.me[^"]*w600_original_IRE2000002-/g) || []).length >= 2);
-  check("its hero photo is the 1200px size", /w1200_original_IRE2000002-cover/.test(pres.body));
+  check("her page shows her whole gallery", (pres.body.match(/img\.chime\.me[^"]*w600_original_IRE2000001-/g) || []).length >= 3);
+  check("its hero photo is the 1200px size", /w1200_original_IRE2000001-cover/.test(pres.body));
+  const other = await page({ path: "/listing/IRE2000002", queryStringParameters: { id: "IRE2000002" } });
+  check("another brokerage's listing page is a 404", other.statusCode === 404, String(other.statusCode));
+  check("...that sends the visitor to her Lofty home search", /href="https:\/\/theboldcollectivehomes\.com\/listing\?condition=/.test(other.body) &&
+    /Search Homes For Sale/.test(other.body));
+  check("...and says so plainly", /isn’t one of my current listings/.test(other.body));
 
   const photo = require(`${FN_DIR}/listing-photo.js`).handler;
-  const ph = await photo({ queryStringParameters: { id: "IRE2000002", i: "2" } });
-  check("a photo link redirects to Lofty's image server", ph.statusCode === 302 && /img\.chime\.me/.test(ph.headers.Location), JSON.stringify(ph.headers));
+  const ph = await photo({ queryStringParameters: { id: "IRE2000001", i: "2" } });
+  check("her photo link redirects to Lofty's image server", ph.statusCode === 302 && /img\.chime\.me/.test(ph.headers.Location), JSON.stringify(ph.headers));
+  const detailsBefore = w8.detailCalls || 0;
+  const phOther = await photo({ queryStringParameters: { id: "IRE2000002", i: "1" } });
+  check("another brokerage's photo link is not served", phOther.statusCode !== 302);
+  check("...and costs no call to Lofty", (w8.detailCalls || 0) === detailsBefore);
+
+  const home = require(`${FN_DIR}/home-search.js`).handler;
+  const hs = await home({ queryStringParameters: { city: "Loveland", noFloor: "true" } });
+  check("/search-homes.html redirects (302) to the same search on Lofty",
+    hs.statusCode === 302 && JSON.parse(new URL(hs.headers.Location).searchParams.get("condition")).location.city[0] === "Loveland, CO",
+    JSON.stringify(hs.headers));
+
+  const alerts = require(`${FN_DIR}/area-alerts.js`).handler;
+  const al = JSON.parse((await alerts({ httpMethod: "POST", body: JSON.stringify({ email: "a@b.co", cities: ["Loveland"] }) })).body);
+  check("a new map alert sign-up is sent to her home search instead", al.ok === false && al.error === "moved" && /theboldcollectivehomes/.test(al.searchUrl));
+  const alRun = await require(`${FN_DIR}/area-alerts-run.js`).handler();
+  check("the alert emails are paused", /paused/.test(alRun.body), alRun.body);
 
   const health = require(`${FN_DIR}/site-health.js`).handler;
   const hres = JSON.parse((await health({ queryStringParameters: { format: "json", probe: "1" } })).body);
   const names = hres.checks.map((c) => c.name);
-  check("/status shows the Lofty refresh rows",
-    names.includes("Listings refreshing from Lofty on schedule") && names.includes("Every listing re-read from Lofty within 12 hours") &&
-    names.includes("No Lofty errors on last run"), names.join(" | "));
+  check("/status shows the refresh rows for her listings",
+    names.includes("Your listings refreshing from Lofty on schedule") && names.includes("Your listings confirmed by Lofty within 12 hours") &&
+    names.includes("No Lofty errors on last run") && names.includes("Christine's own listings found"), names.join(" | "));
   check("/status no longer shows MLS Grid sync rows", !names.some((n) => /MLS Grid/.test(n)), names.join(" | "));
   const showRow = hres.checks.find((c) => /Listings shown on the website/.test(c.name)) || {};
-  check("/status says listings are showing, from Lofty", showRow.ok === true && /from Lofty/.test(String(showRow.detail)), showRow.detail);
+  check("/status says her listings are showing, from Lofty", showRow.ok === true && /own listings are showing, from Lofty/.test(String(showRow.detail)), showRow.detail);
+  const searchRow = hres.checks.find((c) => /Home search goes to Lofty/.test(c.name)) || {};
+  check("/status names where the home search goes", /theboldcollectivehomes\.com\/listing/.test(String(searchRow.detail)), searchRow.detail);
+  const alertRow = hres.checks.find((c) => /alerts paused/.test(c.name)) || {};
+  check("/status counts the paused map alerts", alertRow.optional === true && /\d+ sign-up/.test(String(alertRow.detail)), alertRow.detail);
   const photoRow = hres.checks.find((c) => c.name === "Listing photos load end to end") || {};
   check("the photo check fetches from Lofty's image server", /Lofty's image server/.test(String(photoRow.detail)), photoRow.detail);
 
+  const callsBefore = fetch8.calls.length;
   const sync = require(`${FN_DIR}/sync-listings.js`).handler;
   const syncRes = await sync();
+  const syncCalls = fetch8.calls.slice(callsBefore).filter((c) => c.includes("api.lofty.com/v2.0") || c.includes("api.lofty.com/v1.0/listing"));
   check("the 30-minute schedule runs with no MLS Grid token", syncRes.statusCode === 200 && syncRes.body === "ok", JSON.stringify(syncRes));
-  check("and not one request anywhere in this section went to MLS Grid", !fetch7.calls.some((c) => c.includes("mlsgrid")),
-    fetch7.calls.filter((c) => c.includes("mlsgrid")).join(", "));
+  check("...and makes exactly two listing requests to Lofty", syncCalls.length === 2, syncCalls.join(", "));
+  check("and not one request anywhere in this section went to MLS Grid", !fetch8.calls.some((c) => c.includes("mlsgrid")),
+    fetch8.calls.filter((c) => c.includes("mlsgrid")).join(", "));
+  check("the background whole-market refresh no longer exists",
+    !require("fs").existsSync(`${FN_DIR}/lofty-sync-background.js`));
 
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} check(s) FAILED\n`);
   process.exit(failures ? 1 : 0);

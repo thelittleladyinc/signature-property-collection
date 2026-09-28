@@ -86,7 +86,9 @@ function setEnv(vars) {
   }
 
   console.log("\n2. Where visitors are sent");
-  check("default is thelittleladysellshomes.com", lib.idxSearchUrl({}) === "https://www.thelittleladysellshomes.com");
+  // 2026-09-28: was thelittleladysellshomes.com, whose search passes through to
+  // this site's -- each site's button pointed at the other. Now her Lofty search.
+  check("default is her Lofty home search", lib.idxSearchUrl({}) === "https://theboldcollectivehomes.com/listing");
   check("IDX_SEARCH_URL overrides it", lib.idxSearchUrl({ IDX_SEARCH_URL: "https://search.example.com/homes" }) === "https://search.example.com/homes");
   check("a javascript: URL is refused", lib.idxSearchUrl({ IDX_SEARCH_URL: "javascript:alert(1)" }) === lib.DEFAULT_SEARCH_URL);
   check("garbage is refused", lib.idxSearchUrl({ IDX_SEARCH_URL: "not a url" }) === lib.DEFAULT_SEARCH_URL);
@@ -261,7 +263,9 @@ function setEnv(vars) {
       const good = idxOffHtml({ searchUrl: "https://homes.example.com/", message: lib.MESSAGE });
       check("links to the server's URL with the message", good.includes('href="https://homes.example.com/"') && good.includes(lib.MESSAGE));
       const bad = idxOffHtml({ searchUrl: "javascript:alert(1)", message: "<img src=x onerror=alert(1)>" });
-      check("a javascript: URL falls back to the default", bad.includes('href="https://www.thelittleladysellshomes.com"'));
+      // 2026-09-28: the page's own fallback is this site's search page, which
+      // hands off to her Lofty home search (netlify/functions/home-search.js).
+      check("a javascript: URL falls back to the search page", bad.includes('href="/search-homes.html"'));
       check("the message is escaped", !bad.includes("<img"));
     }
   }

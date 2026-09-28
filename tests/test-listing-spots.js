@@ -19,7 +19,10 @@ function listing(city) {
   return {
     listingId: "IRE123", address: "123 Test St", city, state: "CO", zip: "80538",
     price: 750000, beds: 4, baths: 3, sqft: 2400, status: "Active", mlgCanView: true,
-    propertyType: "Residential", agentName: "Someone Else", photoCount: 3,
+    // 2026-09-28: one of HERS. On Lofty this site's listing pages are Christine's
+    // own listings only (every other home is on her Lofty home search), and hers
+    // are exactly where her local spots now appear.
+    propertyType: "Residential", agentName: "Christine Gwinnup", photoCount: 3,
   };
 }
 function load(city) {

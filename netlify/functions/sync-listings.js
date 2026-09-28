@@ -81,7 +81,7 @@ const {
   listPhotoDemand, clearPhotoDemand,
 } = require("./lib/_media");
 const { drainFailedPushes } = require("./lib/_lofty");
-const { scheduledTick } = require("./lib/_lofty-listings");
+const { runMineSync } = require("./lib/_lofty-listings");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
 // her own listings are still all serving raw MLS Grid URLs. cacheCoverPhoto
@@ -933,10 +933,11 @@ exports.nextLastSuccessAt = nextLastSuccessAt; // for tests
 // When LISTINGS_SOURCE is "lofty" (the default -- see _mls-shared.js) this
 // schedule stops talking to MLS Grid entirely: no crawl, no photo caching, no
 // backfill. It keeps the one job that was never about MLS Grid (retrying queued
-// website leads into Lofty), refreshes Christine's own listings and today's new
-// ones from Lofty, and starts the two-hourly full refresh
-// (lofty-sync-background.js) when one is due. Everything below this function is
-// the MLS Grid path, untouched, for LISTINGS_SOURCE=mlsgrid.
+// website leads into Lofty) and refreshes Christine's own listings from Lofty
+// (lib/_lofty-listings.js runMineSync -- two requests). The home search for
+// every other listing is her Lofty site's job now (lib/_home-search.js).
+// Everything below this function is the MLS Grid path, untouched, for
+// LISTINGS_SOURCE=mlsgrid.
 async function loftyScheduledRun() {
   const store = getBlobStore(getStore);
   const apiKey = process.env.LOFTY_API_KEY;
@@ -950,11 +951,10 @@ async function loftyScheduledRun() {
     console.error("sync-listings: Lofty queue drain failed (ignored):", err && err.message);
   }
   if (!apiKey) {
-    console.error("sync-listings: LOFTY_API_KEY not set, so no listings can be refreshed.");
+    console.error("sync-listings: LOFTY_API_KEY not set, so her listings can't be refreshed.");
     return { statusCode: 200, body: "no Lofty key configured" };
   }
-  const siteUrl = process.env.URL || process.env.DEPLOY_PRIME_URL || "https://signaturepropertycollection.com";
-  const result = await scheduledTick({ store, apiKey, siteUrl });
+  const result = await runMineSync({ store, apiKey });
   console.log("sync-listings (Lofty):", JSON.stringify(result).slice(0, 1500));
   return { statusCode: 200, body: "ok" };
 }

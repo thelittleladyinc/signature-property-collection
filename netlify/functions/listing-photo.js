@@ -62,7 +62,7 @@
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore, BASE_URL, SELECT_FIELDS, MINE_LISTINGS_KEY, LISTINGS_SOURCE } = require("./lib/_mls-shared");
 const {
-  isLoftyPhoto, sizedPhoto, galleryFor, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
+  isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
 } = require("./lib/_lofty-listings");
 const {
   readCachedUrls, isThrottled, resolveMediaFor, SINGLE_TIMEOUT_MS, fetchMediaResponse,
@@ -487,19 +487,15 @@ function photoTimer() {
   };
 }
 
-// Her own listings carry their whole gallery; anyone else's comes from Lofty on
-// demand (one call, then cached for six hours). The 8MB catalogue is never read
-// here -- a single photo request must not cost a second and a half.
+// On Lofty this site shows Christine's own listings only, and each carries its
+// whole gallery -- so a photo link is answered from her small list and nothing
+// else. Any other listing's photos are on her Lofty home search.
 async function loftyPhotoFor(store, listingId, index) {
   const mine = await store.get(MINE_LISTINGS_KEY, { type: "json" }).catch(() => null);
   const hers = Array.isArray(mine) ? mine.find((x) => x && x.listingId === listingId) : null;
-  if (hers) {
-    const own = index === 0 ? hers.photo : (Array.isArray(hers.photos) ? hers.photos[index] : null);
-    if (isLoftyPhoto(own)) return own;
-  }
-  const photos = await galleryFor(store, listingId, { apiKey: process.env.LOFTY_API_KEY });
-  const url = Array.isArray(photos) ? photos[index] : null;
-  return isLoftyPhoto(url) ? url : null;
+  if (!hers) return null;
+  const own = index === 0 ? hers.photo : (Array.isArray(hers.photos) ? hers.photos[index] : null);
+  return isLoftyPhoto(own) ? own : null;
 }
 
 exports.handler = async (event) => {

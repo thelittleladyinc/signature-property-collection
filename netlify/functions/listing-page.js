@@ -36,8 +36,9 @@ const {
   LISTINGS_KEY, SYNC_STATE_KEY, getBlobStore, AGENT_SURNAME, LISTINGS_SOURCE,
 } = require("./lib/_mls-shared");
 const {
-  isLoftyPhoto, sizedPhoto, galleryFor, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
+  isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
 } = require("./lib/_lofty-listings");
+const { homeSearchUrl } = require("./lib/_home-search");
 // How many photos this page may render is not a design choice on its own: every
 // photo shown beyond what listing-photo.js stores is re-downloaded from MLS Grid
 // on every view that misses a CDN edge, forever. The two numbers have to be the
@@ -46,11 +47,9 @@ const { PHOTO_CACHE_MAX_INDEX } = require("./lib/_media");
 const { idxGate } = require("./lib/_idx-display");
 // 2026-09-28: with Lofty the gallery is no longer a cost to ration -- its photos
 // are stable, resized, CDN-served URLs that never touch MLS Grid or this site's
-// functions -- so a buyer sees the whole set instead of "ask for the full set".
-const GALLERY_PHOTOS = LISTINGS_SOURCE === "lofty" ? 30 : PHOTO_CACHE_MAX_INDEX + 1;
-// How long the page waits on Lofty for another brokerage's gallery before
-// rendering with the cover alone. The gallery is cached for six hours after.
-const GALLERY_WAIT_MS = 2500;
+// functions -- so a buyer sees her whole gallery (an IRES listing carries at most
+// 50) instead of "ask for the full set".
+const GALLERY_PHOTOS = LISTINGS_SOURCE === "lofty" ? 60 : PHOTO_CACHE_MAX_INDEX + 1;
 
 const SHELL_PATH = path.join(__dirname, "lib", "_listing-page-shell.html");
 const SITE_DOMAIN = "https://signaturepropertycollection.com";
@@ -148,21 +147,6 @@ function photoCount(listing) {
   return listing.photo ? 1 : 0;
 }
 
-// Another brokerage's listing is stored with its cover and a photo COUNT only
-// (the catalogue would be ~80MB with every gallery in it), so its gallery is
-// fetched from Lofty when its page is opened. Bounded: past GALLERY_WAIT_MS the
-// page renders with the cover alone rather than keep a buyer waiting.
-async function withGallery(store, l) {
-  if (LISTINGS_SOURCE !== "lofty" || !l || !isLoftyPhoto(l.photo)) return l;
-  if (Array.isArray(l.photos) && l.photos.length) return l;
-  if (!(photoCount(l) > 1)) return l;
-  const photos = await Promise.race([
-    galleryFor(store, l.listingId, { apiKey: process.env.LOFTY_API_KEY }).catch(() => []),
-    new Promise((resolve) => setTimeout(() => resolve([]), GALLERY_WAIT_MS)),
-  ]);
-  return photos && photos.length ? { ...l, photos, photoCount: photos.length } : l;
-}
-
 function isHers(listing) {
   const a = (listing.agentName || "").toLowerCase();
   const c = (listing.coAgentName || "").toLowerCase();
@@ -197,6 +181,15 @@ function disclaimerHtml(fetchedAt) {
     </div>`;
 }
 
+// Where "search" goes from a listing that isn't here. On Lofty that is her Lofty
+// home search, as an absolute address: this page is also served under
+// thelittleladysellshomes.com (brand=tllsh), where a relative link would land
+// on that site's own search page instead. Any price -- the visitor came for a
+// particular home, not for this site's $950K+ luxury view.
+function searchHref() {
+  return LISTINGS_SOURCE === "lofty" ? homeSearchUrl({ noFloor: "true" }) : "/search-homes.html";
+}
+
 function notFoundBody(reason) {
   return `<section class="hero" style="padding:90px 0 60px">
   <div class="wrap">
@@ -204,7 +197,7 @@ function notFoundBody(reason) {
     <h1>This Listing Isn&rsquo;t Available</h1>
     <p class="lede">${esc(reason)}</p>
     <div class="btn-row">
-      <a class="btn btn-dark" href="/search-homes.html">Search Active Listings</a>
+      <a class="btn btn-dark" href="${esc(searchHref())}">${LISTINGS_SOURCE === "lofty" ? "Search Homes For Sale" : "Search Active Listings"}</a>
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/contact.html">Ask ${esc(AGENT_NAME.split(" ")[0])} About It</a>
     </div>
   </div>
@@ -661,8 +654,14 @@ exports.handler = async (event) => {
     if (!freshGate.allowed) return idxPage(freshGate);
 
     let l = listings && listings[id];
+    // 2026-09-28: on Lofty this site shows Christine's own listings only; every
+    // other home is on her Lofty home search. Checked here as well as in the sync
+    // (which stores only hers), so nothing else can be rendered from this page.
+    if (l && LISTINGS_SOURCE === "lofty" && !isHers(l)) l = null;
     if (!l) {
-      return notFound("This listing isn’t in our current feed — it may have sold or been withdrawn.", 404);
+      return notFound(LISTINGS_SOURCE === "lofty"
+        ? "This home isn’t one of my current listings — it may have sold, or it may be listed by another brokerage. My home search has every home for sale."
+        : "This listing isn’t in our current feed — it may have sold or been withdrawn.", 404);
     }
     // 2026-08-18 (full endpoint audit): /listing/IRE1054310 — Christine's own
     // Nunn listing — 404'd, because this gate was "Active only" and her listing
@@ -693,7 +692,6 @@ exports.handler = async (event) => {
     if (!showable || l.mlgCanView === false) {
       return notFound("This home is no longer on the market as an active listing.", 404);
     }
-    l = await withGallery(getBlobStore(getStore, "mls-listings"), l);
 
     const canonical = `${SITE_DOMAIN}/listing/${encodeURIComponent(id)}`;
     const addressLine = [l.address, l.city, l.state].filter(Boolean).join(", ");

@@ -13,7 +13,7 @@
 // without touching knownIds, so no listing is ever silently marked as seen
 // but never sent.
 const { getStore } = require("@netlify/blobs");
-const { getBlobStore, LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery } = require("./lib/_mls-shared");
+const { getBlobStore, LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery, LISTINGS_SOURCE } = require("./lib/_mls-shared");
 const { idxGate } = require("./lib/_idx-display");
 
 const STORE_NAME = "area-alerts";
@@ -78,6 +78,14 @@ exports.handler = async () => {
     // read), NOTHING is sent and no alert is touched -- not even a first-pass
     // seed -- so each alert resumes exactly where it stopped once data is
     // current again.
+    // 2026-09-28: on Lofty the stored listings are Christine's own and nobody
+    // else's, so "new homes in your area" can't be answered from them -- an email
+    // built from that would present her listings as the whole market. Paused, with
+    // every alert left exactly as it was (see area-alerts.js).
+    if (LISTINGS_SOURCE === "lofty") {
+      console.warn("area-alerts-run: listings come from Lofty (her own only) — area alerts paused, none sent.");
+      return { statusCode: 200, body: "skipped: area alerts paused (Lofty)" };
+    }
     const switchGate = idxGate({ skipFreshness: true });
     if (!switchGate.allowed) {
       console.warn("area-alerts-run: IDX display is off (IDX_DISPLAY) — no alerts sent.");

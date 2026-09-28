@@ -66,8 +66,37 @@ function idxUnavailable(gate) {
   };
 }
 const {
-  isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
+  isLoftyPhoto, sizedPhoto, isHers, CARD_PHOTO_WIDTH, LARGE_PHOTO_WIDTH,
 } = require("./lib/_lofty-listings");
+const { homeSearchUrl, homeSearchLabel } = require("./lib/_home-search");
+
+// 2026-09-28 (Christine, approving it: "lets do it!!!"): with Lofty as the
+// source, this site keeps HER listings and her Lofty site does the home search
+// for everything else -- it was the faster of the two from click to data. So a
+// search that is not for her listings is answered with where to find it: the
+// same filters on her Lofty site (lib/_home-search.js), in the shape every
+// widget on the site already renders as a button (idxUnavailable + searchUrl +
+// message). No storage is read and nothing about any listing leaves here.
+function homeSearchHandoff(params) {
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": UNAVAILABLE_CACHE_CONTROL,
+      "X-Robots-Tag": "noindex",
+    },
+    body: JSON.stringify({
+      error: "not_configured",
+      idxUnavailable: true,
+      reason: "home_search",
+      message: homeSearchLabel(params),
+      searchUrl: homeSearchUrl(params),
+      listings: [],
+      totalCount: 0,
+      photos: [],
+    }),
+  };
+}
 
 // ---- THE CATALOGUE, PARSED ONCE PER CONTAINER ---------------------------
 // 2026-08-18 (Christine: "it just runs so slow ... what if we just brought in a
@@ -233,13 +262,17 @@ function timer() {
 }
 
 exports.handler = async (event) => {
+  const params = (event && event.queryStringParameters) || {};
+  // Lofty: anything but her own listings is her Lofty site's to show.
+  if (LISTINGS_SOURCE === "lofty" && params.mine !== "true" && !params.listingId) {
+    return homeSearchHandoff(params);
+  }
   // Before touching storage at all: with display off there is nothing to read.
   const switchGate = idxGate({ skipFreshness: true });
   if (!switchGate.allowed) return idxUnavailable(switchGate);
 
   const timing = timer();
   const store = getBlobStore(getStore);
-  const params = event.queryStringParameters || {};
   const top = Math.min(parseInt(params.top, 10) || 12, 24);
   const skip = Math.max(parseInt(params.skip, 10) || 0, 0);
   const mine = params.mine === "true";
@@ -316,7 +349,8 @@ exports.handler = async (event) => {
     // current-listings.html's mine=true cards), so this stays a tiny,
     // cheap lookup even though it's written generically.
     if (params.listingId) {
-      const listing = listingsById[params.listingId];
+      const found = listingsById[params.listingId];
+      const listing = LISTINGS_SOURCE === "lofty" && found && !isHers(found) ? null : found;
       if (!listing) {
         return {
           statusCode: 200,
