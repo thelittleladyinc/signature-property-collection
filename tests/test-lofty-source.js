@@ -172,6 +172,11 @@ const noSleep = async () => {};
   check("...but its photo count is", a.photoCount === 3);
   check("its cover is the stable Lofty URL", L.isLoftyPhoto(a.photo));
   check("empty fields are not stored", !Object.values(a).some((v) => v === null));
+  const land = L.mapLoftyListing(rec("IRE1000099", { bedrooms: -1, bathrooms: -1, sqft: -1, builtYear: -1, price: 250000,
+    propertyType: "Vacant Land", longitude: "-105.07" }), {});
+  check("Lofty's -1 (not provided) becomes blank, so no card says \"-1 bd\"",
+    land.beds === null && land.baths === null && land.sqft === null && land.yearBuilt === null, JSON.stringify(land));
+  check("...while real values and negative longitudes are kept", land.price === 250000 && land.longitude === -105.07);
   const d = cat.IRE1000004 || {};
   check("her co-listed listing is hers", L.isHers(d));
   check("hers keeps its full description and gallery", d.remarks && Array.isArray(d.photos) && d.photos.length === 5);

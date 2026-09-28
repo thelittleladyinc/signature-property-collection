@@ -110,6 +110,20 @@ function toNumber(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Lofty sends -1 for "not provided" (land and commercial listings mostly), and a
+// card that prints "-1 bd · -1 ba · -1 sqft" is worse than printing nothing -- it
+// did exactly that on the preview (2026-09-28). Counts, sizes and prices below
+// zero are therefore unknown, and a size or year of 0 is too. Coordinates must
+// never go through this: every Colorado longitude is negative.
+function known(v) {
+  const n = toNumber(v);
+  return n !== null && n >= 0 ? n : null;
+}
+function positive(v) {
+  const n = toNumber(v);
+  return n !== null && n > 0 ? n : null;
+}
+
 function titleCase(s) {
   return String(s || "").replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
@@ -177,10 +191,10 @@ function mapLoftyListing(item, opts) {
   return {
     listingId: item.mlsListingId || null,
     listingKey: item.id !== undefined && item.id !== null ? String(item.id) : null,
-    price: toNumber(item.price),
-    beds: toNumber(item.bedrooms),
-    baths: toNumber(item.bathrooms),
-    sqft: toNumber(item.sqft),
+    price: known(item.price),
+    beds: known(item.bedrooms),
+    baths: known(item.bathrooms),
+    sqft: positive(item.sqft),
     address: item.streetAddress || (item.address ? String(item.address).split(",")[0].trim() : null),
     city,
     state: item.state || null,
@@ -196,7 +210,7 @@ function mapLoftyListing(item, opts) {
     photoCount: photo ? 1 : 0,
     latitude: toNumber(item.latitude),
     longitude: toNumber(item.longitude),
-    yearBuilt: toNumber(item.builtYear),
+    yearBuilt: positive(item.builtYear),
     listDate: listDate ? new Date(listDate * 1000).toISOString().slice(0, 10) : null,
     modificationTimestamp: loftyTimestamp(item.lastPrimaryChangeTime),
     mlgCanView: true,
