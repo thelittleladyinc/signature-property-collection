@@ -213,7 +213,13 @@ const noSleep = async () => {};
   cat4.IRE8888888 = { listingId: "IRE8888888", status: "Active", city: "Loveland", agentName: "Christine Gwinnup", price: 2 };
   await store.setJSON("lofty-listings.json", cat4);
   world.failing = ["Weld"];
-  const r4 = await L.runFullCrawl({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {}, force: true });
+  // Run this refresh an hour "later" on its own clock. On a fast machine two
+  // refreshes can finish in the same millisecond, and then an unchanged
+  // lastSuccessAt and a new lastFullCrawlAt are the same string -- which is how
+  // the first version of the check below passed locally and failed in CI.
+  const successBefore = store.data.get("lofty-sync-state.json").lastSuccessAt;
+  const anHourLater = () => Date.now() + 60 * 60 * 1000;
+  const r4 = await L.runFullCrawl({ store, apiKey: "test-key", fetchImpl: fetch1, sleepImpl: noSleep, log: () => {}, force: true, now: anHourLater });
   world.failing = [];
   const after4 = store.data.get("lofty-listings.json");
   check("the refresh reports partial", r4.complete === false && r4.incomplete.some((x) => /weld/i.test(x)), JSON.stringify(r4.incomplete));
@@ -223,9 +229,10 @@ const noSleep = async () => {};
     store.data.get("lofty-sync-state.json").lastFullCrawlComplete === false &&
     /weld/i.test((store.data.get("lofty-sync-state.json").lastFullCrawlIncomplete || []).join(" ")));
   check("the last COMPLETE time is kept from before", !!store.data.get("lofty-sync-state.json").lastCompleteFullCrawlAt);
+  const st4 = store.data.get("lofty-sync-state.json");
   check("a partial refresh does not advance lastSuccessAt",
-    store.data.get("lofty-sync-state.json").lastSuccessAt === store.data.get("lofty-sync-state.json").lastCompleteFullCrawlAt &&
-    store.data.get("lofty-sync-state.json").lastSuccessAt !== store.data.get("lofty-sync-state.json").lastFullCrawlAt);
+    !!successBefore && st4.lastSuccessAt === successBefore && st4.lastFullCrawlAt !== successBefore,
+    `lastSuccessAt ${st4.lastSuccessAt}, before ${successBefore}, lastFullCrawlAt ${st4.lastFullCrawlAt}`);
 
   // ---------------------------------------------------------------------------
   console.log("\n5. The 30-minute quick pass");
