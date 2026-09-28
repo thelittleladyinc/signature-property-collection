@@ -40,7 +40,7 @@
 // works.
 const { getStore } = require("@netlify/blobs");
 const {
-  SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS, LISTINGS_SOURCE,
+  SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS, LISTINGS_SOURCE, MLSGRID_KEYS,
 } = require("./lib/_mls-shared");
 const { isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH } = require("./lib/_lofty-listings");
 const { homeSearchUrl } = require("./lib/_home-search");
@@ -132,7 +132,36 @@ async function probeLoftyPhoto(mineListings) {
 // The listing rows when Lofty is the source. Same questions the MLS Grid rows
 // answered -- is it running, did it fail, is her inventory there -- asked of the
 // 30-minute refresh of her own listings (lib/_lofty-listings.js runMineSync).
-function loftyListingRows(state, mineListings, now, alertCount) {
+// 2026-09-28: under Lofty the MLS Grid path still runs after her listings, for
+// the town pages' market figures (sync-listings.js). Its own row, optional: if it
+// stops, the figures go stale and then drop off the town pages -- nothing a
+// visitor sees breaks.
+function mlsGridMarketDataRow(gridState, now) {
+  const tokenSet = !!process.env.MLSGRID_API_TOKEN;
+  const off = String(process.env.MLSGRID_MARKET_DATA || "").trim().toLowerCase() === "off";
+  const disabled = String(process.env.MLS_DISABLED || "").trim().toLowerCase() === "true";
+  const row = { optional: true, name: "Market data from MLS Grid refreshing (optional)" };
+  if (!tokenSet || off || disabled) {
+    return { ...row, ok: false, detail: !tokenSet ? "MLSGRID_API_TOKEN isn't set, so the town market figures can't refresh."
+      : off ? "Switched off (MLSGRID_MARKET_DATA=off); the town market figures will go stale."
+        : "MLS_DISABLED is set, so nothing is read from MLS Grid; the town market figures will go stale." };
+  }
+  const lastRunAt = gridState && gridState.lastRunAt ? Date.parse(gridState.lastRunAt) : null;
+  const minutes = lastRunAt ? Math.round((now - lastRunAt) / 60000) : null;
+  const ok = minutes !== null && minutes < SYNC_LATE_AFTER_MINUTES && !(gridState && gridState.lastRunError);
+  const stored = gridState && typeof gridState.totalListingsStored === "number"
+    ? `${gridState.totalListingsStored.toLocaleString()} listings in the copy. ` : "";
+  return {
+    ...row,
+    ok,
+    detail: (lastRunAt ? `Last ran ${minutes} minute(s) ago. ` : "Has not run yet. ") + stored +
+      (gridState && gridState.lastSuccessAt ? `Last complete pass ${gridState.lastSuccessAt}. ` : "") +
+      (gridState && gridState.lastRunError ? `Error: ${gridState.lastRunError}. ` : "") +
+      "Used only for the town pages' market figures — never shown as listings.",
+  };
+}
+
+function loftyListingRows(state, mineListings, now, alertCount, gridState) {
   const rows = [];
   const lastRunAt = state && state.lastRunAt ? Date.parse(state.lastRunAt) : null;
   const minutes = lastRunAt ? Math.round((now - lastRunAt) / 60000) : null;
@@ -186,6 +215,7 @@ function loftyListingRows(state, mineListings, now, alertCount) {
     detail: `Every "Search Homes" on this site opens ${homeSearchUrl({})} (with the visitor's towns and ` +
       "filters). Change it with IDX_SEARCH_URL in Netlify.",
   });
+  rows.push(mlsGridMarketDataRow(gridState, now));
   if (alertCount) {
     rows.push({
       optional: true,
@@ -741,11 +771,13 @@ exports.handler = async (event) => {
   }
 
   let areaAlertCount = 0;
+  let gridState = null;
   if (LISTINGS_SOURCE === "lofty") {
     const listed = await getBlobStore(getStore, "area-alerts").list().catch(() => null);
     areaAlertCount = ((listed && listed.blobs) || []).length;
+    gridState = await store.get(MLSGRID_KEYS.SYNC_STATE_KEY, { type: "json" }).catch(() => null);
   }
-  const checks = LISTINGS_SOURCE === "lofty" ? loftyListingRows(state, mineListings, now, areaAlertCount) : [
+  const checks = LISTINGS_SOURCE === "lofty" ? loftyListingRows(state, mineListings, now, areaAlertCount, gridState) : [
     {
       name: "Sync running on schedule",
       ok: !isSuspended && minutesSinceLastRun !== null && minutesSinceLastRun < SYNC_LATE_AFTER_MINUTES,

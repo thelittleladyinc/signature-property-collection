@@ -37,8 +37,12 @@
 //   The location group is an OR on Lofty (a city plus a subdivision is "either"),
 //   which is one more reason not to combine them.
 //
-// With NO town named, the search is limited to her operating counties: her
-// Lofty site's default search currently shows listings from other states too.
+// With NO town named, the search opens on Northern Colorado: Larimer and Weld
+// counties (Christine, 2026-09-28: "switch to loveland and noco specifically weld
+// and larimer counties"). Her Lofty site's own default search shows listings from
+// other states, so a search with no town must still name somewhere. A link that
+// names towns -- a Summit County or Denver page, say -- searches those towns.
+// HOME_SEARCH_COUNTIES (comma-separated) overrides the two.
 //
 // The luxury floor: this site's searches start at $950K unless a link says
 // noFloor=true or names its own minimum (matchesQuery in _mls-shared.js), and
@@ -50,7 +54,15 @@
 "use strict";
 
 const { idxSearchUrl } = require("./_idx-display");
-const { OPERATING_COUNTIES, LUXURY_PRICE_FLOOR } = require("./_mls-shared");
+const { LUXURY_PRICE_FLOOR } = require("./_mls-shared");
+
+const DEFAULT_COUNTIES = ["larimer", "weld"];
+
+function defaultCounties(env) {
+  const raw = String(((env || process.env).HOME_SEARCH_COUNTIES) || "").trim();
+  const list = raw ? raw.split(",").map((c) => c.toLowerCase().replace(/\s+county$/, "").trim()).filter(Boolean) : [];
+  return list.length ? list : DEFAULT_COUNTIES;
+}
 
 const MAX_TOWNS = 25;
 const SORTS = {
@@ -105,7 +117,7 @@ function conditionFor(params, counties) {
   if (towns.length) {
     condition.location = { city: towns.map((t) => `${t}, CO`) };
   } else {
-    const list = [...(counties || OPERATING_COUNTIES)].sort().map((c) => `${titleCase(c)}, CO`);
+    const list = [...(counties || defaultCounties())].map((c) => `${titleCase(c)}, CO`);
     if (list.length) condition.location = { county: list };
   }
   const min = minPriceFor(p);
@@ -134,7 +146,7 @@ function homeSearchUrl(params, opts) {
   try { u = new URL(base); } catch (e) { return base; }
   if (!isLoftySearchPage(u)) return base;
   const p = params || {};
-  u.searchParams.set("condition", JSON.stringify(conditionFor(p, o.counties)));
+  u.searchParams.set("condition", JSON.stringify(conditionFor(p, o.counties || defaultCounties(o.env))));
   u.searchParams.set("page", "1");
   const sort = SORTS[String(p.sort || "")];
   if (sort) u.searchParams.set("listingSort", sort);
@@ -157,4 +169,6 @@ function homeSearchLabel(params) {
     : `See ${where}homes for sale${from}`;
 }
 
-module.exports = { homeSearchUrl, homeSearchLabel, conditionFor, townsFrom, SORTS, PROPERTY_TYPES };
+module.exports = {
+  homeSearchUrl, homeSearchLabel, conditionFor, townsFrom, defaultCounties, DEFAULT_COUNTIES, SORTS, PROPERTY_TYPES,
+};

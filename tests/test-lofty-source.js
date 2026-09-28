@@ -36,7 +36,13 @@ function makeStore(initial) {
     setJSON: async (k, v) => { data.set(k, JSON.parse(JSON.stringify(v))); },
     set: async (k, v) => { data.set(k, v); },
     delete: async (k) => { data.delete(k); },
-    list: async () => ({ blobs: [...data.keys()].map((key) => ({ key })) }),
+    // Honors { prefix } like the real API: the MLS Grid path's pruneUsage lists
+    // "mls-usage/" keys only, and a fake that handed it every key would let it
+    // delete the catalogue (test-syncsave.js learned this the hard way).
+    list: async (opts) => {
+      const prefix = (opts && opts.prefix) || "";
+      return { blobs: [...data.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })) };
+    },
   };
 }
 
@@ -354,7 +360,11 @@ const HOUR = 3600e3;
   check("/status shows the refresh rows for her listings",
     names.includes("Your listings refreshing from Lofty on schedule") && names.includes("Your listings confirmed by Lofty within 12 hours") &&
     names.includes("No Lofty errors on last run") && names.includes("Christine's own listings found"), names.join(" | "));
-  check("/status no longer shows MLS Grid sync rows", !names.some((n) => /MLS Grid/.test(n)), names.join(" | "));
+  check("/status no longer shows the MLS Grid listing-sync rows",
+    !names.includes("Sync running on schedule") && !names.includes("No MLS Grid errors on last run"), names.join(" | "));
+  const gridRow = hres.checks.find((c) => /Market data from MLS Grid/.test(c.name)) || {};
+  check("...only the optional market-data row, which says it is never shown as listings",
+    gridRow.optional === true && /never shown as listings|MLSGRID_API_TOKEN isn't set/.test(String(gridRow.detail)), gridRow.detail);
   const showRow = hres.checks.find((c) => /Listings shown on the website/.test(c.name)) || {};
   check("/status says her listings are showing, from Lofty", showRow.ok === true && /own listings are showing, from Lofty/.test(String(showRow.detail)), showRow.detail);
   const searchRow = hres.checks.find((c) => /Home search goes to Lofty/.test(c.name)) || {};
@@ -374,6 +384,53 @@ const HOUR = 3600e3;
     fetch8.calls.filter((c) => c.includes("mlsgrid")).join(", "));
   check("the background whole-market refresh no longer exists",
     !require("fs").existsSync(`${FN_DIR}/lofty-sync-background.js`));
+
+  // ---------------------------------------------------------------------------
+  console.log("\n9. Then MLS Grid, in the background, for the town market figures");
+  // Christine, 2026-09-28: "use my mls grid for whatever we need to for all of
+  // this - it wasn't shut off after all". Her listings still come from Lofty;
+  // the MLS Grid copy is refreshed after them, under its own keys, for the town
+  // pages' figures -- and nothing it does may reach what the site shows.
+  process.env.MLSGRID_API_TOKEN = "grid-token";
+  const gridCalls = [];
+  const w9 = { mine: [rec("IRE2000001")], details: {} };
+  const lofty9 = fakeLofty(w9);
+  const fetch9 = async (url, init) => {
+    const u = new URL(String(url));
+    if (u.host.includes("mlsgrid")) {
+      gridCalls.push(u.pathname);
+      return { ok: true, status: 200, headers: { get: () => "application/json" },
+        text: async () => JSON.stringify({ value: [] }), json: async () => ({ value: [] }) };
+    }
+    return lofty9(url, init);
+  };
+  const gridSentinel = { IRE1: { listingId: "IRE1", source: "mlsgrid", status: "Active", city: "Loveland", county: "larimer", price: 1 } };
+  const store9 = makeStore({
+    "listings.json": gridSentinel,
+    "sync-state.json": { lastRunAt: "2026-09-28T00:00:00.000Z" },
+    "lofty-listings.json": { IRE2000001: hersRec },
+    "lofty-mine-listings.json": [hersRec],
+    "lofty-sync-state.json": { lastRunAt: "2026-09-28T00:00:00.000Z", lastSuccessAt: "2026-09-28T00:00:00.000Z" },
+  });
+  freshModules(store9, fetch9);
+  const sync9 = require(`${FN_DIR}/sync-listings.js`);
+  const res9 = await sync9.handler();
+  check("the schedule still answers ok", res9.statusCode === 200 && res9.body === "ok", JSON.stringify(res9));
+  check("her Lofty listings refreshed first", store9.data.get("lofty-sync-state.json").lastRunAt !== "2026-09-28T00:00:00.000Z");
+  check("then MLS Grid was read", gridCalls.length > 0, String(gridCalls.length));
+  check("...and its own state moved on", store9.data.get("sync-state.json").lastRunAt !== "2026-09-28T00:00:00.000Z",
+    JSON.stringify(store9.data.get("sync-state.json")).slice(0, 200));
+  check("what the site shows is untouched by it: still only her listing",
+    JSON.stringify(Object.keys(store9.data.get("lofty-listings.json"))) === '["IRE2000001"]');
+  check("and the MLS Grid copy was not overwritten with Lofty data", !!(store9.data.get("listings.json") || {}).IRE1 &&
+    !(store9.data.get("listings.json") || {}).IRE2000001);
+  process.env.MLSGRID_MARKET_DATA = "off";
+  gridCalls.length = 0;
+  freshModules(store9, fetch9);
+  await require(`${FN_DIR}/sync-listings.js`).handler();
+  check("MLSGRID_MARKET_DATA=off stops it", gridCalls.length === 0, String(gridCalls.length));
+  delete process.env.MLSGRID_MARKET_DATA;
+  delete process.env.MLSGRID_API_TOKEN;
 
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} check(s) FAILED\n`);
   process.exit(failures ? 1 : 0);

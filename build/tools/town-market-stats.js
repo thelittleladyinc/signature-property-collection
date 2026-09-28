@@ -47,9 +47,16 @@
 const fs = require("fs");
 const path = require("path");
 
-const {
-  getBlobStore, BLOB_STORE_NAME, LISTINGS_KEY, LISTINGS_SOURCE,
-} = require("../../netlify/functions/lib/_mls-shared.js");
+// 2026-09-28: the figures come from the MLS Grid copy of the whole market,
+// whatever the site shows. With Lofty as the listing source the site stores only
+// Christine's own listings from Lofty, and sync-listings.js keeps replicating
+// MLS Grid into these keys in the background precisely so this still has the
+// whole market to count (Christine: "use my mls grid for whatever we need to").
+const { getBlobStore, BLOB_STORE_NAME, MLSGRID_KEYS } = require("../../netlify/functions/lib/_mls-shared.js");
+const { LISTINGS_KEY, SYNC_STATE_KEY } = MLSGRID_KEYS;
+// Refuse to publish from a copy that has stopped refreshing: it replicates every
+// 30 minutes, so two days without a successful run means something is broken.
+const MAX_COPY_AGE_MS = 48 * 60 * 60 * 1000;
 
 // Below this many active listings in a town we publish nothing. See the
 // compliance note above -- this is a privacy/IDX floor, not a cosmetic one.
@@ -89,18 +96,6 @@ function listingsFromBlob(raw) {
 }
 
 async function main() {
-  // 2026-09-28: with Lofty as the listing source the site stores Christine's own
-  // listings and nobody else's (netlify/functions/lib/_lofty-listings.js) -- the
-  // whole-market copy these figures were computed from no longer exists. A
-  // "median" of her dozen listings would be published as the town's market, so
-  // this writes nothing; the figures already committed age out on build.py's
-  // 21-day rule and the town pages fall back to their qualitative copy.
-  // Exit 0: nothing is broken, and a red X every Monday and Thursday would
-  // train everyone to ignore the job.
-  if (LISTINGS_SOURCE === "lofty") {
-    console.log("Listings come from Lofty (Christine's own only) — no whole-market copy to compute town figures from. Not writing a file.");
-    return;
-  }
   if (!process.env.BLOBS_SITE_ID || !process.env.BLOBS_TOKEN) {
     console.error("!! BLOBS_SITE_ID / BLOBS_TOKEN not set — cannot read the replicated");
     console.error("!! listings. Set both and re-run. Not writing a partial file.");
@@ -109,6 +104,14 @@ async function main() {
 
   const { getStore } = require("@netlify/blobs");
   const store = getBlobStore(getStore, BLOB_STORE_NAME);
+  const syncState = await store.get(SYNC_STATE_KEY, { type: "json" }).catch(() => null);
+  const lastOk = syncState && syncState.lastSuccessAt ? Date.parse(syncState.lastSuccessAt) : NaN;
+  if (!Number.isFinite(lastOk) || Date.now() - lastOk > MAX_COPY_AGE_MS) {
+    console.error("!! The MLS Grid copy has no successful refresh in the last 48 hours " +
+      `(last: ${syncState && syncState.lastSuccessAt ? syncState.lastSuccessAt : "never"}). ` +
+      "Check /status. Not writing a file — stale numbers are worse than none.");
+    process.exit(1);
+  }
   const raw = await store.get(LISTINGS_KEY, { type: "json" });
 
   const listings = listingsFromBlob(raw);  // see the note on that function

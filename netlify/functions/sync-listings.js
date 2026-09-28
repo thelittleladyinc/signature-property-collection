@@ -68,9 +68,17 @@
 const { getStore } = require("@netlify/blobs");
 const {
   BASE_URL, SELECT_FIELDS, REPLICATED_STATUSES, FILTER_STATUSES, OPERATING_COUNTIES,
-  LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY, AGENT_SURNAME, mapListing, getBlobStore,
+  MLSGRID_KEYS, AGENT_SURNAME, mapListing, getBlobStore,
   inferCountyFromCity, hasEquestrianKeywords, LISTINGS_SOURCE,
 } = require("./lib/_mls-shared");
+// 2026-09-28: everything in this file below loftyScheduledRun() is the MLS Grid
+// path, and it always reads and writes the MLS Grid copy. With Lofty as the
+// listing source it still runs, after her Lofty listings, to keep the
+// whole-market copy that the town pages' market figures are computed from
+// (Christine: "use my mls grid for whatever we need to for all of this - it
+// wasn't shut off after all"). What the site SHOWS lives under the Lofty keys
+// (lib/_lofty-listings.js) and is never touched from here.
+const { LISTINGS_KEY, SYNC_STATE_KEY, MINE_LISTINGS_KEY } = MLSGRID_KEYS;
 const {
   cachePhotoToCloudinary, isCloudinaryConfigured, isOnCurrentCloud, deliveryUrl,
 } = require("./lib/_cloudinary");
@@ -959,9 +967,40 @@ async function loftyScheduledRun() {
   return { statusCode: 200, body: "ok" };
 }
 
-exports.handler = async () => {
-  if (LISTINGS_SOURCE === "lofty") return loftyScheduledRun();
+// The MLS Grid market-data run under Lofty: on whenever there is an MLS Grid
+// token, unless MLSGRID_MARKET_DATA=off. MLS_DISABLED still stops it outright
+// (checkMlsQuota below), exactly as it always stopped the MLS Grid path.
+function mlsGridMarketDataOn(env) {
+  const e = env || process.env;
+  return !!e.MLSGRID_API_TOKEN &&
+    String(e.MLSGRID_MARKET_DATA == null ? "" : e.MLSGRID_MARKET_DATA).trim().toLowerCase() !== "off";
+}
+exports.mlsGridMarketDataOn = mlsGridMarketDataOn; // for tests
 
+exports.handler = async () => {
+  // One clock for the whole invocation, so the MLS Grid path's time budget
+  // (TIME_BUDGET_MS and the rest, all measured from startedAt) counts the time
+  // her Lofty listings took first. Netlify stops a scheduled run at 30 seconds.
+  const startedAt = Date.now();
+  if (LISTINGS_SOURCE !== "lofty") return mlsGridRun({ startedAt });
+  const result = await loftyScheduledRun();
+  if (mlsGridMarketDataOn()) {
+    try {
+      const grid = await mlsGridRun({ startedAt, background: true });
+      console.log("sync-listings (MLS Grid market data):", grid && grid.body);
+    } catch (err) {
+      // Her listings are already refreshed and saved; this only delays the figures.
+      console.error("sync-listings: MLS Grid market-data run failed (her listings are unaffected):", err && err.message);
+    }
+  }
+  return result;
+};
+
+// The MLS Grid path. opts.background: running after her Lofty listings, for the
+// market data only -- the Lofty lead queue was already drained this run, and the
+// overnight photo backfill has nothing to do (it stands down under Lofty).
+async function mlsGridRun(opts) {
+  const o = opts || {};
   // MLS_DISABLED (see lib/_mls-usage.js) also stops this run: checkMlsQuota()
   // below reports it as blocked before a single MLS Grid request is made.
   const token = process.env.MLSGRID_API_TOKEN;
@@ -971,7 +1010,7 @@ exports.handler = async () => {
   }
 
   const store = getBlobStore(getStore);
-  const startedAt = Date.now();
+  const startedAt = o.startedAt || Date.now();
   _lastCloudinaryError = null; // see the 2026-08-13 diagnostics note above
 
   // Our own budget, before MLS Grid's. Checked once at the top so a blocked run
@@ -1033,7 +1072,7 @@ exports.handler = async () => {
   // Lofty has nothing to do with listing replication, so it must never be able
   // to slow it down or fail it.
   let loftyDrain = { attempted: 0, recovered: 0 };
-  try {
+  if (!o.background) try {
     loftyDrain = await drainFailedPushes(store, process.env.LOFTY_API_KEY);
     if (loftyDrain.attempted) {
       console.log(`sync-listings: retried ${loftyDrain.attempted} queued Lofty lead(s), ` +
@@ -1626,7 +1665,7 @@ exports.handler = async () => {
     const OVERNIGHT_UTC_HOURS = [7, 8, 9, 10, 11]; // 1-5 AM MDT / 12-4 AM MST
     const siteUrl = process.env.URL || process.env.DEPLOY_PRIME_URL ||
       "https://signaturepropertycollection.com";
-    if (OVERNIGHT_UTC_HOURS.includes(utcHour) && !httpErrorOccurred) {
+    if (OVERNIGHT_UTC_HOURS.includes(utcHour) && !httpErrorOccurred && !o.background) {
       const kick = await fetch(`${siteUrl}/.netlify/functions/photo-backfill-background`, {
         method: "POST",
         signal: AbortSignal.timeout(5000),
@@ -1644,4 +1683,4 @@ exports.handler = async () => {
   }
 
   return { statusCode: 200, body: "ok" };
-};
+}

@@ -63,10 +63,15 @@ check("a subdivision search opens the whole town (Lofty matches exact names only
   JSON.stringify(c4.location) === '{"city":["Loveland, CO"]}' && !JSON.stringify(c4).includes("Mariana"), JSON.stringify(c4));
 check("riverfront / horse property have no Lofty filter and are not sent", !/waterfront|equestrian/i.test(JSON.stringify(c4)));
 
-console.log("\n4. No town named: her counties, not the whole country");
+console.log("\n4. No town named: Northern Colorado (Larimer + Weld), not the whole country");
 const c5 = cond(H.homeSearchUrl({}));
-check("the operating counties, as Lofty's \"County, CO\"", Array.isArray(c5.location.county) && c5.location.county.includes("Larimer, CO") &&
-  c5.location.county.includes("Weld, CO") && c5.location.county.length === 9, JSON.stringify(c5.location));
+check("Larimer and Weld, as Lofty's \"County, CO\" (Christine: \"weld and larimer counties\")",
+  JSON.stringify(c5.location) === '{"county":["Larimer, CO","Weld, CO"]}', JSON.stringify(c5.location));
+const c6 = cond(H.homeSearchUrl({}, { env: { HOME_SEARCH_COUNTIES: "Larimer County, weld, Boulder" } }));
+check("HOME_SEARCH_COUNTIES changes that, tidying the names", JSON.stringify(c6.location) === '{"county":["Larimer, CO","Weld, CO","Boulder, CO"]}',
+  JSON.stringify(c6.location));
+check("a link that names a town outside NoCo still searches that town",
+  JSON.stringify(cond(H.homeSearchUrl({ cities: "breckenridge,frisco" })).location) === '{"city":["Breckenridge, CO","Frisco, CO"]}');
 
 console.log("\n5. The address is a setting");
 const custom = H.homeSearchUrl({ city: "Loveland" }, { env: { IDX_SEARCH_URL: "https://search.thelittleladysellshomes.com/listing" } });
