@@ -4,6 +4,10 @@
 // Repo root derived from this file's own location, never hardcoded: these suites
 // run both locally and in GitHub Actions, where the checkout is at
 // /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+// 2026-09-28: listing display is behind the IDX kill switch (default OFF) and a
+// 12-hour freshness guard -- see lib/_idx-display.js and test-idxdisplay.js. This
+// suite tests what happens once display is ON with current data.
+process.env.IDX_DISPLAY = "on";
 const ROOT = require("path").resolve(__dirname, "..");
 const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
@@ -22,7 +26,7 @@ function load(city) {
     getStore: () => ({
       // listings.json is a MAP keyed by listing id, not an array.
       get: async (k) => (k === "listings.json" ? { IRE123: listing(city) }
-        : k === "sync-state.json" ? { lastRunAt: "2026-08-16T00:00:00Z" } : null),
+        : k === "sync-state.json" ? { lastRunAt: "2026-08-16T00:00:00Z", lastSuccessAt: new Date().toISOString() } : null),
     }),
   } };
   for (const k of Object.keys(require.cache)) {

@@ -13,7 +13,8 @@
 // without touching knownIds, so no listing is ever silently marked as seen
 // but never sent.
 const { getStore } = require("@netlify/blobs");
-const { getBlobStore, LISTINGS_KEY, matchesQuery } = require("./lib/_mls-shared");
+const { getBlobStore, LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery } = require("./lib/_mls-shared");
+const { idxGate } = require("./lib/_idx-display");
 
 const STORE_NAME = "area-alerts";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -71,10 +72,29 @@ exports.emailHtml = emailHtml; // for tests
 
 exports.handler = async () => {
   try {
+    // 2026-09-28: IDX display kill switch + 12-hour freshness guard
+    // (lib/_idx-display.js). An alert email is IDX display too, so when display
+    // is off, or the listing copy is older than 12 hours (or its age cannot be
+    // read), NOTHING is sent and no alert is touched -- not even a first-pass
+    // seed -- so each alert resumes exactly where it stopped once data is
+    // current again.
+    const switchGate = idxGate({ skipFreshness: true });
+    if (!switchGate.allowed) {
+      console.warn("area-alerts-run: IDX display is off (IDX_DISPLAY) — no alerts sent.");
+      return { statusCode: 200, body: "skipped: idx display off" };
+    }
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.LEAD_ALERT_FROM || "onboarding@resend.dev";
     const alertStore = getBlobStore(getStore, STORE_NAME);
     const listingStore = getBlobStore(getStore);
+
+    const state = await listingStore.get(SYNC_STATE_KEY, { type: "json" }).catch(() => null);
+    const freshGate = idxGate({ state });
+    if (!freshGate.allowed) {
+      console.warn(`area-alerts-run: listing data not current (${freshGate.reason}` +
+        `${freshGate.lastSuccessAt ? `, last successful sync ${freshGate.lastSuccessAt}` : ""}) — no alerts sent.`);
+      return { statusCode: 200, body: `skipped: listing data ${freshGate.reason}` };
+    }
 
     const index = await alertStore.list().catch(() => null);
     const keys = ((index && index.blobs) || []).map((b) => b.key);

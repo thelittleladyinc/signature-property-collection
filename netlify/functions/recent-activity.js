@@ -17,9 +17,12 @@
 // reason a page shows an error.
 //
 // Env:
+//   IDX_DISPLAY          must be "on", else always empty (lib/_idx-display.js)
 //   LISTING_FEED_KEY     required; unset -> always empty
 //   LISTING_ENGINE_URL   optional; default https://listing-engine-api.onrender.com
 "use strict";
+
+const { idxGate } = require("./lib/_idx-display");
 
 const DEFAULT_BASE = "https://listing-engine-api.onrender.com";
 const TZ = "America/Denver";
@@ -280,6 +283,12 @@ function respond(items, maxAge) {
 async function handler(event, context, deps = {}) {
   const now = typeof deps.now === "function" ? deps.now() : Date.now();
   const env = deps.env || process.env;
+  // 2026-09-28: these events are MLS-derived listing data (Listing Engine records
+  // them from the IRES feed), so they obey the same IDX display kill switch as the
+  // search (lib/_idx-display.js). Off -> an empty list, which the front end
+  // already treats as "keep the strip hidden". Checked before the memo so a
+  // switch-off takes effect immediately, not after a cached list expires.
+  if (!idxGate({ env, skipFreshness: true }).allowed) return respond([], 300);
   if (cache && now - cache.at < cache.ttl) {
     return respond(cache.items, Math.round((cache.ttl - (now - cache.at)) / 1000) || 1);
   }

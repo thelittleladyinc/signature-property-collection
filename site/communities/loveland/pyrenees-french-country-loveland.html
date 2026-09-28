@@ -1737,6 +1737,18 @@ window.__ytPlay = function (b) {
       var fetchedAtEl = document.getElementById('pyrenees_french_country_loveland_feed-fetched-at');
       var emptyNote = "This is a very small, 38-home neighborhood, so it's common to see long stretches with no active listings at all.";
 
+  function idxOffHtml(data) {
+    var url = (data && typeof data.searchUrl === 'string' && /^https?:\/\//i.test(data.searchUrl))
+      ? data.searchUrl : 'https://www.thelittleladysellshomes.com';
+    var msg = (data && typeof data.message === 'string' && data.message) || 'Search homes on my home-search site';
+    var e = function (s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    };
+    return '<a class="btn btn-dark" href="' + e(url) + '" rel="noopener">' + e(msg) + ' &rarr;</a>';
+  }
+
       function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
           return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -1911,6 +1923,10 @@ window.__ytPlay = function (b) {
       fetch('/.netlify/functions/listings-search?city=Loveland&subdivision=Pyrenees&top=6')
         .then(function (r) { return r.json(); })
         .then(function (data) {
+          if (data.idxUnavailable) {
+            statusEl.innerHTML = idxOffHtml(data);
+            return;
+          }
           if (data.error === 'not_configured') {
             statusEl.textContent = 'Live search isn\u2019t connected yet \u2014 contact us directly for current listings here.';
             return;

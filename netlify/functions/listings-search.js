@@ -48,6 +48,23 @@ const {
   BASE_URL, SELECT_FIELDS,
 } = require("./lib/_mls-shared");
 const { prewarmPhotoUrls } = require("./lib/_media");
+const { idxGate, unavailablePayload, UNAVAILABLE_CACHE_CONTROL } = require("./lib/_idx-display");
+
+// 2026-09-28: IDX display kill switch + 12-hour freshness guard -- see
+// lib/_idx-display.js. When display is off or the data is stale, NO listing
+// leaves this function: the answer is a friendly pointer to Christine's
+// home-search site instead.
+function idxUnavailable(gate) {
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": UNAVAILABLE_CACHE_CONTROL,
+      "X-Robots-Tag": "noindex",
+    },
+    body: JSON.stringify(unavailablePayload(gate, { photos: [] })),
+  };
+}
 
 // ---- THE CATALOGUE, PARSED ONCE PER CONTAINER ---------------------------
 // 2026-08-18 (Christine: "it just runs so slow ... what if we just brought in a
@@ -208,6 +225,10 @@ function timer() {
 }
 
 exports.handler = async (event) => {
+  // Before touching storage at all: with display off there is nothing to read.
+  const switchGate = idxGate({ skipFreshness: true });
+  if (!switchGate.allowed) return idxUnavailable(switchGate);
+
   const timing = timer();
   const store = getBlobStore(getStore);
   const params = event.queryStringParameters || {};
@@ -239,6 +260,13 @@ exports.handler = async (event) => {
     // catalogue needs reading at all.
     const state = await store.get(SYNC_STATE_KEY, { type: "json" });
     timing.mark("state");
+    // Freshness: refuse to serve a copy older than 12 hours (IDX rule). A
+    // missing state blob falls through to the not_configured answer below,
+    // which also shows no listings.
+    if (state) {
+      const freshGate = idxGate({ state });
+      if (!freshGate.allowed) return idxUnavailable(freshGate);
+    }
     if (!allListings) {
       const stamp = state && state.lastRunAt ? String(state.lastRunAt) : null;
       const memo = catalogueFromMemo(stamp);
