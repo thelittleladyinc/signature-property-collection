@@ -14,6 +14,10 @@
 // So this pins the property that was actually wrong: for EVERY failure path,
 // debug=1 returns JSON naming the reason. A test per path, because the bug was
 // precisely that one path (success) was covered and the rest were not.
+// 2026-09-28: listing display is behind the IDX kill switch (default OFF) and a
+// 12-hour freshness guard -- see lib/_idx-display.js and test-idxdisplay.js. This
+// suite tests what happens once display is ON with current data.
+process.env.IDX_DISPLAY = "on";
 const path = require("path");
 const ROOT = path.resolve(__dirname, "..");
 const FN_DIR = path.join(ROOT, "netlify", "functions");

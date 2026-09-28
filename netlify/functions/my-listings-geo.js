@@ -21,7 +21,8 @@
 // carry one: this is public, unauthenticated data the site already shows
 // every visitor, and the Mapbox preview page (a local file) needs to read it.
 const { getStore } = require("@netlify/blobs");
-const { getBlobStore, MINE_LISTINGS_KEY } = require("./lib/_mls-shared");
+const { getBlobStore, MINE_LISTINGS_KEY, SYNC_STATE_KEY } = require("./lib/_mls-shared");
+const { idxGate, UNAVAILABLE_CACHE_CONTROL } = require("./lib/_idx-display");
 const { geocodeAddress } = require("./lib/_geocode");
 
 const GEOCODE_STORE_NAME = "my-listings-geocode-cache";
@@ -84,7 +85,19 @@ function corsJson(payload, cacheControl) {
   };
 }
 
+// 2026-09-28: IDX display gate (lib/_idx-display.js). Off or stale -> an empty
+// pin layer, same shape as "no listings yet", so the map simply shows no pins.
+function noPins(gate) {
+  return corsJson(
+    { pins: [], totalCount: 0, pending: false, idxUnavailable: true, reason: gate.reason,
+      message: gate.message, searchUrl: gate.searchUrl },
+    UNAVAILABLE_CACHE_CONTROL
+  );
+}
+
 exports.handler = async () => {
+  const switchGate = idxGate({ skipFreshness: true });
+  if (!switchGate.allowed) return noPins(switchGate);
   try {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
@@ -92,6 +105,10 @@ exports.handler = async () => {
     }
 
     const listingsStore = getBlobStore(getStore); // default: the mls-listings store
+    // Freshness: an unreadable state blob fails closed (no pins), never open.
+    const state = await listingsStore.get(SYNC_STATE_KEY, { type: "json" }).catch(() => null);
+    const freshGate = idxGate({ state });
+    if (!freshGate.allowed) return noPins(freshGate);
     const mine = await listingsStore.get(MINE_LISTINGS_KEY, { type: "json" }).catch(() => null);
     // Sold/expired records don't belong on a "for sale right now" layer; an
     // address is required because it is the only thing to geocode by.

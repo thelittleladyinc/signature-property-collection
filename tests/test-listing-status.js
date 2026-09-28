@@ -16,6 +16,10 @@
 // Repo root derived from this file's own location, never hardcoded: these suites
 // run both locally and in GitHub Actions, where the checkout is at
 // /home/runner/work/<repo>/<repo>. An absolute path would pass here and fail there.
+// 2026-09-28: listing display is behind the IDX kill switch (default OFF) and a
+// 12-hour freshness guard -- see lib/_idx-display.js and test-idxdisplay.js. This
+// suite tests what happens once display is ON with current data.
+process.env.IDX_DISPLAY = "on";
 const ROOT = require("path").resolve(__dirname, "..");
 const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
@@ -52,7 +56,7 @@ function load(store) {
   return require(`${FN_DIR}/listing-page.js`).handler;
 }
 const okStore = () => ({
-  get: async (k) => (/listings/i.test(k) ? LIVE : { lastRunAt: "2026-08-16T00:00:00Z" }),
+  get: async (k) => (/listings/i.test(k) ? LIVE : { lastRunAt: "2026-08-16T00:00:00Z", lastSuccessAt: new Date().toISOString() }),
   setJSON: async () => {}, list: async () => ({ blobs: [] }),
 });
 
@@ -105,7 +109,7 @@ const okStore = () => ({
   const poisonStore = () => ({
     get: async (k) => (/listings/i.test(k)
       ? { IRE900003: { get status() { throw new Error("boom"); } } }
-      : null),
+      : { lastSuccessAt: new Date().toISOString() }),
     setJSON: async () => {}, list: async () => ({ blobs: [] }),
   });
   res = await load(poisonStore)({ queryStringParameters: { id: "IRE900003" } });

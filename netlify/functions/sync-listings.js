@@ -936,7 +936,22 @@ async function cacheOwnPhotosFirst(listingsById, store, token, startedAt, thrott
   return { attempted, cached, remaining };
 }
 
+// 2026-09-28: the timestamp the IDX freshness guard reads (lib/_idx-display.js).
+// Advanced ONLY by a run that finished with no error and caught up with MLS Grid
+// (no resume cursor left) -- the one moment the stored copy is known to match
+// the feed. lastRunAt cannot serve: failed and part-done runs write it too.
+// Every other outcome carries the previous value forward, so the data simply
+// ages until a good run lands.
+function nextLastSuccessAt(prevState, outcome, nowIso) {
+  const ok = !!(outcome && outcome.passComplete && !outcome.lastRunError && !outcome.httpErrorOccurred);
+  if (ok) return nowIso;
+  return (prevState && prevState.lastSuccessAt) || null;
+}
+exports.nextLastSuccessAt = nextLastSuccessAt; // for tests
+
 exports.handler = async () => {
+  // MLS_DISABLED (see lib/_mls-usage.js) also stops this run: checkMlsQuota()
+  // below reports it as blocked before a single MLS Grid request is made.
   const token = process.env.MLSGRID_API_TOKEN;
   if (!token) {
     console.error("sync-listings: MLSGRID_API_TOKEN not set, skipping run.");
@@ -1332,6 +1347,8 @@ exports.handler = async () => {
           backfillCursor: state.backfillCursor || 0,
           totalBackfillCandidates: state.totalBackfillCandidates || 0,
           lastRunError: null,
+          // Mid-pass checkpoint: not caught up yet, so never a new success.
+          lastSuccessAt: state.lastSuccessAt || null,
           lastCloudinaryError: _lastCloudinaryError,
           herOfficeMlsId: state.herOfficeMlsId || null,
           lastRunNewlyDiscoveredByOffice: newlyDiscoveredByOffice,
@@ -1559,6 +1576,7 @@ exports.handler = async () => {
     backfillCursor: state.backfillCursor || 0,
     totalBackfillCandidates: state.totalBackfillCandidates || 0,
     lastRunError,
+    lastSuccessAt: nextLastSuccessAt(state, { passComplete, lastRunError, httpErrorOccurred }, new Date().toISOString()),
     lastCloudinaryError: _lastCloudinaryError,
     herOfficeMlsId: state.herOfficeMlsId || null,
     lastRunNewlyDiscoveredByOffice: newlyDiscoveredByOffice,

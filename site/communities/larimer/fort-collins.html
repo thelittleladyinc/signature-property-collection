@@ -2603,7 +2603,25 @@ window.__ytPlay = function (b) {
   var resultCacheKeys = [];
   var CACHE_TTL_MS = 2 * 60 * 1000;
 
+
+  function idxOffHtml(data) {
+    var url = (data && typeof data.searchUrl === 'string' && /^https?:\/\//i.test(data.searchUrl))
+      ? data.searchUrl : 'https://www.thelittleladysellshomes.com';
+    var msg = (data && typeof data.message === 'string' && data.message) || 'Search homes on my home-search site';
+    var e = function (s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    };
+    return '<a class="btn btn-dark" href="' + e(url) + '" rel="noopener">' + e(msg) + ' &rarr;</a>';
+  }
+
   function renderResults(data, fetchedAt) {
+    if (data.idxUnavailable) {
+      statusEl.innerHTML = idxOffHtml(data);
+      loadMoreBtn.style.display = 'none';
+      return;
+    }
     if (data.error === 'not_configured') {
       statusEl.textContent = 'Live search isn\u2019t connected yet \u2014 contact us directly for current listings.';
       loadMoreBtn.style.display = 'none';

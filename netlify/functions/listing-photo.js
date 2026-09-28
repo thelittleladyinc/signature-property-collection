@@ -67,6 +67,7 @@ const {
   PHOTO_CACHE_MAX_INDEX, photoCacheKey, writeCachedPhoto, recordPhotoDemand,
 } = require("./lib/_media");
 const { checkMlsQuota, recordMlsBytes } = require("./lib/_mls-usage");
+const { idxGate } = require("./lib/_idx-display");
 // NOT required at module load. lib/_cloudinary.js pulls in the Cloudinary SDK, and
 // this is the hottest function on the site -- every photo on every page. Paying
 // that import on every cold start, for a branch that only fires on photos too big
@@ -234,6 +235,9 @@ function cachedPhotoResponse(hit, reason) {
 // real cost -- too long on a transient failure freezes a working photo grey, too
 // short on a permanent one is the drip above.
 const PLACEHOLDER_TTL = {
+  // 2026-09-28: IDX display switched off (lib/_idx-display.js). Short, so photos
+  // return within minutes of display being switched back on.
+  idx_display_off: 300,
   // Temporary by definition. Short, so photos come back as soon as the limit
   // clears -- and the cooldown, not the CDN, is what protects the host meanwhile.
   media_rate_limited: 60,
@@ -331,6 +335,8 @@ function placeholder(reason, debug, extra) {
 // Keyed by the reason codes used below. The point of each entry is to say what
 // to DO about it, since a code alone still leaves the next step unclear.
 const EXPLANATIONS = {
+  idx_display_off: "IDX display is switched off on this site (IDX_DISPLAY is not \"on\"), so no stored " +
+    "MLS photo is served -- not even one already cached. See lib/_idx-display.js.",
   bad_id: "The listing id in the URL isn't a valid MLS id.",
   not_configured: "MLSGRID_API_TOKEN is not set on this deploy, so no photo can be fetched at all.",
   no_media: "MLS Grid returned no photos for this listing. Either the listing genuinely has none, " +
@@ -486,6 +492,12 @@ exports.handler = async (event) => {
   // explanation rather than a grey square. It used to be read at the very bottom
   // of this function, so it only ever described a success. See placeholder().
   const debug = params.debug === "1";
+  // IDX display kill switch, ahead of our own stored copies: a cached MLS photo
+  // is still MLS data. Photos are images, not listing facts, so only the switch
+  // applies here; the 12-hour freshness guard lives on the endpoints that hand
+  // out photo URLs (listings-search, listing-page), which stop issuing them.
+  const switchGate = idxGate({ skipFreshness: true });
+  if (!switchGate.allowed) return placeholder("idx_display_off", debug, {});
   try {
     const listingId = String(params.id || params.listingId || "").trim();
     if (!listingId || !/^[A-Za-z0-9_-]{3,40}$/.test(listingId)) {

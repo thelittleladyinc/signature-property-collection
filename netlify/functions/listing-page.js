@@ -40,6 +40,7 @@ const {
 // on every view that misses a CDN edge, forever. The two numbers have to be the
 // same number, so they are literally the same number. See lib/_media.js.
 const { PHOTO_CACHE_MAX_INDEX } = require("./lib/_media");
+const { idxGate } = require("./lib/_idx-display");
 const GALLERY_PHOTOS = PHOTO_CACHE_MAX_INDEX + 1;
 
 const SHELL_PATH = path.join(__dirname, "lib", "_listing-page-shell.html");
@@ -174,6 +175,23 @@ function notFoundBody(reason) {
     <div class="btn-row">
       <a class="btn btn-dark" href="/search-homes.html">Search Active Listings</a>
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/contact.html">Ask ${esc(AGENT_NAME.split(" ")[0])} About It</a>
+    </div>
+  </div>
+</section>`;
+}
+
+// 2026-09-28: shown instead of ANY listing while IDX display is off or the
+// stored data is older than 12 hours (lib/_idx-display.js). No listing fact
+// from storage appears on it -- not even the address from the URL's record.
+function idxUnavailableBody(gate) {
+  return `<section class="hero" style="padding:90px 0 60px">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--dusty-rose)">Home Search</span>
+    <h1>${esc(gate.message)}</h1>
+    <p class="lede">Current listings, photos and details now live on my home-search site. It&rsquo;s the best place to see what&rsquo;s for sale right now.</p>
+    <div class="btn-row">
+      <a class="btn btn-dark" href="${esc(gate.searchUrl)}" rel="noopener">${esc(gate.message)}</a>
+      <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/contact.html">Ask ${esc(AGENT_NAME.split(" ")[0])} About a Home</a>
     </div>
   </div>
 </section>`;
@@ -530,6 +548,40 @@ exports.handler = async (event) => {
     }),
   });
 
+  // IDX display gate (lib/_idx-display.js).
+  //
+  // SEO choice, deliberately:
+  //   - display OFF -> 410 Gone + noindex. The listing is not coming back on this
+  //     URL while the licence is gone, and 410 is Google's fastest "drop it" signal.
+  //     A 302 to another domain would be read as a soft 404 anyway and would hide
+  //     the reason from a visitor who followed a texted link; a real page with a
+  //     prominent link does neither. If display is ever restored, Google recrawls
+  //     and re-indexes a 200 normally.
+  //   - data STALE (display on, sync behind) -> 503 + Retry-After + noindex: a
+  //     temporary condition, which Google handles without penalty.
+  const idxPage = (gate) => {
+    const off = gate.reason === "disabled";
+    return {
+      statusCode: off ? 410 : 503,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": off ? "public, max-age=300" : "no-store",
+        "X-Robots-Tag": "noindex",
+        ...(off ? {} : { "Retry-After": "3600" }),
+      },
+      body: render(shell(params.brand), {
+        TITLE: `${gate.message} | ${brandName(params.brand)}`,
+        DESCRIPTION: "Current Northern Colorado listings are on Christine Gwinnup's home-search site.",
+        CANONICAL: `${SITE_DOMAIN}/`,
+        OG_IMAGE: `${SITE_DOMAIN}/assets/img/logo-full.png`,
+        SCHEMA: "",
+        BODY: idxUnavailableBody(gate),
+      }).replace("<head>", '<head>\n<meta name="robots" content="noindex">'),
+    };
+  };
+  const switchGate = idxGate({ skipFreshness: true });
+  if (!switchGate.allowed) return idxPage(switchGate);
+
   try {
     if (!id || !/^[A-Za-z0-9_-]{3,40}$/.test(id)) {
       return notFound("That listing link doesn’t look right. Search below and you’ll find what you’re after.", 404);
@@ -569,6 +621,10 @@ exports.handler = async (event) => {
         },
       };
     }
+    // Freshness: never render a listing from a copy older than 12 hours.
+    const freshGate = idxGate({ state });
+    if (!freshGate.allowed) return idxPage(freshGate);
+
     const l = listings && listings[id];
     if (!l) {
       return notFound("This listing isn’t in our current feed — it may have sold or been withdrawn.", 404);
@@ -638,7 +694,7 @@ exports.handler = async (event) => {
         CANONICAL: canonical,
         OG_IMAGE: ogImage,
         SCHEMA: `<script type="application/ld+json">${listingSchema(l, canonical, ogImage)}</script>`,
-        BODY: listingBody(l, state && state.lastRunAt),
+        BODY: listingBody(l, state && (state.lastSuccessAt || state.lastRunAt)),
       }),
     };
   } catch (err) {

@@ -61,7 +61,7 @@ async function call(env, events, opts = {}) {
 }
 
 (async () => {
-  const ENV = { LISTING_FEED_KEY: KEY };
+  const ENV = { LISTING_FEED_KEY: KEY, IDX_DISPLAY: "on" }; // IDX kill switch on (lib/_idx-display.js)
 
   console.log("\n1. No key, no call");
   {
@@ -69,6 +69,26 @@ async function call(env, events, opts = {}) {
     check("unset LISTING_FEED_KEY returns 200", res.statusCode === 200);
     check("...with an empty list", Array.isArray(body.items) && body.items.length === 0);
     check("...and never calls Listing Engine", calls.length === 0, String(calls.length));
+  }
+
+  console.log("\n1b. IDX display off (lib/_idx-display.js): empty, and no call");
+  {
+    for (const [label, env] of [
+      ["IDX_DISPLAY unset", { LISTING_FEED_KEY: KEY }],
+      ["IDX_DISPLAY=off", { LISTING_FEED_KEY: KEY, IDX_DISPLAY: "off" }],
+      ["IDX_DISPLAY=true (only \"on\" counts)", { LISTING_FEED_KEY: KEY, IDX_DISPLAY: "true" }],
+    ]) {
+      const { res, body } = await call(env, [ev(1, "just_sold")]);
+      check(`${label} -> 200 with an empty list`, res.statusCode === 200 && body.items.length === 0, res.body);
+      check(`${label} -> never calls Listing Engine`, calls.length === 0, String(calls.length));
+    }
+    // A list cached while display was on must not survive the switch going off.
+    RA.resetCache();
+    stubFetch(async () => ({ status: 200, body: { events: [ev(1, "just_sold")], has_more: false } }));
+    const on = JSON.parse((await RA.handler({}, {}, { env: ENV, now: () => NOW })).body);
+    const off = JSON.parse((await RA.handler({}, {}, { env: { LISTING_FEED_KEY: KEY }, now: () => NOW + 1000 })).body);
+    check("switching off hides an already-cached list at once", on.items.length === 1 && off.items.length === 0,
+      `${on.items.length} then ${off.items.length}`);
   }
 
   console.log("\n2. The request");
@@ -83,7 +103,7 @@ async function call(env, events, opts = {}) {
     check("asks only for just_sold + open_house_scheduled", q.get("types") === "just_sold,open_house_scheduled", q.get("types"));
     check("sends an ISO `since`", !Number.isNaN(Date.parse(q.get("since"))) && Date.parse(q.get("since")) < NOW);
     check("does not override owner_only (feed default = the owner's listings)", !q.has("owner_only"));
-    await call({ LISTING_FEED_KEY: KEY, LISTING_ENGINE_URL: "https://le.example.test/" }, []);
+    await call({ ...ENV, LISTING_ENGINE_URL: "https://le.example.test/" }, []);
     check("LISTING_ENGINE_URL overrides the host (trailing slash tolerated)",
       calls[0].url.startsWith("https://le.example.test/api/feed/listing-events?"), calls[0].url);
   }

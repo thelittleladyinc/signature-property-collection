@@ -1654,6 +1654,30 @@ def _mls_disclaimer_html(fetched_at_id="mls-fetched-at"):
     </div>"""
 
 
+def _idx_off_js():
+    """2026-09-28: the in-page answer when IDX display is switched off.
+
+    listings-search.js returns {error: 'not_configured', idxUnavailable: true,
+    message, searchUrl} while IDX_DISPLAY is not "on" or its copy of the feed
+    is older than 12 hours (netlify/functions/lib/_idx-display.js). Every live
+    listing widget checks idxUnavailable FIRST and shows this link to
+    Christine's home-search site instead of an error. The URL comes from the
+    server (IDX_SEARCH_URL) and is re-checked here: only http(s) is linked."""
+    return r"""
+  function idxOffHtml(data) {
+    var url = (data && typeof data.searchUrl === 'string' && /^https?:\/\//i.test(data.searchUrl))
+      ? data.searchUrl : 'https://www.thelittleladysellshomes.com';
+    var msg = (data && typeof data.message === 'string' && data.message) || 'Search homes on my home-search site';
+    var e = function (s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    };
+    return '<a class="btn btn-dark" href="' + e(url) + '" rel="noopener">' + e(msg) + ' &rarr;</a>';
+  }
+"""
+
+
 def _live_feed_widget(anchor_id, api_params, empty_note=None):
     """A small embedded live-MLS feed (up to 6 cards), reused on subdivision
     / area guide pages (Buckhorn, West Loveland riverfront, and the eight
@@ -1689,7 +1713,7 @@ def _live_feed_widget(anchor_id, api_params, empty_note=None):
       var resultsEl = document.getElementById('{anchor_id}-results');
       var fetchedAtEl = document.getElementById('{anchor_id}-fetched-at');
       var emptyNote = {empty_note_js};
-
+{_idx_off_js()}
       function esc(s) {{
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {{
           return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[c];
@@ -1728,6 +1752,10 @@ def _live_feed_widget(anchor_id, api_params, empty_note=None):
       fetch('/.netlify/functions/listings-search?{qs}&top=6')
         .then(function (r) {{ return r.json(); }})
         .then(function (data) {{
+          if (data.idxUnavailable) {{
+            statusEl.innerHTML = idxOffHtml(data);
+            return;
+          }}
           if (data.error === 'not_configured') {{
             statusEl.textContent = 'Live search isn\\u2019t connected yet \\u2014 contact us directly for current listings here.';
             return;
@@ -2525,7 +2553,13 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
   var resultCacheKeys = [];
   var CACHE_TTL_MS = 2 * 60 * 1000;
 
+{_idx_off_js()}
   function renderResults(data, fetchedAt) {{
+    if (data.idxUnavailable) {{
+      statusEl.innerHTML = idxOffHtml(data);
+      loadMoreBtn.style.display = 'none';
+      return;
+    }}
     if (data.error === 'not_configured') {{
       statusEl.textContent = 'Live search isn\\u2019t connected yet \\u2014 contact us directly for current listings.';
       loadMoreBtn.style.display = 'none';
@@ -13151,7 +13185,7 @@ def build_current_listings():
 
     js = """<script>
 (function () {
-""" + _listing_showcase_js_helpers() + """
+""" + _listing_showcase_js_helpers() + _idx_off_js() + """
   // ---- Photo gallery + Ask A Question / Request A Tour modals ----
   // Both modals are opened from onclick="" attributes on HTML that
   // listingCardHtml() injects dynamically, so openGallery/openListingInquiry
@@ -13269,6 +13303,11 @@ def build_current_listings():
     fetch('/.netlify/functions/listings-search?' + qs)
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        if (data.idxUnavailable) {
+          statusEl.innerHTML = idxOffHtml(data);
+          loadMoreBtn.style.display = 'none';
+          return;
+        }
         if (data.error === 'not_configured') {
           statusEl.textContent = 'Live listings aren\\u2019t connected yet \\u2014 contact us directly for current inventory.';
           loadMoreBtn.style.display = 'none';
