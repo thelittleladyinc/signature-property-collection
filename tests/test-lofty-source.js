@@ -371,6 +371,9 @@ const HOUR = 3600e3;
   check("/status names where the home search goes", /theboldcollectivehomes\.com\/listing/.test(String(searchRow.detail)), searchRow.detail);
   const alertRow = hres.checks.find((c) => /alerts paused/.test(c.name)) || {};
   check("/status counts the paused map alerts", alertRow.optional === true && /\d+ sign-up/.test(String(alertRow.detail)), alertRow.detail);
+  const stripRow = hres.checks.find((c) => /Sold & open-houses strip/.test(c.name)) || {};
+  check("/status says whether the sold & open-houses strip is on (optional row)",
+    stripRow.optional === true && /^(ON|OFF)/.test(String(stripRow.detail)), stripRow.detail);
   const photoRow = hres.checks.find((c) => c.name === "Listing photos load end to end") || {};
   check("the photo check fetches from Lofty's image server", /Lofty's image server/.test(String(photoRow.detail)), photoRow.detail);
 

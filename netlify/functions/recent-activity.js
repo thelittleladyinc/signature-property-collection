@@ -324,7 +324,7 @@ async function handler(event, context, deps = {}) {
 
 exports.handler = (event, context) => handler(event, context);
 exports._internals = {
-  handler, shapeEvents, denverSlot, denverWallToMs, httpsUrl,
+  handler, shapeEvents, denverSlot, denverWallToMs, httpsUrl, loadEvents, stripAllowed,
   resetCache: () => { cache = null; },
   MAX_ITEMS, DEFAULT_BASE,
 };
