@@ -268,6 +268,10 @@ const noSleep = async () => {};
   check("...and the start request is recorded for /status", (store.data.get(L.CRAWL_KICK_KEY) || {}).httpStatus === 202);
 
   // ---------------------------------------------------------------------------
+  check("a catalogue with no recorded success is due as soon as the 20-minute guard allows",
+    L.fullCrawlDue({ lastFullCrawlAt: new Date(Date.now() - 25 * 60e3).toISOString(), lastFullCrawlComplete: true }, Date.now()) === true &&
+    L.fullCrawlDue({ lastFullCrawlAt: new Date(Date.now() - 5 * 60e3).toISOString(), lastFullCrawlComplete: true }, Date.now()) === false);
+
   console.log("\n7. The functions, end to end, with Lofty as the source");
   // A catalogue with one of hers (full gallery) and one other brokerage's listing.
   const hersRec = L.slimForStorage(L.applyDetails(L.mapLoftyListing(rec("IRE2000001", { agentName: "Christine Gwinnup" }), { county: "larimer" }),

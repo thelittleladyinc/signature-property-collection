@@ -660,6 +660,10 @@ async function runQuickPass(opts) {
 
 function fullCrawlDue(state, nowMs) {
   if (!state || !state.lastFullCrawlAt) return true;
+  // No recorded success means the IDX freshness guard is holding every listing
+  // back, so a refresh is due now -- runFullCrawl's own 20-minute guard still
+  // stops this from repeating faster than that.
+  if (!state.lastSuccessAt) return nowMs - Date.parse(state.lastFullCrawlAt) >= MIN_CRAWL_GAP_MS;
   const age = nowMs - Date.parse(state.lastFullCrawlAt);
   if (!state.lastFullCrawlComplete) return age >= MIN_CRAWL_GAP_MS;
   return age >= FULL_CRAWL_EVERY_MS;
