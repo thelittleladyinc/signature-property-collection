@@ -4052,13 +4052,17 @@ def header_html(active=None):
     # it read as a monogram rather than a blob) on a small white badge
     # backing so both colors keep contrast against the header's rose
     # background, echoing the badge treatment already used for the LPT mark.
+    # 2026-09-29: the home link is "/" -- exactly what visitors and Google got while
+    # Netlify's Pretty URLs rewrote /index.html links (now switched off in
+    # netlify.toml), and the address Google indexes the home page under. "/" is a
+    # 200 rewrite in site/_redirects, not a redirect. tests/test-prettyurls.js.
     return f"""<header class="site-header">
   <div class="wrap">
     <div class="brand">
       <span class="brand-monogram-badge" aria-hidden="true">
         <img class="brand-monogram" src="/assets/img/logo-monogram.svg" alt="">
       </span>
-      <a href="/index.html" class="brand-wordmark">
+      <a href="/" class="brand-wordmark">
         <img class="brand-logo" src="/assets/img/logo-mark.png" alt="{SITE['name']}" width="209" height="78">
         <span class="brand-sub">Property Collection</span>
       </a>
@@ -13566,7 +13570,7 @@ def build_404():
     <p class="lede">That page moved or never existed — but here's where you probably
     meant to go.</p>
     <div class="btn-row">
-      <a class="btn btn-primary" href="/index.html">Home</a>
+      <a class="btn btn-primary" href="/">Home</a>
       <a class="btn btn-outline" href="/communities/index.html">Communities</a>
       <a class="btn btn-outline" href="/contact.html">Contact {esc(SITE['agent'].split()[0])}</a>
     </div>

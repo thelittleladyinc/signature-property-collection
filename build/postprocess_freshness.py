@@ -71,6 +71,7 @@ PLACEHOLDER = "@@DATE@@"
 
 # 2026-09-24: the lead-submit marker build.py puts on every page is measurement
 # plumbing, not content. Without this, adding it would re-date every page.
+_HOME_LINK = re.compile(r'href="/(?:index\.html)?(?=[#?"])')
 _LEAD_MARKER = re.compile(r"<script>(?:(?!</script>)[\s\S])*?spc_lead_submit[\s\S]*?</script>\n?")
 
 
@@ -79,6 +80,10 @@ def _blank(text: str) -> str:
     (except the lead-submit marker, which is ignored -- see _LEAD_MARKER)."""
     for pattern, _ in DATE_FIELDS:
         text = pattern.sub(lambda m: m.group(1) + PLACEHOLDER + m.group(3), text)
+    # 2026-09-29: the home link changed from /index.html to "/" on every page
+    # (see build.py's header). Same link, same destination -- not a content edit,
+    # so it must not re-date every page.
+    text = _HOME_LINK.sub('href="@@HOME@@', text)
     return _normalize_business_address(_LEAD_MARKER.sub("", text))
 
 
