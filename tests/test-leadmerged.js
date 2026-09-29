@@ -96,8 +96,11 @@ const GHOST_ID = 1147334685108095;
     /merged/i.test(row.name), row.name);
   check("explains that Lofty returned the absorbed record's id",
     /absorbed/.test(row.detail), row.detail.slice(0, 120));
-  check("reassures that the tag is still on the surviving contact",
-    /appends tags on a\s+merge/.test(row.detail));
+  // 2026-09-29 (second review): "Lofty appends tags on a merge" was wrong -- `tags`
+  // on create REPLACES a merged contact's set -- so the page now says what was
+  // actually sent: tagsAdd when the pre-check couldn't rule the person out.
+  check("reassures that the form's tags reached the surviving contact",
+    /The form's tags were (?:added to the surviving contact|sent with the lead)/.test(row.detail), row.detail);
   check("says a new enquirer is unaffected", /new enquirer creates a new contact/.test(row.detail));
   check("accounts for the skipped tag call rather than leaving a gap",
     /Trigger tag: not attempted, because it reads the same id/.test(row.detail));

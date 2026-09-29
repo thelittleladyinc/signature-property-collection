@@ -65,6 +65,10 @@ const { getBlobStore } = require("./lib/_mls-shared");
 const { postLead, recordPush } = require("./lib/_lofty");
 const { addLoftyNote, refireLoftyTag, sendLeadAlertEmail } = require("./lib/_notify");
 const { homeValueProperty } = require("./lib/_lead-address");
+const {
+  findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
+  leadIdFromResponse,
+} = require("./lib/_lofty-returning");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
 
@@ -114,6 +118,11 @@ const SOURCE_LABELS = {
   "testimonials-page-inquiry": "Signature Property Collection - Testimonials Page Inquiry",
 };
 
+// 2026-09-29 (second review): the Lofty create -- both attempts -- must finish
+// this long after the function starts (contact lookup included), so the backup
+// email always goes out inside the function's time limit.
+const CREATE_DEADLINE_MS = 7000;
+
 function splitName(fullName) {
   const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { firstName: undefined, lastName: undefined };
@@ -122,6 +131,7 @@ function splitName(fullName) {
 }
 
 exports.handler = async (event) => {
+  const startedAt = Date.now();
   try {
     const apiKey = process.env.LOFTY_API_KEY;
     if (!apiKey) {
@@ -228,7 +238,28 @@ exports.handler = async (event) => {
     const homeProperty = homeValueProperty(formName, data);
     if (homeProperty) body.property = homeProperty;
 
-    const result = await postLead(body, apiKey);
+    // 2026-09-29: ask Lofty first whether this person is already a contact
+    // (exact email and phone searches, in parallel, capped at 2 seconds in total --
+    // lib/_lofty-returning.js). A returning lead's note, call-back task and phone
+    // push then go to the contact that actually exists (email matches only),
+    // instead of the absorbed record a merge hands back. Never throws; if Lofty
+    // can't answer in time, everything below runs exactly as before.
+    const existing = await findExistingLead(data.email, data.phone, apiKey);
+    // A known contact keeps its own tags. `tags` on the create call REPLACES the
+    // tag set of the contact a submission merges into ("All existing tags will be
+    // updated based on this call" -- Lofty's create-lead reference); `tagsAdd`
+    // only adds. So `tags` is sent only for a contact PROVEN new (both searches
+    // answered and found nobody), created exactly as before. Anyone found -- and,
+    // since the second review, anyone the lookup couldn't answer for (slow,
+    // rate-limited, ambiguous) -- gets tagsAdd: "can't tell" is never "new".
+    if (Array.isArray(body.tags) && !(existing.ok && !existing.anyMatch)) {
+      body.tagsAdd = body.tags;
+      delete body.tags;
+    }
+
+    // Both attempts at the create finish by this deadline, so the backup email
+    // below always has time to go out (lib/_lofty.js MIN_RETRY_MS).
+    const result = await postLead(body, apiKey, { deadline: startedAt + CREATE_DEADLINE_MS });
     // The store is only needed for diagnostics, so a Blobs problem must not
     // prevent the push itself -- it's fetched after the lead has already gone.
     let store = null;
@@ -239,9 +270,9 @@ exports.handler = async (event) => {
     // POST /leads returns the lead id whether it CREATED a contact or merged into
     // an existing one -- Christine's 16:48 test proved that, coming back with
     // 1147334685108095 for a contact that already existed. That is what makes the
-    // follow-up calls below possible without having to search Lofty by email
-    // (which its API offers no way to do -- sellerintelligence pages all ~20k
-    // leads to find one, far too slow for a form handler).
+    // follow-up calls below possible. (2026-09-29: that id is the ABSORBED record
+    // on a merge, which is why the exact email lookup above now runs first -- a
+    // match sends the note and task to the surviving contact instead.)
     const leadId = json?.data?.leadId ?? json?.data?.id ?? json?.leadId ?? json?.id ?? null;
 
     // ---- The notification, in the order that matters -------------------------
@@ -262,7 +293,7 @@ exports.handler = async (event) => {
       // The long labels all start with the site name; the subject line doesn't
       // need it repeated.
       sourceShort: stampedSource.replace("Signature Property Collection - ", ""),
-      noteText: body.notes, leadId, stamp: `${stamp} MT`,
+      noteText: body.notes, leadId: existing.leadId || leadId, stamp: `${stamp} MT`,
     });
 
     if (!result.ok) {
@@ -277,9 +308,26 @@ exports.handler = async (event) => {
 
     console.log(`Pushed lead to Lofty${leadId ? ` (leadId ${leadId})` : ""} from form "${formName}" (${result.payloadShape} payload).`);
 
+    // Recorded as soon as the email is out, so /status has this lead even if the
+    // slower steps below run the function out of time. Rewritten as they finish.
+    const existingSummary = {
+      attempted: existing.attempted, ok: existing.ok, found: !!existing.leadId, via: existing.via,
+      anyMatch: existing.anyMatch, leadId: existing.leadId, error: existing.error,
+      // Which field carried the form's tags: "tags" replaces a merged contact's set,
+      // "tagsAdd" only adds. /status says which, instead of guessing.
+      tagField: Array.isArray(body.tags) ? "tags" : Array.isArray(body.tagsAdd) ? "tagsAdd" : null,
+    };
+    if (store) {
+      await recordPush(store, {
+        ...result, leadId, emailResult, existing: existingSummary, inProgress: true,
+      }, formName, body);
+    }
+
     // The note as its own call, because a merge has no reason to overwrite an
     // existing contact's fields -- which is why her repeat tests left no trace.
-    const noteResult = leadId ? await addLoftyNote(leadId, body.notes, apiKey) : { attempted: false };
+    // 2026-09-29: to the existing contact when there is one (see above).
+    const noteTarget = existing.leadId || leadId;
+    const noteResult = noteTarget ? await addLoftyNote(noteTarget, body.notes, apiKey) : { attempted: false };
     // And make the trigger tag a real CHANGE, so the Smart Plan fires on a
     // returning buyer's second enquiry and not only their first.
     //
@@ -289,12 +337,54 @@ exports.handler = async (event) => {
     // call and puts a second, redundant failure on /status that reads like a
     // separate fault. tagRestored stays true because the tag written by the
     // create call is still on the surviving contact; Lofty appends tags on merge.
+    //
+    // 2026-09-29: and not at all for a RETURNING lead. Lofty's API can't re-fire
+    // a tag the contact already has (GET /leads doesn't even return tags), so a
+    // returning lead gets what Lofty documents for "act on this lead now"
+    // instead: a Call task on the contact and a push to the agent's phone.
     const tagResult = !leadId ? { attempted: false }
+      : existing.leadId ? { attempted: false, skipped: "returning-lead-task", tagRestored: true }
       : noteResult.leadMissing
         ? { attempted: false, skipped: "lead-missing", tagRestored: true }
         : await refireLoftyTag(leadId, TRIGGER_TAG, apiKey);
+    // Recorded again before the optional steps below (a returning lead's task,
+    // a new contact's fields), so /status keeps the note and tag results even if
+    // those run the function out of time.
+    if (store) {
+      await recordPush(store, {
+        ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
+        inProgress: !!existing.leadId,
+      }, formName, body);
+    }
 
-    if (store) await recordPush(store, { ...result, leadId, emailResult, noteResult, tagResult }, formName, body);
+    const returningResult = existing.leadId
+      ? await alertReturningLead(existing.leadId, {
+        label: stampedSource.replace("Signature Property Collection - ", ""),
+        name: data.name, phone: data.phone, email: data.email,
+      }, apiKey)
+      : { attempted: false };
+
+    // 2026-09-29: which form, first page, form page and traffic source as Lofty
+    // fields she can filter on -- written only on a contact PROVEN brand new: both
+    // searches answered and found nobody, the create call's own id (read exactly,
+    // not through JSON.parse) took the note. An update's effect on a client's
+    // other custom fields is undocumented, so an existing record is never touched.
+    let fieldsResult = { attempted: false };
+    const newLeadId = leadIdFromResponse(result.responseBody);
+    if (existing.ok && !existing.anyMatch && newLeadId && newLeadId === String(leadId) &&
+        noteResult.ok && noteTarget === leadId) {
+      const ensured = await ensureWebsiteFields(store, apiKey);
+      fieldsResult = ensured.ok
+        ? await setWebsiteFields(newLeadId, websiteFieldValues(stampedSource, data), apiKey)
+        : { attempted: false, reason: "fields not ready", ensured };
+    }
+
+    if (store) {
+      await recordPush(store, {
+        ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
+        returningResult, fieldsResult,
+      }, formName, body);
+    }
     return { statusCode: 200, body: "ok" };
   } catch (err) {
     console.error("submission-created function error:", err);
