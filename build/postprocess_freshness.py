@@ -71,6 +71,16 @@ PLACEHOLDER = "@@DATE@@"
 
 # 2026-09-24: the lead-submit marker build.py puts on every page is measurement
 # plumbing, not content. Without this, adding it would re-date every page.
+_PRODUCTION_ONLY = [
+    re.compile(r'<link rel="preconnect" href="https://www\.googletagmanager\.com" crossorigin>\n?'),
+    re.compile(r'<link rel="dns-prefetch" href="https://connect\.facebook\.net">\n?'),
+    re.compile(r'<script async src="https://www\.googletagmanager\.com/gtag/js\?id=[^"]*"></script>\n?'),
+    re.compile(r'<script>window\.dataLayer=window\.dataLayer\|\|\[\];function gtag\(\)[\s\S]*?</script>\n?'),
+    re.compile(r'<script>!function\(f,b,e,v,n,t,s\)\{if\(f\.fbq\)return;[\s\S]*?</script>\n?'),
+    re.compile(r'<noscript><img height="1" width="1" style="display:none" '
+               r'src="https://www\.facebook\.com/tr\?[^"]*"/></noscript>\n?'),
+    re.compile(r'<meta name="google-site-verification" content="[^"]*">\n?'),
+]
 _HOME_LINK = re.compile(r'href="/(?:index\.html)?(?=[#?"])')
 _LEAD_MARKER = re.compile(r"<script>(?:(?!</script>)[\s\S])*?spc_lead_submit[\s\S]*?</script>\n?")
 
@@ -84,6 +94,17 @@ def _blank(text: str) -> str:
     # (see build.py's header). Same link, same destination -- not a content edit,
     # so it must not re-date every page.
     text = _HOME_LINK.sub('href="@@HOME@@', text)
+    # 2026-09-29: the analytics tags exist ONLY in production builds (GA, the
+    # Meta Pixel and Search Console verification come from Netlify environment
+    # variables; the committed site/ is built without them), so on Netlify every
+    # page differed from its committed copy on every deploy and every deploy
+    # dated every page "today" -- the live sitemap on 2026-09-29 had 34 of 37
+    # pages at that day. Tracking tags are infrastructure, not content.
+    for pattern in _PRODUCTION_ONLY:
+        text = pattern.sub("", text)
+    # The template leaves an empty line where each unset tag would go, so drop
+    # blank lines on both sides too. Comparison only; the page is never rewritten.
+    text = re.sub(r"\n[ \t]*(?=\n)", "", text)
     return _normalize_business_address(_LEAD_MARKER.sub("", text))
 
 
