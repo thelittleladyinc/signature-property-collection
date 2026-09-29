@@ -44,6 +44,7 @@ const {
 } = require("./lib/_mls-shared");
 const { isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH } = require("./lib/_lofty-listings");
 const { homeSearchUrl } = require("./lib/_home-search");
+const recentActivity = require("./recent-activity")._internals;
 const { idxGate } = require("./lib/_idx-display");
 const { isCloudinaryConfigured, cloudinaryCredentials } = require("./lib/_cloudinary");
 const {
@@ -159,6 +160,37 @@ function mlsGridMarketDataRow(gridState, now) {
       (gridState && gridState.lastRunError ? `Error: ${gridState.lastRunError}. ` : "") +
       "Used only for the town pages' market figures — never shown as listings.",
   };
+}
+
+// 2026-09-28: the homepage's "Recently sold & open houses" strip (recent-activity.js)
+// hides itself whenever it has nothing to show, so "it's on" and "it's broken"
+// looked the same from the outside. Christine wants it on, and off when needed:
+// this says which it is, and -- with ?probe=1 -- what Listing Engine is sending it.
+async function recentActivityRow(wantsProbe, now) {
+  const env = process.env;
+  const row = { optional: true, name: "Sold & open-houses strip (optional)" };
+  if (!recentActivity.stripAllowed(env)) {
+    return { ...row, ok: true, detail: "OFF. To show it, set RECENT_ACTIVITY_DISPLAY=on (with IDX_DISPLAY=on) in Netlify and redeploy; set it to off to hide it again." };
+  }
+  if (!String(env.LISTING_FEED_KEY || "").trim()) {
+    return { ...row, ok: false, detail: "ON, but LISTING_FEED_KEY isn't set in Netlify, so it has nothing to show and stays hidden." };
+  }
+  if (!wantsProbe) {
+    return { ...row, ok: true, detail: "ON (RECENT_ACTIVITY_DISPLAY=on). Add ?probe=1 to this page's URL to see what Listing Engine is sending it right now." };
+  }
+  try {
+    const events = await recentActivity.loadEvents(env, now);
+    const items = recentActivity.shapeEvents(events, now);
+    return {
+      ...row,
+      ok: true,
+      detail: `ON — Listing Engine sent ${events.length} event(s) from the last 75 days; ${items.length} fit the strip right now ` +
+        "(homes sold in the last 60 days, open houses in the next 14)." +
+        (items.length ? "" : " With nothing to show, it stays hidden until one does."),
+    };
+  } catch (err) {
+    return { ...row, ok: false, detail: `ON, but Listing Engine didn't answer: ${err && err.name === "AbortError" ? "timed out" : err && err.message}.` };
+  }
 }
 
 function loftyListingRows(state, mineListings, now, alertCount, gridState) {
@@ -935,6 +967,7 @@ exports.handler = async (event) => {
         ? `ON — ${what}; last complete refresh ${gate.lastSuccessAt}.`
         : (why[gate.reason] || `Held back (${gate.reason}).`),
     });
+    checks.push(await recentActivityRow(wantsProbe, now));
   }
 
   // Google Maps: three separate rows, because "the key is set" and "the two
