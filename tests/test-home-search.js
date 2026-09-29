@@ -88,6 +88,28 @@ check("several towns, a million-plus floor",
   H.homeSearchLabel({ cities: "vail,avon", minPrice: "2500000" }) === "See homes for sale in these towns from $2.5M");
 check("nothing named", H.homeSearchLabel({ noFloor: "true" }) === "See homes for sale");
 
+console.log("\n7a. Which site sent them: utm_source, so Lofty names the lead's source (2026-09-29)");
+const qs = (url) => new URL(url).searchParams;
+const sig = qs(H.homeSearchUrl({ city: "Loveland" }));
+check("this site's searches say utm_source=signaturepropertycollection.com",
+  sig.get("utm_source") === "signaturepropertycollection.com", sig.get("utm_source"));
+check("utm_medium=website, utm_campaign=home-search",
+  sig.get("utm_medium") === "website" && sig.get("utm_campaign") === "home-search");
+const ll = qs(H.homeSearchUrl({ city: "Loveland", noFloor: "true", site: "thelittleladysellshomes" }));
+check("?site=thelittleladysellshomes (the Little Lady pass-through) -> utm_source=thelittleladysellshomes.com",
+  ll.get("utm_source") === "thelittleladysellshomes.com", ll.get("utm_source"));
+check("an unknown ?site= is this site, never passed through",
+  qs(H.homeSearchUrl({ site: "evil.example" })).get("utm_source") === "signaturepropertycollection.com");
+check("the site parameter never reaches Lofty's condition",
+  !JSON.stringify(cond(H.homeSearchUrl({ city: "Loveland", site: "thelittleladysellshomes" }))).includes("site"));
+check("the filters are unchanged by the tags",
+  JSON.stringify(cond(H.homeSearchUrl({ city: "Loveland", site: "thelittleladysellshomes", noFloor: "true" }))) ===
+  JSON.stringify({ location: { city: ["Loveland, CO"] } }));
+check("an address that is not a Lofty /listing page gets no tags",
+  H.homeSearchUrl({ city: "Loveland" }, { env: { IDX_SEARCH_URL: "https://example.com/homes" } }) === "https://example.com/homes");
+check("nothing about the visitor is added (only the three utm_ tags beyond the search)",
+  [...sig.keys()].sort().join(",") === "condition,page,utm_campaign,utm_medium,utm_source", [...sig.keys()].join(","));
+
 console.log("\n7. The built site sends /search-homes to the hand-off");
 const redirects = fs.readFileSync(path.join(ROOT, "site", "_redirects"), "utf8").split("\n");
 const idx = (p) => redirects.findIndex((l) => l.split(/\s+/)[0] === p);

@@ -2592,6 +2592,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
     if (data.idxUnavailable) {{
       if (goOnHandoff && data.reason === 'home_search' && /^https?:\/\//i.test(String(data.searchUrl || ''))) {{
         goOnHandoff = false;
+        if (typeof window.gtag === 'function') window.gtag('event', 'home_search_handoff', {{ page_path: location.pathname, cta_id: 'search-widget', transport_type: 'beacon' }});
         window.location.href = data.searchUrl;
         return;
       }}
@@ -4428,6 +4429,17 @@ def _contact_bar():
     window.gtag("event", "contact_click", {{
       method: a.getAttribute("data-contact"),
       page_path: window.location.pathname
+    }});
+  }}, {{ passive: true }});
+  /* Search Homes is a redirect to her Lofty site, never a page view: count the
+     hand-off (page + button only, never the search). */
+  document.addEventListener("click", function (e) {{
+    var a = e.target && e.target.closest && e.target.closest('a[href*="/search-homes"]');
+    if (!a || typeof window.gtag !== "function") return;
+    window.gtag("event", "home_search_handoff", {{
+      page_path: window.location.pathname,
+      cta_id: a.getAttribute("data-roi-cta") || "link",
+      transport_type: "beacon"
     }});
   }}, {{ passive: true }});
 }})();

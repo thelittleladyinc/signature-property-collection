@@ -51,6 +51,21 @@
 // The base address is IDX_SEARCH_URL (lib/_idx-display.js), so moving the Lofty
 // site to another domain is one Netlify variable. If it ever points somewhere
 // that is not a Lofty /listing page, it is used as-is, with no condition added.
+//
+// WHICH SITE SENT THEM (2026-09-29, Christine approved: "lets do 1-5"). Lofty
+// sets a new lead's source from the utm_source on the link they arrived by
+// ("If a lead registers via a campaign or URL with an associated 'utm_source,'
+// that source will be assigned to the lead automatically" -- Lofty Help Center,
+// Lead Organization with Sources). Without it, someone who taps Search Homes
+// here and then registers on her Lofty site is just "Website" in her CRM. So
+// every hand-off carries utm_source = the site's own domain, plus
+// utm_medium=website and utm_campaign=home-search. The Little Lady site's
+// searches come through this module too (its functions pass through to this
+// site's) and say so with ?site=thelittleladysellshomes -- a query parameter
+// rather than a request header, because these responses are cached by URL and a
+// header would let one site's cached answer be served to the other's visitors.
+// Nothing about the visitor or the page they were on is added: the page-level
+// view lives in each site's own Google Analytics (home_search_handoff).
 "use strict";
 
 const { idxSearchUrl } = require("./_idx-display");
@@ -75,6 +90,21 @@ const PROPERTY_TYPES = {
   house: ["Single Family Home"],
   condo: ["Condo", "Townhouse"],
 };
+
+// ?site= values this module recognises, and the lead source each one becomes
+// in Lofty. Anything else -- missing, misspelled, or made up -- is this site.
+const SITE_SOURCES = {
+  signaturepropertycollection: "signaturepropertycollection.com",
+  thelittleladysellshomes: "thelittleladysellshomes.com",
+};
+const DEFAULT_SITE = "signaturepropertycollection";
+const UTM_MEDIUM = "website";
+const UTM_CAMPAIGN = "home-search";
+
+function utmSourceFor(params) {
+  const site = String((params || {}).site || "").toLowerCase();
+  return SITE_SOURCES[site] || SITE_SOURCES[DEFAULT_SITE];
+}
 
 function titleCase(s) {
   return String(s || "").toLowerCase().replace(/(^|[\s-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
@@ -150,6 +180,9 @@ function homeSearchUrl(params, opts) {
   u.searchParams.set("page", "1");
   const sort = SORTS[String(p.sort || "")];
   if (sort) u.searchParams.set("listingSort", sort);
+  u.searchParams.set("utm_source", utmSourceFor(p));
+  u.searchParams.set("utm_medium", UTM_MEDIUM);
+  u.searchParams.set("utm_campaign", UTM_CAMPAIGN);
   return u.toString();
 }
 
@@ -170,5 +203,6 @@ function homeSearchLabel(params) {
 }
 
 module.exports = {
-  homeSearchUrl, homeSearchLabel, conditionFor, townsFrom, defaultCounties, DEFAULT_COUNTIES, SORTS, PROPERTY_TYPES,
+  homeSearchUrl, homeSearchLabel, conditionFor, townsFrom, defaultCounties, utmSourceFor,
+  DEFAULT_COUNTIES, SORTS, PROPERTY_TYPES, SITE_SOURCES, UTM_MEDIUM, UTM_CAMPAIGN,
 };

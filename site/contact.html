@@ -1815,6 +1815,17 @@ window.__ytPlay = function (b) {
       page_path: window.location.pathname
     });
   }, { passive: true });
+  /* Search Homes is a redirect to her Lofty site, never a page view: count the
+     hand-off (page + button only, never the search). */
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest('a[href*="/search-homes"]');
+    if (!a || typeof window.gtag !== "function") return;
+    window.gtag("event", "home_search_handoff", {
+      page_path: window.location.pathname,
+      cta_id: a.getAttribute("data-roi-cta") || "link",
+      transport_type: "beacon"
+    });
+  }, { passive: true });
 })();
 </script>
 <script>document.addEventListener('submit',function(e){var f=e.target;if(e.defaultPrevented||!f||!f.getAttribute)return;var m=/\/thank-you\.html\?from=([^&#]+)/.exec(f.getAttribute('action')||'');if(!m)return;try{sessionStorage.setItem('spc_lead_submit',JSON.stringify({form:decodeURIComponent(m[1]),t:Date.now()}));}catch(_){}});</script>

@@ -185,19 +185,21 @@ function disclaimerHtml(fetchedAt) {
 // home search, as an absolute address: this page is also served under
 // thelittleladysellshomes.com (brand=tllsh), where a relative link would land
 // on that site's own search page instead. Any price -- the visitor came for a
-// particular home, not for this site's $950K+ luxury view.
-function searchHref() {
-  return LISTINGS_SOURCE === "lofty" ? homeSearchUrl({ noFloor: "true" }) : "/search-homes.html";
+// particular home, not for this site's $950K+ luxury view. The brand says which
+// site the visitor is on, so Lofty credits the right one (utm_source).
+function searchHref(brand) {
+  if (LISTINGS_SOURCE !== "lofty") return "/search-homes.html";
+  return homeSearchUrl({ noFloor: "true", ...(brand === "tllsh" ? { site: "thelittleladysellshomes" } : {}) });
 }
 
-function notFoundBody(reason) {
+function notFoundBody(reason, brand) {
   return `<section class="hero" style="padding:90px 0 60px">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Listing Unavailable</span>
     <h1>This Listing Isn&rsquo;t Available</h1>
     <p class="lede">${esc(reason)}</p>
     <div class="btn-row">
-      <a class="btn btn-dark" href="${esc(searchHref())}">${LISTINGS_SOURCE === "lofty" ? "Search Homes For Sale" : "Search Active Listings"}</a>
+      <a class="btn btn-dark" href="${esc(searchHref(brand))}">${LISTINGS_SOURCE === "lofty" ? "Search Homes For Sale" : "Search Active Listings"}</a>
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/contact.html">Ask ${esc(AGENT_NAME.split(" ")[0])} About It</a>
     </div>
   </div>
@@ -572,7 +574,7 @@ exports.handler = async (event) => {
       CANONICAL: `${SITE_DOMAIN}/search-homes.html`,
       OG_IMAGE: `${SITE_DOMAIN}/assets/img/logo-full.png`,
       SCHEMA: "",
-      BODY: notFoundBody(reason),
+      BODY: notFoundBody(reason, params.brand),
     }),
   });
 
