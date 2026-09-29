@@ -18,6 +18,16 @@
   command = "bash scripts/netlify-build.sh"
   publish = "site"
 
+# 2026-09-29: Netlify's "Pretty URLs" post-processing is OFF. It rewrote every
+# internal link in the published HTML to its extensionless form (/about.html ->
+# /about) after the build, and site/_redirects then 301'd each of those back to
+# the .html page -- so every click on the site went through one of our own
+# redirects, and Google kept seeing two addresses for many pages. This file
+# setting overrides the one in the Netlify UI. The home link stays "/" exactly as
+# before (build.py header). tests/test-prettyurls.js pins both.
+[build.processing.html]
+  pretty_urls = false
+
 [functions]
   directory = "netlify/functions"
   # 2026-08-17: /listing/<id> crashed in production with
