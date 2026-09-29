@@ -67,6 +67,7 @@ const { addLoftyNote, refireLoftyTag, sendLeadAlertEmail } = require("./lib/_not
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
   findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
+  leadIdFromResponse,
 } = require("./lib/_lofty-returning");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
@@ -231,12 +232,22 @@ exports.handler = async (event) => {
     const homeProperty = homeValueProperty(formName, data);
     if (homeProperty) body.property = homeProperty;
 
-    // 2026-09-29: ask Lofty first whether this person is already a contact (an
-    // exact email search, then phone -- lib/_lofty-returning.js). A returning lead's note,
-    // call-back task and phone push then go to the contact that actually exists,
+    // 2026-09-29: ask Lofty first whether this person is already a contact
+    // (exact email and phone searches, in parallel, capped at 2 seconds in total --
+    // lib/_lofty-returning.js). A returning lead's note, call-back task and phone
+    // push then go to the contact that actually exists (email matches only),
     // instead of the absorbed record a merge hands back. Never throws; if Lofty
-    // can't answer, nothing below changes from before.
+    // can't answer in time, everything below runs exactly as before.
     const existing = await findExistingLead(data.email, data.phone, apiKey);
+    // A known contact keeps its own tags. `tags` on the create call REPLACES the
+    // tag set of the contact a submission merges into ("All existing tags will be
+    // updated based on this call" -- Lofty's create-lead reference); `tagsAdd`
+    // only adds. Anyone found by email or phone gets tagsAdd; a brand-new contact
+    // is created exactly as before.
+    if (existing.anyMatch && Array.isArray(body.tags)) {
+      body.tagsAdd = body.tags;
+      delete body.tags;
+    }
 
     const result = await postLead(body, apiKey);
     // The store is only needed for diagnostics, so a Blobs problem must not
@@ -311,6 +322,18 @@ exports.handler = async (event) => {
       : noteResult.leadMissing
         ? { attempted: false, skipped: "lead-missing", tagRestored: true }
         : await refireLoftyTag(leadId, TRIGGER_TAG, apiKey);
+    // Recorded now, before the optional steps below, so /status always has this
+    // lead even if a slow Lofty runs the function out of time after this point.
+    const existingSummary = {
+      ok: existing.ok, found: !!existing.leadId, via: existing.via, anyMatch: existing.anyMatch,
+      leadId: existing.leadId, error: existing.error,
+    };
+    if (store) {
+      await recordPush(store, {
+        ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
+      }, formName, body);
+    }
+
     const returningResult = existing.leadId
       ? await alertReturningLead(existing.leadId, {
         label: stampedSource.replace("Signature Property Collection - ", ""),
@@ -319,21 +342,22 @@ exports.handler = async (event) => {
       : { attempted: false };
 
     // 2026-09-29: which form, first page, form page and traffic source as Lofty
-    // fields she can filter on -- written only on a BRAND-NEW contact (Lofty's
-    // email search said none existed), because an update's effect on a client's
-    // other custom fields is undocumented. See lib/_lofty-returning.js.
+    // fields she can filter on -- written only on a contact PROVEN brand new: both
+    // searches answered and found nobody, the create call's own id (read exactly,
+    // not through JSON.parse) took the note. An update's effect on a client's
+    // other custom fields is undocumented, so an existing record is never touched.
     let fieldsResult = { attempted: false };
-    if (existing.ok && !existing.leadId && leadId && !noteResult.leadMissing) {
+    const newLeadId = leadIdFromResponse(result.responseBody);
+    if (existing.ok && !existing.anyMatch && newLeadId && noteResult.ok && noteTarget === leadId) {
       const ensured = await ensureWebsiteFields(store, apiKey);
       fieldsResult = ensured.ok
-        ? await setWebsiteFields(leadId, websiteFieldValues(stampedSource, data), apiKey)
+        ? await setWebsiteFields(newLeadId, websiteFieldValues(stampedSource, data), apiKey)
         : { attempted: false, reason: "fields not ready", ensured };
     }
 
-    if (store) {
+    if (store && (returningResult.attempted || fieldsResult.attempted)) {
       await recordPush(store, {
-        ...result, leadId, emailResult, noteResult, tagResult,
-        existing: { ok: existing.ok, found: !!existing.leadId, via: existing.via, leadId: existing.leadId, error: existing.error },
+        ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
         returningResult, fieldsResult,
       }, formName, body);
     }

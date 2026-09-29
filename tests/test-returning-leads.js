@@ -11,6 +11,9 @@
 // lead's note/task/push go to the contact that exists; fields only ever touch a
 // brand-new contact; and any Lofty failure changes nothing that worked before.
 "use strict";
+// Fails unless the suite reaches its own verdict: a promise the event loop
+// abandons would otherwise exit 0 halfway through and look like a pass.
+process.exitCode = 1;
 const ROOT = require("path").resolve(__dirname, "..");
 const FN_DIR = `${ROOT}/netlify/functions`;
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
@@ -29,7 +32,8 @@ function resp(status, body) {
 (async () => {
   console.log("\n1. Looking a contact up by email (exact)");
   let seen = [];
-  const lookupFetch = (leads, status = 200) => async (url, init) => { seen.push({ url: String(url), init }); return resp(status, { _metadata: {}, leads }); };
+  // Options object for the lookups: { fetchImpl } answering with these leads.
+  const lookupFetch = (leads, status = 200) => ({ fetchImpl: async (url, init) => { seen.push({ url: String(url), init }); return resp(status, { _metadata: {}, leads }); } });
   let r = await R.findLeadByEmail("Buyer@Example.com", "k", lookupFetch([{ leadId: Number(EXISTING), emails: ["buyer@example.com"] }]));
   const u = new URL(seen[0].url);
   check("GET /v1.0/leads with the email and preciseSearchFlag=true",
@@ -37,12 +41,17 @@ function resp(status, body) {
   check("authorised with the key", seen[0].init.headers.Authorization === "token k");
   check("finds the contact, case-insensitively", r.ok === true && r.leadId === EXISTING, JSON.stringify(r));
   r = await R.findLeadByEmail("buyer@example.com", "k", lookupFetch([{ leadId: 5, emails: ["someone.else@example.com"] }]));
-  check("a result whose email doesn't match exactly is not this person", r.ok === true && r.leadId === null);
+  check("a result that isn't an exact match makes the answer untrustworthy (can't tell, never 'new')", r.ok === false && !r.leadId);
+  r = await R.findLeadByEmail("buyer@example.com", "k", lookupFetch([null, { leadId: Number(EXISTING), emails: ["buyer@example.com"] }]));
+  check("a null entry in Lofty's answer doesn't throw", r.ok === true && r.leadId === EXISTING);
+  const big = [{ leadId: Number(EXISTING), emails: ["buyer@example.com"], tags: Array.from({ length: 40 }, (_, i) => `tag ${i} ${"x".repeat(80)}`) }];
+  r = await R.findLeadByEmail("buyer@example.com", "k", lookupFetch(big));
+  check("a long record (over 4 KB) is parsed whole", r.ok === true && r.leadId === EXISTING, JSON.stringify(r));
   r = await R.findLeadByEmail("buyer@example.com", "k", lookupFetch([]));
   check("no contact: ok, and no id", r.ok === true && r.leadId === null && r.matches === 0);
-  r = await R.findLeadByEmail("buyer@example.com", "k", async () => resp(500, "boom"));
+  r = await R.findLeadByEmail("buyer@example.com", "k", { fetchImpl: async () => resp(500, "boom") });
   check("Lofty error: not ok (callers change nothing)", r.ok === false && r.httpStatus === 500);
-  r = await R.findLeadByEmail("buyer@example.com", "k", async () => resp(200, { weird: true }));
+  r = await R.findLeadByEmail("buyer@example.com", "k", { fetchImpl: async () => resp(200, { weird: true }) });
   check("unexpected shape: not ok", r.ok === false);
   r = await R.findLeadByEmail("buyer@example.com", "k", lookupFetch([{ leadId: 2 ** 60, emails: ["buyer@example.com"] }]));
   check("an id JavaScript can't hold exactly is refused, not rounded", r.ok === false);
@@ -57,16 +66,32 @@ function resp(status, body) {
     new URL(seen[0].url).searchParams.get("preciseSearchFlag") === "true");
   check("matches however the number is formatted", r.ok === true && r.leadId === "42");
   seen = [];
-  r = await R.findExistingLead("new@example.com", "970-555-0100", "k", async (url) => {
+  r = await R.findExistingLead("new@example.com", "970-555-0100", "k", { fetchImpl: async (url) => {
     seen.push(String(url));
     return /email=/.test(String(url)) ? resp(200, { leads: [] }) : resp(200, { leads: [{ leadId: 42, phones: ["9705550100"] }] });
+  } });
+  check("email and phone asked together", seen.length === 2);
+  check("a phone-only match is 'someone' (blocks fields, keeps tags) but never redirects the note or task (could be a spouse)",
+    r.ok === true && r.anyMatch === true && r.leadId === null && r.phoneLeadId === "42" && r.via === "phone", JSON.stringify(r));
+  r = await R.findExistingLead("buyer@example.com", "970-555-0100", "k", { fetchImpl: async () => resp(200, { leads: [{ leadId: 7, emails: ["buyer@example.com"], phones: ["9705550100"] }] }) });
+  check("an email match is the contact to use", r.ok === true && r.leadId === "7" && r.via === "email" && r.anyMatch === true);
+  r = await R.findExistingLead("new@example.com", "970-555-0100", "k", { fetchImpl: async (url) =>
+    (/email=/.test(String(url)) ? resp(200, { leads: [] }) : resp(500, "down")) });
+  check("if the phone question fails, 'new' can't be trusted (ok false)", r.ok === false && r.anyMatch === false);
+  r = await R.findExistingLead("new@example.com", "", "k", { fetchImpl: async () => resp(200, { leads: [] }) });
+  check("no phone given: the email answer alone decides", r.ok === true && r.leadId === null && r.anyMatch === false);
+  const hang = (url, init) => new Promise((resolve, reject) => {
+    init.signal.addEventListener("abort", () => reject(new Error("aborted")));
   });
-  check("unknown email but known phone = an existing contact, found via phone", r.ok === true && r.leadId === "42" && r.via === "phone" && seen.length === 2);
-  r = await R.findExistingLead("new@example.com", "970-555-0100", "k", async (url) =>
-    (/email=/.test(String(url)) ? resp(200, { leads: [] }) : resp(500, "down")));
-  check("if the phone question fails, 'new' can't be trusted (ok false)", r.ok === false);
-  r = await R.findExistingLead("new@example.com", "", "k", async () => resp(200, { leads: [] }));
-  check("no phone given: the email answer alone decides", r.ok === true && r.leadId === null);
+  // AbortSignal.timeout's timer doesn't hold Node's event loop open (a function
+  // invocation does, in production), so the test holds it open itself.
+  const keepAlive = setTimeout(() => {}, 5000);
+  const t0 = Date.now();
+  r = await R.findExistingLead("new@example.com", "970-555-0100", "k", { fetchImpl: hang, budgetMs: 300 });
+  const took = Date.now() - t0;
+  clearTimeout(keepAlive);
+  check("a hung Lofty costs one budget in total, not one per question", r.ok === false && took < 900, `${took}ms`);
+  check("the default budget is 2 seconds", R.LOOKUP_BUDGET_MS === 2000);
 
   console.log("\n2. Denver time, the shape Lofty's task API documents");
   check("summer is MDT (-06:00)", R.denverIso(new Date("2026-09-29T14:30:00Z")) === "2026-09-29T08:30:00-06:00", R.denverIso(new Date("2026-09-29T14:30:00Z")));
@@ -124,9 +149,13 @@ function resp(status, body) {
   e = await R.ensureWebsiteFields(store, "k", { fetchImpl: fieldFetch, now: Date.parse("2026-10-01T14:00:00Z") });
   check("remembered for a week: no calls the next time", e.cached === true && seen.length === 0);
   seen = [];
-  const put = await R.setWebsiteFields(NEWID, vals, "k", fieldFetch);
+  const put = await R.setWebsiteFields(NEWID, vals, "k", { fetchImpl: fieldFetch });
   check("PUT /v1.0/leads/{id} with customAttributeList", put.ok === true && seen[0].init.method === "PUT" &&
     seen[0].url.endsWith(`/v1.0/leads/${NEWID}`) && JSON.parse(seen[0].init.body).customAttributeList.length === 4);
+  const manyFields = { data: Array.from({ length: 60 }, (_, i) => ({ attributeName: `Other field ${i} ${"y".repeat(60)}` })).concat(R.WEBSITE_FIELDS.map((n) => ({ attributeName: n }))) };
+  seen = [];
+  e = await R.ensureWebsiteFields(null, "k", { fetchImpl: async (url, init) => { seen.push({ url: String(url), init }); return /listCustomField/.test(String(url)) ? resp(200, manyFields) : resp(200, "ok"); } });
+  check("a team with many fields (a long answer) doesn't get duplicates", e.ok === true && e.created.length === 0 && seen.length === 1);
 
   console.log("\n5. The form handler, end to end");
   const pushes = [];
@@ -138,11 +167,14 @@ function resp(status, body) {
   process.env.RESEND_API_KEY = "r";
   const handler = require(`${FN_DIR}/submission-created.js`).handler;
   const event = (email) => ({ body: JSON.stringify({ payload: { form_name: "contact", data: { name: "Pat Buyer", email, phone: "970-555-0100", message: "Hi" } } }) });
-  const route = (existingLeads) => {
+  const route = (existingLeads, phoneLeads) => {
     const calls = [];
+    const bodies = [];
     const f = async (url, init = {}) => {
       const s = String(url); const m = init.method || "GET";
       calls.push(`${m} ${s.replace(/^https:\/\/api\.(lofty|resend)\.com/, "")}`.split("?")[0]);
+      if (m === "POST" && /\/v1\.0\/leads$/.test(s)) bodies.push(JSON.parse(init.body));
+      if (m === "GET" && /\/v1\.0\/leads\?phone=/.test(s)) return resp(200, { leads: phoneLeads || existingLeads });
       if (/resend\.com/.test(s)) return resp(200, { id: "e1" });
       if (m === "GET" && /\/v1\.0\/leads\?/.test(s)) return resp(200, { leads: existingLeads });
       if (m === "POST" && /\/v1\.0\/leads$/.test(s)) return resp(200, `{"data":{"leadId": ${existingLeads.length ? EXISTING : NEWID}}}`);
@@ -154,7 +186,7 @@ function resp(status, body) {
       if (m === "PUT") return resp(200, "{}");
       return resp(404, "unexpected " + s);
     };
-    return { f, calls };
+    return { f, calls, bodies };
   };
   delete mem["lofty-website-fields.json"];
 
@@ -170,15 +202,28 @@ function resp(status, body) {
     rt.calls.includes("POST /v2.0/sales-agent/notification/app-push/send-task-reminder") && rec.returningResult.ok === true);
   check("returning: no tag re-fire (Lofty can't) and no field writes on a client's record",
     rec.tagResult.skipped === "returning-lead-task" && !rt.calls.includes(`PUT /v1.0/leads/${EXISTING}`) && rec.fieldsResult.attempted === false);
+  check("returning: the create call ADDS its tags (tagsAdd) instead of replacing the client's (tags)",
+    rt.bodies[0] && Array.isArray(rt.bodies[0].tagsAdd) && rt.bodies[0].tagsAdd.includes("Hot Lead - Website") && !("tags" in rt.bodies[0]), JSON.stringify(rt.bodies[0]));
+  check("returning: /status got the lead before the optional steps, then the update", pushes.length >= 2 &&
+    !pushes[pushes.length - 2].returningResult && pushes[pushes.length - 1].returningResult);
 
   rt = route([]);
   global.fetch = rt.f;
   await handler(event("new.person@example.com"));
   rec = pushes[pushes.length - 1];
-  check("new contact: no task, no push", !rt.calls.includes("POST /v2.0/tasks") && rec.returningResult.attempted === false);
+  check("new contact: no task, no push", !rt.calls.includes("POST /v2.0/tasks") && rec.returningResult && rec.returningResult.attempted === false);
   check("new contact: fields ensured then written on the new lead",
     rt.calls.includes("GET /v1.0/teamFeatures/listCustomField") && rt.calls.includes(`PUT /v1.0/leads/${NEWID}`) && rec.fieldsResult.ok === true,
     JSON.stringify(rt.calls));
+  check("new contact: created exactly as before (tags, not tagsAdd)", Array.isArray(rt.bodies[0].tags) && !("tagsAdd" in rt.bodies[0]));
+
+  rt = route([], [{ leadId: 42, phones: ["9705550100"] }]);
+  global.fetch = rt.f;
+  await handler(event("spouse@example.com"));
+  rec = pushes[pushes.length - 1];
+  check("phone-only match: tags added not replaced, but no task, no fields, and the note goes to the create's own id",
+    Array.isArray(rt.bodies[0].tagsAdd) && rec.returningResult === undefined && !rt.calls.includes("POST /v2.0/tasks") &&
+    !rt.calls.some((c) => c.startsWith("PUT ")) && rec.existing.anyMatch === true, JSON.stringify(rt.calls));
 
   rt = route([]);
   rt.f = ((inner) => async (url, init = {}) => (/\/v1\.0\/leads\?/.test(String(url)) ? resp(503, "down") : inner(url, init)))(rt.f);
@@ -186,7 +231,8 @@ function resp(status, body) {
   await handler(event("new.person@example.com"));
   rec = pushes[pushes.length - 1];
   check("lookup down: the lead still goes to Lofty and her inbox, and nothing new is attempted",
-    rec.ok === true && rec.emailResult.ok === true && rec.returningResult.attempted === false && rec.fieldsResult.attempted === false);
+    rec.ok === true && rec.emailResult.ok === true && !rec.returningResult && !rec.fieldsResult &&
+    Array.isArray(rt.bodies[0].tags) && !rt.calls.includes("POST /v2.0/tasks") && !rt.calls.some((c) => c.startsWith("PUT ")));
 
   console.log("\n6. /status explains a returning lead instead of a red tag failure");
   const record = {

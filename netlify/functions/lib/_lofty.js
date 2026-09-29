@@ -52,17 +52,29 @@ function minimalLead(body) {
   return out;
 }
 
+// 2026-09-29 (independent review): this call had no timeout, so a hung Lofty ran
+// the whole function out of time before the backup email and the retry queue --
+// the one outcome this file exists to prevent. Now it gives up after 6 seconds
+// and reports a failure like any other, which the caller emails and queues.
+const POST_TIMEOUT_MS = 6000;
+
 async function postOnce(body, apiKey) {
-  const res = await fetch(`${LOFTY_BASE_URL}/leads`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      // Verbatim from Lofty's own usage example on its API settings page:
-      // Authorization: token <your apiKey>. Lowercase "token", not "Bearer".
-      "Authorization": `token ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(`${LOFTY_BASE_URL}/leads`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Verbatim from Lofty's own usage example on its API settings page:
+        // Authorization: token <your apiKey>. Lowercase "token", not "Bearer".
+        "Authorization": `token ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(POST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    return { ok: false, httpStatus: 0, responseBody: `no answer from Lofty: ${String((err && err.message) || err).slice(0, 200)}` };
+  }
   const text = await res.text().catch(() => "");
   return { ok: res.ok, httpStatus: res.status, responseBody: text.slice(0, 500) };
 }
