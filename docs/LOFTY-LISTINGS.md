@@ -82,6 +82,17 @@ is gone.
 - **Not mapped, on purpose**: subdivision (Lofty wants the exact name — "Mariana"
   finds nothing, "Mariana Butte" does — so those searches open the whole town),
   riverfront / horse property (no Lofty filter), land / farm (labels didn't match).
+- **Tagged with where they came from** (2026-09-29): every hand-off URL carries
+  `utm_source=signaturepropertycollection.com` (or `thelittleladysellshomes.com`
+  when the Little Lady site passes the search through with `?site=thelittleladysellshomes`),
+  `utm_medium=website`, `utm_campaign=home-search`. Lofty sets a new lead's
+  source from `utm_source`, so a buyer who registers on her Lofty site after
+  tapping Search Homes here shows up with this site as their source instead of
+  plain "Website". A query parameter, not a header, because these answers are
+  cached by URL. Nothing about the visitor or the page is added.
+- **Counted in Google Analytics**: a redirect is never a page view, so the
+  hand-off itself is an event, `home_search_handoff` (`page_path`, `cta_id` —
+  the button's `data-roi-cta`, `search-widget` or `link`; never the search).
 - A listing page for anyone else's listing is a 404 with a "Search Homes For Sale"
   button to her Lofty search (old links from the MLS Grid days land there).
 - **thelittleladysellshomes.com** does the same (its PR #45): its
