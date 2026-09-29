@@ -1410,6 +1410,12 @@ exports.handler = async (event) => {
   // (the function stopped first) must not read as a green "not attempted yet".
   const returningUnconfirmed = !!(tag && tag.skipped === "returning-lead-task" && !returningHandled);
   const lookup = loftyLast && loftyLast.existing;
+  // submission-created records the lead as soon as the email is out (inProgress)
+  // and rewrites the record as each later step finishes; a record still marked
+  // inProgress means the function stopped before the end.
+  const stoppedEarly = !!(loftyLast && loftyLast.inProgress && !returningHandled);
+  const emailLine = loftyLast && loftyLast.emailResult && loftyLast.emailResult.ok
+    ? "The backup email reached you." : "See the email row above for the backup email.";
   // 2026-08-16, SETTLED WITH EVIDENCE, and it is the merge case rather than a
   // fault. Christine submitted a real listing-inquiry at 13:50; the push
   // succeeded and returned leadId 1147334685108095, and POST /notes for that very
@@ -1437,13 +1443,21 @@ exports.handler = async (event) => {
   if (lookup) {
     parts.push(lookup.found ? "Checked Lofty first: already a contact (matched by email)."
       : lookup.anyMatch ? "Checked Lofty first: their phone matches an existing contact but the email " +
-        "doesn't, so the form's tags were added (not replaced) and the note went to this record."
+        "doesn't, so the form's tags were added rather than replacing that contact's."
       : lookup.ok ? "Checked Lofty first: a new contact."
+      : lookup.attempted === false ? "No usable email or phone on the form to check Lofty with, so the " +
+        "form's tags were added rather than replacing any."
       : `Couldn't check Lofty first (${lookup.error || "no answer in time"}), so the form's tags were ` +
         "added rather than replacing any a returning client already had.");
   }
+  if (stoppedEarly) {
+    parts.push("The function stopped before it finished (Lofty was slow), so the steps after " +
+      "this point weren't recorded" +
+      (lookup && lookup.found ? " — including the call-back task and phone push" : "") +
+      `. ${emailLine} Check the contact in Lofty.`);
+  }
   if (!note || !note.attempted) {
-    parts.push("Timeline note: not attempted yet.");
+    if (!stoppedEarly) parts.push("Timeline note: not attempted yet.");
   } else if (note.ok) {
     parts.push("Timeline note: written to the lead ✓.");
   } else if (leadMerged) {
@@ -1452,24 +1466,28 @@ exports.handler = async (event) => {
       "note had no id to attach to (404 \"Lead not exist\"). The email lookup before the push " +
       "didn't match them (a different email, or Lofty didn't answer in time); a match by " +
       "email sends the note, a call-back task and a phone push to the right contact instead. " +
-      (lookup ? "The form's tags were added to the surviving contact (never replacing theirs), "
-        : "The form's tags were sent with the lead, ") +
-      "and the backup email reached you. This only happens for someone already in your CRM — " +
+      (lookup && lookup.tagField === "tagsAdd"
+        ? "The form's tags were added to the surviving contact (never replacing theirs). "
+        : "The form's tags were sent with the lead. ") +
+      `${emailLine} This only happens for someone already in your CRM — ` +
       "a new enquirer creates a new contact, and the note and tag land normally.");
   } else {
     parts.push(`Timeline note FAILED (${note.httpStatus || note.error || "unknown"}).`);
   }
-  if (returningUnconfirmed) {
+  if (stoppedEarly) {
+    // Said once, above.
+  } else if (returningUnconfirmed) {
     parts.push("They were already in Lofty, but the call-back task and phone push were NOT " +
-      "confirmed — the function stopped before recording them. The backup email reached you; " +
-      "check their contact in Lofty for the task.");
+      `confirmed — the function stopped before recording them. ${emailLine} ` +
+      "Check their contact in Lofty for the task.");
   } else if (returningHandled) {
     // The tag isn't the mechanism for a returning lead any more; the task is.
     parts.push(returning.ok
       ? "They were already in Lofty, so instead of the Hot Lead tag (which can't fire twice) " +
         "a call-back task was created on their contact and pushed to the assigned agent's phone ✓."
       : `They were already in Lofty; the call-back ${returning.step === "task" ? "task" : "phone push"} FAILED ` +
-        `(${returning.httpStatus || returning.error || "unknown"}). The backup email still reached you.`);
+        `(${returning.httpStatus || returning.error || "unknown"}). ` +
+        (loftyLast.emailResult && loftyLast.emailResult.ok ? "The backup email still reached you." : emailLine));
   } else if (leadMerged) {
     // The tag call reads the same unresolvable id, so submission-created no
     // longer spends a request on it. Saying so beats an unexplained gap.
@@ -1511,7 +1529,7 @@ exports.handler = async (event) => {
     name: leadMerged && !returningHandled
       ? "Lofty note on your last lead (it merged — expected)"
       : "Your Lofty notification will fire",
-    ok: returningUnconfirmed ? false
+    ok: (stoppedEarly || returningUnconfirmed) ? false
       : returningHandled ? (!!(note && note.ok) && !!returning.ok)
       : leadMerged ? false
       : (!note || !note.attempted) ? true

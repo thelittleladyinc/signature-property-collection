@@ -311,8 +311,11 @@ exports.handler = async (event) => {
     // Recorded as soon as the email is out, so /status has this lead even if the
     // slower steps below run the function out of time. Rewritten as they finish.
     const existingSummary = {
-      ok: existing.ok, found: !!existing.leadId, via: existing.via, anyMatch: existing.anyMatch,
-      leadId: existing.leadId, error: existing.error,
+      attempted: existing.attempted, ok: existing.ok, found: !!existing.leadId, via: existing.via,
+      anyMatch: existing.anyMatch, leadId: existing.leadId, error: existing.error,
+      // Which field carried the form's tags: "tags" replaces a merged contact's set,
+      // "tagsAdd" only adds. /status says which, instead of guessing.
+      tagField: Array.isArray(body.tags) ? "tags" : Array.isArray(body.tagsAdd) ? "tagsAdd" : null,
     };
     if (store) {
       await recordPush(store, {

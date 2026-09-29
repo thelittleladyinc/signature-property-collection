@@ -273,6 +273,7 @@ function resp(status, body) {
   console.log("\n6. /status explains a returning lead instead of a red tag failure");
   const record = {
     at: "2026-09-29T15:00:00Z", formName: "contact", ok: true, httpStatus: 200, payloadShape: "full", leadId: Number(EXISTING),
+    emailResult: { attempted: true, ok: true },
     noteResult: { attempted: true, ok: true, httpStatus: 200 },
     tagResult: { attempted: false, skipped: "returning-lead-task", tagRestored: true },
     existing: { ok: true, found: true, leadId: EXISTING },
@@ -300,12 +301,25 @@ function resp(status, body) {
   const res3 = await require(`${FN_DIR}/site-health.js`).handler({ queryStringParameters: { format: "json" } });
   const row3 = JSON.parse(res3.body).checks.find((c) => /Lofty notification will fire/.test(c.name));
   check("a returning lead whose task never recorded is NOT green (second review)", row3 && row3.ok === false &&
-    /NOT confirmed/.test(row3.detail) && !/Trigger tag: not attempted yet/.test(row3.detail), row3 && row3.detail);
+    /(NOT confirmed|including the call-back task and phone push)/.test(row3.detail) &&
+    !/Trigger tag: not attempted yet/.test(row3.detail), row3 && row3.detail);
   record.existing = { ok: false, found: false, anyMatch: false, leadId: null, error: "timeout" };
   const res4 = await require(`${FN_DIR}/site-health.js`).handler({ queryStringParameters: { format: "json" } });
   const row4 = JSON.parse(res4.body).checks.find((c) => /Lofty notification will fire|merged/.test(c.name));
   check("a lookup that couldn't answer says so, and that tags were added", row4 &&
     /Couldn't check Lofty first \(timeout\)/.test(row4.detail), row4 && row4.detail);
+  // Second re-check: a record still marked inProgress means the function stopped
+  // before the end -- never a green "not attempted yet".
+  const early = { at: "2026-09-29T16:00:00Z", formName: "contact", ok: true, httpStatus: 200, payloadShape: "full",
+    leadId: 5, emailResult: { attempted: true, ok: false, httpStatus: 403 }, inProgress: true,
+    existing: { attempted: true, ok: true, found: false, anyMatch: false, leadId: null, tagField: "tags" } };
+  Object.keys(record).forEach((k) => delete record[k]);
+  Object.assign(record, early);
+  const res5 = await require(`${FN_DIR}/site-health.js`).handler({ queryStringParameters: { format: "json" } });
+  const row5 = JSON.parse(res5.body).checks.find((c) => /Lofty notification will fire|merged/.test(c.name));
+  check("a run that stopped early is not green and says so", row5 && row5.ok === false &&
+    /stopped before it finished/.test(row5.detail) && !/not attempted yet/.test(row5.detail), row5 && row5.detail);
+  check("and doesn't claim the email reached her when it didn't", row5 && !/backup email reached you/.test(row5.detail));
 
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
   process.exit(failures ? 1 : 0);
