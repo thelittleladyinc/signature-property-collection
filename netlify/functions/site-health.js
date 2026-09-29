@@ -1399,6 +1399,13 @@ exports.handler = async (event) => {
   // and a tag that genuinely counts as newly added so a Smart Plan re-triggers.
   const note = loftyLast && loftyLast.noteResult;
   const tag = loftyLast && loftyLast.tagResult;
+  // 2026-09-29: a RETURNING lead now gets a call-back task + phone push instead
+  // of the tag re-fire Lofty's API can't do (lib/_lofty-returning.js), and a new
+  // contact gets the four website fields. Records written before today have
+  // neither, and read exactly as they did.
+  const returning = loftyLast && loftyLast.returningResult;
+  const fields = loftyLast && loftyLast.fieldsResult;
+  const returningHandled = !!(returning && returning.attempted);
   // 2026-08-16, SETTLED WITH EVIDENCE, and it is the merge case rather than a
   // fault. Christine submitted a real listing-inquiry at 13:50; the push
   // succeeded and returned leadId 1147334685108095, and POST /notes for that very
@@ -1438,7 +1445,14 @@ exports.handler = async (event) => {
   } else {
     parts.push(`Timeline note FAILED (${note.httpStatus || note.error || "unknown"}).`);
   }
-  if (leadMerged) {
+  if (returningHandled) {
+    // The tag isn't the mechanism for a returning lead any more; the task is.
+    parts.push(returning.ok
+      ? "They were already in Lofty, so instead of the Hot Lead tag (which can't fire twice) " +
+        "a call-back task was created on their contact and pushed to the assigned agent's phone ✓."
+      : `They were already in Lofty; the call-back ${returning.step === "task" ? "task" : "phone push"} FAILED ` +
+        `(${returning.httpStatus || returning.error || "unknown"}). The backup email still reached you.`);
+  } else if (leadMerged) {
     // The tag call reads the same unresolvable id, so submission-created no
     // longer spends a request on it. Saying so beats an unexplained gap.
     parts.push("Trigger tag: not attempted, because it reads the same id and would fail " +
@@ -1467,17 +1481,23 @@ exports.handler = async (event) => {
     parts.push(`Trigger tag: unchanged, Lofty refused the edit (${tag.httpStatus || tag.error || "unknown"}). ` +
       "The tag from the original push is still there; only the re-trigger didn't happen.");
   }
+  if (fields && fields.attempted) {
+    parts.push(fields.ok
+      ? `Website fields (${(fields.fields || []).join(", ")}) written to the new contact ✓.`
+      : `Website fields NOT written (${fields.httpStatus || fields.error || "unknown"}) — the same details are in the note.`);
+  }
   checks.push({
     // Named for what she cares about, not for the mechanism: this row is the
     // primary notification path now that the tag genuinely changes.
-    optional: leadMerged,
-    name: leadMerged
+    optional: leadMerged && !returningHandled,
+    name: leadMerged && !returningHandled
       ? "Lofty note on your last lead (it merged — expected)"
       : "Your Lofty notification will fire",
-    ok: leadMerged ? false
+    ok: returningHandled ? (!!(note && note.ok) && !!returning.ok)
+      : leadMerged ? false
       : (!note || !note.attempted) ? true
       : (!!note.ok && (!tag || !tag.attempted || (tag.ok && tag.tagRestored !== false))),
-    detail: parts.join(" ") + (leadMerged ? "" :
+    detail: parts.join(" ") + (leadMerged || returningHandled ? "" :
       " These are what make a lead that MERGED into an existing contact still show up — " +
       "the case that hid your own test submissions, because they used your account-owner email."),
   });

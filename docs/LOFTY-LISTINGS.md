@@ -123,6 +123,32 @@ is gone.
   from Lofty. So turning `IDX_DISPLAY` on for her Lofty listings does not turn it
   on: on Lofty it also needs `RECENT_ACTIVITY_DISPLAY=on`, Christine's call.
 
+## Website leads in Lofty: returning leads and website fields (2026-09-29)
+
+`lib/_lofty-returning.js`, used by `submission-created.js` on both sites (the
+Little Lady copy is pinned identical by its tests):
+
+- **Before pushing a lead, Lofty is asked whether the person already exists**:
+  `GET /v1.0/leads?email=…&preciseSearchFlag=true`, then by phone (bare digits)
+  if the email found nobody. Exact matches only.
+- **Returning lead** (found): the timeline note goes to that contact (not the
+  absorbed record a merge hands back), and instead of the tag re-fire Lofty's
+  API can't do, a **Call task** is created on the contact
+  (`POST /v2.0/tasks`, assigned to the lead's agent, due in 30 minutes Denver
+  time) and **pushed to that agent's phone**
+  (`POST /v2.0/sales-agent/notification/app-push/send-task-reminder`). Nothing
+  is ever sent to the client. The backup email is unchanged.
+- **New contact** (both lookups answered, nobody found): four text custom
+  fields — *Website Form*, *Website First Page*, *Website Form Page*, *Website
+  Traffic Source* — are written on the new lead (`PUT /v1.0/leads/{id}` with
+  `customAttributeList`). The fields are created on her team once
+  (`POST /v1.0/teamFeatures/custom-field`) and remembered for a week (Blobs
+  `lofty-website-fields.json`). Never written on an existing contact: whether an
+  update replaces a lead's other custom fields is undocumented.
+- If Lofty can't answer the lookup, nothing new is attempted and the lead flows
+  exactly as before. `/status` → *Your Lofty notification will fire* shows the
+  task/push (or what failed) for a returning lead.
+
 ## Showing listings: the IDX display switch
 
 Display is governed by the kill switch added the same day (PR #59,

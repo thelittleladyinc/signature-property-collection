@@ -65,6 +65,9 @@ const { getBlobStore } = require("./lib/_mls-shared");
 const { postLead, recordPush } = require("./lib/_lofty");
 const { addLoftyNote, refireLoftyTag, sendLeadAlertEmail } = require("./lib/_notify");
 const { homeValueProperty } = require("./lib/_lead-address");
+const {
+  findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
+} = require("./lib/_lofty-returning");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
 
@@ -228,6 +231,13 @@ exports.handler = async (event) => {
     const homeProperty = homeValueProperty(formName, data);
     if (homeProperty) body.property = homeProperty;
 
+    // 2026-09-29: ask Lofty first whether this person is already a contact (an
+    // exact email search, then phone -- lib/_lofty-returning.js). A returning lead's note,
+    // call-back task and phone push then go to the contact that actually exists,
+    // instead of the absorbed record a merge hands back. Never throws; if Lofty
+    // can't answer, nothing below changes from before.
+    const existing = await findExistingLead(data.email, data.phone, apiKey);
+
     const result = await postLead(body, apiKey);
     // The store is only needed for diagnostics, so a Blobs problem must not
     // prevent the push itself -- it's fetched after the lead has already gone.
@@ -262,7 +272,7 @@ exports.handler = async (event) => {
       // The long labels all start with the site name; the subject line doesn't
       // need it repeated.
       sourceShort: stampedSource.replace("Signature Property Collection - ", ""),
-      noteText: body.notes, leadId, stamp: `${stamp} MT`,
+      noteText: body.notes, leadId: existing.leadId || leadId, stamp: `${stamp} MT`,
     });
 
     if (!result.ok) {
@@ -279,7 +289,9 @@ exports.handler = async (event) => {
 
     // The note as its own call, because a merge has no reason to overwrite an
     // existing contact's fields -- which is why her repeat tests left no trace.
-    const noteResult = leadId ? await addLoftyNote(leadId, body.notes, apiKey) : { attempted: false };
+    // 2026-09-29: to the existing contact when there is one (see above).
+    const noteTarget = existing.leadId || leadId;
+    const noteResult = noteTarget ? await addLoftyNote(noteTarget, body.notes, apiKey) : { attempted: false };
     // And make the trigger tag a real CHANGE, so the Smart Plan fires on a
     // returning buyer's second enquiry and not only their first.
     //
@@ -289,12 +301,42 @@ exports.handler = async (event) => {
     // call and puts a second, redundant failure on /status that reads like a
     // separate fault. tagRestored stays true because the tag written by the
     // create call is still on the surviving contact; Lofty appends tags on merge.
+    //
+    // 2026-09-29: and not at all for a RETURNING lead. Lofty's API can't re-fire
+    // a tag the contact already has (GET /leads doesn't even return tags), so a
+    // returning lead gets what Lofty documents for "act on this lead now"
+    // instead: a Call task on the contact and a push to the agent's phone.
     const tagResult = !leadId ? { attempted: false }
+      : existing.leadId ? { attempted: false, skipped: "returning-lead-task", tagRestored: true }
       : noteResult.leadMissing
         ? { attempted: false, skipped: "lead-missing", tagRestored: true }
         : await refireLoftyTag(leadId, TRIGGER_TAG, apiKey);
+    const returningResult = existing.leadId
+      ? await alertReturningLead(existing.leadId, {
+        label: stampedSource.replace("Signature Property Collection - ", ""),
+        name: data.name, phone: data.phone, email: data.email,
+      }, apiKey)
+      : { attempted: false };
 
-    if (store) await recordPush(store, { ...result, leadId, emailResult, noteResult, tagResult }, formName, body);
+    // 2026-09-29: which form, first page, form page and traffic source as Lofty
+    // fields she can filter on -- written only on a BRAND-NEW contact (Lofty's
+    // email search said none existed), because an update's effect on a client's
+    // other custom fields is undocumented. See lib/_lofty-returning.js.
+    let fieldsResult = { attempted: false };
+    if (existing.ok && !existing.leadId && leadId && !noteResult.leadMissing) {
+      const ensured = await ensureWebsiteFields(store, apiKey);
+      fieldsResult = ensured.ok
+        ? await setWebsiteFields(leadId, websiteFieldValues(stampedSource, data), apiKey)
+        : { attempted: false, reason: "fields not ready", ensured };
+    }
+
+    if (store) {
+      await recordPush(store, {
+        ...result, leadId, emailResult, noteResult, tagResult,
+        existing: { ok: existing.ok, found: !!existing.leadId, via: existing.via, leadId: existing.leadId, error: existing.error },
+        returningResult, fieldsResult,
+      }, formName, body);
+    }
     return { statusCode: 200, body: "ok" };
   } catch (err) {
     console.error("submission-created function error:", err);
