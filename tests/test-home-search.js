@@ -26,7 +26,7 @@ const cond = (url) => JSON.parse(new URL(url).searchParams.get("condition"));
 
 console.log("\n1. The URL Lofty's site understands");
 const u1 = H.homeSearchUrl({ city: "Loveland", minPrice: "950000", beds: "3" });
-check("her Lofty site's search page", u1.startsWith("https://theboldcollectivehomes.com/listing?"), u1);
+check("her Lofty site's search page", u1.startsWith("https://thelittleladyhomesearch.com/listing?"), u1);
 check("the tried-and-working condition for Loveland, $950K+, 3+ beds",
   JSON.stringify(cond(u1)) === JSON.stringify({ location: { city: ["Loveland, CO"] }, price: "950000,", beds: "3," }), JSON.stringify(cond(u1)));
 check("page 1", new URL(u1).searchParams.get("page") === "1");
@@ -79,7 +79,7 @@ check("a new Lofty domain is used as given", custom.startsWith("https://search.t
 check("an address that is not a Lofty /listing page is used as-is",
   H.homeSearchUrl({ city: "Loveland" }, { env: { IDX_SEARCH_URL: "https://example.com/homes" } }) === "https://example.com/homes");
 check("a javascript: address falls back to her Lofty search",
-  H.homeSearchUrl({}, { env: { IDX_SEARCH_URL: "javascript:alert(1)" } }).startsWith("https://theboldcollectivehomes.com/listing?"));
+  H.homeSearchUrl({}, { env: { IDX_SEARCH_URL: "javascript:alert(1)" } }).startsWith("https://thelittleladyhomesearch.com/listing?"));
 
 console.log("\n6. The words on the button");
 check("one town", H.homeSearchLabel({ city: "loveland" }) === "See Loveland homes for sale from $950K", H.homeSearchLabel({ city: "loveland" }));

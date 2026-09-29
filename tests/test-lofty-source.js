@@ -298,7 +298,7 @@ const HOUR = 3600e3;
   check("display OFF: her listings are held back", offMine.idxUnavailable === true && offMine.reason === "disabled" && offMine.totalCount === 0);
   const offPublic = JSON.parse((await search({ queryStringParameters: { city: "Loveland" } })).body);
   check("display OFF: a public search still hands off to her Lofty search",
-    offPublic.reason === "home_search" && /theboldcollectivehomes\.com\/listing\?/.test(offPublic.searchUrl), offPublic.searchUrl);
+    offPublic.reason === "home_search" && /thelittleladyhomesearch\.com\/listing\?/.test(offPublic.searchUrl), offPublic.searchUrl);
 
   process.env.IDX_DISPLAY = "on";
   freshModules(siteStore, fetch8);
@@ -330,7 +330,7 @@ const HOUR = 3600e3;
   check("its hero photo is the 1200px size", /w1200_original_IRE2000001-cover/.test(pres.body));
   const other = await page({ path: "/listing/IRE2000002", queryStringParameters: { id: "IRE2000002" } });
   check("another brokerage's listing page is a 404", other.statusCode === 404, String(other.statusCode));
-  check("...that sends the visitor to her Lofty home search", /href="https:\/\/theboldcollectivehomes\.com\/listing\?condition=/.test(other.body) &&
+  check("...that sends the visitor to her Lofty home search", /href="https:\/\/thelittleladyhomesearch\.com\/listing\?condition=/.test(other.body) &&
     /Search Homes For Sale/.test(other.body));
   check("...and says so plainly", /isn’t one of my current listings/.test(other.body));
 
@@ -350,7 +350,7 @@ const HOUR = 3600e3;
 
   const alerts = require(`${FN_DIR}/area-alerts.js`).handler;
   const al = JSON.parse((await alerts({ httpMethod: "POST", body: JSON.stringify({ email: "a@b.co", cities: ["Loveland"] }) })).body);
-  check("a new map alert sign-up is sent to her home search instead", al.ok === false && al.error === "moved" && /theboldcollectivehomes/.test(al.searchUrl));
+  check("a new map alert sign-up is sent to her home search instead", al.ok === false && al.error === "moved" && /thelittleladyhomesearch\.com/.test(al.searchUrl));
   const alRun = await require(`${FN_DIR}/area-alerts-run.js`).handler();
   check("the alert emails are paused", /paused/.test(alRun.body), alRun.body);
 
@@ -368,7 +368,7 @@ const HOUR = 3600e3;
   const showRow = hres.checks.find((c) => /Listings shown on the website/.test(c.name)) || {};
   check("/status says her listings are showing, from Lofty", showRow.ok === true && /own listings are showing, from Lofty/.test(String(showRow.detail)), showRow.detail);
   const searchRow = hres.checks.find((c) => /Home search goes to Lofty/.test(c.name)) || {};
-  check("/status names where the home search goes", /theboldcollectivehomes\.com\/listing/.test(String(searchRow.detail)), searchRow.detail);
+  check("/status names where the home search goes", /thelittleladyhomesearch\.com\/listing/.test(String(searchRow.detail)), searchRow.detail);
   const alertRow = hres.checks.find((c) => /alerts paused/.test(c.name)) || {};
   check("/status counts the paused map alerts", alertRow.optional === true && /\d+ sign-up/.test(String(alertRow.detail)), alertRow.detail);
   const stripRow = hres.checks.find((c) => /Sold & open-houses strip/.test(c.name)) || {};

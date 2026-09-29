@@ -30,9 +30,22 @@
 // public search on this site goes from now on (lib/_home-search.js adds the
 // visitor's filters to it). If she moves her Lofty site to another domain, set
 // IDX_SEARCH_URL to the new https://<domain>/listing -- nothing else changes.
+//
+// 2026-09-29: she did. Christine bought thelittleladyhomesearch.com (Namecheap)
+// so her Lofty site stops saying Bold Collective, pointed it at Lofty, and
+// switched her Lofty site's domain to it. The default follows; the old
+// theboldcollectivehomes.com address is no longer used by either site.
+//
+// The old address still 301s to the new one with the search filters intact
+// (checked live the same day), but a setting that still names it would send
+// every search through that hop -- and would break outright if the retired
+// domain ever lapses. So an IDX_SEARCH_URL on a retired Bold host is sent to
+// the same path on the new host. Only the host changes, and only for those two.
 "use strict";
 
-const DEFAULT_SEARCH_URL = "https://theboldcollectivehomes.com/listing";
+const DEFAULT_SEARCH_URL = "https://thelittleladyhomesearch.com/listing";
+const CURRENT_LOFTY_HOST = "thelittleladyhomesearch.com";
+const RETIRED_LOFTY_HOSTS = new Set(["theboldcollectivehomes.com", "www.theboldcollectivehomes.com"]);
 const IDX_MAX_AGE_MS = 12 * 60 * 60 * 1000; // IDX rule: not older than 12 hours
 const MESSAGE = "Search homes on my home-search site";
 
@@ -49,7 +62,13 @@ function idxSearchUrl(env) {
   if (raw) {
     try {
       const u = new URL(raw);
-      if (u.protocol === "https:" || u.protocol === "http:") return u.toString();
+      if (u.protocol === "https:" || u.protocol === "http:") {
+        if (RETIRED_LOFTY_HOSTS.has(u.hostname.toLowerCase())) {
+          u.protocol = "https:";
+          u.hostname = CURRENT_LOFTY_HOST;
+        }
+        return u.toString();
+      }
     } catch (_) { /* fall through */ }
   }
   return DEFAULT_SEARCH_URL;
