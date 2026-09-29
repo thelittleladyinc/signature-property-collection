@@ -15,9 +15,17 @@ page ~1.1s vs ~2.4s, search results ~0.6s vs ~1.0s — so:
   the market. Every "Search Homes" on this site opens it, already filtered.
 - **This site keeps her own listings** — with their video tours — and the town
   pages.
-- The Lofty site's domain (today `theboldcollectivehomes.com`) is being rebranded
-  to The Little Lady in Lofty. When it moves, set `IDX_SEARCH_URL` in Netlify to
-  `https://<new domain>/listing`. Nothing else changes.
+- The Lofty site's domain moved from `theboldcollectivehomes.com` to
+  **`thelittleladyhomesearch.com`** (2026-09-29: Christine bought it at Namecheap;
+  DNS: A `@` 52.52.24.52 + 52.9.101.47, CNAME `www` -> the root; switched in
+  Lofty CMS -> Settings -> Basic Info -> Domain). It is the default in
+  `lib/_idx-display.js`; `IDX_SEARCH_URL` in Netlify still overrides it, and an
+  `IDX_SEARCH_URL` that still names the retired Bold host is sent to the new
+  host directly. Use the bare domain: on 2026-09-29 `www.` had no matching
+  certificate yet. The old address 301s to the new one with the search filters
+  intact.
+  (`littleladysellshomes.com`, bought the same day, 301s to
+  www.thelittleladysellshomes.com at Namecheap.)
 
 For a few hours the same day this site copied the whole market from Lofty
 (~25,000 listings every two hours through a background function). That was cut

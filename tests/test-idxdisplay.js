@@ -88,10 +88,18 @@ function setEnv(vars) {
   console.log("\n2. Where visitors are sent");
   // 2026-09-28: was thelittleladysellshomes.com, whose search passes through to
   // this site's -- each site's button pointed at the other. Now her Lofty search.
-  check("default is her Lofty home search", lib.idxSearchUrl({}) === "https://theboldcollectivehomes.com/listing");
+  check("default is her Lofty home search", lib.idxSearchUrl({}) === "https://thelittleladyhomesearch.com/listing");
   check("IDX_SEARCH_URL overrides it", lib.idxSearchUrl({ IDX_SEARCH_URL: "https://search.example.com/homes" }) === "https://search.example.com/homes");
   check("a javascript: URL is refused", lib.idxSearchUrl({ IDX_SEARCH_URL: "javascript:alert(1)" }) === lib.DEFAULT_SEARCH_URL);
   check("garbage is refused", lib.idxSearchUrl({ IDX_SEARCH_URL: "not a url" }) === lib.DEFAULT_SEARCH_URL);
+  // 2026-09-29: the Lofty site moved to thelittleladyhomesearch.com. A setting
+  // still naming the retired Bold host goes straight to the new one, same path.
+  for (const old of ["https://theboldcollectivehomes.com/listing", "http://www.theboldcollectivehomes.com/listing",
+    "https://THEBOLDCOLLECTIVEHOMES.COM/listing"]) {
+    check(`retired host ${old} -> thelittleladyhomesearch.com`,
+      lib.idxSearchUrl({ IDX_SEARCH_URL: old }) === "https://thelittleladyhomesearch.com/listing", lib.idxSearchUrl({ IDX_SEARCH_URL: old }));
+  }
+  check("no other host is rewritten", lib.idxSearchUrl({ IDX_SEARCH_URL: "https://boldcollectivehomes.example.com/listing" }) === "https://boldcollectivehomes.example.com/listing");
   check("the message is the agreed wording", lib.MESSAGE === "Search homes on my home-search site");
 
   console.log("\n3. Freshness (IDX: never older than 12 hours)");
