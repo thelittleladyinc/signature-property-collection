@@ -1406,14 +1406,19 @@ exports.handler = async (event) => {
   const returning = loftyLast && loftyLast.returningResult;
   const fields = loftyLast && loftyLast.fieldsResult;
   const returningHandled = !!(returning && returning.attempted);
+  // 2026-09-29 (second review): a returning lead whose task step never recorded
+  // (the function stopped first) must not read as a green "not attempted yet".
+  const returningUnconfirmed = !!(tag && tag.skipped === "returning-lead-task" && !returningHandled);
+  const lookup = loftyLast && loftyLast.existing;
   // 2026-08-16, SETTLED WITH EVIDENCE, and it is the merge case rather than a
   // fault. Christine submitted a real listing-inquiry at 13:50; the push
   // succeeded and returned leadId 1147334685108095, and POST /notes for that very
   // id came back 404 "Lead not exist" -- while an unrelated lead read back 200.
   //
   // Lofty hands back the id of the record it ABSORBED on a merge, never the
-  // survivor's, and offers no lookup-by-email to find the survivor. So this
-  // cannot be fixed from here -- but it also only happens when the submitter is
+  // survivor's. (2026-09-29: submission-created now looks the person up by exact
+  // email first and, on a match, sends the note and task to the survivor; this
+  // row is what's left when that lookup didn't match.) It only happens when the submitter is
   // already in her CRM, which so far has only ever been Christine testing with
   // her own account-owner address. A stranger creates a new contact, the id
   // resolves, and note and tag both land.
@@ -1429,6 +1434,14 @@ exports.handler = async (event) => {
   const leadMerged = !!(note && (note.leadMissing ||
     (note.httpStatus === 404 && mergeSignature(note.response))));
   const parts = [];
+  if (lookup) {
+    parts.push(lookup.found ? "Checked Lofty first: already a contact (matched by email)."
+      : lookup.anyMatch ? "Checked Lofty first: their phone matches an existing contact but the email " +
+        "doesn't, so the form's tags were added (not replaced) and the note went to this record."
+      : lookup.ok ? "Checked Lofty first: a new contact."
+      : `Couldn't check Lofty first (${lookup.error || "no answer in time"}), so the form's tags were ` +
+        "added rather than replacing any a returning client already had.");
+  }
   if (!note || !note.attempted) {
     parts.push("Timeline note: not attempted yet.");
   } else if (note.ok) {
@@ -1436,16 +1449,21 @@ exports.handler = async (event) => {
   } else if (leadMerged) {
     parts.push("This lead MERGED into a contact Lofty already had, and Lofty returns the " +
       "id of the record it absorbed rather than the surviving contact's — so the timeline " +
-      "note had no id to attach to (404 \"Lead not exist\"). Its API offers no way to look a " +
-      "contact up by email, so nothing more can be done from here. Two things to know: the " +
-      "tag from the original push IS on the surviving contact (Lofty appends tags on a " +
-      "merge), and this only happens for someone already in your CRM — which so far has only " +
-      "been you, testing with your own address. A new enquirer creates a new contact, the id " +
-      "works, and both the note and the tag land normally.");
+      "note had no id to attach to (404 \"Lead not exist\"). The email lookup before the push " +
+      "didn't match them (a different email, or Lofty didn't answer in time); a match by " +
+      "email sends the note, a call-back task and a phone push to the right contact instead. " +
+      (lookup ? "The form's tags were added to the surviving contact (never replacing theirs), "
+        : "The form's tags were sent with the lead, ") +
+      "and the backup email reached you. This only happens for someone already in your CRM — " +
+      "a new enquirer creates a new contact, and the note and tag land normally.");
   } else {
     parts.push(`Timeline note FAILED (${note.httpStatus || note.error || "unknown"}).`);
   }
-  if (returningHandled) {
+  if (returningUnconfirmed) {
+    parts.push("They were already in Lofty, but the call-back task and phone push were NOT " +
+      "confirmed — the function stopped before recording them. The backup email reached you; " +
+      "check their contact in Lofty for the task.");
+  } else if (returningHandled) {
     // The tag isn't the mechanism for a returning lead any more; the task is.
     parts.push(returning.ok
       ? "They were already in Lofty, so instead of the Hot Lead tag (which can't fire twice) " +
@@ -1493,7 +1511,8 @@ exports.handler = async (event) => {
     name: leadMerged && !returningHandled
       ? "Lofty note on your last lead (it merged — expected)"
       : "Your Lofty notification will fire",
-    ok: returningHandled ? (!!(note && note.ok) && !!returning.ok)
+    ok: returningUnconfirmed ? false
+      : returningHandled ? (!!(note && note.ok) && !!returning.ok)
       : leadMerged ? false
       : (!note || !note.attempted) ? true
       : (!!note.ok && (!tag || !tag.attempted || (tag.ok && tag.tagRestored !== false))),

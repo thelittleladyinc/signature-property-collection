@@ -57,8 +57,14 @@ function minimalLead(body) {
 // the one outcome this file exists to prevent. Now it gives up after 6 seconds
 // and reports a failure like any other, which the caller emails and queues.
 const POST_TIMEOUT_MS = 6000;
+// 2026-09-29 (second review): the two attempts in postLead could still add up to
+// 12 seconds on top of the 2-second contact lookup, past the function's time
+// limit and in front of the backup email. A caller can now pass a deadline; no
+// attempt runs past it, and the minimal-shape retry is skipped when less than
+// this much time is left (the lead is then emailed and queued like any failure).
+const MIN_RETRY_MS = 1500;
 
-async function postOnce(body, apiKey) {
+async function postOnce(body, apiKey, timeoutMs = POST_TIMEOUT_MS) {
   let res;
   try {
     res = await fetch(`${LOFTY_BASE_URL}/leads`, {
@@ -70,7 +76,7 @@ async function postOnce(body, apiKey) {
         "Authorization": `token ${apiKey}`,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(POST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(Math.max(1, Math.min(POST_TIMEOUT_MS, timeoutMs))),
     });
   } catch (err) {
     return { ok: false, httpStatus: 0, responseBody: `no answer from Lofty: ${String((err && err.message) || err).slice(0, 200)}` };
@@ -81,8 +87,11 @@ async function postOnce(body, apiKey) {
 
 // Posts a lead, falling back to the minimal payload shape if Lofty rejects the
 // full one as malformed. Returns what happened, including which shape was used.
-async function postLead(body, apiKey) {
-  const full = await postOnce(body, apiKey);
+// opts.deadline (epoch ms): see MIN_RETRY_MS. Without it, behaves as before.
+async function postLead(body, apiKey, opts = {}) {
+  const deadline = opts.deadline || Infinity;
+  const left = () => deadline - Date.now();
+  const full = await postOnce(body, apiKey, Math.min(POST_TIMEOUT_MS, left()));
   if (full.ok) return { ...full, payloadShape: "full" };
 
   // 401/403 is a key problem and 5xx is Lofty's problem -- neither is fixed by
@@ -93,7 +102,8 @@ async function postLead(body, apiKey) {
 
   const minimal = minimalLead(body);
   if (!minimal.email && !minimal.phone) return { ...full, payloadShape: "full" };
-  const retry = await postOnce(minimal, apiKey);
+  if (left() < MIN_RETRY_MS) return { ...full, payloadShape: "full (no time left for the minimal retry; queued)" };
+  const retry = await postOnce(minimal, apiKey, Math.min(POST_TIMEOUT_MS, left()));
   return {
     ...retry,
     payloadShape: retry.ok ? "minimal" : "full+minimal both rejected",
@@ -141,7 +151,15 @@ async function drainFailedPushes(store, apiKey) {
       continue;
     }
     attempted += 1;
-    const result = await postLead(entry.lead, apiKey);
+    // 2026-09-29: a replay never REPLACES tags. By the time it runs the contact
+    // may exist -- a create that timed out on our side can still have landed in
+    // Lofty -- and `tags` would wipe anything added since. `tagsAdd` only adds.
+    const lead = { ...entry.lead };
+    if (Array.isArray(lead.tags)) {
+      lead.tagsAdd = [...new Set([...(lead.tagsAdd || []), ...lead.tags])];
+      delete lead.tags;
+    }
+    const result = await postLead(lead, apiKey);
     if (result.ok) {
       recovered += 1;
       console.log(`Recovered a queued Lofty lead from "${entry.formName}" (${result.payloadShape} shape).`);
@@ -165,6 +183,8 @@ async function drainFailedPushes(store, apiKey) {
 
 module.exports = {
   LOFTY_BASE_URL,
+  POST_TIMEOUT_MS,
+  MIN_RETRY_MS,
   LAST_PUSH_KEY,
   FAILED_PUSH_KEY,
   minimalLead,

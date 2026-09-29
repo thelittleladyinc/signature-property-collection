@@ -118,6 +118,11 @@ const SOURCE_LABELS = {
   "testimonials-page-inquiry": "Signature Property Collection - Testimonials Page Inquiry",
 };
 
+// 2026-09-29 (second review): the Lofty create -- both attempts -- must finish
+// this long after the function starts (contact lookup included), so the backup
+// email always goes out inside the function's time limit.
+const CREATE_DEADLINE_MS = 7000;
+
 function splitName(fullName) {
   const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { firstName: undefined, lastName: undefined };
@@ -126,6 +131,7 @@ function splitName(fullName) {
 }
 
 exports.handler = async (event) => {
+  const startedAt = Date.now();
   try {
     const apiKey = process.env.LOFTY_API_KEY;
     if (!apiKey) {
@@ -242,14 +248,18 @@ exports.handler = async (event) => {
     // A known contact keeps its own tags. `tags` on the create call REPLACES the
     // tag set of the contact a submission merges into ("All existing tags will be
     // updated based on this call" -- Lofty's create-lead reference); `tagsAdd`
-    // only adds. Anyone found by email or phone gets tagsAdd; a brand-new contact
-    // is created exactly as before.
-    if (existing.anyMatch && Array.isArray(body.tags)) {
+    // only adds. So `tags` is sent only for a contact PROVEN new (both searches
+    // answered and found nobody), created exactly as before. Anyone found -- and,
+    // since the second review, anyone the lookup couldn't answer for (slow,
+    // rate-limited, ambiguous) -- gets tagsAdd: "can't tell" is never "new".
+    if (Array.isArray(body.tags) && !(existing.ok && !existing.anyMatch)) {
       body.tagsAdd = body.tags;
       delete body.tags;
     }
 
-    const result = await postLead(body, apiKey);
+    // Both attempts at the create finish by this deadline, so the backup email
+    // below always has time to go out (lib/_lofty.js MIN_RETRY_MS).
+    const result = await postLead(body, apiKey, { deadline: startedAt + CREATE_DEADLINE_MS });
     // The store is only needed for diagnostics, so a Blobs problem must not
     // prevent the push itself -- it's fetched after the lead has already gone.
     let store = null;
@@ -260,9 +270,9 @@ exports.handler = async (event) => {
     // POST /leads returns the lead id whether it CREATED a contact or merged into
     // an existing one -- Christine's 16:48 test proved that, coming back with
     // 1147334685108095 for a contact that already existed. That is what makes the
-    // follow-up calls below possible without having to search Lofty by email
-    // (which its API offers no way to do -- sellerintelligence pages all ~20k
-    // leads to find one, far too slow for a form handler).
+    // follow-up calls below possible. (2026-09-29: that id is the ABSORBED record
+    // on a merge, which is why the exact email lookup above now runs first -- a
+    // match sends the note and task to the surviving contact instead.)
     const leadId = json?.data?.leadId ?? json?.data?.id ?? json?.leadId ?? json?.id ?? null;
 
     // ---- The notification, in the order that matters -------------------------
@@ -298,6 +308,18 @@ exports.handler = async (event) => {
 
     console.log(`Pushed lead to Lofty${leadId ? ` (leadId ${leadId})` : ""} from form "${formName}" (${result.payloadShape} payload).`);
 
+    // Recorded as soon as the email is out, so /status has this lead even if the
+    // slower steps below run the function out of time. Rewritten as they finish.
+    const existingSummary = {
+      ok: existing.ok, found: !!existing.leadId, via: existing.via, anyMatch: existing.anyMatch,
+      leadId: existing.leadId, error: existing.error,
+    };
+    if (store) {
+      await recordPush(store, {
+        ...result, leadId, emailResult, existing: existingSummary, inProgress: true,
+      }, formName, body);
+    }
+
     // The note as its own call, because a merge has no reason to overwrite an
     // existing contact's fields -- which is why her repeat tests left no trace.
     // 2026-09-29: to the existing contact when there is one (see above).
@@ -322,15 +344,13 @@ exports.handler = async (event) => {
       : noteResult.leadMissing
         ? { attempted: false, skipped: "lead-missing", tagRestored: true }
         : await refireLoftyTag(leadId, TRIGGER_TAG, apiKey);
-    // Recorded now, before the optional steps below, so /status always has this
-    // lead even if a slow Lofty runs the function out of time after this point.
-    const existingSummary = {
-      ok: existing.ok, found: !!existing.leadId, via: existing.via, anyMatch: existing.anyMatch,
-      leadId: existing.leadId, error: existing.error,
-    };
+    // Recorded again before the optional steps below (a returning lead's task,
+    // a new contact's fields), so /status keeps the note and tag results even if
+    // those run the function out of time.
     if (store) {
       await recordPush(store, {
         ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
+        inProgress: !!existing.leadId,
       }, formName, body);
     }
 
@@ -348,14 +368,15 @@ exports.handler = async (event) => {
     // other custom fields is undocumented, so an existing record is never touched.
     let fieldsResult = { attempted: false };
     const newLeadId = leadIdFromResponse(result.responseBody);
-    if (existing.ok && !existing.anyMatch && newLeadId && noteResult.ok && noteTarget === leadId) {
+    if (existing.ok && !existing.anyMatch && newLeadId && newLeadId === String(leadId) &&
+        noteResult.ok && noteTarget === leadId) {
       const ensured = await ensureWebsiteFields(store, apiKey);
       fieldsResult = ensured.ok
         ? await setWebsiteFields(newLeadId, websiteFieldValues(stampedSource, data), apiKey)
         : { attempted: false, reason: "fields not ready", ensured };
     }
 
-    if (store && (returningResult.attempted || fieldsResult.attempted)) {
+    if (store) {
       await recordPush(store, {
         ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
         returningResult, fieldsResult,
