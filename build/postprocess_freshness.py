@@ -71,6 +71,9 @@ PLACEHOLDER = "@@DATE@@"
 
 # 2026-09-24: the lead-submit marker build.py puts on every page is measurement
 # plumbing, not content. Without this, adding it would re-date every page.
+_HOME_LINK = re.compile(r'href="/(?:index\.html)?(?=[#?"])')
+_LEAD_MARKER = re.compile(r"<script>(?:(?!</script>)[\s\S])*?spc_lead_submit[\s\S]*?</script>\n?")
+# 2026-09-29: tags only production builds carry (see _blank).
 _PRODUCTION_ONLY = [
     re.compile(r'<link rel="preconnect" href="https://www\.googletagmanager\.com" crossorigin>'),
     re.compile(r'<link rel="dns-prefetch" href="https://connect\.facebook\.net">'),
@@ -81,8 +84,6 @@ _PRODUCTION_ONLY = [
                r'src="https://www\.facebook\.com/tr\?[^"]*"/></noscript>'),
     re.compile(r'<meta name="google-site-verification" content="[^"]*">'),
 ]
-_HOME_LINK = re.compile(r'href="/(?:index\.html)?(?=[#?"])')
-_LEAD_MARKER = re.compile(r"<script>(?:(?!</script>)[\s\S])*?spc_lead_submit[\s\S]*?</script>\n?")
 
 
 def _blank(text: str) -> str:
