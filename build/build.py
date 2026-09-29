@@ -3991,7 +3991,7 @@ def head(title, description, path="/", canonical_extra="", schema_extra="",
 <link rel="preconnect" href="https://www.youtube-nocookie.com" crossorigin>
 <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
 {'<link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>' if GA_MEASUREMENT_ID else ''}
-{'<link rel="preconnect" href="https://connect.facebook.net" crossorigin>' if META_PIXEL_ID else ''}
+{'<link rel="dns-prefetch" href="https://connect.facebook.net">' if META_PIXEL_ID else ''}
 <link rel="dns-prefetch" href="https://www.youtube.com">
 <style>{_inline_css()}</style>
 {'<meta name="robots" content="noindex, follow">' if path in NOINDEX_PATHS else ''}
@@ -4555,11 +4555,42 @@ def _meta_pixel_tag():
     pid = META_PIXEL_ID
     return (
         "<script>"
+        # 2026-09-29: fbevents.js no longer loads during page load. PageSpeed
+        # (mobile, home page) scored Signature 68 with the pixel injected at
+        # once: 258 KiB and ~270 ms of main-thread time from Facebook's CDN,
+        # plus its "efficient cache lifetimes" (228 KiB) and unused-JS flags.
+        # The Little Lady measured the same regression on 2026-08-26 (92 -> 70)
+        # and fixed it this way; this is the same snippet.
+        #
+        # Meta's stub queues every call (n.queue.push) until the script
+        # arrives, so delaying only the INJECTION loses no events: init,
+        # PageView and Contact queue and flush when it loads. It loads on the
+        # first sign of a person -- scroll, tap, key, pointer -- or when the
+        # tab is hidden, which is what a bounce looks like. (Not `once` on
+        # visibilitychange: a tab opened in the background turns visible
+        # first, and that must not use up the listener.)
+        #
+        # The thank-you page is the exception and loads it straight away.
+        # That page's whole job is the confirmed conversion, and a visitor
+        # who reads "thank you" and closes the tab never scrolls -- a queued
+        # conversion there would only ever be sent by the hidden-tab path,
+        # which a closing tab doesn't wait for. It is noindex, so its speed
+        # score costs nothing.
+        #
+        # The page head's hint for connect.facebook.net is dns-prefetch rather
+        # than preconnect for the same reason: a connection opened at load
+        # would sit unused for most visitors (tests/test-metapixel.js).
         "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){"
         "n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};"
         "if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';"
-        "n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;"
-        "s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}"
+        "n.queue=[];var L=!1,G=function(){if(L)return;L=!0;"
+        "t=b.createElement(e);t.async=!0;t.src=v;"
+        "s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)};"
+        r"if(/^\/thank-you(\.html)?\/?$/.test(f.location.pathname))G();else{"
+        "['pointerdown','keydown','touchstart','scroll'].forEach(function(x){"
+        "b.addEventListener(x,G,{once:!0,passive:!0})});"
+        "b.addEventListener('visibilitychange',function(){"
+        "if(b.visibilityState==='hidden')G()})}}"
         "(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');"
         f"fbq('init','{pid}');fbq('track','PageView');"
         "document.addEventListener('click',function(e){"
