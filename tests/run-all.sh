@@ -5,6 +5,14 @@
 set -u
 cd "$(dirname "$0")/.."
 python3 build/build.py >/dev/null || { echo "build FAILED"; exit 1; }
+# 2026-09-30: build.py stamps today's date on every page, so on any day after the
+# last site/ commit CI's "committed site/ matches the generator" check could only
+# pass by committing a fresh rebuild -- which re-dated every page (PR #70 moved
+# all 34 sitemap entries to 2026-09-30 with no content change). Netlify already
+# runs this step after the build (scripts/netlify-build.sh); running it here too
+# means the check compares like with like: unchanged pages keep their committed
+# date, and only a page whose content really changed shows up as out of date.
+python3 build/postprocess_freshness.py >/dev/null || { echo "freshness step FAILED"; exit 1; }
 fail=0
 for t in tests/test-*.js; do
   printf "%-28s " "$(basename "$t" .js)"
@@ -13,6 +21,10 @@ for t in tests/test-*.js; do
   else echo "FAILED"; printf '%s\n' "$out" | grep -E "FAIL" | head -5; fail=1; fi
 done
 [ "$fail" -eq 0 ] && echo "All suites passed." || echo "Some suites FAILED."
+# Some suites rebuild site/ themselves to restore what they experimented on
+# (test-reviewspot.js), and build.py alone re-dates every page; put the
+# committed dates back so the CI check sees only real changes.
+python3 build/postprocess_freshness.py >/dev/null || { echo "freshness step FAILED"; exit 1; }
 
 # Ground truth, printed rather than trusted. NEXT-SESSION.md quotes these numbers
 # and any hand-written figure goes stale; this prints what is actually true right
