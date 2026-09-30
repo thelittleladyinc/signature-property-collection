@@ -160,6 +160,11 @@ function isCloudinaryConfigError(message) {
     .test(String(message || ""));
 }
 const PAGE_SIZE = 50; // kept small since $expand=Media makes each record heavy
+// 2026-09-30 (API audit): the market-data crawl under Lofty asks for no Media
+// (see mlsGridRun's `photos` flag), so its pages can be far larger -- MLS Grid
+// serves up to 5,000 records a page without $expand. 1,000 keeps one page well
+// inside MLS_PAGE_FETCH_TIMEOUT_MS while cutting the requests for a pass ~20-fold.
+const MARKET_DATA_PAGE_SIZE = 1000;
 // 2026-08-12 (rate-limit fix): MLS Grid suspended API access today (and
 // several times before, per notify@mlsgrid.com emails going back to
 // mid-July) for exceeding their request-rate limits. Their own numbers:
@@ -1117,8 +1122,32 @@ exports.handler = async () => {
 // The MLS Grid path. opts.background: running after her Lofty listings, for the
 // market data only -- the Lofty lead queue was already drained this run, and the
 // overnight photo backfill has nothing to do (it stands down under Lofty).
+//
+// 2026-09-30 (API audit; the shared MLS Grid account was suspended for over-use on
+// 2026-08-01): in the background run nothing asks for photos any more. The town
+// figures read only status, city, price and square feet
+// (build/tools/town-market-stats.js), and no page shows an MLS Grid photo under
+// Lofty -- yet every 30 minutes this run still pulled $expand=Media for every
+// changed listing in the market, re-cached her MLS photos to Cloudinary, checked
+// two of her listings and her office's listings with Media, swept five "stale
+// photo" listings and pre-stored 24 covers nobody requests. With `photos` off it
+// makes only the incremental Property crawl, without Media and in bigger pages;
+// what is already stored about photos is kept as it was (keepStoredPhotos).
+// Her Lofty listings' on-market check (loftyScheduledRun) is separate and unchanged.
+function keepStoredPhotos(mapped, previouslyStored) {
+  delete mapped.photo;
+  delete mapped.photos;
+  if (!previouslyStored) return mapped;
+  for (const k of ["photo", "photos", "photoCount", "cloudinaryPhoto", "cloudinaryPhotos"]) {
+    if (previouslyStored[k] !== undefined) mapped[k] = previouslyStored[k];
+  }
+  return mapped;
+}
+exports.keepStoredPhotos = keepStoredPhotos; // for tests
+
 async function mlsGridRun(opts) {
   const o = opts || {};
+  const photos = !o.background;
   // MLS_DISABLED (see lib/_mls-usage.js) also stops this run: checkMlsQuota()
   // below reports it as blocked before a single MLS Grid request is made.
   const token = process.env.MLSGRID_API_TOKEN;
@@ -1219,7 +1248,9 @@ async function mlsGridRun(opts) {
   // ---- Christine's own photos, FIRST. Before any crawling, because the
   // leftover-time window this used to depend on never actually opened -- see
   // OWN_PHOTO_START_CUTOFF_MS above. No-ops once they're all cached. ----
-  const ownPhotoResult = await cacheOwnPhotosFirst(listingsById, store, token, startedAt, throttle);
+  const ownPhotoResult = photos
+    ? await cacheOwnPhotosFirst(listingsById, store, token, startedAt, throttle)
+    : { cached: 0 };
   coverPhotosCached += ownPhotoResult.cached;
 
   // ---- Office-wide discovery: learn Christine's ListOfficeMlsId once (if
@@ -1227,7 +1258,7 @@ async function mlsGridRun(opts) {
   // why that's not assumed), then use it every run as a fast supplement to
   // the priority pass below. Entirely best-effort: if either step fails or
   // is never able to run, nothing else in this file changes behavior. ----
-  if (!state.herOfficeMlsId) {
+  if (photos && !state.herOfficeMlsId) {
     const discovered = await discoverHerOfficeMlsId(listingsById, token, store);
     if (discovered) {
       state = { ...state, herOfficeMlsId: discovered };
@@ -1235,7 +1266,7 @@ async function mlsGridRun(opts) {
     }
   }
   let newlyDiscoveredByOffice = 0;
-  if (state.herOfficeMlsId) {
+  if (photos && state.herOfficeMlsId) {
     const officeResult = await discoverListingsByOffice(state.herOfficeMlsId, listingsById, store, token, startedAt, throttle);
     newlyDiscoveredByOffice = officeResult.found || 0;
     if (officeResult.suspended) {
@@ -1256,7 +1287,7 @@ async function mlsGridRun(opts) {
     && Array.isArray(l.photos)
     && l.cloudinaryPhotos.length >= l.photos.length
     && l.cloudinaryPhotos.slice(0, l.photos.length).every(Boolean);
-  const herPendingIds = Object.values(listingsById)
+  const herPendingIds = !photos ? [] : Object.values(listingsById)
     .filter((l) => l.listingId && isHerListing(l) && !isFullyCached(l))
     .map((l) => l.listingId);
 
@@ -1287,7 +1318,9 @@ async function mlsGridRun(opts) {
   // limit, and every one goes through the same throttle() gate -- so it cannot
   // move the 2 rps sustained average that the 2026-08-01 suspension fired on.
   const HER_STATUS_CHECKS_PER_RUN = 2;
-  const herStatusCheckIds = Object.values(listingsById)
+  // Not in the background run: under Lofty her listings are shown from Lofty and
+  // checked against MLS Grid by loftyScheduledRun, without Media.
+  const herStatusCheckIds = !photos ? [] : Object.values(listingsById)
     .filter((l) => l.listingId && isHerListing(l) && isFullyCached(l))
     .sort((a, b) => {
       const at = a.photosRefreshedAt ? Date.parse(a.photosRefreshedAt) : 0;
@@ -1408,8 +1441,8 @@ async function mlsGridRun(opts) {
     const qs = new URLSearchParams({
       "$filter": filter,
       "$select": SELECT_FIELDS,
-      "$expand": "Media",
-      "$top": String(PAGE_SIZE),
+      ...(photos ? { "$expand": "Media" } : {}),
+      "$top": String(photos ? PAGE_SIZE : MARKET_DATA_PAGE_SIZE),
       "$orderby": "ModificationTimestamp asc",
     });
     requestUrl = `${BASE_URL}?${qs.toString()}`;
@@ -1475,7 +1508,9 @@ async function mlsGridRun(opts) {
           }
           if (mapped.listingId) {
             const previouslyStored = listingsById[mapped.listingId];
-            if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
+            if (!photos) {
+              keepStoredPhotos(mapped, previouslyStored);
+            } else if (Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
               await invalidatePhotosIfChanged(store, previouslyStored, mapped);
               const photosCached = await cacheCoverPhotoIfHers(mapped, previouslyStored, token, startedAt, throttle, null, store);
               coverPhotosCached += photosCached;
@@ -1533,7 +1568,7 @@ async function mlsGridRun(opts) {
     // ago (or never) and re-fetches just those, one at a time, through the
     // same REQUEST_DELAY_MS-throttled gate — so it can never spike request
     // volume no matter how large the stored dataset grows.
-    if (!httpErrorOccurred && Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
+    if (photos && !httpErrorOccurred && Date.now() - startedAt < TIME_BUDGET_MS - LATE_WORK_TIME_MARGIN_MS) {
       const touchedThisRun = new Set();
       const stale = Object.values(listingsById)
         .filter((l) => l.listingId)
@@ -1590,7 +1625,7 @@ async function mlsGridRun(opts) {
     // cursor. Skips: her own listings (the priority pass owns those),
     // photo-less listings, and anything oversize (the on-demand path's
     // Cloudinary re-host handles those better).
-    if (!httpErrorOccurred &&
+    if (photos && !httpErrorOccurred &&
         !(await isThrottled(store)) && !(await isMediaThrottled(store)) &&
         Date.now() - startedAt < TIME_BUDGET_MS) {
       try {
