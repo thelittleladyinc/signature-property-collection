@@ -6223,12 +6223,13 @@ def _live_market_snapshot():
 
 def _live_market_asof(snap):
     """The dated 'live from IRES' line -- freshness claim rather than apology."""
+    # 2026-09-30: the exact date only. "yesterday" / "2 days ago" was computed
+    # from the build calendar, so it went stale on the live page (the site is
+    # rebuilt on deploys, not daily) and made the page look edited on every
+    # day CI or Netlify built it. The date itself is the honest freshness claim.
     when = datetime.date.fromisoformat(snap["generated_at"]).strftime("%B %-d, %Y")
-    age = snap["age_days"]
-    freshness = ("today" if age == 0 else
-                 "yesterday" if age == 1 else f"{age} days ago")
     return (f'<p class="mr-asof">Live from <strong>IRES MLS</strong>, last refreshed '
-            f'{freshness} ({esc(when)}) across {snap["town_count"]} Northern Colorado '
+            f'{esc(when)}, across {snap["town_count"]} Northern Colorado '
             f'towns. These are <strong>asking</strong> prices on homes for sale right '
             f'now &mdash; what sellers are asking, not what buyers finally paid.</p>')
 
