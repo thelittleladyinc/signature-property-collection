@@ -49,6 +49,8 @@
 //   - Responses are parsed whole; only what is stored for /status is cut short.
 "use strict";
 
+const { inferCountyFromCity } = require("./_mls-shared");
+
 const LOFTY_API = "https://api.lofty.com";
 const CALL_TIMEOUT_MS = 5000;
 const LOOKUP_BUDGET_MS = 2000;
@@ -321,9 +323,90 @@ async function setWebsiteFields(leadId, fields, apiKey, opts) {
   }
 }
 
+// ---- 2026-09-30 (API audit): what a buyer asked for, in Lofty's own fields ----
+// A listing-alert request (and a "where are you looking" answer) reached Lofty
+// only as note text, which Lofty can't search, alert on or hand to its assistant,
+// and the alert form's own comment said the alert had to be set up by hand
+// because no endpoint was confirmed. Lofty's API reference has one:
+// POST /v1.0/leads/{leadId}/inquiry, "set a lead's home search wants: price, beds,
+// baths, areas". The field names are the ones Lofty returns as a lead's
+// leadInquiry (priceMin, priceMax, bedroomsMin, bathroomsMin, propertyType,
+// locations -- read that way by the noco-newsletter Lofty client); the endpoint's
+// request schema itself wasn't readable from here, so the answer is recorded for
+// /status and the note keeps the same wishes either way. Written only on a contact
+// proven brand new, like the website fields: whether an inquiry replaces a
+// client's existing one is undocumented.
+//
+// Property-type labels are the ones her Lofty search uses (lib/_home-search.js in
+// the Signature repo, read off her Lofty site).
+const INQUIRY_PROPERTY_TYPES = { house: ["Single Family Home"], condo: ["Condo", "Townhouse"] };
+const MAX_INQUIRY_TOWNS = 25;
+
+function positiveInt(v) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function townNames(list) {
+  const out = [];
+  for (const t of list) {
+    const name = String(t || "").replace(/[^A-Za-z .'-]/g, "").trim();
+    if (!name || name.length > 40) continue;
+    const title = name.toLowerCase().replace(/(^|[\s-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+    if (!out.includes(title)) out.push(title);
+    if (out.length >= MAX_INQUIRY_TOWNS) break;
+  }
+  return out;
+}
+
+// The inquiry for a form submission, or null when it carries no search. Reads the
+// alert form's alert_query (the site's own search parameters) and, failing towns
+// there, a free-text where_looking answer -- used only when every part of it is a
+// town the site knows, so free text never becomes a wrong search area.
+function inquiryFromForm(data) {
+  const d = data || {};
+  const q = new URLSearchParams(String(d.alert_query || ""));
+  let towns = townNames([q.get("city")].concat(String(q.get("cities") || "").split(",")));
+  if (!towns.length && d.where_looking) {
+    const parts = String(d.where_looking).split(/,|\/|&|;|\bor\b|\band\b/i)
+      .map((p) => p.replace(/\b(co|colorado)\b\.?/gi, "").trim()).filter(Boolean);
+    if (parts.length && parts.every((p) => inferCountyFromCity(p.toLowerCase()))) towns = townNames(parts);
+  }
+  const body = {};
+  if (towns.length) body.locations = towns.map((city) => ({ city, state: "CO" }));
+  const min = positiveInt(q.get("minPrice"));
+  const max = positiveInt(q.get("maxPrice"));
+  if (min) body.priceMin = min;
+  if (max && (!min || max >= min)) body.priceMax = max;
+  const beds = positiveInt(q.get("beds"));
+  if (beds) body.bedroomsMin = beds;
+  const baths = positiveInt(q.get("baths"));
+  if (baths) body.bathroomsMin = baths;
+  const types = INQUIRY_PROPERTY_TYPES[String(q.get("propertyCategory") || "").toLowerCase()];
+  if (types) body.propertyType = types.slice();
+  return Object.keys(body).length ? body : null;
+}
+
+// POST /v1.0/leads/{leadId}/inquiry. Never throws; the caller records the result.
+async function placeInquiry(leadId, inquiry, apiKey, opts) {
+  try {
+    if (!apiKey || !leadId || !inquiry) return { attempted: false };
+    const res = await call("POST", `/v1.0/leads/${String(leadId).replace(/\D/g, "")}/inquiry`, apiKey,
+      JSON.stringify(inquiry), opts);
+    return {
+      attempted: true, ok: res.ok, httpStatus: res.httpStatus, error: res.error,
+      fields: Object.keys(inquiry),
+      response: res.ok ? undefined : short(res.text),
+    };
+  } catch (err) {
+    return { attempted: true, ok: false, error: short((err && err.message) || err, 120) };
+  }
+}
+
 module.exports = {
   LOFTY_API, TZ, TASK_DUE_MINUTES, LOOKUP_BUDGET_MS, FIELDS_KEY, WEBSITE_FIELDS,
   idsFrom, withId, leadIdFromResponse, denverIso, taskContent,
   findLeadByEmail, findLeadByPhone, findExistingLead,
   alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
+  INQUIRY_PROPERTY_TYPES, inquiryFromForm, placeInquiry,
 };

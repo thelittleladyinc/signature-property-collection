@@ -305,11 +305,11 @@ async function sendLeadAlertEmail(details) {
 
   const to = (process.env.LEAD_ALERT_TO || DEFAULT_TO)
     .split(",").map((s) => s.trim()).filter(Boolean);
-  const from = process.env.LEAD_ALERT_FROM || DEFAULT_FROM;
+  const customFrom = String(process.env.LEAD_ALERT_FROM || "").trim();
   const who = details.name || details.email || details.phone || "someone";
   const subject = `New website lead: ${who}${details.sourceShort ? ` — ${details.sourceShort}` : ""}`;
 
-  try {
+  const send = async (from) => {
     const res = await fetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
@@ -322,8 +322,27 @@ async function sendLeadAlertEmail(details) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const text = await res.text().catch(() => "");
-    if (!res.ok) console.error(`Resend lead alert failed: HTTP ${res.status} ${text.slice(0, 300)}`);
-    return { attempted: true, ok: res.ok, httpStatus: res.status, response: text.slice(0, 300) };
+    return { ok: res.ok, httpStatus: res.status, response: text.slice(0, 300) };
+  };
+
+  try {
+    let result = await send(customFrom || DEFAULT_FROM);
+    // 2026-09-30 (API audit): LEAD_ALERT_FROM is how the alert moves off Resend's
+    // shared test sender onto her own verified domain. If that sender is refused
+    // -- the domain not verified yet (403) or the address malformed (422) -- the
+    // alert goes out once more from the test sender rather than not at all, and
+    // the refusal is kept for /status.
+    if (!result.ok && customFrom && (result.httpStatus === 403 || result.httpStatus === 422)) {
+      console.error(`Resend refused LEAD_ALERT_FROM (HTTP ${result.httpStatus} ${result.response}); ` +
+        "resending from the default sender.");
+      const first = result;
+      result = { ...(await send(DEFAULT_FROM)), fromFallback: true, customFromRefused: first };
+    }
+    if (!result.ok) console.error(`Resend lead alert failed: HTTP ${result.httpStatus} ${result.response}`);
+    return {
+      attempted: true, ...result,
+      sender: customFrom && !result.fromFallback ? "custom" : "default",
+    };
   } catch (err) {
     console.error("Resend lead alert error:", err && err.message);
     return { attempted: true, ok: false, error: String(err && err.message) };
