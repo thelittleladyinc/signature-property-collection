@@ -38,6 +38,15 @@ const MAX_QUEUED_FAILURES = 25;
 // Small: this runs inside the listing sync's time budget, which has real work to
 // do. A backlog drains over consecutive runs rather than all at once.
 const MAX_DRAIN_PER_RUN = 3;
+// 2026-09-30 (API audit): the Little Lady site now drains its own copy of this
+// queue on a schedule (its netlify/functions/lofty-queue-drain.js), and if its
+// Blobs settings point at this site's store, two schedules read the SAME key. A
+// drain therefore holds a short lease first -- a create-only write, which only
+// one caller can win -- so a queued lead is never replayed twice at once, and it
+// writes the queue back merged with anything queued while it ran instead of
+// overwriting it. A lease older than any function can run is taken over.
+const DRAIN_LOCK_KEY = "lofty-drain-lock.json";
+const DRAIN_LOCK_TTL_MS = 5 * 60 * 1000;
 
 // Strips the full payload down to the least a CRM could possibly need. Used only
 // after Lofty has already refused the full one.
@@ -137,8 +146,48 @@ async function recordPush(store, result, formName, lead) {
 // an outage arrives on a later run instead of waiting on someone noticing.
 // Bounded, wrapped, and never allowed to affect the sync: any throw is caught by
 // the caller and the queue is simply left for next time.
-async function drainFailedPushes(store, apiKey) {
+async function takeDrainLease(store) {
+  const lease = { at: new Date().toISOString() };
+  try {
+    const first = await store.setJSON(DRAIN_LOCK_KEY, lease, { onlyIfNew: true });
+    if (!first || first.modified !== false) return true;
+    const held = await store.get(DRAIN_LOCK_KEY, { type: "json" }).catch(() => null);
+    const age = held && Date.parse(held.at);
+    if (Number.isFinite(age) && Date.now() - age < DRAIN_LOCK_TTL_MS) return false;
+    await store.delete(DRAIN_LOCK_KEY);
+    const again = await store.setJSON(DRAIN_LOCK_KEY, lease, { onlyIfNew: true });
+    return !again || again.modified !== false;
+  } catch (err) {
+    console.error("Lofty queue drain: could not take the lease (skipping this run):", err && err.message);
+    return false;
+  }
+}
+
+async function releaseDrainLease(store) {
+  try {
+    if (typeof store.delete === "function") await store.delete(DRAIN_LOCK_KEY);
+  } catch (err) {
+    // Expires on its own after DRAIN_LOCK_TTL_MS.
+  }
+}
+
+// opts.deadline (epoch ms, optional): no replay starts, and none runs, past it --
+// so a caller with a hard time limit finishes and writes the queue back.
+async function drainFailedPushes(store, apiKey, opts) {
   if (!apiKey) return { attempted: 0, recovered: 0 };
+  const peek = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
+  if (!peek.length) return { attempted: 0, recovered: 0 };
+  if (!(await takeDrainLease(store))) return { attempted: 0, recovered: 0, locked: true };
+  try {
+    return await drainWithLease(store, apiKey, opts || {});
+  } finally {
+    await releaseDrainLease(store);
+  }
+}
+
+async function drainWithLease(store, apiKey, opts) {
+  const deadline = opts.deadline || Infinity;
+  // Read again under the lease: another drain may have finished in between.
   const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
   if (!queue.length) return { attempted: 0, recovered: 0 };
 
@@ -146,7 +195,7 @@ async function drainFailedPushes(store, apiKey) {
   let attempted = 0;
   let recovered = 0;
   for (const entry of queue) {
-    if (!entry || !entry.lead || attempted >= MAX_DRAIN_PER_RUN) {
+    if (!entry || !entry.lead || attempted >= MAX_DRAIN_PER_RUN || deadline - Date.now() < MIN_RETRY_MS) {
       if (entry) remaining.push(entry);
       continue;
     }
@@ -159,7 +208,7 @@ async function drainFailedPushes(store, apiKey) {
       lead.tagsAdd = [...new Set([...(lead.tagsAdd || []), ...lead.tags])];
       delete lead.tags;
     }
-    const result = await postLead(lead, apiKey);
+    const result = await postLead(lead, apiKey, { deadline });
     if (result.ok) {
       recovered += 1;
       console.log(`Recovered a queued Lofty lead from "${entry.formName}" (${result.payloadShape} shape).`);
@@ -167,7 +216,12 @@ async function drainFailedPushes(store, apiKey) {
       remaining.push({ ...entry, lastRetryAt: new Date().toISOString(), ...result });
     }
   }
-  await store.setJSON(FAILED_PUSH_KEY, remaining.slice(0, MAX_QUEUED_FAILURES)).catch(() => {});
+  // Anything a form queued while this ran (recordPush puts it first) is kept.
+  const entryKey = (e) => `${e && e.at}|${e && e.formName}`;
+  const taken = new Set(queue.map(entryKey));
+  const latest = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
+  const arrived = (Array.isArray(latest) ? latest : []).filter((e) => e && !taken.has(entryKey(e)));
+  await store.setJSON(FAILED_PUSH_KEY, arrived.concat(remaining).slice(0, MAX_QUEUED_FAILURES)).catch(() => {});
   if (attempted) {
     await store.setJSON(LAST_PUSH_KEY, {
       at: new Date().toISOString(),
@@ -187,6 +241,7 @@ module.exports = {
   MIN_RETRY_MS,
   LAST_PUSH_KEY,
   FAILED_PUSH_KEY,
+  DRAIN_LOCK_KEY,
   minimalLead,
   postLead,
   recordPush,
