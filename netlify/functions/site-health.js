@@ -1611,6 +1611,13 @@ exports.handler = async (event) => {
       ? `Website fields (${(fields.fields || []).join(", ")}) written to the new contact ✓.`
       : `Website fields NOT written (${fields.httpStatus || fields.error || "unknown"}) — the same details are in the note.`);
   }
+  // 2026-09-30: the buyer's search as Lofty inquiry fields (lib/_lofty-returning.js).
+  const inquiryStep = loftyLast && loftyLast.inquiryResult;
+  if (inquiryStep && inquiryStep.attempted) {
+    parts.push(inquiryStep.ok
+      ? `Their home search (${(inquiryStep.fields || []).join(", ")}) set on the new contact in Lofty ✓.`
+      : `Their home search was NOT set on the contact (${inquiryStep.httpStatus || inquiryStep.error || "unknown"}) — it is in the note.`);
+  }
   checks.push({
     // Named for what she cares about, not for the mechanism: this row is the
     // primary notification path now that the tag genuinely changes.

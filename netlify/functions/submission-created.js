@@ -67,7 +67,7 @@ const { addLoftyNote, refireLoftyTag, sendLeadAlertEmail } = require("./lib/_not
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
   findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
-  leadIdFromResponse,
+  leadIdFromResponse, inquiryFromForm, placeInquiry,
 } = require("./lib/_lofty-returning");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
@@ -189,6 +189,10 @@ exports.handler = async (event) => {
       // endpoint couldn't be verified, and a guessed endpoint would fail
       // silently -- the worst outcome for a lead-capture path. The lead arrives
       // tagged and ready; switching the alert on is one step in Lofty.
+      //
+      // 2026-09-30: Lofty's API reference is readable now, and the same search
+      // also goes onto the contact as Lofty's own inquiry fields (price, beds,
+      // baths, towns) -- see placeInquiry below. The note and tags stay as they are.
       body.notes = `${banner}\nWants email alerts for new listings matching: ${data.alert_criteria || "(no filters — all new listings)"}` +
         (data.alert_query ? `\nReproduce this search: https://signaturepropertycollection.com/search-homes.html?${data.alert_query}` : "") +
         (data.message ? `\nAlso said: "${data.message}"` : "");
@@ -371,18 +375,27 @@ exports.handler = async (event) => {
     // other custom fields is undocumented, so an existing record is never touched.
     let fieldsResult = { attempted: false };
     const newLeadId = leadIdFromResponse(result.responseBody);
-    if (existing.ok && !existing.anyMatch && newLeadId && newLeadId === String(leadId) &&
-        noteResult.ok && noteTarget === leadId) {
+    const provenNew = !!(existing.ok && !existing.anyMatch && newLeadId && newLeadId === String(leadId) &&
+        noteResult.ok && noteTarget === leadId);
+    if (provenNew) {
       const ensured = await ensureWebsiteFields(store, apiKey);
       fieldsResult = ensured.ok
         ? await setWebsiteFields(newLeadId, websiteFieldValues(stampedSource, data), apiKey)
         : { attempted: false, reason: "fields not ready", ensured };
     }
 
+    // 2026-09-30 (API audit): what a buyer asked for -- towns, price, beds, baths --
+    // as Lofty's own inquiry fields, not only note text. Same proven-new rule as
+    // the fields above; lib/_lofty-returning.js explains both.
+    const inquiry = inquiryFromForm(data);
+    const inquiryResult = !inquiry ? { attempted: false }
+      : provenNew ? await placeInquiry(newLeadId, inquiry, apiKey)
+      : { attempted: false, reason: "not a proven-new contact; the search is in the note" };
+
     if (store) {
       await recordPush(store, {
         ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
-        returningResult, fieldsResult,
+        returningResult, fieldsResult, inquiryResult,
       }, formName, body);
     }
     return { statusCode: 200, body: "ok" };
