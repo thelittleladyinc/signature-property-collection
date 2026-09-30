@@ -685,7 +685,7 @@ exports.handler = async (event) => {
     // worse than not showing it at all.
     const status = String(l.status || "").toLowerCase();
     // 2026-09-28: was agentName only, so an under-contract listing where she is
-    // the CO-agent (several of hers are co-listed with Kendra) 404'd here while
+    // the CO-agent (several of hers are co-listed) 404'd here while
     // every other part of the site counted it as hers. isHers() checks both.
     const hers = isHers(l);
     const comingSoon = status.includes("coming soon");
