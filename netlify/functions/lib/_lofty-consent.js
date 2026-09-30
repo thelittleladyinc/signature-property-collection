@@ -34,8 +34,9 @@
 // her A2P filing says the boxes are not required), so neither is read as
 // texting consent: those leads stay cannotText:true.
 //
-// Nothing here throws; every entry point returns a small result for /status,
-// without names, emails or phone numbers.
+// Nothing here throws; every entry point returns a small result (kept in the
+// Blobs push record, and the reason logged when texting is held), without
+// names, emails or phone numbers. /status does not show it yet.
 "use strict";
 
 const LOFTY_API = "https://api.lofty.com";
