@@ -688,6 +688,70 @@ function esc(s) {
   ));
 }
 
+// ---- 2026-09-30 (API audit): no personal data on this page ------------------
+// /status and /site-health are public rewrites, and the Little Lady site's /status
+// is a pass-through to this same function. The page used to print the last lead's
+// email address, and ?format=json returned the raw push record plus the whole
+// retry queue -- up to 25 failed leads with name, email, phone and what they wrote.
+// The diagnosis never needed any of that: which form, when, the HTTP status and
+// which step failed say everything, and the leads themselves are safe in Lofty,
+// Netlify Forms and the alert email. So the rows name no one, free text from a
+// vendor is scrubbed of email addresses and phone numbers before it is shown, and
+// the JSON carries a whitelisted summary instead of the stored records.
+function redactPersonal(text) {
+  return String(text == null ? "" : text)
+    .replace(/[^\s@"'<>(),;:]+@[^\s@"'<>(),;:]+\.[a-z]{2,}/gi, "[email]")
+    .replace(/(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g, "[phone]");
+}
+
+const PUBLIC_STEP_FIELDS = [
+  "attempted", "ok", "httpStatus", "step", "skipped", "reason", "leadMissing", "tagRestored",
+  "tagsSeen", "tagShape", "found", "via", "anyMatch", "tagField", "leadId", "taskId", "fields",
+  "fromFallback",
+];
+
+function publicStep(r) {
+  if (!r || typeof r !== "object") return r == null ? null : undefined;
+  const out = {};
+  for (const k of PUBLIC_STEP_FIELDS) if (r[k] !== undefined) out[k] = r[k];
+  // Vendor error text is kept for a failure only -- it is the diagnosis -- and
+  // scrubbed, because nobody controls what a vendor echoes back.
+  if (r.ok === false || r.error) {
+    const why = r.error || r.response;
+    if (why) out.error = redactPersonal(why).slice(0, 200);
+  }
+  return out;
+}
+
+// What ?format=json says about the last push: the same facts the rows use, and
+// nothing about the person.
+function publicPushRecord(p) {
+  if (!p || typeof p !== "object") return null;
+  const out = {
+    at: p.at || null, formName: p.formName || null, ok: !!p.ok, httpStatus: p.httpStatus,
+    payloadShape: p.payloadShape || null, leadId: p.leadId || null, inProgress: !!p.inProgress,
+  };
+  if (!p.ok && p.responseBody) out.responseBody = redactPersonal(p.responseBody).slice(0, 240);
+  for (const k of ["existing", "emailResult", "noteResult", "tagResult", "returningResult",
+    "fieldsResult", "inquiryResult"]) {
+    if (p[k] !== undefined) out[k] = publicStep(p[k]);
+  }
+  return out;
+}
+
+// The retry queue as counts and times only. Each entry stored for the retry
+// carries the whole lead, which is exactly why it must never be printed.
+function publicFailedQueue(queue) {
+  const list = Array.isArray(queue) ? queue : [];
+  return {
+    count: list.length,
+    entries: list.map((e) => ({
+      at: (e && e.at) || null, formName: (e && e.formName) || null,
+      httpStatus: e && e.httpStatus, lastRetryAt: (e && e.lastRetryAt) || null,
+    })),
+  };
+}
+
 exports.handler = async (event) => {
   const store = getBlobStore(getStore);
   const params = (event && event.queryStringParameters) || {};
@@ -1180,17 +1244,16 @@ exports.handler = async (event) => {
       "(2026-08-15). Submit any form once and this row will show exactly what Lofty said.";
   } else if (loftyLast.ok) {
     loftyOk = failedCount === 0;
-    loftyDetail = `Last lead from "${loftyLast.formName}"` +
-      `${loftyLast.leadEmail ? ` (${loftyLast.leadEmail})` : ""} reached Lofty at ${loftyLast.at}` +
+    // No email address here any more (2026-09-30): see redactPersonal above.
+    loftyDetail = `Last lead from "${loftyLast.formName}" reached Lofty at ${loftyLast.at}` +
       `${loftyLast.leadId ? ` (lead ${loftyLast.leadId})` : ""}` +
       `${loftyLast.payloadShape ? `, ${loftyLast.payloadShape} payload` : ""}.` +
       (failedCount ? ` ${failedCount} earlier push(es) failed and are queued.` : "");
   } else {
     loftyOk = false;
-    loftyDetail = `Last lead from "${loftyLast.formName}"` +
-      `${loftyLast.leadEmail ? ` (${loftyLast.leadEmail})` : ""} FAILED at ${loftyLast.at}: ` +
+    loftyDetail = `Last lead from "${loftyLast.formName}" FAILED at ${loftyLast.at}: ` +
       `Lofty returned HTTP ${loftyLast.httpStatus} (payload shape: ${loftyLast.payloadShape || "full"}). ` +
-      `Lofty said: ${String(loftyLast.responseBody || "(empty response)").slice(0, 240)}. ` +
+      `Lofty said: ${redactPersonal(loftyLast.responseBody || "(empty response)").slice(0, 240)}. ` +
       `${failedCount} lead(s) queued and recoverable — nothing is lost, the submissions are also in Netlify Forms.`;
   }
   checks.push({ name: "Website leads reaching Lofty", ok: loftyOk, detail: loftyDetail });
@@ -1240,7 +1303,7 @@ exports.handler = async (event) => {
     emailOk = false;
     emailDetail = `The lead email FAILED at ${loftyLast.at}: ` +
       `${lastEmail.httpStatus ? `HTTP ${lastEmail.httpStatus} — ` : ""}` +
-      `${String(lastEmail.response || lastEmail.error || "(no detail)").slice(0, 240)}. ` +
+      `${redactPersonal(lastEmail.response || lastEmail.error || "(no detail)").slice(0, 240)}. ` +
       "The lead itself is safe (Netlify Forms and Lofty both have it) — this is only the alert.";
   }
   // ---- What Lofty says about the last lead, read straight back ------------
@@ -1293,7 +1356,7 @@ exports.handler = async (event) => {
   } else if (!loftyLeadCheck.ok) {
     leadRowOk = false;
     leadRowDetail = `Lofty would NOT return lead ${loftyLeadCheck.leadId}: ` +
-      `${loftyLeadCheck.httpStatus}${loftyLeadCheck.body ? ` — ${String(loftyLeadCheck.body).slice(0, 200)}` : ""}. ` +
+      `${loftyLeadCheck.httpStatus}${loftyLeadCheck.body ? ` — ${redactPersonal(loftyLeadCheck.body).slice(0, 200)}` : ""}. ` +
       "This is NOT the merge signature (a merge answers 404 with errorCode=20006 / " +
       "\"Lead not exist\"), so it is worth looking at properly.";
   } else if (/no 'tags' field/.test(loftyLeadCheck.tagShape || "")) {
@@ -1520,7 +1583,7 @@ exports.handler = async (event) => {
     // lead we just created, the tag can never be re-fired, and that is a
     // different problem from the tag edit being refused.
     parts.push(`Trigger tag: could NOT read the lead back from Lofty ` +
-      `(HTTP ${tag.httpStatus}${tag.response ? ` — ${String(tag.response).slice(0, 120)}` : ""}). ` +
+      `(HTTP ${tag.httpStatus}${tag.response ? ` — ${redactPersonal(tag.response).slice(0, 120)}` : ""}). ` +
       `The tag from the original push should still be on the lead, but it could not be re-fired.`);
   } else if (tag.step === "unreadable-tags") {
     parts.push(`Trigger tag: left alone on purpose — Lofty returned tags in a shape this code ` +
@@ -1625,7 +1688,13 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         allOk, checks,
         cloudinaryConfig: (() => { try { return cloudinaryDiagnostics(); } catch (e) { return { error: String(e && e.message) }; } })(),
-        raw: { state, suspension, mineCount, mineCloudinaryCount, google, loftyLast, loftyFailed, loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck },
+        // loftyLast / loftyFailed are summaries, never the stored records: those
+        // carry the lead's name, email, phone and message (see redactPersonal).
+        raw: {
+          state, suspension, mineCount, mineCloudinaryCount, google,
+          loftyLast: publicPushRecord(loftyLast), loftyFailed: publicFailedQueue(loftyFailed),
+          loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck,
+        },
       }, null, 2),
     };
   }
