@@ -402,8 +402,15 @@ const HOUR = 3600e3;
     const u = new URL(String(url));
     if (u.host.includes("mlsgrid")) {
       gridCalls.push(u.pathname);
+      // 2026-09-30: the sync now asks MLS Grid whether each Lofty listing is
+      // still on the market (tests/test-lofty-mls-check.js). Answer "yes" for
+      // her listing here so this section keeps testing what it always did:
+      // the market-data crawl itself never touches what the site shows.
+      const filter = u.searchParams.get("$filter") || "";
+      const m = /ListingId eq '([^']+)'/.exec(filter);
+      const value = m ? [{ ListingId: m[1], StandardStatus: "Active", MlgCanView: true }] : [];
       return { ok: true, status: 200, headers: { get: () => "application/json" },
-        text: async () => JSON.stringify({ value: [] }), json: async () => ({ value: [] }) };
+        text: async () => JSON.stringify({ value }), json: async () => ({ value }) };
     }
     return lofty9(url, init);
   };
