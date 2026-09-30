@@ -219,6 +219,44 @@ process.env.RESEND_API_KEY = "resend-test-key";
   process.env.RESEND_API_KEY = "resend-test-key";
 })
 
+// === 7. LEAD_ALERT_FROM: her own sender, with the test sender as the fallback ===
+// 2026-09-30 (API audit). Setting the variable before the domain is verified in
+// Resend must not cost her the alert.
+.then(async () => {
+  console.log("\n7. LEAD_ALERT_FROM (her own verified sender)");
+  process.env.LEAD_ALERT_FROM = "Christine <leads@example.com>";
+  const lofty = ({ url, method }) => {
+    if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 777 } } };
+    if (url.includes("/notes")) return { status: 200, body: {} };
+    if (url.includes("/leads/777") && method === "GET") return { status: 200, body: { data: { tags: [] } } };
+    if (url.includes("/leads/777") && method === "PUT") return { status: 200, body: {} };
+    return { status: 404, body: {} };
+  };
+  stubFetch((r) => (r.url.includes("api.resend.com") ? { status: 200, body: { id: "email_7" } } : lofty(r)));
+  await loadHandler()(submission({ name: "Sender Test", email: "s@example.com" }));
+  let emails = of("POST", "api.resend.com");
+  check("one email, from her own sender", emails.length === 1 && emails[0].body.from === process.env.LEAD_ALERT_FROM,
+    JSON.stringify(emails.map((e) => e.body.from)));
+  check("recorded as her own sender", stored["lofty-last-push.json"].emailResult.sender === "custom");
+
+  stubFetch((r) => {
+    if (r.url.includes("api.resend.com")) {
+      return r.body.from === process.env.LEAD_ALERT_FROM
+        ? { status: 403, body: { name: "validation_error", message: "The example.com domain is not verified." } }
+        : { status: 200, body: { id: "email_8" } };
+    }
+    return lofty(r);
+  });
+  await loadHandler()(submission({ name: "Sender Test", email: "s@example.com" }));
+  emails = of("POST", "api.resend.com");
+  const er = stored["lofty-last-push.json"].emailResult;
+  check("a refused sender is retried once from the default", emails.length === 2 &&
+    /onboarding@resend\.dev/.test(emails[1].body.from), JSON.stringify(emails.map((e) => e.body.from)));
+  check("...the alert still counts as sent, and says why", er.ok === true && er.fromFallback === true &&
+    er.customFromRefused.httpStatus === 403, JSON.stringify(er));
+  delete process.env.LEAD_ALERT_FROM;
+})
+
 .then(() => {
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} CHECK(S) FAILED\n`);
   process.exit(failures === 0 ? 0 : 1);

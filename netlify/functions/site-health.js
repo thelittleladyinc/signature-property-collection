@@ -707,7 +707,7 @@ function redactPersonal(text) {
 const PUBLIC_STEP_FIELDS = [
   "attempted", "ok", "httpStatus", "step", "skipped", "reason", "leadMissing", "tagRestored",
   "tagsSeen", "tagShape", "found", "via", "anyMatch", "tagField", "leadId", "taskId", "fields",
-  "fromFallback",
+  "fromFallback", "sender",
 ];
 
 function publicStep(r) {
@@ -1296,9 +1296,19 @@ exports.handler = async (event) => {
       "will show whether the email actually left.";
   } else if (lastEmail.ok) {
     emailOk = true;
+    // 2026-09-30: says which sender was actually used (lib/_notify.js), instead of
+    // always blaming the test sender.
     emailDetail = `Sent to you at ${loftyLast.at} for the lead from "${loftyLast.formName}". ` +
-      "If it isn't in your inbox, check spam — the default sender is Resend's shared " +
-      "onboarding@resend.dev address, which only delivers to the Resend account owner.";
+      (lastEmail.sender === "custom"
+        ? "It went from your own verified sender (LEAD_ALERT_FROM)."
+        : lastEmail.fromFallback
+          ? "Resend REFUSED your LEAD_ALERT_FROM sender " +
+            `(HTTP ${(lastEmail.customFromRefused && lastEmail.customFromRefused.httpStatus) || "?"}), so it went ` +
+            "from the shared onboarding@resend.dev address instead — verify that domain in Resend " +
+            "(Domains) or correct LEAD_ALERT_FROM in Netlify."
+          : "If it isn't in your inbox, check spam — the default sender is Resend's shared " +
+            "onboarding@resend.dev address, which only delivers to the Resend account owner. " +
+            "Verify your domain in Resend and set LEAD_ALERT_FROM in Netlify to send from it.");
   } else {
     emailOk = false;
     emailDetail = `The lead email FAILED at ${loftyLast.at}: ` +
