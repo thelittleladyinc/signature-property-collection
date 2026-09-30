@@ -34,6 +34,7 @@
 // the TTL is checked on read so an entry can never be served stale past it.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
+const { isTownPlace, isNeighborhoodPlace, takeDailyLookup } = require("./lib/_google-guard");
 
 const WALK_STORE_NAME = "walkability-cache";
 // 30 days, matching nearby-places.js and (since 2026-08-15) sold-homes-geocode.js.
@@ -279,6 +280,21 @@ exports.handler = async (event) => {
         // checkedAt deliberately survives -- it is when the data was actually
         // fetched from Google, which is what the page reports to the reader.
         body: JSON.stringify({ ...cached, cachedAt: undefined, cached: true }),
+      };
+    }
+
+    // 2026-09-30 (API audit): a fresh score is ten paid Places calls plus one or
+    // two geocodes, and this endpoint is public on two domains. Only a known town
+    // ("Loveland, CO") or a neighbourhood page's place inside one (with that town
+    // as `near`) is scored, within the day's allowance -- lib/_google-guard.js.
+    const allowed = near ? isNeighborhoodPlace(place, near) : isTownPlace(place);
+    const budget = allowed ? await takeDailyLookup(store, "walkability") : null;
+    if (!allowed || !budget.ok) {
+      if (allowed) console.warn(`walkability: daily Google lookup allowance used (${budget.used || 0}/${budget.limit}).`);
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: allowed ? "daily_limit" : "unknown_place" }),
       };
     }
 
