@@ -404,6 +404,16 @@ async function enrich(ids, listingsById, { apiKey, pace, fetchImpl, errors }) {
 
 // ---- The 30-minute sync -----------------------------------------------------------
 
+// What runMineSync's confirmOnMarket hook may answer: a bare true/false/null, or
+// { onMarket, why }. Anything else is "unknown", which never hides a listing.
+function normalizeVerdict(v) {
+  if (v === true || v === false) return { onMarket: v, why: "" };
+  if (v && typeof v === "object" && (v.onMarket === true || v.onMarket === false)) {
+    return { onMarket: v.onMarket, why: String(v.why || "") };
+  }
+  return { onMarket: null, why: "" };
+}
+
 async function runMineSync(opts) {
   const { store, apiKey, fetchImpl, sleepImpl } = opts;
   const now = opts.now || Date.now;
@@ -455,6 +465,42 @@ async function runMineSync(opts) {
     errors.push(`her listings: ${err.message}`);
   }
 
+  // 2026-09-30: Lofty's copy of the IRES feed showed IRE1043314 (212 N 54th,
+  // Greeley) as Active and listed by Christine -- a listing that expired in
+  // November 2025. Every Lofty-powered site carried it, and this one showed it
+  // for a day before she noticed. So a Lofty record is no longer enough on its
+  // own: when the caller can ask the MLS (sync-listings.js makeOnMarketConfirmer,
+  // which reads the site's own MLS Grid copy and, only for a listing that copy
+  // does not have, asks MLS Grid for that one record), a listing MLS says is
+  // off-market is hidden and named in the state so /site-health shows it.
+  // The confirmer answers with { onMarket: true | false | null, why }:
+  //   true  -> keep;   false -> hide;   null -> unknown, keep (never hide blind).
+  // Applied after `answer` so hiding can never turn a complete Lofty answer into
+  // an "empty" one that the two-hour rule below would hold back.
+  const hiddenOffMarket = [];
+  let unconfirmed = 0;
+  let mlsCheck = "not available";
+  if (answer === "ok" && typeof opts.confirmOnMarket === "function") {
+    mlsCheck = "checked";
+    for (const id of Object.keys(fresh)) {
+      const l = fresh[id];
+      let verdict = { onMarket: null, why: "" };
+      try {
+        verdict = normalizeVerdict(await opts.confirmOnMarket(l));
+      } catch (err) {
+        log(`lofty (her listings): MLS check for ${id} failed, so it is kept: ${err && err.message}`);
+      }
+      if (verdict.onMarket === false) {
+        const why = verdict.why || "the MLS says this listing is not on the market";
+        hiddenOffMarket.push({ listingId: id, address: l.address || "", city: l.city || "", status: l.status || "", why });
+        delete fresh[id];
+        log(`lofty (her listings): HIDDEN ${id} (${l.address || ""}, ${l.city || ""}) -- Lofty says ${l.status}, but ${why}`);
+      } else if (verdict.onMarket !== true) {
+        unconfirmed += 1;
+      }
+    }
+  }
+
   // Is this answer the new truth?
   let emptySince = prevState.emptyMineSince || null;
   let accept = false;
@@ -498,6 +544,12 @@ async function runMineSync(opts) {
     herNonMlsListings: herNonMls.slice(0, 20),
     skippedNotHers,
     detailsFetchedLastRun: details.fetched,
+    // 2026-09-30: what the MLS check did this run (see confirmOnMarket above).
+    // hiddenOffMarket is what /site-health names, so a stale Lofty record is a
+    // visible finding rather than a listing that quietly comes and goes.
+    mlsCheck,
+    mlsUnconfirmed: unconfirmed,
+    hiddenOffMarket: hiddenOffMarket.slice(0, 20),
   };
   // A stored set that still holds anyone else's listing (the whole-market copy
   // an earlier version wrote) is cut down to hers even when this answer is not
@@ -509,8 +561,10 @@ async function runMineSync(opts) {
   }
   await store.setJSON(LOFTY_KEYS.SYNC_STATE_KEY, state);
   log(`lofty (her listings): ${answer}${accept ? "" : " — kept the last good set"} — ${mine.length} listing(s), ` +
-    `${pace.requests} request(s), ${details.fetched} detail record(s)` + (errors.length ? `; ${errors.join("; ")}` : ""));
-  return { answer, accepted: accept, hers: mine.length, requests: pace.requests, errors };
+    `${pace.requests} request(s), ${details.fetched} detail record(s)` +
+    (hiddenOffMarket.length ? `; ${hiddenOffMarket.length} hidden as off-market per the MLS` : "") +
+    (errors.length ? `; ${errors.join("; ")}` : ""));
+  return { answer, accepted: accept, hers: mine.length, requests: pace.requests, errors, hiddenOffMarket };
 }
 
 module.exports = {

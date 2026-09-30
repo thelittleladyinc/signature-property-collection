@@ -17,6 +17,10 @@
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore, LISTINGS_SOURCE } = require("./lib/_mls-shared");
 const { runMineSync } = require("./lib/_lofty-listings");
+// 2026-09-30: the same MLS check the scheduled run applies, so a manual refresh
+// cannot bring back a listing the MLS says is off the market (see sync-listings.js
+// makeOnMarketConfirmer).
+const { makeOnMarketConfirmer, mlsGridMarketDataOn } = require("./sync-listings");
 
 function json(statusCode, body) {
   return {
@@ -37,7 +41,10 @@ exports.handler = async (event) => {
   if (!apiKey) return json(503, { error: "LOFTY_API_KEY is not set in Netlify." });
   try {
     const store = getBlobStore(getStore);
-    const result = await runMineSync({ store, apiKey, manual: true });
+    const confirmOnMarket = mlsGridMarketDataOn()
+      ? makeOnMarketConfirmer({ store, token: process.env.MLSGRID_API_TOKEN })
+      : undefined;
+    const result = await runMineSync({ store, apiKey, manual: true, confirmOnMarket });
     return json(result.skipped ? 429 : 200, result);
   } catch (err) {
     console.error("refresh-my-listings:", err && err.message);

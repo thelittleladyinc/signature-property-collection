@@ -62,9 +62,27 @@ is gone.
 - **Photos**: `img.chime.me` — stable URLs that resize on request (`w600_`,
   `w1200_` …). Cards get 600px directly, galleries and heroes 1200px. Her listing
   pages show her whole gallery.
+- **The MLS has the last word on "on the market" (2026-09-30).** Lofty's copy of
+  the IRES feed carried IRE1043314 — 212 N 54th, Greeley, expired November 2025 —
+  as Active and listed by Christine, on this site, her home search and every
+  other Lofty-powered site. So every listing Lofty reports is now confirmed
+  before it is stored (`sync-listings.js` `makeOnMarketConfirmer`, passed to
+  `runMineSync` as `confirmOnMarket`): first against the site's own MLS Grid copy
+  of her listings (`mine-listings.json`, no request), then, for a listing that
+  copy does not have, one MLS Grid request for that `ListingId` alone. Expired,
+  Closed, not viewable, or unknown to MLS Grid → hidden, named in
+  `lofty-sync-state.json` (`hiddenOffMarket`) and on `/status` with "ask Lofty
+  support". A verdict is kept a day (`lofty-mls-verdicts.json`), so a stale
+  record costs one request a day. A listing Lofty says was listed within the
+  last 7 days that MLS Grid does not know yet is "unknown" — kept, never hidden —
+  and so is every failure (quota guard, 429, network): the check can only ever
+  remove a listing the MLS has positively said is off the market. It runs only
+  when the MLS Grid market-data run is on (`MLSGRID_API_TOKEN` set); without it
+  her listings show exactly as Lofty reports them, as before. The manual refresh
+  applies the same check. Pinned by `tests/test-lofty-mls-check.js`.
 - **No MLS Grid calls** on anything that shows listings (pinned by
-  `tests/test-lofty-source.js`). MLS Grid is still read in the background for the
-  town market figures — see below.
+  `tests/test-lofty-source.js`) — apart from that one-record confirmation. MLS
+  Grid is still read in the background for the town market figures — see below.
 
 ## The home search hand-off (`netlify/functions/lib/_home-search.js`)
 

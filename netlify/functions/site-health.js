@@ -231,6 +231,22 @@ function loftyListingRows(state, mineListings, now, alertCount, gridState) {
       (state && state.skippedNotHers ? `; ${state.skippedNotHers} more from Lofty's "my listings" don't carry her name as agent or co-agent, so they aren't shown` : "") +
       (nonMls.length ? `. Also in Lofty but not on the MLS, so not shown here: ${nonMls.join("; ")}` : ""),
   });
+  // 2026-09-30: a Lofty record the MLS says is off the market is hidden by the
+  // sync (lib/_lofty-listings.js confirmOnMarket) and named here, because the
+  // fix for it lives with Lofty support, not on this site.
+  const hidden = state && Array.isArray(state.hiddenOffMarket) ? state.hiddenOffMarket : [];
+  rows.push({
+    name: "Every listing Lofty reports is still on the MLS",
+    ok: hidden.length === 0,
+    detail: hidden.length
+      ? `${hidden.length} listing(s) Lofty reports as yours are NOT on the market per the MLS, so the site hides them: ` +
+        hidden.map((h) => `${h.listingId} · ${h.address}, ${h.city} (Lofty says ${h.status}; ${h.why})`).join("; ") +
+        ". Ask Lofty support to correct the record — it shows on every Lofty-powered site, including your home search."
+      : state && state.mlsCheck === "checked"
+        ? `All ${mineCount} confirmed against the MLS on the last refresh` +
+          (state.mlsUnconfirmed ? ` (${state.mlsUnconfirmed} could not be checked and were kept)` : "") + "."
+        : "Not checked: the MLS check runs only when the MLS Grid market-data run is on (MLSGRID_API_TOKEN set).",
+  });
   const withDetails = (Array.isArray(mineListings) ? mineListings : []).filter((l) => l && l.detailsFor).length;
   rows.push({
     optional: true,
