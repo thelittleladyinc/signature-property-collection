@@ -150,6 +150,14 @@ exports.handler = async (event) => {
     if (data.email) body.emails = [data.email];
     if (data.phone) body.phones = [data.phone];
     body.source = SOURCE_LABELS[formName] || `Signature Property Collection - ${formName}`;
+    // 2026-09-30 (consent fix): every lead is created with texting OFF, and on
+    // this site it stays off. No Signature form posts a texting consent: each
+    // form's consent box is required and has no name, so nothing about it
+    // reaches this function, and a required box would not be a free yes anyway.
+    // A lead here is only made textable by hand in Lofty, once consent is
+    // confirmed. lib/_lofty.js enforces cannotText:true on every
+    // create, the queue replay included; lib/_lofty-consent.js has the rule.
+    body.cannotText = true;
     // 2026-08-15 (Christine: "make sure that when the new lead comes in or if it
     // merges that i am still notified some how in lofty with a hot lead or
     // something of hte sort"). Her 16:48 test DID reach Lofty -- lead

@@ -47,11 +47,19 @@ const MAX_DRAIN_PER_RUN = 3;
 // overwriting it. A lease older than any function can run is taken over.
 const DRAIN_LOCK_KEY = "lofty-drain-lock.json";
 const DRAIN_LOCK_TTL_MS = 5 * 60 * 1000;
+// 2026-09-30 (consent fix): every lead this file creates goes to Lofty with
+// texting OFF (cannotText:true) -- the full shape, the minimal retry and the
+// queue replay alike, including leads queued before this change. Texting goes
+// on only afterwards, and only through lib/_lofty-consent.js's rule (an explicit
+// yes, and every phone on the lead is the number the yes came with).
+const { applyTextingConsent } = require("./_lofty-consent");
+const { leadIdFromResponse } = require("./_lofty-returning");
 
 // Strips the full payload down to the least a CRM could possibly need. Used only
 // after Lofty has already refused the full one.
 function minimalLead(body) {
-  const out = {};
+  // Texting stays off even in the most conservative shape.
+  const out = { cannotText: true };
   if (body.firstName) out.firstName = body.firstName;
   if (body.lastName) out.lastName = body.lastName;
   if (Array.isArray(body.emails) && body.emails[0]) out.email = body.emails[0];
@@ -84,7 +92,8 @@ async function postOnce(body, apiKey, timeoutMs = POST_TIMEOUT_MS) {
         // Authorization: token <your apiKey>. Lowercase "token", not "Bearer".
         "Authorization": `token ${apiKey}`,
       },
-      body: JSON.stringify(body),
+      // Whatever the caller built or the queue held: a create never turns texting on.
+      body: JSON.stringify({ ...body, cannotText: true }),
       signal: AbortSignal.timeout(Math.max(1, Math.min(POST_TIMEOUT_MS, timeoutMs))),
     });
   } catch (err) {
@@ -194,6 +203,7 @@ async function drainWithLease(store, apiKey, opts) {
   const remaining = [];
   let attempted = 0;
   let recovered = 0;
+  let consentHeld = 0;
   for (const entry of queue) {
     if (!entry || !entry.lead || attempted >= MAX_DRAIN_PER_RUN || deadline - Date.now() < MIN_RETRY_MS) {
       if (entry) remaining.push(entry);
@@ -212,6 +222,17 @@ async function drainWithLease(store, apiKey, opts) {
     if (result.ok) {
       recovered += 1;
       console.log(`Recovered a queued Lofty lead from "${entry.formName}" (${result.payloadShape} shape).`);
+      // The replay was created with texting off. The same consent rule as the
+      // live form: only a recorded yes, and only if every phone on the lead the
+      // create landed on is the consented number (that lead may be a client's
+      // by now, so its tags are read and merged, never replaced).
+      if (entry.smsConsent === true) {
+        const consent = await applyTextingConsent(leadIdFromResponse(result.responseBody), consentPhoneOf(entry.lead), apiKey, { deadline });
+        if (!consent.textingEnabled) {
+          consentHeld += 1;
+          console.warn(`Queued Lofty lead from "${entry.formName}": texting not turned on -- ${consent.textingNotEnabled || consent.reason || consent.error || "not applied"}.`);
+        }
+      }
     } else {
       remaining.push({ ...entry, lastRetryAt: new Date().toISOString(), ...result });
     }
@@ -228,11 +249,19 @@ async function drainWithLease(store, apiKey, opts) {
       formName: "(queued retry)",
       ok: recovered > 0,
       httpStatus: recovered > 0 ? 200 : "retry failed",
-      responseBody: `${recovered} of ${attempted} queued lead(s) recovered; ${remaining.length} still queued.`,
+      responseBody: `${recovered} of ${attempted} queued lead(s) recovered; ${remaining.length} still queued.` +
+        (consentHeld ? ` Texting left off on ${consentHeld} that said yes to texts (see the function log).` : ""),
       payloadShape: "queued retry",
     }).catch(() => {});
   }
-  return { attempted, recovered, stillQueued: remaining.length };
+  return { attempted, recovered, stillQueued: remaining.length, ...(consentHeld ? { consentHeld } : {}) };
+}
+
+// The number a queued lead's texting yes came with: the one the form sent.
+function consentPhoneOf(lead) {
+  if (!lead) return null;
+  if (Array.isArray(lead.phones) && lead.phones.length) return lead.phones[0];
+  return lead.phone || null;
 }
 
 module.exports = {
