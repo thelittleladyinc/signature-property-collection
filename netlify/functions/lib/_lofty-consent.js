@@ -43,6 +43,7 @@ const LOFTY_API = "https://api.lofty.com";
 const CALL_TIMEOUT_MS = 5000;
 // EN DASH, exactly as the Command Center writes it.
 const CONSENT_TAG = "Consent – SMS Opt-In";
+const isDncTag = (name) => /^consent\s*[-\u2010-\u2015]\s*dnc$/i.test(name.trim());
 const SMS_CONSENT_FIELD = "sms_consent";
 
 const YES_VALUE = /^(yes|y|true|on|1|checked|agree|agreed|accept|accepted|opt[-_ ]?in|opted[-_ ]?in|i agree|i consent|i accept)\b/i;
@@ -170,6 +171,12 @@ async function applyTextingConsent(leadId, consentPhone, apiKey, opts) {
     if (tags === null || phones === null) {
       return { attempted: true, ok: false, changed: false, textingEnabled: false, step: "unreadable",
         textingNotEnabled: `the lead's ${tags === null ? "tags" : "phones"} could not be read; nothing written, ${HELD}` };
+    }
+    if (tags.some(isDncTag)) {
+      return {
+        attempted: true, ok: true, changed: false, textingEnabled: false, step: "dnc",
+        textingNotEnabled: "the lead is tagged Consent - DNC; Do Not Contact wins over a yes, SMS consent tag held",
+      };
     }
     const applies = phones.length > 0 && phones.every((p) => last10(p) === consented);
     if (!applies) {

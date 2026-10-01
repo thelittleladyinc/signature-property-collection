@@ -242,6 +242,10 @@ const newLead = (extra) => ({ phones: ["+1 970-555-0100"], emails: ["pat@example
     }
   }
 
+  const dncRegression = require('node:child_process').spawnSync(process.execPath,
+    ['--test', require('node:path').join(__dirname, 'test-dnc-regression.cjs')], { stdio: 'inherit' });
+  check('DNC regression suite passes', dncRegression.status === 0);
+
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
