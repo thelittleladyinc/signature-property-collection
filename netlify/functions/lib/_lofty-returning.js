@@ -131,6 +131,10 @@ async function search(field, value, isMatch, apiKey, opts) {
     const leads = leadsFrom(res.text);
     if (!leads) return { attempted: true, ok: false, httpStatus: res.httpStatus, error: "unexpected response shape" };
     const exact = leads.filter(isMatch);
+    if (exact.length > 1) {
+      return { attempted: true, ok: false, httpStatus: res.httpStatus, matches: exact.length,
+        leadId: null, manualReview: true, error: "multiple exact matches; identity needs manual review" };
+    }
     if (leads.length && !exact.length) {
       return { attempted: true, ok: false, httpStatus: res.httpStatus, error: `${leads.length} result(s), none an exact match` };
     }
@@ -179,14 +183,18 @@ async function findExistingLead(email, phone, apiKey, opts) {
     const failed = asked.find((r) => !r.ok);
     const emailId = byEmail.ok ? byEmail.leadId || null : null;
     const phoneId = byPhone.ok ? byPhone.leadId || null : null;
+    const mismatchedIds = !!(emailId && phoneId && emailId !== phoneId);
+    const manualReview = !!(byEmail.manualReview || byPhone.manualReview || mismatchedIds);
     return {
       attempted: true,
-      ok: !failed,
-      leadId: emailId,
+      ok: !failed && !manualReview,
+      leadId: manualReview ? null : emailId,
       via: emailId ? "email" : phoneId ? "phone" : undefined,
       phoneLeadId: phoneId,
-      anyMatch: !!(emailId || phoneId),
-      error: failed ? failed.error || `HTTP ${failed.httpStatus}` : undefined,
+      anyMatch: !!(emailId || phoneId || manualReview),
+      manualReview,
+      error: mismatchedIds ? "email and phone identify different contacts; identity needs manual review"
+        : failed ? failed.error || `HTTP ${failed.httpStatus}` : undefined,
     };
   } catch (err) {
     return { attempted: true, ok: false, leadId: null, anyMatch: false, error: short((err && err.message) || err, 120) };

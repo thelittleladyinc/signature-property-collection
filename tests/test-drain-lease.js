@@ -48,9 +48,15 @@ const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, tex
 
   console.log("\n2. A lead that fails while a drain is running is kept");
   store = blobStore({ [L.FAILED_PUSH_KEY]: [lead(1)] });
-  global.fetch = async () => {
-    // A form's recordPush lands mid-drain, exactly as the live handler writes it.
-    await L.recordPush(store, { ok: false, httpStatus: 503 }, "buyers-guide", { emails: ["new@example.com"] });
+  let landed = false;
+  global.fetch = async (url, init) => {
+    // A form's recordPush lands mid-drain, exactly as the live handler writes it:
+    // once, while the replay's create is in flight (the drain also reads Lofty
+    // before and after the create; those reads are not submissions).
+    if (init && init.method === "POST" && !landed) {
+      landed = true;
+      await L.recordPush(store, { ok: false, httpStatus: 503 }, "buyers-guide", { emails: ["new@example.com"] });
+    }
     return resp(200, { data: { leadId: 6 } });
   };
   await L.drainFailedPushes(store, "k");
@@ -61,7 +67,8 @@ const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, tex
   console.log("\n3. Leases");
   store = blobStore({ [L.FAILED_PUSH_KEY]: [lead(1)], [L.DRAIN_LOCK_KEY]: { at: new Date().toISOString() } });
   posted.length = 0;
-  global.fetch = async (url, init) => { posted.push(1); return resp(200, {}); };
+  // Count creates only: the drain's identity and texting reads are not replays.
+  global.fetch = async (url, init) => { if (init && init.method === "POST") posted.push(1); return resp(200, {}); };
   let r = await L.drainFailedPushes(store, "k");
   check("a live lease held elsewhere: nothing replayed, queue untouched",
     r.locked === true && posted.length === 0 && store.data[L.FAILED_PUSH_KEY].length === 1);
