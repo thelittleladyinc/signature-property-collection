@@ -63,6 +63,7 @@
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
 const { postLead, recordPush } = require("./lib/_lofty");
+const { applyTextingPreference } = require("./lib/_lofty-consent");
 const { addLoftyNote, refireLoftyTag, sendLeadAlertEmail } = require("./lib/_notify");
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
@@ -257,6 +258,20 @@ exports.handler = async (event) => {
     // instead of the absorbed record a merge hands back. Never throws; if Lofty
     // can't answer in time, everything below runs exactly as before.
     const existing = await findExistingLead(data.email, data.phone, apiKey);
+    if (existing.manualReview) {
+      const held = { ok: false, attempted: false, manualReview: true,
+        payloadShape: "held for identity review", responseBody: existing.error };
+      const emailResult = await sendLeadAlertEmail({
+        name: data.name, email: data.email, phone: data.phone,
+        source: SOURCE_LABELS[formName] || formName, sourceShort: formName,
+        noteText: `${body.notes}\n\nMANUAL REVIEW: ${existing.error}. No Lofty contact changed.`,
+        leadId: null, stamp: `${stamp} MT`,
+      });
+      let store = null;
+      try { store = getBlobStore(getStore, DIAG_STORE); } catch (e) { store = null; }
+      if (store) await recordPush(store, { ...held, emailResult }, formName, body);
+      return { statusCode: 200, body: "ok (captured; Lofty identity needs manual review)" };
+    }
     // A known contact keeps its own tags. `tags` on the create call REPLACES the
     // tag set of the contact a submission merges into ("All existing tags will be
     // updated based on this call" -- Lofty's create-lead reference); `tagsAdd`
@@ -340,6 +355,10 @@ exports.handler = async (event) => {
     // 2026-09-29: to the existing contact when there is one (see above).
     const noteTarget = existing.leadId || leadId;
     const noteResult = noteTarget ? await addLoftyNote(noteTarget, body.notes, apiKey) : { attempted: false };
+    const consentTarget = existing.leadId || leadIdFromResponse(result.responseBody) || leadId;
+    const consentResult = consentTarget ? await applyTextingPreference(consentTarget, data.phone, false, apiKey)
+      : { attempted: false, textingEnabled: false, reason: "no lead id for texting safety check" };
+    if (consentResult.textingNotEnabled) console.warn(`Signature texting safety: ${consentResult.textingNotEnabled}`);
     // And make the trigger tag a real CHANGE, so the Smart Plan fires on a
     // returning buyer's second enquiry and not only their first.
     //
@@ -364,7 +383,7 @@ exports.handler = async (event) => {
     // those run the function out of time.
     if (store) {
       await recordPush(store, {
-        ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
+        ...result, leadId, emailResult, noteResult, consentResult, tagResult, existing: existingSummary,
         inProgress: !!existing.leadId,
       }, formName, body);
     }
@@ -402,7 +421,7 @@ exports.handler = async (event) => {
 
     if (store) {
       await recordPush(store, {
-        ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
+        ...result, leadId, emailResult, noteResult, consentResult, tagResult, existing: existingSummary,
         returningResult, fieldsResult, inquiryResult,
       }, formName, body);
     }

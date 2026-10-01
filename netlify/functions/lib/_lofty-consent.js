@@ -24,12 +24,11 @@
 //      is unreadable, never "none" -- a create can fold into an existing lead
 //      by email or phone, so the id it returns may be a client's -- and then
 //      nothing is written at all.
-//   4. A "no" or a blank never turns texting on and never removes a consent tag
-//      a lead already has: without a yes, nothing here runs.
+//   4. A new number without a yes turns texting off. DNC always wins. Safe-off
+//      writes change only cannotText; existing tags and phone lists stay intact.
 //
-// Only the explicit, optional sms_consent box counts. The Little Lady site's
-// five ROI funnel forms post a `consent` box that is REQUIRED to submit, and
-// Signature's boxes are required and have no name (nothing is posted). A box
+// Only the explicit, optional sms_consent box counts. Legacy `consent` fields
+// and Signature's required unnamed boxes do not count. A box
 // nobody can leave unticked is not a free yes (The Little Lady build.py header;
 // her A2P filing says the boxes are not required), so neither is read as
 // texting consent: those leads stay cannotText:true.
@@ -137,19 +136,16 @@ async function call(method, path, apiKey, rawBody, o) {
 
 const HELD = "texting left off and SMS consent tag held";
 
-// Called only after an explicit yes. Reads the lead, and turns texting on and
-// adds the consent tag -- in ONE merged write -- only if every phone on it is
-// the consented number. Otherwise writes nothing and says why
-// (textingNotEnabled). Returns { attempted, ok, changed, textingEnabled, step, ... }.
-async function applyTextingConsent(leadId, consentPhone, apiKey, opts) {
+// Read back every submission: Lofty's create can merge into a textable contact.
+// Enable only with a verified yes; turn off for DNC or an unconsented new number.
+async function applyTextingPreference(leadId, consentPhone, consentGiven, apiKey, opts) {
   try {
     const o = opts || {};
-    const id = String(leadId == null ? "" : leadId).replace(/\D/g, "");
-    if (!apiKey || !id) return { attempted: false, textingEnabled: false, reason: "no lead id" };
-    const consented = last10(consentPhone);
-    if (consented.length !== 10) {
-      return { attempted: false, textingEnabled: false, textingNotEnabled: `consent given but no phone number on the form; ${HELD}` };
+    const id = String(leadId == null ? "" : leadId).trim();
+    if (!apiKey || !/^\d+$/.test(id) || (typeof leadId === "number" && !Number.isSafeInteger(leadId))) {
+      return { attempted: false, textingEnabled: false, reason: "no safe lead id" };
     }
+    const consented = last10(consentPhone);
     const got = await call("GET", `/v1.0/leads/${id}`, apiKey, null, o);
     if (!got.ok) {
       return {
@@ -168,24 +164,47 @@ async function applyTextingConsent(leadId, consentPhone, apiKey, opts) {
     // write would replace the client's tags with ours.
     const tags = l.tags == null ? null : tagNames(l.tags);
     const phones = leadPhones(l);
-    if (tags === null || phones === null) {
-      return { attempted: true, ok: false, changed: false, textingEnabled: false, step: "unreadable",
-        textingNotEnabled: `the lead's ${tags === null ? "tags" : "phones"} could not be read; nothing written, ${HELD}` };
-    }
-    if (tags.some(isDncTag)) {
+    async function disableTexting(step, reason) {
+      if (l.cannotText === true) {
+        return { attempted: true, ok: true, changed: false, textingEnabled: false, textingDisabled: true, step,
+          textingNotEnabled: reason };
+      }
+      const put = await call("PUT", `/v1.0/leads/${id}`, apiKey, JSON.stringify({ cannotText: true }), o);
       return {
-        attempted: true, ok: true, changed: false, textingEnabled: false, step: "dnc",
-        textingNotEnabled: "the lead is tagged Consent - DNC; Do Not Contact wins over a yes, SMS consent tag held",
+        attempted: true, ok: put.ok, changed: put.ok, textingEnabled: !put.ok && l.cannotText === false,
+        textingDisabled: put.ok, step: put.ok ? step : "write", fields: ["cannotText"],
+        httpStatus: put.httpStatus, error: put.error,
+        textingNotEnabled: put.ok ? reason : `${reason}; could not turn texting off, manual review required`,
       };
+    }
+    if (tags && tags.some(isDncTag)) {
+      return disableTexting("dnc", "the lead is tagged Consent - DNC; Do Not Contact wins, SMS consent tag held");
+    }
+    if (consentGiven === true && consented.length !== 10) {
+      return { attempted: true, ok: true, changed: false, textingEnabled: l.cannotText === false, step: "held",
+        textingNotEnabled: "consent given but no phone number on the form; SMS consent tag held" };
+    }
+    if (consentGiven !== true) {
+      if (phones === null) {
+        return { attempted: true, ok: false, changed: false, textingEnabled: l.cannotText === false, step: "unreadable",
+          textingNotEnabled: "the lead's phones could not be read; no consent change made, manual review required" };
+      }
+      // A create may already have appended the submitted number. Any other
+      // number still makes whole-lead texting unsafe without a new yes.
+      const newNumber = consented.length === 10 && (!phones.length || !phones.every((p) => last10(p) === consented));
+      if (newNumber) return disableTexting("new-number", "a new number was submitted without a yes; texting turned off, existing tags and phones kept");
+      return { attempted: true, ok: true, changed: false, textingEnabled: l.cannotText === false, step: "no-consent",
+        reason: "no SMS yes or new number; existing texting preference unchanged" };
+    }
+    if (tags === null || phones === null) {
+      return { attempted: true, ok: false, changed: false, textingEnabled: l.cannotText === false, step: "unreadable",
+        textingNotEnabled: `the lead's ${tags === null ? "tags" : "phones"} could not be read; nothing written, SMS consent tag held` };
     }
     const applies = phones.length > 0 && phones.every((p) => last10(p) === consented);
     if (!applies) {
-      return {
-        attempted: true, ok: true, changed: false, textingEnabled: l.cannotText === false, step: "held",
-        textingNotEnabled: !phones.length
-          ? `the lead has no phone number on it; ${HELD}`
-          : `the lead has another phone number; ${l.cannotText === false ? "texting was already on, SMS consent tag held" : HELD} until you confirm which number agreed`,
-      };
+      return disableTexting("held", !phones.length
+        ? `the lead has no phone number on it; ${HELD}`
+        : `the lead has another phone number; ${HELD} until you confirm which number agreed`);
     }
     const body = {};
     if (l.cannotText !== false) body.cannotText = false;
@@ -203,12 +222,17 @@ async function applyTextingConsent(leadId, consentPhone, apiKey, opts) {
   }
 }
 
+async function applyTextingConsent(leadId, consentPhone, apiKey, opts) {
+  return applyTextingPreference(leadId, consentPhone, true, apiKey, opts);
+}
+
 module.exports = {
   CONSENT_TAG,
   SMS_CONSENT_FIELD,
   affirmative,
   smsConsentFromForm,
   applyTextingConsent,
+  applyTextingPreference,
   unwrapLead,
   leadPhones,
   last10,

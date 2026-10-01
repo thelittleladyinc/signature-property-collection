@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { test } = require('node:test');
+require('./test-texting-preference.cjs');
 
 const root = path.resolve(__dirname, '..');
 const phone = '9705550199';
@@ -43,7 +44,8 @@ for (const [name, file, listingEngine] of targets) {
         const lead = { leadId: 777, tags: ['Existing Tag', dnc], phones: [phone], cannotText };
         const out = await run({ lead });
         assert.equal(out.error, undefined);
-        assert.deepEqual(out.writes, [], 'DNC must not permit texting or consent-tag writes');
+        assert.deepEqual(out.writes.map((w) => w.body), cannotText === true ? [] : [{ cannotText: true }],
+          'DNC must enforce texting off without changing tags or phones');
         assert.equal(out.result.consentApplied || out.result.textingEnabled || false, false);
         assert.match(out.result.textingNotEnabled, /Do Not Contact/i);
       });

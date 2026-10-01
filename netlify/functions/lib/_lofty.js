@@ -52,8 +52,8 @@ const DRAIN_LOCK_TTL_MS = 5 * 60 * 1000;
 // queue replay alike, including leads queued before this change. Texting goes
 // on only afterwards, and only through lib/_lofty-consent.js's rule (an explicit
 // yes, and every phone on the lead is the number the yes came with).
-const { applyTextingConsent } = require("./_lofty-consent");
-const { leadIdFromResponse } = require("./_lofty-returning");
+const { applyTextingPreference } = require("./_lofty-consent");
+const { leadIdFromResponse, findExistingLead } = require("./_lofty-returning");
 
 // Strips the full payload down to the least a CRM could possibly need. Used only
 // after Lofty has already refused the full one.
@@ -140,7 +140,7 @@ async function recordPush(store, result, formName, lead) {
     // behaviour, and would look exactly like "the push is broken".
     const leadEmail = (lead && (lead.email || (Array.isArray(lead.emails) && lead.emails[0]))) || null;
     await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, leadEmail, ...result });
-    if (!result.ok) {
+    if (!result.ok && !result.manualReview) {
       const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
       queue.unshift({ at: new Date().toISOString(), formName, lead, ...result });
       await store.setJSON(FAILED_PUSH_KEY, queue.slice(0, MAX_QUEUED_FAILURES));
@@ -205,7 +205,7 @@ async function drainWithLease(store, apiKey, opts) {
   let recovered = 0;
   let consentHeld = 0;
   for (const entry of queue) {
-    if (!entry || !entry.lead || attempted >= MAX_DRAIN_PER_RUN || deadline - Date.now() < MIN_RETRY_MS) {
+    if (!entry || !entry.lead || entry.manualReview || attempted >= MAX_DRAIN_PER_RUN || deadline - Date.now() < MIN_RETRY_MS) {
       if (entry) remaining.push(entry);
       continue;
     }
@@ -214,6 +214,14 @@ async function drainWithLease(store, apiKey, opts) {
     // may exist -- a create that timed out on our side can still have landed in
     // Lofty -- and `tags` would wipe anything added since. `tagsAdd` only adds.
     const lead = { ...entry.lead };
+    const email = lead.email || (Array.isArray(lead.emails) && lead.emails[0]);
+    const identity = await findExistingLead(email, consentPhoneOf(lead), apiKey,
+      { budgetMs: Math.max(1, Math.min(2000, deadline - Date.now())) });
+    if (identity.manualReview) {
+      remaining.push({ ...entry, manualReview: true, heldReason: identity.error });
+      console.warn("Queued Lofty lead held: identity needs manual review.");
+      continue;
+    }
     if (Array.isArray(lead.tags)) {
       lead.tagsAdd = [...new Set([...(lead.tagsAdd || []), ...lead.tags])];
       delete lead.tags;
@@ -222,13 +230,11 @@ async function drainWithLease(store, apiKey, opts) {
     if (result.ok) {
       recovered += 1;
       console.log(`Recovered a queued Lofty lead from "${entry.formName}" (${result.payloadShape} shape).`);
-      // The replay was created with texting off. The same consent rule as the
-      // live form: only a recorded yes, and only if every phone on the lead the
-      // create landed on is the consented number (that lead may be a client's
-      // by now, so its tags are read and merged, never replaced).
-      if (entry.smsConsent === true) {
-        const consent = await applyTextingConsent(leadIdFromResponse(result.responseBody), consentPhoneOf(entry.lead), apiKey, { deadline });
-        if (!consent.textingEnabled) {
+      // A create can merge into an already-textable contact. Check no-yes
+      // submissions too, so an unconsented new number turns texting off.
+      {
+        const consent = await applyTextingPreference(leadIdFromResponse(result.responseBody), consentPhoneOf(entry.lead), entry.smsConsent === true, apiKey, { deadline });
+        if (entry.smsConsent === true && !consent.textingEnabled) {
           consentHeld += 1;
           console.warn(`Queued Lofty lead from "${entry.formName}": texting not turned on -- ${consent.textingNotEnabled || consent.reason || consent.error || "not applied"}.`);
         }
