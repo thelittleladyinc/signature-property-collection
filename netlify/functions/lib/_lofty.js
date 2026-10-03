@@ -53,7 +53,14 @@ const DRAIN_LOCK_TTL_MS = 5 * 60 * 1000;
 // on only afterwards, and only through lib/_lofty-consent.js's rule (an explicit
 // yes, and every phone on the lead is the number the yes came with).
 const { applyTextingPreference } = require("./_lofty-consent");
-const { leadIdFromResponse, findExistingLead } = require("./_lofty-returning");
+const {
+  leadIdFromResponse, findExistingLead, alertReturningLead,
+  ensureWebsiteFields, setWebsiteFields, websiteFieldValues, inquiryFromForm, placeInquiry,
+} = require("./_lofty-returning");
+const { addLoftyNote, refireLoftyTag } = require("./_notify");
+
+// Must match submission-created.js TRIGGER_TAG (pinned by tests/test-queue-replay-steps.js).
+const REPLAY_TRIGGER_TAG = "Hot Lead - Website";
 
 // Strips the full payload down to the least a CRM could possibly need. Used only
 // after Lofty has already refused the full one.
@@ -139,7 +146,9 @@ async function recordPush(store, result, formName, lead) {
     // duplicates an existing contact (let alone the account owner) is ordinary
     // behaviour, and would look exactly like "the push is broken".
     const leadEmail = (lead && (lead.email || (Array.isArray(lead.emails) && lead.emails[0]))) || null;
-    await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, leadEmail, ...result });
+    // formData only rides on the retry queue (for the replay), not the status record.
+    const { formData: _formData, ...shown } = result || {};
+    await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, leadEmail, ...shown });
     if (!result.ok && !result.manualReview) {
       const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
       queue.unshift({ at: new Date().toISOString(), formName, lead, ...result });
@@ -230,15 +239,22 @@ async function drainWithLease(store, apiKey, opts) {
     if (result.ok) {
       recovered += 1;
       console.log(`Recovered a queued Lofty lead from "${entry.formName}" (${result.payloadShape} shape).`);
+      const newId = leadIdFromResponse(result.responseBody);
+      // The surviving contact: the one the lookup found, else the create's id.
+      const target = identity.leadId || newId;
       // A create can merge into an already-textable contact. Check no-yes
       // submissions too, so an unconsented new number turns texting off.
       {
-        const consent = await applyTextingPreference(leadIdFromResponse(result.responseBody), consentPhoneOf(entry.lead), entry.smsConsent === true, apiKey, { deadline });
+        const consent = await applyTextingPreference(target, consentPhoneOf(entry.lead), entry.smsConsent === true, apiKey, { deadline });
         if (entry.smsConsent === true && !consent.textingEnabled) {
           consentHeld += 1;
           console.warn(`Queued Lofty lead from "${entry.formName}": texting not turned on -- ${consent.textingNotEnabled || consent.reason || consent.error || "not applied"}.`);
         }
       }
+      // 2026-10-03: finish what the live form path does after a create, so a
+      // lead that needed a retry is not a lesser lead. Each step is best-effort
+      // and stops at the deadline; none can undo the recovery above.
+      await finishReplay(entry, lead, { identity, newId, target, apiKey, store, deadline });
     } else {
       remaining.push({ ...entry, lastRetryAt: new Date().toISOString(), ...result });
     }
@@ -263,6 +279,43 @@ async function drainWithLease(store, apiKey, opts) {
   return { attempted, recovered, stillQueued: remaining.length, ...(consentHeld ? { consentHeld } : {}) };
 }
 
+// The steps submission-created.js runs after a successful create, for a
+// replayed lead: the note on the surviving contact, the trigger-tag re-add on
+// a brand-new contact (so the Smart Plan fires), a Call task + push for a
+// returning contact, and -- only for a contact proven new -- the website
+// fields and inquiry, when the queued entry carried the form data.
+async function finishReplay(entry, lead, ctx) {
+  const { identity, newId, target, apiKey, store, deadline } = ctx;
+  const time = () => deadline - Date.now() >= MIN_RETRY_MS;
+  const steps = {};
+  try {
+    if (target && lead.notes && time()) steps.note = await addLoftyNote(target, lead.notes, apiKey);
+    if (newId && !identity.leadId && time() && !(steps.note && steps.note.leadMissing)) {
+      steps.tag = await refireLoftyTag(newId, REPLAY_TRIGGER_TAG, apiKey);
+    }
+    const data = entry.formData || null;
+    const label = String(lead.source || entry.formName || "website").replace("The Little Lady Sells Homes - ", "");
+    if (identity.leadId && time()) {
+      steps.returning = await alertReturningLead(identity.leadId, {
+        label: `${label} (queued retry)`,
+        name: data ? data.name : [lead.firstName, lead.lastName].filter(Boolean).join(" "),
+        phone: data ? data.phone : consentPhoneOf(lead),
+        email: data ? data.email : (lead.email || (Array.isArray(lead.emails) && lead.emails[0])),
+      }, apiKey);
+    }
+    const provenNew = !!(identity.ok && !identity.anyMatch && newId && steps.note && steps.note.ok);
+    if (provenNew && data && store && time()) {
+      const ensured = await ensureWebsiteFields(store, apiKey);
+      if (ensured.ok) steps.fields = await setWebsiteFields(newId, websiteFieldValues(lead.source || label, data), apiKey);
+      const inquiry = inquiryFromForm(data);
+      if (inquiry && time()) steps.inquiry = await placeInquiry(newId, inquiry, apiKey);
+    }
+  } catch (err) {
+    console.error(`Queued Lofty lead from "${entry.formName}": a follow-up step failed:`, err && err.message);
+  }
+  return steps;
+}
+
 // The number a queued lead's texting yes came with: the one the form sent.
 function consentPhoneOf(lead) {
   if (!lead) return null;
@@ -281,4 +334,5 @@ module.exports = {
   postLead,
   recordPush,
   drainFailedPushes,
+  REPLAY_TRIGGER_TAG,
 };

@@ -195,7 +195,10 @@ const newLead = (extra) => ({ phones: ["+1 970-555-0100"], emails: ["pat@example
   global.fetch = f.fetch;
   dr = await quiet(() => L.drainFailedPushes(drainStore, "k"));
   check("a lead queued before this fix (no cannotText, no yes) replays with cannotText:true and nothing turns texting on",
-    dr.recovered === 1 && f.posts[0].cannotText === true && !f.puts.length, JSON.stringify({ post: f.posts[0], puts: f.puts }));
+    // 2026-10-03: the replay now also re-adds the Hot Lead tag (tags only), so
+    // "nothing turns texting on" means no write enables texting or adds consent.
+    dr.recovered === 1 && f.posts[0].cannotText === true && !textingOn(f).length && !tagged(f).length &&
+    f.puts.every((p) => !("cannotText" in p.body)), JSON.stringify({ post: f.posts[0], puts: f.puts }));
 
   mem["lofty-failed-pushes.json"] = [{ ...oldEntry, smsConsent: true }];
   f = fakeLofty({ leads: { [NEWID]: newLead({ phones: ["9705550100", "3035550199"] }) } });
