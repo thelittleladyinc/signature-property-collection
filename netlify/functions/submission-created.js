@@ -329,7 +329,9 @@ exports.handler = async (event) => {
       // Forms, and -- new as of this change -- has already been emailed to her.
       // Still returns 200: failing here would not help the visitor, whose
       // submission already succeeded.
-      if (store) await recordPush(store, { ...result, emailResult }, formName, body);
+      // formData rides along so the queue replay can set the website fields and
+      // the inquiry exactly as a first-try create would (lib/_lofty.js finishReplay).
+      if (store) await recordPush(store, { ...result, emailResult, formData: data }, formName, body);
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
