@@ -156,10 +156,25 @@ async function addLoftyNote(leadId, content, apiKey) {
 // So: unreadable means null, null means make no changes at all, and the shape we
 // actually got is reported to /site-health so this can be settled with evidence
 // rather than another guess.
+// GET /v1.0/leads/{id} answers { lead: { ..., tags: [{ tagName, tagId, ... }] } }
+// (verified against a real lead, 2026-10-03). The earlier reading -- "this
+// account returns no tags" -- came from looking at the top level / `data` only,
+// and from expecting plain strings. Unwrap `lead`, and read each tag object's
+// tagName, so the trigger-tag re-add can actually run.
+function leadFromPayload(payload) {
+  return (payload && (payload.lead || payload.data || payload)) || {};
+}
+
+function tagName(t) {
+  if (typeof t === "string") return t;
+  if (t && typeof t === "object" && typeof t.tagName === "string") return t.tagName;
+  return null;
+}
+
 function tagsFromLead(payload) {
-  const lead = (payload && (payload.data || payload)) || {};
+  const lead = leadFromPayload(payload);
   if (!Array.isArray(lead.tags)) return null;
-  const strings = lead.tags.filter((t) => typeof t === "string");
+  const strings = lead.tags.map(tagName).filter((t) => typeof t === "string");
   // Some tags present but none of them strings => a shape we don't understand.
   if (lead.tags.length > 0 && strings.length === 0) return null;
   return strings;
@@ -167,7 +182,7 @@ function tagsFromLead(payload) {
 
 // Describes what came back, for the health page, without dumping lead data.
 function describeTagShape(payload) {
-  const lead = (payload && (payload.data || payload)) || {};
+  const lead = leadFromPayload(payload);
   if (!("tags" in lead)) return "response had no 'tags' field";
   if (!Array.isArray(lead.tags)) return `'tags' was ${typeof lead.tags}, not an array`;
   const kinds = Array.from(new Set(lead.tags.map((t) => (t === null ? "null" : typeof t))));
