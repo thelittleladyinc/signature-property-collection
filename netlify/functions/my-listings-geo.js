@@ -38,6 +38,20 @@ function fullAddress(l) {
   return [l.address, l.city, l.state || "CO", l.zip].filter(Boolean).join(", ");
 }
 
+// 2026-09-30 (API audit): her listings come from Lofty now, and Lofty sends each
+// one's latitude and longitude (lib/_lofty-listings.js). Geocoding them again was
+// a paid lookup for coordinates already in hand -- and without GOOGLE_MAPS_API_KEY
+// the layer showed no pins at all. A listing that carries coordinates is pinned
+// from them; only one without is geocoded, exactly as before.
+function storedCoords(l) {
+  const lat = Number(l && l.latitude);
+  const lng = Number(l && l.longitude);
+  if (l == null || l.latitude == null || l.longitude == null) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  if (lat === 0 && lng === 0) return null;
+  return { lat, lng };
+}
+
 function normalizeAddressKey(address) {
   return address.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -100,9 +114,6 @@ exports.handler = async () => {
   if (!switchGate.allowed) return noPins(switchGate);
   try {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      return corsJson({ error: "not_configured", pins: [] }, "no-store");
-    }
 
     const listingsStore = getBlobStore(getStore); // default: the mls-listings store
     // Freshness: an unreadable state blob fails closed (no pins), never open.
@@ -121,6 +132,9 @@ exports.handler = async () => {
         "no-store"
       );
     }
+    if (!apiKey && !process.env.MAPBOX_PUBLIC_TOKEN && !active.some(storedCoords)) {
+      return corsJson({ error: "not_configured", pins: [] }, "no-store");
+    }
 
     const geoStore = getBlobStore(getStore, GEOCODE_STORE_NAME);
     const startedAt = Date.now();
@@ -128,6 +142,11 @@ exports.handler = async () => {
     const pins = [];
     let deferred = 0;
     await mapWithConcurrency(active, GEOCODE_CONCURRENCY, async (l) => {
+      const coords = storedCoords(l);
+      if (coords) {
+        pins.push(toPin(l, coords));
+        return;
+      }
       const key = normalizeAddressKey(fullAddress(l));
       const cached = await geoStore.get(key, { type: "json" }).catch(() => null);
       if (cached && cached.cachedAt && Date.now() - cached.cachedAt < GEOCODE_CACHE_TTL_MS) {

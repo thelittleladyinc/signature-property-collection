@@ -156,10 +156,25 @@ async function addLoftyNote(leadId, content, apiKey) {
 // So: unreadable means null, null means make no changes at all, and the shape we
 // actually got is reported to /site-health so this can be settled with evidence
 // rather than another guess.
+// GET /v1.0/leads/{id} answers { lead: { ..., tags: [{ tagName, tagId, ... }] } }
+// (verified against a real lead, 2026-10-03). The earlier reading -- "this
+// account returns no tags" -- came from looking at the top level / `data` only,
+// and from expecting plain strings. Unwrap `lead`, and read each tag object's
+// tagName, so the trigger-tag re-add can actually run.
+function leadFromPayload(payload) {
+  return (payload && (payload.lead || payload.data || payload)) || {};
+}
+
+function tagName(t) {
+  if (typeof t === "string") return t;
+  if (t && typeof t === "object" && typeof t.tagName === "string") return t.tagName;
+  return null;
+}
+
 function tagsFromLead(payload) {
-  const lead = (payload && (payload.data || payload)) || {};
+  const lead = leadFromPayload(payload);
   if (!Array.isArray(lead.tags)) return null;
-  const strings = lead.tags.filter((t) => typeof t === "string");
+  const strings = lead.tags.map(tagName).filter((t) => typeof t === "string");
   // Some tags present but none of them strings => a shape we don't understand.
   if (lead.tags.length > 0 && strings.length === 0) return null;
   return strings;
@@ -167,7 +182,7 @@ function tagsFromLead(payload) {
 
 // Describes what came back, for the health page, without dumping lead data.
 function describeTagShape(payload) {
-  const lead = (payload && (payload.data || payload)) || {};
+  const lead = leadFromPayload(payload);
   if (!("tags" in lead)) return "response had no 'tags' field";
   if (!Array.isArray(lead.tags)) return `'tags' was ${typeof lead.tags}, not an array`;
   const kinds = Array.from(new Set(lead.tags.map((t) => (t === null ? "null" : typeof t))));
@@ -305,11 +320,11 @@ async function sendLeadAlertEmail(details) {
 
   const to = (process.env.LEAD_ALERT_TO || DEFAULT_TO)
     .split(",").map((s) => s.trim()).filter(Boolean);
-  const from = process.env.LEAD_ALERT_FROM || DEFAULT_FROM;
+  const customFrom = String(process.env.LEAD_ALERT_FROM || "").trim();
   const who = details.name || details.email || details.phone || "someone";
   const subject = `New website lead: ${who}${details.sourceShort ? ` — ${details.sourceShort}` : ""}`;
 
-  try {
+  const send = async (from) => {
     const res = await fetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
@@ -322,8 +337,27 @@ async function sendLeadAlertEmail(details) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const text = await res.text().catch(() => "");
-    if (!res.ok) console.error(`Resend lead alert failed: HTTP ${res.status} ${text.slice(0, 300)}`);
-    return { attempted: true, ok: res.ok, httpStatus: res.status, response: text.slice(0, 300) };
+    return { ok: res.ok, httpStatus: res.status, response: text.slice(0, 300) };
+  };
+
+  try {
+    let result = await send(customFrom || DEFAULT_FROM);
+    // 2026-09-30 (API audit): LEAD_ALERT_FROM is how the alert moves off Resend's
+    // shared test sender onto her own verified domain. If that sender is refused
+    // -- the domain not verified yet (403) or the address malformed (422) -- the
+    // alert goes out once more from the test sender rather than not at all, and
+    // the refusal is kept for /status.
+    if (!result.ok && customFrom && (result.httpStatus === 403 || result.httpStatus === 422)) {
+      console.error(`Resend refused LEAD_ALERT_FROM (HTTP ${result.httpStatus} ${result.response}); ` +
+        "resending from the default sender.");
+      const first = result;
+      result = { ...(await send(DEFAULT_FROM)), fromFallback: true, customFromRefused: first };
+    }
+    if (!result.ok) console.error(`Resend lead alert failed: HTTP ${result.httpStatus} ${result.response}`);
+    return {
+      attempted: true, ...result,
+      sender: customFrom && !result.fromFallback ? "custom" : "default",
+    };
   } catch (err) {
     console.error("Resend lead alert error:", err && err.message);
     return { attempted: true, ok: false, error: String(err && err.message) };
