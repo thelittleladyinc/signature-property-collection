@@ -85,17 +85,26 @@ if "$PY" "$BUILD"; then
   # 2026-09-15: build.py stamps today's date into every page, so a deploy that
   # changed one listing told Google all 117 pages were edited today -- and a
   # deploy that changed nothing said the same. This puts the previous date back
-  # on any page whose content did not actually change. It only ever rewrites
-  # date fields, so a failure here cannot corrupt a page; if it does fail, say
-  # so and publish anyway rather than lose a good build over a meta tag.
+  # on any page whose content did not actually change.
+  #
+  # 2026-10-03: a failure here used to publish anyway ("the pages are correct,
+  # their modified dates are just optimistic"). But a build published without
+  # this step tells Google every page was edited today -- the exact false
+  # freshness this step exists to prevent, and what PR #70 shipped by accident.
+  # So a failure now fails the deploy and the last good deploy keeps serving,
+  # the same rule as a failed build. CI runs this step too (tests/run-all.sh),
+  # so a code-level break is caught before merge; this only guards against a
+  # failure that happens on Netlify alone.
   if "$PY" "$FRESHNESS"; then
-    :
-  else
-    echo "!! netlify-build: $FRESHNESS failed. Publishing the build anyway --"
-    echo "!! the pages are correct, their modified dates are just optimistic."
+    echo "--- netlify-build: build OK, publishing freshly generated site/"
+    exit 0
   fi
-  echo "--- netlify-build: build OK, publishing freshly generated site/"
-  exit 0
+  echo "!! netlify-build: $FRESHNESS FAILED."
+  echo "!! Not publishing pages whose modified dates would all read today."
+  echo "!! Restoring the committed copy and failing this deploy so the last"
+  echo "!! good deploy keeps serving."
+  restore_site
+  exit 1
 fi
 
 echo "!! netlify-build: $BUILD FAILED."
