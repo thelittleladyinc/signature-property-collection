@@ -66,6 +66,8 @@ const GOOGLE_CHECK_KEY = "google-api-check.json";
 // working one from outside, which is how a real form submission went missing.
 const LOFTY_LAST_PUSH_KEY = "lofty-last-push.json";
 const LOFTY_FAILED_PUSH_KEY = "lofty-failed-pushes.json";
+// Leads held for identity review, 2026-10-04 (lib/_lofty.js MANUAL_REVIEW_KEY).
+const LOFTY_MANUAL_REVIEW_KEY = "lofty-manual-review.json";
 const LOFTY_CHECK_KEY = "lofty-key-check.json";
 const LOFTY_LEAD_CHECK_KEY = "lofty-lead-check.json";
 // Must match TRIGGER_TAG in submission-created.js.
@@ -731,6 +733,7 @@ function publicPushRecord(p) {
     at: p.at || null, formName: p.formName || null, ok: !!p.ok, httpStatus: p.httpStatus,
     payloadShape: p.payloadShape || null, leadId: p.leadId || null, inProgress: !!p.inProgress,
   };
+  if (p.manualReview) out.manualReview = true;
   if (!p.ok && p.responseBody) out.responseBody = redactPersonal(p.responseBody).slice(0, 240);
   for (const k of ["existing", "emailResult", "noteResult", "tagResult", "returningResult",
     "fieldsResult", "inquiryResult"]) {
@@ -752,12 +755,27 @@ function publicFailedQueue(queue) {
   };
 }
 
+// Leads held for identity review (lib/_lofty.js MANUAL_REVIEW_KEY): how many,
+// which submissions (Netlify's own ids, so each can be found in the Forms inbox)
+// and why -- never who. Each stored entry carries the whole submission.
+function publicHeldLeads(list) {
+  const held = Array.isArray(list) ? list : [];
+  return {
+    count: held.length,
+    entries: held.map((e) => ({
+      heldAt: (e && e.heldAt) || null, at: (e && e.at) || null, formName: (e && e.formName) || null,
+      submissionId: (e && e.submissionId) || null,
+      reason: redactPersonal((e && (e.reason || e.heldReason)) || "identity needs manual review").slice(0, 160),
+    })),
+  };
+}
+
 exports.handler = async (event) => {
   const store = getBlobStore(getStore);
   const params = (event && event.queryStringParameters) || {};
   const wantsJson = params.format === "json";
 
-  const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, cachedLoftyKey,
+  const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, loftyHeld, cachedLoftyKey,
     cachedLoftyLead, cachedPhotoCheck, cachedCloudCheck] = await Promise.all([
     store.get(SYNC_STATE_KEY, { type: "json" }),
     store.get(MINE_LISTINGS_KEY, { type: "json" }),
@@ -765,6 +783,7 @@ exports.handler = async (event) => {
     store.get(GOOGLE_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_LAST_PUSH_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_FAILED_PUSH_KEY, { type: "json" }).catch(() => null),
+    store.get(LOFTY_MANUAL_REVIEW_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_LEAD_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(PHOTO_CHECK_KEY, { type: "json" }).catch(() => null),
@@ -1242,6 +1261,14 @@ exports.handler = async (event) => {
     loftyOk = true;
     loftyDetail = "No website lead has been submitted since this check was added " +
       "(2026-08-15). Submit any form once and this row will show exactly what Lofty said.";
+  } else if (loftyLast.manualReview) {
+    // Not a failed push: there was no push. The held-leads row below has the count.
+    loftyOk = failedCount === 0;
+    loftyDetail = `Last lead from "${loftyLast.formName}" at ${loftyLast.at} was HELD for identity review ` +
+      `(${redactPersonal(loftyLast.responseBody || "identity needs manual review").slice(0, 160)}); ` +
+      "no Lofty contact was created or changed. It is in the alert email and the Netlify Forms inbox — " +
+      "see the held-leads row below." +
+      (failedCount ? ` ${failedCount} earlier push(es) failed and are queued.` : "");
   } else if (loftyLast.ok) {
     loftyOk = failedCount === 0;
     // No email address here any more (2026-09-30): see redactPersonal above.
@@ -1257,6 +1284,30 @@ exports.handler = async (event) => {
       `${failedCount} lead(s) queued and recoverable — nothing is lost, the submissions are also in Netlify Forms.`;
   }
   checks.push({ name: "Website leads reaching Lofty", ok: loftyOk, detail: loftyDetail });
+
+  // ---- Leads waiting on a human --------------------------------------------
+  // 2026-10-04 (re-audit): a lead the identity lookup could not settle -- several
+  // exact Lofty matches, an email and a phone naming different contacts, a lookup
+  // that failed -- used to exist only in the alert email. It is now kept
+  // (lib/_lofty.js holdForManualReview) and counted here by submission id, never
+  // by name, email or phone: this page is public. Informational, not a breakage:
+  // the lead is captured three times over (the email, Netlify Forms, this
+  // record); what it needs is Christine, in Lofty, by hand.
+  const heldPublic = publicHeldLeads(loftyHeld);
+  checks.push({
+    name: "Leads held for identity review",
+    ok: heldPublic.count === 0,
+    optional: true,
+    detail: heldPublic.count === 0
+      ? "None waiting. A lead is held, not pushed, when Lofty has several exact matches for it " +
+        "or when its email and phone name different contacts. A lookup Lofty could not answer " +
+        "does not hold the lead: it is created with texting off and its tags only added, never replaced."
+      : `${heldPublic.count} lead(s) waiting for you to settle in Lofty by hand — Netlify Forms submission id(s): ` +
+        `${heldPublic.entries.map((e) => e.submissionId || `(no id; ${e.formName} at ${e.at})`).join(", ")}. ` +
+        `Reason(s): ${[...new Set(heldPublic.entries.map((e) => e.reason))].join("; ")}. ` +
+        "Each is in the alert email and the Netlify Forms inbox; nothing in Lofty was created or " +
+        "changed for it, and nothing replays it.",
+  });
 
   // ---- Is Christine actually being TOLD about the lead? --------------------
   // 2026-08-15: added because the answer turned out to be no, twice, while the
@@ -1709,7 +1760,7 @@ exports.handler = async (event) => {
         // carry the lead's name, email, phone and message (see redactPersonal).
         raw: {
           state, suspension, mineCount, mineCloudinaryCount, google,
-          loftyLast: publicPushRecord(loftyLast), loftyFailed: publicFailedQueue(loftyFailed),
+          loftyLast: publicPushRecord(loftyLast), loftyFailed: publicFailedQueue(loftyFailed), loftyHeld: heldPublic,
           loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck,
         },
       }, null, 2),

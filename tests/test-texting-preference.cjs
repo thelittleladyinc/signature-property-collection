@@ -234,9 +234,19 @@ test('queue ambiguity holds the entry and will not replay it again automatically
   const first = await flow.queue.drainFailedPushes(store, 'offline-key');
   assert.equal(first.recovered, 0);
   assert.deepEqual(f.calls.filter((c) => c.method !== 'GET'), []);
-  assert.equal(store.data['lofty-failed-pushes.json'][0].manualReview, true);
+  // 2026-10-04: held under its own key (with the lead, the consent and the
+  // reason), not left in the retry queue flagged -- nothing reads it back.
+  assert.equal(first.heldForReview, 1);
+  assert.deepEqual(store.data['lofty-failed-pushes.json'], []);
+  const held = store.data['lofty-manual-review.json'];
+  assert.equal(held.length, 1);
+  assert.equal(held[0].manualReview, true);
+  assert.equal(held[0].smsConsent, true);
+  assert.deepEqual(held[0].lead.emails, ['pat@example.com']);
+  assert.match(held[0].reason, /manual review/);
   const count = f.calls.length;
   const second = await flow.queue.drainFailedPushes(store, 'offline-key');
   assert.equal(second.attempted, 0);
   assert.equal(f.calls.length, count);
+  assert.equal(store.data['lofty-manual-review.json'].length, 1);
 });

@@ -143,6 +143,10 @@ exports.handler = async (event) => {
     const payload = JSON.parse(event.body);
     const data = (payload && payload.payload && payload.payload.data) || {};
     const formName = (payload && payload.payload && payload.payload.form_name) || "website";
+    // Netlify's own id for this submission: the handle /status shows for a lead
+    // held for identity review, so it can be found in the Forms inbox by id --
+    // never by name, email or phone, because /status is public.
+    const submissionId = payload && payload.payload && payload.payload.id ? String(payload.payload.id) : null;
 
     const { firstName, lastName } = splitName(data.name);
     const body = {};
@@ -269,7 +273,11 @@ exports.handler = async (event) => {
       });
       let store = null;
       try { store = getBlobStore(getStore, DIAG_STORE); } catch (e) { store = null; }
-      if (store) await recordPush(store, { ...held, emailResult }, formName, body);
+      // 2026-10-04 (re-audit): until now this lead existed only in that email.
+      // recordPush keeps a held lead under its own key (lib/_lofty.js
+      // MANUAL_REVIEW_KEY) with the whole submission and the reason, where
+      // nothing replays it and /status counts it by submission id.
+      if (store) await recordPush(store, { ...held, emailResult, submissionId, formData: data }, formName, body);
       return { statusCode: 200, body: "ok (captured; Lofty identity needs manual review)" };
     }
     // A known contact keeps its own tags. `tags` on the create call REPLACES the
@@ -325,13 +333,14 @@ exports.handler = async (event) => {
 
     if (!result.ok) {
       console.error(`Lofty API ${result.httpStatus} (payload shape "${result.payloadShape}"): ${result.responseBody}`);
-      // The lead is queued for retry by the next sync run, is sitting in Netlify
+      // The lead is queued for retry by the next scheduled drain
+      // (lofty-queue-drain.js), is sitting in Netlify
       // Forms, and -- new as of this change -- has already been emailed to her.
       // Still returns 200: failing here would not help the visitor, whose
       // submission already succeeded.
       // formData rides along so the queue replay can set the website fields and
       // the inquiry exactly as a first-try create would (lib/_lofty.js finishReplay).
-      if (store) await recordPush(store, { ...result, emailResult, formData: data }, formName, body);
+      if (store) await recordPush(store, { ...result, emailResult, submissionId, formData: data }, formName, body);
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 

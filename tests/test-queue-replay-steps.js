@@ -52,7 +52,7 @@ function fakeLofty({ existingId = null } = {}) {
 (async () => {
   const src = fs.readFileSync(`${FN_DIR}/submission-created.js`, "utf8");
   check("trigger tag matches submission-created.js", src.includes(`const TRIGGER_TAG = "${L.REPLAY_TRIGGER_TAG}";`));
-  check("a failed live create queues the form data for the replay", /recordPush\(store, \{ \.\.\.result, emailResult(, smsConsent: consent\.given)?, formData: data \}/.test(src));
+  check("a failed live create queues the form data and the submission id for the replay", /recordPush\(store, \{ \.\.\.result, emailResult, submissionId(, smsConsent: consent\.given)?, formData: data \}/.test(src));
 
   console.log("\n1. Brand-new contact");
   let calls = fakeLofty();
