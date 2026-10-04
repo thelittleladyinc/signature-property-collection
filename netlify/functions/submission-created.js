@@ -63,11 +63,12 @@
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
 const { postLead, recordPush } = require("./lib/_lofty");
+const { applyTextingPreference } = require("./lib/_lofty-consent");
 const { addLoftyNote, refireLoftyTag, sendLeadAlertEmail } = require("./lib/_notify");
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
   findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
-  leadIdFromResponse,
+  leadIdFromResponse, inquiryFromForm, placeInquiry,
 } = require("./lib/_lofty-returning");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
@@ -150,6 +151,14 @@ exports.handler = async (event) => {
     if (data.email) body.emails = [data.email];
     if (data.phone) body.phones = [data.phone];
     body.source = SOURCE_LABELS[formName] || `Signature Property Collection - ${formName}`;
+    // 2026-09-30 (consent fix): every lead is created with texting OFF, and on
+    // this site it stays off. No Signature form posts a texting consent: each
+    // form's consent box is required and has no name, so nothing about it
+    // reaches this function, and a required box would not be a free yes anyway.
+    // A lead here is only made textable by hand in Lofty, once consent is
+    // confirmed. lib/_lofty.js enforces cannotText:true on every
+    // create, the queue replay included; lib/_lofty-consent.js has the rule.
+    body.cannotText = true;
     // 2026-08-15 (Christine: "make sure that when the new lead comes in or if it
     // merges that i am still notified some how in lofty with a hot lead or
     // something of hte sort"). Her 16:48 test DID reach Lofty -- lead
@@ -189,6 +198,10 @@ exports.handler = async (event) => {
       // endpoint couldn't be verified, and a guessed endpoint would fail
       // silently -- the worst outcome for a lead-capture path. The lead arrives
       // tagged and ready; switching the alert on is one step in Lofty.
+      //
+      // 2026-09-30: Lofty's API reference is readable now, and the same search
+      // also goes onto the contact as Lofty's own inquiry fields (price, beds,
+      // baths, towns) -- see placeInquiry below. The note and tags stay as they are.
       body.notes = `${banner}\nWants email alerts for new listings matching: ${data.alert_criteria || "(no filters — all new listings)"}` +
         (data.alert_query ? `\nReproduce this search: https://signaturepropertycollection.com/search-homes.html?${data.alert_query}` : "") +
         (data.message ? `\nAlso said: "${data.message}"` : "");
@@ -245,6 +258,20 @@ exports.handler = async (event) => {
     // instead of the absorbed record a merge hands back. Never throws; if Lofty
     // can't answer in time, everything below runs exactly as before.
     const existing = await findExistingLead(data.email, data.phone, apiKey);
+    if (existing.manualReview) {
+      const held = { ok: false, attempted: false, manualReview: true,
+        payloadShape: "held for identity review", responseBody: existing.error };
+      const emailResult = await sendLeadAlertEmail({
+        name: data.name, email: data.email, phone: data.phone,
+        source: SOURCE_LABELS[formName] || formName, sourceShort: formName,
+        noteText: `${body.notes}\n\nMANUAL REVIEW: ${existing.error}. No Lofty contact changed.`,
+        leadId: null, stamp: `${stamp} MT`,
+      });
+      let store = null;
+      try { store = getBlobStore(getStore, DIAG_STORE); } catch (e) { store = null; }
+      if (store) await recordPush(store, { ...held, emailResult }, formName, body);
+      return { statusCode: 200, body: "ok (captured; Lofty identity needs manual review)" };
+    }
     // A known contact keeps its own tags. `tags` on the create call REPLACES the
     // tag set of the contact a submission merges into ("All existing tags will be
     // updated based on this call" -- Lofty's create-lead reference); `tagsAdd`
@@ -302,7 +329,9 @@ exports.handler = async (event) => {
       // Forms, and -- new as of this change -- has already been emailed to her.
       // Still returns 200: failing here would not help the visitor, whose
       // submission already succeeded.
-      if (store) await recordPush(store, { ...result, emailResult }, formName, body);
+      // formData rides along so the queue replay can set the website fields and
+      // the inquiry exactly as a first-try create would (lib/_lofty.js finishReplay).
+      if (store) await recordPush(store, { ...result, emailResult, formData: data }, formName, body);
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
@@ -328,6 +357,10 @@ exports.handler = async (event) => {
     // 2026-09-29: to the existing contact when there is one (see above).
     const noteTarget = existing.leadId || leadId;
     const noteResult = noteTarget ? await addLoftyNote(noteTarget, body.notes, apiKey) : { attempted: false };
+    const consentTarget = existing.leadId || leadIdFromResponse(result.responseBody) || leadId;
+    const consentResult = consentTarget ? await applyTextingPreference(consentTarget, data.phone, false, apiKey)
+      : { attempted: false, textingEnabled: false, reason: "no lead id for texting safety check" };
+    if (consentResult.textingNotEnabled) console.warn(`Signature texting safety: ${consentResult.textingNotEnabled}`);
     // And make the trigger tag a real CHANGE, so the Smart Plan fires on a
     // returning buyer's second enquiry and not only their first.
     //
@@ -352,7 +385,7 @@ exports.handler = async (event) => {
     // those run the function out of time.
     if (store) {
       await recordPush(store, {
-        ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
+        ...result, leadId, emailResult, noteResult, consentResult, tagResult, existing: existingSummary,
         inProgress: !!existing.leadId,
       }, formName, body);
     }
@@ -371,18 +404,27 @@ exports.handler = async (event) => {
     // other custom fields is undocumented, so an existing record is never touched.
     let fieldsResult = { attempted: false };
     const newLeadId = leadIdFromResponse(result.responseBody);
-    if (existing.ok && !existing.anyMatch && newLeadId && newLeadId === String(leadId) &&
-        noteResult.ok && noteTarget === leadId) {
+    const provenNew = !!(existing.ok && !existing.anyMatch && newLeadId && newLeadId === String(leadId) &&
+        noteResult.ok && noteTarget === leadId);
+    if (provenNew) {
       const ensured = await ensureWebsiteFields(store, apiKey);
       fieldsResult = ensured.ok
         ? await setWebsiteFields(newLeadId, websiteFieldValues(stampedSource, data), apiKey)
         : { attempted: false, reason: "fields not ready", ensured };
     }
 
+    // 2026-09-30 (API audit): what a buyer asked for -- towns, price, beds, baths --
+    // as Lofty's own inquiry fields, not only note text. Same proven-new rule as
+    // the fields above; lib/_lofty-returning.js explains both.
+    const inquiry = inquiryFromForm(data);
+    const inquiryResult = !inquiry ? { attempted: false }
+      : provenNew ? await placeInquiry(newLeadId, inquiry, apiKey)
+      : { attempted: false, reason: "not a proven-new contact; the search is in the note" };
+
     if (store) {
       await recordPush(store, {
-        ...result, leadId, emailResult, noteResult, tagResult, existing: existingSummary,
-        returningResult, fieldsResult,
+        ...result, leadId, emailResult, noteResult, consentResult, tagResult, existing: existingSummary,
+        returningResult, fieldsResult, inquiryResult,
       }, formName, body);
     }
     return { statusCode: 200, body: "ok" };

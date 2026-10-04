@@ -38,6 +38,9 @@
 //   Google API quota exactly once, not 50 times.
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
+const {
+  isTownPlace, isTownCountyPlace, isShownListingAddress, takeDailyLookup,
+} = require("./lib/_google-guard");
 
 const NEARBY_STORE_NAME = "nearby-places-cache";
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -244,6 +247,22 @@ exports.handler = async (event) => {
           categories: Object.fromEntries(wanted.map((k) => [k, have[k]])),
           cached: true,
         }),
+      };
+    }
+
+    // 2026-09-30 (API audit): everything below costs money, and this endpoint is
+    // public on two domains. Only a known town ("Ault, Weld County, CO") or the
+    // address of a listing the site is showing gets a fresh lookup, within the
+    // day's allowance -- see lib/_google-guard.js.
+    const allowed = isTownCountyPlace(address) || isTownPlace(address) ||
+      await isShownListingAddress(address, getBlobStore(getStore));
+    const budget = allowed ? await takeDailyLookup(store, "nearby-places") : null;
+    if (!allowed || !budget.ok) {
+      if (allowed) console.warn(`nearby-places: daily Google lookup allowance used (${budget.used || 0}/${budget.limit}).`);
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: allowed ? "daily_limit" : "unknown_address", categories: {} }),
       };
     }
 

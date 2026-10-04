@@ -396,28 +396,41 @@ const HOUR = 3600e3;
   // pages' figures -- and nothing it does may reach what the site shows.
   process.env.MLSGRID_API_TOKEN = "grid-token";
   const gridCalls = [];
+  const gridUrls = [];
   const w9 = { mine: [rec("IRE2000001")], details: {} };
   const lofty9 = fakeLofty(w9);
   const fetch9 = async (url, init) => {
     const u = new URL(String(url));
     if (u.host.includes("mlsgrid")) {
       gridCalls.push(u.pathname);
+      gridUrls.push(u);
       // 2026-09-30: the sync now asks MLS Grid whether each Lofty listing is
       // still on the market (tests/test-lofty-mls-check.js). Answer "yes" for
       // her listing here so this section keeps testing what it always did:
       // the market-data crawl itself never touches what the site shows.
       const filter = u.searchParams.get("$filter") || "";
       const m = /ListingId eq '([^']+)'/.exec(filter);
-      const value = m ? [{ ListingId: m[1], StandardStatus: "Active", MlgCanView: true }] : [];
+      const value = m ? [{ ListingId: m[1], StandardStatus: "Active", MlgCanView: true }]
+        // The market crawl: one changed record, one of hers, with no Media.
+        : u.searchParams.get("$orderby") ? [{ ListingId: "IRE3", StandardStatus: "Active", MlgCanView: true,
+          City: "Loveland", ListPrice: 700000, ListAgentFullName: "Christine Gwinnup",
+          ModificationTimestamp: "2026-09-29T00:00:00.000Z" }]
+        : [];
       return { ok: true, status: 200, headers: { get: () => "application/json" },
         text: async () => JSON.stringify({ value }), json: async () => ({ value }) };
     }
     return lofty9(url, init);
   };
-  const gridSentinel = { IRE1: { listingId: "IRE1", source: "mlsgrid", status: "Active", city: "Loveland", county: "larimer", price: 1 } };
+  const gridSentinel = {
+    IRE1: { listingId: "IRE1", source: "mlsgrid", status: "Active", city: "Loveland", county: "larimer", price: 1 },
+    // One of HER listings in the MLS Grid copy, photos not yet re-hosted, and her
+    // office known: exactly what used to set off the photo passes every run.
+    IRE3: { listingId: "IRE3", status: "Active", city: "Loveland", price: 690000, agentName: "Christine Gwinnup",
+      photos: ["https://media.mlsgrid.com/a.jpg", "https://media.mlsgrid.com/b.jpg"], photo: "https://media.mlsgrid.com/a.jpg" },
+  };
   const store9 = makeStore({
     "listings.json": gridSentinel,
-    "sync-state.json": { lastRunAt: "2026-09-28T00:00:00.000Z" },
+    "sync-state.json": { lastRunAt: "2026-09-28T00:00:00.000Z", herOfficeMlsId: "OFF1" },
     "lofty-listings.json": { IRE2000001: hersRec },
     "lofty-mine-listings.json": [hersRec],
     "lofty-sync-state.json": { lastRunAt: "2026-09-28T00:00:00.000Z", lastSuccessAt: "2026-09-28T00:00:00.000Z" },
@@ -428,6 +441,21 @@ const HOUR = 3600e3;
   check("the schedule still answers ok", res9.statusCode === 200 && res9.body === "ok", JSON.stringify(res9));
   check("her Lofty listings refreshed first", store9.data.get("lofty-sync-state.json").lastRunAt !== "2026-09-28T00:00:00.000Z");
   check("then MLS Grid was read", gridCalls.length > 0, String(gridCalls.length));
+  // 2026-09-30 (API audit): the market-data run is for town figures only, so it
+  // never asks MLS Grid for photos (the shared account was suspended for over-use).
+  check("...and not one of those requests asked for Media",
+    gridUrls.every((u) => !u.searchParams.get("$expand")), gridUrls.map((u) => u.search).join(" | "));
+  const crawl = gridUrls.filter((u) => /ModificationTimestamp|MlgCanView eq true and \(/.test(u.searchParams.get("$filter") || "") &&
+    u.searchParams.get("$orderby"));
+  check("...the market crawl pages 1,000 records at a time", crawl.length > 0 &&
+    crawl.every((u) => u.searchParams.get("$top") === "1000"), crawl.map((u) => u.searchParams.get("$top")).join(","));
+  const ire3 = (store9.data.get("listings.json") || {}).IRE3 || {};
+  check("...the crawl updated her record's price but kept its stored photos",
+    ire3.price === 700000 && Array.isArray(ire3.photos) && ire3.photos.length === 2, JSON.stringify(ire3).slice(0, 200));
+  check("...and makes no per-listing or office photo lookups", gridUrls.every((u) =>
+    !/ListOfficeMlsId/.test(u.searchParams.get("$filter") || "") &&
+    (!/ListingId eq/.test(u.searchParams.get("$filter") || "") || u.searchParams.get("$select") === "ListingId,StandardStatus,MlgCanView")),
+    gridUrls.map((u) => u.searchParams.get("$filter")).join(" | "));
   check("...and its own state moved on", store9.data.get("sync-state.json").lastRunAt !== "2026-09-28T00:00:00.000Z",
     JSON.stringify(store9.data.get("sync-state.json")).slice(0, 200));
   check("what the site shows is untouched by it: still only her listing",
