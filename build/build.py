@@ -694,10 +694,6 @@ TESTIMONIALS = [
      "John Zamora"),
     ("I couldn't be happier with the outcome and highly recommend Christine to anyone "
      "looking for a knowledgeable and supportive agent.", "Rhonda Beach"),
-    ("Kendra is passionate about selling your home. She has amazing marketing skills and "
-     "was a professional while dealing with an underhanded buying agent and sold our home "
-     "in a tough market. I'm convinced there is no better agent than Kendra.",
-     "Rhonda Beach"),
     ("She's one of the best agents on the planet.", "Andrew Vose"),
     ("Christine has done such a wonderful job for us and our home. She is great at "
      "keeping in constant contact with you about what's going on with your home and "
@@ -718,21 +714,13 @@ TESTIMONIALS = [
      "things moving with grace and momentum. Her clients are beyond lucky — they're "
      "working with a true professional who knows her stuff and leads with heart.",
      "Lindsay Klein"),
-    ("Christine and Kendra were amazing. They fought to keep the price up on my home "
-     "since the buyers came up with all sorts of nonsense to try to lower the price.",
-     "Tiny Conquest"),
-    ("Christine and Kendra helped us sell our home for more than we expected, and their "
-     "marketing strategies were key in getting so much attention. Highly recommend!",
-     "Cassidi G"),
 ]
-# Christine confirmed (Aug 2026) she and Kendra Bajcar work as a duo, so the four
-# reviews naming Kendra as co-agent are accurate and included above. The second
-# Rhonda Beach quote (2026-08-14, sourced from Christine's official "Signature
-# Listing Strategy" marketing brochure) is a distinct, genuine review focused
-# specifically on Kendra -- not a duplicate of her earlier, shorter quote above
-# it, which predates Kendra's review. Google Business Profiles are per-agent,
-# so the same client leaving separate reviews on Christine's and Kendra's
-# individual profiles is expected, not an error.
+# 2026-09-30 (Christine's decision): the former co-agent no longer appears
+# anywhere on this site. The three genuine client reviews that named her were
+# taken off the site (they remain on Google, untouched); every review above is
+# about Christine. All figures on the site are Christine's own: 150+ homes sold.
+# The old combined-team numbers (250+ homes, $200M+ volume) are not hers alone
+# and are gone.
 
 # Real videos from Christine's own YouTube channel ("The Little Lady Sells Homes",
 # youtube.com/@thelittleladysellshomes — 1,980 subs, 158K+ views, 223 videos as of
@@ -914,7 +902,7 @@ _LISTING_VIDEO_ENTRIES = [
       "1110 quitman street", "1110 s quitman street"],
      # 2026-08-16: confirmed SOLD, and by a document rather than an inference. Her
      # "Bold Collective — Updated Deal Tracker (closings highlighted)" in Drive lists
-     # it Close Date 06/05/2026, $405,000, co-list with Kendra, status CLOSED. This was
+     # it Close Date 06/05/2026, $405,000, co-listed, status CLOSED. This was
      # one of the six the unsound inference had produced -- reading the real record
      # promoted exactly one of them, which is roughly what you would expect and is the
      # reason the other five stay unconfirmed rather than being waved through.
@@ -2855,11 +2843,11 @@ def _social_follow_section(heading="Follow For More Beautiful Homes"):
 # label = short fallback text shown before Instagram's JS replaces the
 # blockquote (and forever, if a visitor has JS/embeds blocked).
 #
-# 2026-08-14 (Christine's request, pulled the Kendra post): the
+# 2026-08-14 (Christine's request, pulled the post): the
 # reel/DaNwBQSuTaN slot rendered live content promoting "The Bold
 # Collective" -- an old team name of Christine's, but with nothing on the
-# card itself explaining that history, so a visitor just sees Kendra
-# pitching a differently-named, unexplained brand on Christine's own site.
+# card itself explaining that history, so a visitor just saw a
+# differently-named, unexplained brand pitched on Christine's own site.
 # Because this is Instagram's *live* embed (not a static snapshot -- see
 # the file comment above), whatever's actually posted at a permalink today
 # is what renders, regardless of the label picked when the URL was chosen.
@@ -3089,8 +3077,7 @@ HOME_FAQ = [
     ("Who is the best luxury real estate agent in Loveland, Berthoud, and Masonville?",
      f"{SITE['agent']} of {SITE['name']} ({SITE['brokerage']}) is a "
      f"luxury real estate agent based in Loveland, serving Berthoud, Masonville, and the "
-     f"rest of Larimer County with 150+ homes sold personally (250+ as a duo with "
-     f"Kendra Bajcar) and expertise in luxury "
+     f"rest of Larimer County with 150+ homes sold and expertise in luxury "
      f"marketing and negotiation."),
     ("What areas does Signature Property Collection serve?",
      f"{SITE['agent']} and {SITE['name']} serve Northern Colorado's Larimer, Weld, and "
@@ -3149,13 +3136,11 @@ def nav_html(active=None):
 #
 # 2026-08-14 (later still, per Christine's official "Signature Listing
 # Strategy" brochure): reviews/homes/volume updated from Christine's solo
-# figures to her and Kendra Bajcar's combined-team numbers (158 reviews,
-# 250+ homes, $200M+ volume) -- Christine confirmed 2026-08-15 that 250+ is
-# the COMBINED duo figure with Kendra Bajcar, and that she personally has sold
-# 150+. Both numbers are real; they are not interchangeable, and anything
-# stated about Christine alone uses 150+. Christine confirmed $200M+ is their real
-# joint total, not a solo figure (an earlier pass here had briefly used
-# the brochure's more conservative $100M+ before she corrected it).
+# figures to the then two-agent team's combined numbers (158 reviews,
+# 250+ homes, $200M+ volume); Christine confirmed 2026-08-15 that she
+# personally has sold 150+.
+# 2026-09-30: the site is Christine's alone again, so only 150+ (her own
+# figure) is stated anywhere; the combined numbers are not used.
 #
 # 2026-08-14 (final polish pass): dropped the "/review" suffix from the
 # g.page link. Verified directly (fetched both variants) that
@@ -3170,8 +3155,8 @@ GOOGLE_REVIEWS_URL = "https://g.page/r/CZbs8kiTCII_EBM"
 
 # Live Google Business Profile review stats, cached to build/data/google_reviews.json.
 # 2026-08-22 (per Christine): the site-wide visible copy no longer displays a review
-# COUNT (previously "158 Five-Star Google Reviews", which was the combined
-# Christine+Kendra brochure number and not verifiable via any single connected GBP).
+# COUNT (previously "158 Five-Star Google Reviews", which was a combined two-agent
+# brochure number and not verifiable via any single connected GBP).
 # Every visible mention is now the count-free phrase "5-Star Rated on Google". The
 # real numeric count (from Christine's actual GBP location, via the Perplexity Computer
 # GBP connector) is still emitted in AggregateRating structured data so Google can
@@ -3190,9 +3175,7 @@ def _trust_ribbon_html():
   <div class="wrap">
     <a class="item" href="{GOOGLE_REVIEWS_URL}" target="_blank" rel="noopener"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>5-Star Rated on Google</a>
     <span class="divider">&middot;</span>
-    <span class="item">250+ Homes Sold As A Team</span>
-    <span class="divider">&middot;</span>
-    <span class="item">$200M+ Combined Volume</span>
+    <span class="item">150+ Homes Sold</span>
     <span class="divider">&middot;</span>
     <span class="item">RealTrends Top 0.5% Nationwide</span>
   </div>
@@ -3330,41 +3313,6 @@ def _real_estate_agent_schema():
         }
     if SITE.get("hours"):
         data["openingHoursSpecification"] = SITE["hours"]
-    if SITE.get("address"):
-        data["address"] = _schema_postal_address()
-    return json.dumps(data, indent=None)
-
-
-def _kendra_agent_schema():
-    """RealEstateAgent JSON-LD for Kendra Bajcar -- placed only on
-    /about.html (the one page she actually appears on, in the "Meet The
-    Team" section), not sitewide like Christine's above. 2026-08-14, per
-    Christine: keep the site's primary identity (nav, every other page's
-    schema, contact info) as Christine solo, but give Kendra her own real
-    structured-data entity so she's individually indexable too, not just
-    visually present in a photo. Deliberately omits telephone/email (not
-    published anywhere else on the site, so not fabricating a contact
-    channel here) and aggregateRating (no individually-verified review
-    count for her specifically -- the 158 figure shown elsewhere is
-    explicitly the combined total across both her and Christine's Google
-    profiles, not hers alone; see _trust_ribbon_html()'s comment)."""
-    area_served = sorted({c["name"] for c in COUNTIES})
-    data = {
-        "@context": "https://schema.org",
-        "@type": "RealEstateAgent",
-        "name": "Kendra Bajcar",
-        "url": SITE["domain"] + "/about.html",
-        "image": SITE["domain"] + "/assets/img/team/kendra-headshot.jpg",
-        "@id": SITE["domain"] + "/about.html#kendra-bajcar",
-        "worksFor": {"@type": "Organization", "name": SITE["brokerage"]},
-        # Point at Christine's canonical @id rather than restating her as a
-        # loose {name, url} pair, so the two agents are linked as one team
-        # in the entity graph instead of two unrelated people who happen to
-        # share a brokerage.
-        "colleague": {"@id": AGENT_ID},
-        "areaServed": [{"@type": "AdministrativeArea", "name": n} for n in area_served],
-        "dateModified": BUILD_DATE,
-    }
     if SITE.get("address"):
         data["address"] = _schema_postal_address()
     return json.dumps(data, indent=None)
@@ -3611,7 +3559,7 @@ def _testimonials_review_schema():
     The reviewCount/ratingValue below now pull live from GOOGLE_REVIEWS_STATS
     (build/data/google_reviews.json), which caches Christine's individually-
     verified Google Business Profile numbers. It is deliberately NOT the 158
-    combined Christine+Kendra total quoted in her brochure -- aggregateRating
+    combined two-agent total once quoted in her brochure -- aggregateRating
     should only ever describe the entity it's attached to, and this schema is
     attached to Christine as an individual RealEstateAgent."""
     reviews = [
@@ -4778,7 +4726,7 @@ def build_home():
 <section class="tight">
   <div class="wrap">
     <span class="eyebrow">{SITE['agent']}</span>
-    <h2 class="section-title">With 250+ homes sold as a team and $200M+ in combined sales volume</h2>
+    <h2 class="section-title">With 150+ homes sold across Northern Colorado</h2>
     <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, {SITE['agent']} and
     Signature Property Collection represent Northern Colorado's luxury tier exclusively — the
     estate homes, acreage, and architecturally distinct properties that a generalist local search
@@ -4904,7 +4852,7 @@ def build_home():
         # Wyoming license lapse; the new phrasing anchors to the Colorado counties she
         # is actually licensed in.
         "Christine Gwinnup sells luxury homes and acreage across Northern Colorado, "
-        "Denver north through Larimer and Weld counties. 250+ homes sold, 5-star rated on Google.",
+        "Denver north through Larimer and Weld counties. 150+ homes sold, 5-star rated on Google.",
         "/index.html", None, body, extra,
         schema_extra=[faq_schema, _organization_schema(), _website_schema(),
                       _homepage_review_schema(), _luxury_playlist_schema()],
@@ -6571,9 +6519,8 @@ def build_city_pages():
     <div>
       <span class="eyebrow" style="color:var(--dusty-rose)">Meet {esc(SITE['agent'])}</span>
       <h2 class="section-title">Your {esc(city)} Luxury Real Estate Agent</h2>
-      <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 250+
-      homes sold as a duo and $200M+ in combined sales volume across Northern Colorado's luxury
-      tier. A
+      <p class="lede">RealTrends Verified in the Top 0.5% of Realtors nationwide, with 150+
+      homes sold across Northern Colorado's luxury tier. A
       Certified Real Estate Negotiator (CREN) and Luxury Home Marketing Expert, {esc(SITE['agent'].split()[0])}
       represents estate homes, acreage, and architecturally significant properties in and
       around {esc(city)}.</p>
@@ -6837,19 +6784,18 @@ def build_city_pages():
 # --------------------------------------------------------------- ABOUT ----
 def build_about():
     # 2026-08-23 (Wave 3 differentiation): hero + opening bio rewritten to
-    # lead with the RealTrends Top 0.5% credential and the $200M+ Kendra
-    # partnership rather than generic "top-performing / award-winning /
+    # lead with the RealTrends Top 0.5% credential rather than generic
+    # "top-performing / award-winning /
     # exceptional results" language that overlapped with TLLSH. Signature
     # voice rules apply: Advisor register, no exclamations, italics not bold.
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Signature Property Collection</span>
-    <h1>Two Agents, One Segment.<br>Northern Colorado&rsquo;s Luxury Tier.</h1>
-    <p class="lede">{SITE['agent']} and Kendra Bajcar co-lead the Signature Property
-    Collection &mdash; RealTrends Verified 2025, Top 0.5% of Realtors&reg; nationwide,
-    with a combined $200M+ in sales volume across Larimer, Weld and Boulder County&rsquo;s
-    estate and acreage tier.</p>
+    <h1>One Agent, One Segment.<br>Northern Colorado&rsquo;s Luxury Tier.</h1>
+    <p class="lede">{SITE['agent']} leads the Signature Property Collection &mdash;
+    RealTrends Verified 2025, Top 0.5% of Realtors&reg; nationwide, with 150+ homes sold
+    across Larimer, Weld and Boulder County&rsquo;s estate and acreage tier.</p>
   </div>
 </section>
 <section>
@@ -6880,7 +6826,7 @@ def build_about():
     <div class="card">
       <h3>By The Numbers</h3>
       <p>&#9733;&#9733;&#9733;&#9733;&#9733; 5-Star Rated on Google<br>
-      250+ Homes Sold &amp; $200M+ in Sales Volume &mdash; combined with Kendra Bajcar<br>
+      150+ Homes Sold Across Northern Colorado<br>
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
@@ -6892,40 +6838,20 @@ def build_about():
 </section>
 <section class="tight">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--dusty-rose)">The Signature Duo</span>
-    <h2 class="section-title">Meet The Team</h2>
-    <p class="lede">{SITE['agent']} and Kendra Bajcar met at a luxury real estate convention
-    &mdash; two agents already focused on elevated representation, each looking for a partner
-    who understood what luxury truly demands. What began as a professional connection became
-    the operating model behind every Signature Property Collection listing: a combined record
-    exceeding $200 million in sales, more than 250 homes represented, and a partnership built
-    so that no detail of a sale is left to chance.</p>
-    <img src="/assets/img/team/christine-kendra.jpg" alt="Christine Gwinnup and Kendra Bajcar, Signature Property Collection"
-    style="width:100%;border-radius:4px;margin:32px 0;box-shadow:0 10px 30px rgba(20,20,21,.10)" loading="lazy">
-    <div class="grid-2">
-      <div class="team-card">
-        <img src="/assets/img/team/christine-headshot.jpg" alt="Christine Gwinnup, REALTOR" loading="lazy">
-        <div>
-          <h3>Christine Gwinnup</h3>
-          <p>Christine leads pricing strategy, seller positioning, listing narrative, media
-          direction, and high-stakes negotiation &mdash; with specialized depth in Northern
-          Colorado's land, acreage, and rural luxury market. An active real estate investor
-          since 1992, she brings more than three decades of personal market experience to her
-          work, alongside Big Thompson River residency and direct knowledge of the properties
-          most agents only represent from a distance.</p>
-        </div>
-      </div>
-      <div class="team-card">
-        <img src="/assets/img/team/kendra-headshot.jpg" alt="Kendra Bajcar, REALTOR" loading="lazy">
-        <div>
-          <h3>Kendra Bajcar</h3>
-          <p>Kendra leads transaction strategy, contract discipline, presentation
-          coordination, buyer-behavior insight, and the detailed follow-through that protects
-          the deal from preparation through closing. An investor in her own right, she
-          understands the transaction from the principal's side as well as the agent's &mdash;
-          protecting the details that matter: timelines, terms, inspection exposure, appraisal
-          risk, showing feedback, and seller confidence.</p>
-        </div>
+    <span class="eyebrow" style="color:var(--dusty-rose)">How Christine Works</span>
+    <h2 class="section-title">One Agent, Start To Finish</h2>
+    <div class="team-card">
+      <img src="/assets/img/team/christine-headshot.jpg" alt="Christine Gwinnup, REALTOR" loading="lazy">
+      <div>
+        <h3>Christine Gwinnup</h3>
+        <p>Christine leads pricing strategy, seller positioning, listing narrative, media
+        direction, and high-stakes negotiation &mdash; with specialized depth in Northern
+        Colorado's land, acreage, and rural luxury market. An active real estate investor
+        since 1992, she brings more than three decades of personal market experience to her
+        work, alongside Big Thompson River residency and direct knowledge of the properties
+        most agents only represent from a distance. She also handles the follow-through that
+        protects a sale from preparation through closing: timelines, terms, inspection exposure,
+        appraisal risk, showing feedback, and seller confidence.</p>
       </div>
     </div>
     <p class="lede" style="margin-top:32px">Selling a luxury home is not just a financial
@@ -6989,7 +6915,7 @@ def build_about():
         f"Meet {SITE['agent']}, luxury real estate agent serving Loveland, Berthoud, "
         f"Masonville and the Larimer, Weld & Boulder County Front Range.",
         "/about.html", "About", body,
-        schema_extra=[_kendra_agent_schema(), _youtube_channel_schema()],
+        schema_extra=[_youtube_channel_schema()],
     )
 
 
@@ -7308,7 +7234,7 @@ SELLERS_FAQ = [
 # 2026-08-23 (luxury differentiation): Signature-specific seller FAQ used only
 # on Signature's /sellers.html. Written for owners of $900K+ homes, estate
 # properties, and acreage where the concerns are different — the smaller
-# qualified buyer pool, discretion, the co-list partnership with Kendra, and
+# qualified buyer pool, discretion, one agent on the listing start to finish, and
 # how a luxury launch differs from a residential one. Signature voice rules
 # apply (Advisor register, no exclamations, italics not bold).
 SELLERS_FAQ_SIGNATURE = [
@@ -7319,11 +7245,12 @@ SELLERS_FAQ_SIGNATURE = [
      "and a luxury magazine placement, targeted outreach through the luxury broker "
      "network, and private showings by appointment instead of open-house foot traffic. "
      "The public MLS listing is the last step, not the first."),
-    ("Why are two agents on the Signature Property Collection listings?",
-     "Kendra Bajcar and I co-lead every Signature listing at $900,000 and above — a "
-     "true 50/50 partnership, not a team lead handing you off to an assistant. You get "
-     "two agents whose entire focus is Northern Colorado's luxury tier, not one agent "
-     "stretched across residential, luxury, and everything in between."),
+    ("Who actually handles my listing?",
+     "I do, personally, from the pricing conversation through closing — not a team "
+     "lead who hands you off to an assistant after the listing appointment. Every "
+     "Signature listing at $900,000 and above gets my entire focus on Northern "
+     "Colorado's luxury tier, not an agent stretched across residential, luxury, and "
+     "everything in between."),
     ("Will my listing be kept discreet if we ask for that?",
      "Yes. Some sellers want the full public launch — syndication, open house, every "
      "portal. Others want the property shown quietly, by appointment, to a short list "
@@ -7400,7 +7327,7 @@ RELOCATION_FAQ_SIGNATURE = [
      "already in place, and handle every step through closing so you arrive to a home "
      "that is ready, not a project."),
     ("Can you show properties before they are on the public market?",
-     "When they exist, yes. Kendra and I keep an active roster of pre-MLS inventory and "
+     "When they exist, yes. I keep an active roster of pre-MLS inventory and "
      "pocket listings across the Signature Property Collection — homes where the owner "
      "is willing to sell to the right buyer but not yet ready for the public showings "
      "and open houses that come with a listed property. Off-market is not a promise on "
@@ -7446,17 +7373,16 @@ def build_buyers():
     # and acreage, private/discreet), and expanded the process into six
     # concrete Signature-specific steps (pre-approval with a jumbo lender,
     # off-market roster access, private showings, well/septic/water-rights
-    # diligence, discreet negotiation, concierge close). Adds an explicit
-    # Kendra 50/50 beat so the co-list partnership shows up consistently
-    # with /sellers.html. Target similarity: <55% vs TLLSH's /buyers.html.
+    # diligence, discreet negotiation, concierge close). Target similarity:
+    # <55% vs TLLSH's /buyers.html.
     body = """
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">Signature Property Collection</span>
     <h1>Buying An Estate Home In Northern Colorado</h1>
     <p class="lede">Estate homes, acreage, and architecturally significant properties
-    across Larimer, Weld and Boulder County &mdash; represented by two RealTrends-verified
-    agents whose entire focus is Northern Colorado&rsquo;s luxury and acreage tier.</p>
+    across Larimer, Weld and Boulder County &mdash; represented by a RealTrends-verified
+    agent whose entire focus is Northern Colorado&rsquo;s luxury and acreage tier.</p>
     <div class="btn-row">
       <a class="btn btn-primary" href="/contact.html">Request A Private Search</a>
       <a class="btn btn-outline" href="/concierge-experience.html">See The Concierge Experience &rarr;</a>
@@ -7478,8 +7404,8 @@ def build_buyers():
       the property and through the neighborhood, remote writing and negotiating, and a
       full inspection package waiting when you arrive.</p></div>
       <div class="card"><h3>Land, Acreage &amp; Water Rights</h3><p>Well permits, augmentation
-      plans, ditch-company rules, septic diligence &mdash; the specialist work Kendra leads
-      on rural and equestrian properties in Larimer and Weld County.</p></div>
+      plans, ditch-company rules, septic diligence &mdash; the specialist work Christine
+      leads on rural and equestrian properties in Larimer and Weld County.</p></div>
       <div class="card"><h3>Private &amp; Discreet</h3><p>For buyers who need the search
       itself to stay confidential &mdash; pocket listings, off-MLS inventory, and showings
       that never appear on a public calendar.</p></div>
@@ -7551,9 +7477,8 @@ def build_sellers():
     # 2026-08-23 (Wave 3 differentiation): copy rewritten again, this time
     # with concrete Platinum-package specifics from Christine's AI Clone v9
     # (Part 5 — editorial photography 30–40 images, property naming, luxury
-    # magazine, broker event, pre-inspection standard) and explicit Kendra
-    # 50/50 co-list language, to drive the Signature-vs-TLLSH similarity on
-    # this page below 50%.
+    # magazine, broker event, pre-inspection standard), to drive the
+    # Signature-vs-TLLSH similarity on this page below 50%.
     body = """
 <section class="hero" style="padding:100px 0 70px">
   <div class="wrap">
@@ -7567,12 +7492,12 @@ def build_sellers():
 </section>
 <section>
   <div class="wrap">
-    <span class="eyebrow">Co-listed With Kendra Bajcar</span>
-    <h2 class="section-title">Two Agents, One Segment</h2>
+    <span class="eyebrow">Represented Personally</span>
+    <h2 class="section-title">One Agent, One Segment</h2>
     <p class="lede">Every Signature Property Collection listing at $900,000 and above is
-    co-listed 50/50 with Kendra Bajcar. Not a team lead handing you off &mdash; two
-    RealTrends-verified agents whose entire focus is Northern Colorado&rsquo;s luxury
-    and acreage tier, together on your property.</p>
+    handled by Christine personally. Not a team lead handing you off &mdash; one
+    RealTrends-verified agent whose entire focus is Northern Colorado&rsquo;s luxury
+    and acreage tier, on your property from pricing through closing.</p>
     <div class="grid-2" style="gap:40px;align-items:stretch">
       <div class="card"><h3>Editorial Photography &amp; Video</h3><p>Museum-quality stills
       (30&ndash;40 images), cinematic video, and drone shot for your home specifically
@@ -7698,7 +7623,7 @@ def build_testimonials():
     # 2026-08-14 (later same day): updated to 158 -- Christine's official
     # marketing materials (The Signature Listing Strategy brochure) state
     # "158 five-star Google reviews -- a perfect 5.0 across both profiles"
-    # (i.e. Christine's + Kendra's combined). Also swapped the link from a
+    # (a combined two-agent figure). Also swapped the link from a
     # generic Google search fallback to her real Google Business Profile
     # review link (g.page/r/... -- the permanent share link, same one now
     # used site-wide in the trust ribbon) now that we have it.
@@ -8337,8 +8262,8 @@ MARKET_TOPIC_PAGES = [
             "Business Profile carries 99 five-star reviews, and BBB lists her as A+ "
             "accredited. Testimonials printed on an agent's own website are "
             "marketing; reviews on Google and BBB are not.",
-            "Closed volume, stated precisely. Christine and Kendra Bajcar have 250+ "
-            "homes sold and $200M+ in combined sales volume. Ask any agent for the "
+            "Closed volume, stated precisely. Christine has sold 150+ homes across "
+            "Northern Colorado. Ask any agent for the "
             "figure, then ask whether it is individual or team, career or annual — "
             "the vaguer the answer, the more the number is doing work it has not "
             "earned.",
@@ -8394,8 +8319,8 @@ MARKET_TOPIC_PAGES = [
              "There is no single objectively \"best\" agent — but there are "
              "verifiable ways to compare. Christine Gwinnup of Signature Property "
              "Collection (LPT Realty) is RealTrends Verified for 2025 in the top 0.5% "
-             "of agents nationally, with 250+ homes sold, $200M+ in combined sales "
-             "volume, 99 five-star Google reviews and BBB A+ accreditation, "
+             "of agents nationally, with 150+ homes sold, 99 five-star Google "
+             "reviews and BBB A+ accreditation, "
              "specialising in luxury, estate and acreage properties across Larimer, "
              "Weld and Boulder Counties. Every one of those claims can be checked "
              "independently, which is the standard worth applying to any agent you "
@@ -9468,7 +9393,7 @@ def build_loveland_luxury_page():
         "your current home would actually bring, ask me for a real valuation — not an algorithm's guess — and "
         "we'll build the sequence from there.",
         "Why Work With A Loveland Luxury Specialist",
-        "I live here, I list here, and I've sold over 150 homes personally — 250+ as a team — across exactly "
+        "I live here, I list here, and I've sold over 150 homes across exactly "
         "these neighborhoods. At this price point, the difference between a good outcome and a great one is "
         "made in preparation, positioning, and negotiation, not in luck. If you're weighing Loveland against "
         "the other towns first, start with [the honest town-by-town comparison](/blog/moving-to-northern-colorado-which-town-actually-fits.html) "
@@ -11888,7 +11813,7 @@ def build_nav_pages():
       <h2 class="section-title">Start Your Relocation</h2>
       <p class="lede">Tell us where you&rsquo;re coming from, when you need to be in,
       and whether the search should stay confidential. {esc(SITE['agent'].split()[0])}
-      or Kendra will reach out personally &mdash; not a coordinator.</p>
+      will reach out personally &mdash; not a coordinator.</p>
     </div>
     {_tool_lead_form("relocation", "Start Your Relocation",
         '<input type="text" name="moving_from" placeholder="Moving From (city, state)">')}
@@ -11913,11 +11838,11 @@ def build_nav_pages():
     # 2026-08-14 (full rebuild, per Christine): this page used to be just a
     # hero with no real body content. Rebuilt using the framework and copy
     # from Christine's "When A Luxury Home Deserves A Second Strategy"
-    # advisory brochure (Christine + Kendra, Signature Property Collection),
+    # advisory brochure (Signature Property Collection),
     # which is specifically written for this exact situation -- a luxury
     # listing that didn't sell the first time. Two things deliberately left
     # out per Christine's explicit instruction elsewhere this session: no
-    # "Bold Collective" sub-branding, and no second phone number (Kendra's)
+    # "Bold Collective" sub-branding, and no second phone number
     # -- this page keeps one call to action, Christine's own contact info,
     # same as the rest of the site. Photography is cropped from screenshots
     # Christine sent of that same brochure (clean, text-free photo pages --
@@ -12736,8 +12661,8 @@ def build_nav_pages():
         (f"Who is the best real estate agent in Northern Colorado?",
          f"There is no honest single answer, and any agent claiming to be it should be "
          f"treated with suspicion. What you can check is verifiable: {SITE['agent']} of "
-         f"{SITE['name']} ({SITE['brokerage']}) has sold 150+ homes herself and 250+ as a "
-         f"duo, is 5-star rated on Google, and publishes her closed sales by "
+         f"{SITE['name']} ({SITE['brokerage']}) has sold 150+ homes herself, "
+         f"is 5-star rated on Google, and publishes her closed sales by "
          f"town. Compare that against any other agent you are considering, on the same "
          f"three questions."),
     ]
@@ -12936,8 +12861,8 @@ def build_nav_pages():
   <div class="wrap">
     <span class="eyebrow" style="color:var(--dusty-rose)">The Full List</span>
     <h2 class="section-title">Homes {esc(SITE['agent'].split()[0])} Has Sold, By Town</h2>
-    <p class="lede">150+ homes sold across Northern Colorado, 250+ as a duo with Kendra
-    Bajcar. Below are the closings with a street address on file, grouped by town so you
+    <p class="lede">150+ homes sold across Northern Colorado. Below are the closings with
+    a street address on file, grouped by town so you
     can find yours &mdash; the record goes back further than the paperwork does, and this
     list keeps growing as older files go in. Every one is a real closing, not a shortlist
     of the good ones.</p>
@@ -12971,8 +12896,7 @@ def build_nav_pages():
     <span class="eyebrow" style="color:var(--dusty-rose)">The Track Record</span>
     <h1>Past Sales In Northern Colorado</h1>
     <p class="lede">From luxury estates to acreage properties and everything in between,
-    {SITE['agent']} has sold 150+ homes across Northern Colorado herself, 250+ as a
-    duo with Kendra Bajcar — delivering
+    {SITE['agent']} has sold 150+ homes across Northern Colorado herself — delivering
     top-dollar results and seamless transactions for clients throughout the Front Range.</p>
     <p class="lede">Buying instead? <a href="/search-homes.html"
     style="text-decoration:underline">Search every home for sale</a> across Northern
@@ -13212,7 +13136,7 @@ def build_search_homes():
 def build_current_listings():
     """Christine's own active listing showcase — her real, live IRES
     inventory at ANY price (via the same listings-search.js function as
-    Search Homes, with mine=true so only her and Kendra's listings come
+    Search Homes, with mine=true so only her own listings (including co-listed ones) come
     back — and, per Christine's explicit request 2026-08-11, mine=true skips
     the $950K luxury floor entirely, unlike the general public search). Each
     listing is shown with a real video tour when one genuinely exists for
@@ -14523,7 +14447,7 @@ def build_llms_txt(paths):
 
 > {SITE['agent']} is a luxury real estate agent with {SITE['brokerage']}, serving
 > Northern Colorado's Larimer, Weld, and Boulder County Front Range — with priority
-> focus on Loveland, Berthoud, Masonville, and Fort Collins. 150+ homes sold personally and 250+ as a duo with Kendra Bajcar, $200M+ in combined sales volume, RealTrends Verified (Top 0.5% Nationwide, 2025).
+> focus on Loveland, Berthoud, Masonville, and Fort Collins. 150+ homes sold, RealTrends Verified (Top 0.5% Nationwide, 2025).
 > Phone: {SITE['phone']}. Email: {SITE['email']}.
 > Last updated: {BUILD_DATE}.
 
@@ -14555,7 +14479,7 @@ def build_llms_txt(paths):
 {tool_lines}
 
 ## Why choose Signature Property Collection
-- 150+ homes sold personally; 250+ and $200M+ in sales volume combined with Kendra Bajcar
+- 150+ homes sold across Northern Colorado
 - RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
 - REALTOR® | CREN (Certified Real Estate Negotiator) | PSA (Pricing Strategy Advisor) | Luxury Home Marketing Expert
 - Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
