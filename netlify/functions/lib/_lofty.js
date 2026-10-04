@@ -33,9 +33,10 @@
 //      error, logged it where nobody looks, and returned success.
 //
 //   4. A HELD-LEAD RECORD (2026-10-04, re-audit). A lead whose identity the Lofty
-//      lookup could not settle -- several exact matches, an email and a phone
-//      naming different contacts, or a lookup that failed -- is not created, not
-//      queued and never replayed: nothing in Lofty changes until Christine has
+//      lookup could not settle -- several exact matches, or an email and a phone
+//      naming different contacts -- is not created, not queued and never
+//      replayed (a lookup Lofty could not answer is NOT held: that lead is
+//      created with texting off and tagsAdd; see _lofty-returning.js): nothing in Lofty changes until Christine has
 //      looked. Until now that lead lived only in the alert email. It is kept
 //      under MANUAL_REVIEW_KEY, with the submission and the reason, where
 //      /status counts it and names the submission ids (never the person).

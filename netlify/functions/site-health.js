@@ -1299,8 +1299,9 @@ exports.handler = async (event) => {
     ok: heldPublic.count === 0,
     optional: true,
     detail: heldPublic.count === 0
-      ? "None waiting. A lead is held, not pushed, when Lofty has several exact matches for it, " +
-        "when its email and phone name different contacts, or when the lookup failed."
+      ? "None waiting. A lead is held, not pushed, when Lofty has several exact matches for it " +
+        "or when its email and phone name different contacts. A lookup Lofty could not answer " +
+        "does not hold the lead: it is created with texting off and its tags only added, never replaced."
       : `${heldPublic.count} lead(s) waiting for you to settle in Lofty by hand — Netlify Forms submission id(s): ` +
         `${heldPublic.entries.map((e) => e.submissionId || `(no id; ${e.formName} at ${e.at})`).join(", ")}. ` +
         `Reason(s): ${[...new Set(heldPublic.entries.map((e) => e.reason))].join("; ")}. ` +
