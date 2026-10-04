@@ -23,24 +23,37 @@
 //      figure out why.
 //
 //   2. A DRAINABLE QUEUE. Every failed push is stored with its full payload and
-//      retried by the next sync run (see drainFailedPushes, called from
-//      sync-listings.js). A lead that fails during a Lofty outage now arrives
+//      retried on a schedule (see drainFailedPushes, run by each site's
+//      lofty-queue-drain.js). A lead that fails during a Lofty outage now arrives
 //      late instead of never, without Christine re-typing anything.
 //
 //   3. A VISIBLE RECORD. The last push result -- Lofty's own status code and the
 //      first part of its response -- is written where /site-health can show it.
 //      This whole class of bug was invisible before: the function caught the
 //      error, logged it where nobody looks, and returned success.
+//
+//   4. A HELD-LEAD RECORD (2026-10-04, re-audit). A lead whose identity the Lofty
+//      lookup could not settle -- several exact matches, an email and a phone
+//      naming different contacts, or a lookup that failed -- is not created, not
+//      queued and never replayed: nothing in Lofty changes until Christine has
+//      looked. Until now that lead lived only in the alert email. It is kept
+//      under MANUAL_REVIEW_KEY, with the submission and the reason, where
+//      /status counts it and names the submission ids (never the person).
 const LOFTY_BASE_URL = "https://api.lofty.com/v1.0";
 const LAST_PUSH_KEY = "lofty-last-push.json";
 const FAILED_PUSH_KEY = "lofty-failed-pushes.json";
 const MAX_QUEUED_FAILURES = 25;
-// Small: this runs inside the listing sync's time budget, which has real work to
-// do. A backlog drains over consecutive runs rather than all at once.
+// Held for identity review (4 above). Its own key, so the drain -- which reads
+// FAILED_PUSH_KEY only -- can never replay one blindly. Newest kept.
+const MANUAL_REVIEW_KEY = "lofty-manual-review.json";
+const MAX_HELD_FOR_REVIEW = 50;
+// Small: a run has a 20-second budget (each site's lofty-queue-drain.js) inside
+// Netlify's 30-second limit. A backlog drains over consecutive runs rather than
+// all at once.
 const MAX_DRAIN_PER_RUN = 3;
-// 2026-09-30 (API audit): the Little Lady site now drains its own copy of this
-// queue on a schedule (its netlify/functions/lofty-queue-drain.js), and if its
-// Blobs settings point at this site's store, two schedules read the SAME key. A
+// 2026-09-30 (API audit): both sites drain this queue on their own schedule (each
+// site's netlify/functions/lofty-queue-drain.js), and if their Blobs settings
+// point at the same store, two schedules read the SAME key. A
 // drain therefore holds a short lease first -- a create-only write, which only
 // one caller can win -- so a queued lead is never replayed twice at once, and it
 // writes the queue back merged with anything queued while it ran instead of
@@ -149,7 +162,15 @@ async function recordPush(store, result, formName, lead) {
     // formData only rides on the retry queue (for the replay), not the status record.
     const { formData: _formData, ...shown } = result || {};
     await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, leadEmail, ...shown });
-    if (!result.ok && !result.manualReview) {
+    if (!result.ok && result.manualReview) {
+      // Held, not queued: the drain must never create a contact whose identity
+      // is unsettled. The submission (the lead body, and the form data when the
+      // caller passed it) and the reason go to their own record.
+      await holdForManualReview(store, {
+        at: new Date().toISOString(), formName, lead, ...result,
+        reason: result.reason || result.responseBody || "identity needs manual review",
+      });
+    } else if (!result.ok) {
       const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
       queue.unshift({ at: new Date().toISOString(), formName, lead, ...result });
       await store.setJSON(FAILED_PUSH_KEY, queue.slice(0, MAX_QUEUED_FAILURES));
@@ -160,10 +181,34 @@ async function recordPush(store, result, formName, lead) {
   }
 }
 
-// Retries queued leads. Called by sync-listings.js, so a lead that failed during
-// an outage arrives on a later run instead of waiting on someone noticing.
-// Bounded, wrapped, and never allowed to affect the sync: any throw is caught by
-// the caller and the queue is simply left for next time.
+// The held-lead record: the submission and why it was held, for Christine to
+// settle by hand in Lofty. Read-then-write, newest first, one entry per
+// submission (a lead held again replaces its earlier entry rather than adding
+// one). Nothing in this file ever posts one of these to Lofty: the drain reads
+// FAILED_PUSH_KEY only. Returns true when the record was written.
+function heldKey(e) {
+  return e && e.submissionId ? `id:${e.submissionId}` : `${e && e.at}|${e && e.formName}`;
+}
+
+async function holdForManualReview(store, held) {
+  if (!store || !held) return false;
+  try {
+    const list = (await store.get(MANUAL_REVIEW_KEY, { type: "json" }).catch(() => null)) || [];
+    const key = heldKey(held);
+    const kept = (Array.isArray(list) ? list : []).filter((e) => e && heldKey(e) !== key);
+    kept.unshift({ ...held, manualReview: true, heldAt: new Date().toISOString() });
+    await store.setJSON(MANUAL_REVIEW_KEY, kept.slice(0, MAX_HELD_FOR_REVIEW));
+    return true;
+  } catch (err) {
+    console.error("could not record a lead held for identity review:", err && err.message);
+    return false;
+  }
+}
+
+// Retries queued leads. Run by each site's lofty-queue-drain.js on a schedule, so
+// a lead that failed during an outage arrives on a later run instead of waiting
+// on someone noticing. Bounded and wrapped: any throw is caught by the caller
+// and the queue is simply left for next time.
 async function takeDrainLease(store) {
   const lease = { at: new Date().toISOString() };
   try {
@@ -213,9 +258,19 @@ async function drainWithLease(store, apiKey, opts) {
   let attempted = 0;
   let recovered = 0;
   let consentHeld = 0;
+  let heldForReview = 0;
   for (const entry of queue) {
-    if (!entry || !entry.lead || entry.manualReview || attempted >= MAX_DRAIN_PER_RUN || deadline - Date.now() < MIN_RETRY_MS) {
-      if (entry) remaining.push(entry);
+    if (!entry) continue;
+    // 2026-10-04: an entry an earlier drain flagged for review used to stay here,
+    // taking one of the 25 queue slots for ever. It moves to the held-lead record
+    // (and stays here only if that record could not be written).
+    if (entry.manualReview) {
+      const moved = await holdForManualReview(store, { ...entry, reason: entry.reason || entry.heldReason || "identity needs manual review" });
+      if (moved) heldForReview += 1; else remaining.push(entry);
+      continue;
+    }
+    if (!entry.lead || attempted >= MAX_DRAIN_PER_RUN || deadline - Date.now() < MIN_RETRY_MS) {
+      remaining.push(entry);
       continue;
     }
     attempted += 1;
@@ -227,7 +282,10 @@ async function drainWithLease(store, apiKey, opts) {
     const identity = await findExistingLead(email, consentPhoneOf(lead), apiKey,
       { budgetMs: Math.max(1, Math.min(2000, deadline - Date.now())) });
     if (identity.manualReview) {
-      remaining.push({ ...entry, manualReview: true, heldReason: identity.error });
+      // Held, not retried (holdForManualReview above). Kept in this queue only
+      // if the held-lead record could not be written, so it is never lost.
+      const flagged = { ...entry, manualReview: true, heldReason: identity.error, reason: identity.error };
+      if (await holdForManualReview(store, flagged)) heldForReview += 1; else remaining.push(flagged);
       console.warn("Queued Lofty lead held: identity needs manual review.");
       continue;
     }
@@ -272,11 +330,15 @@ async function drainWithLease(store, apiKey, opts) {
       ok: recovered > 0,
       httpStatus: recovered > 0 ? 200 : "retry failed",
       responseBody: `${recovered} of ${attempted} queued lead(s) recovered; ${remaining.length} still queued.` +
+        (heldForReview ? ` ${heldForReview} held for identity review (see /status).` : "") +
         (consentHeld ? ` Texting left off on ${consentHeld} that said yes to texts (see the function log).` : ""),
       payloadShape: "queued retry",
     }).catch(() => {});
   }
-  return { attempted, recovered, stillQueued: remaining.length, ...(consentHeld ? { consentHeld } : {}) };
+  return {
+    attempted, recovered, stillQueued: remaining.length,
+    ...(heldForReview ? { heldForReview } : {}), ...(consentHeld ? { consentHeld } : {}),
+  };
 }
 
 // The steps submission-created.js runs after a successful create, for a
@@ -330,9 +392,12 @@ module.exports = {
   LAST_PUSH_KEY,
   FAILED_PUSH_KEY,
   DRAIN_LOCK_KEY,
+  MANUAL_REVIEW_KEY,
+  MAX_HELD_FOR_REVIEW,
   minimalLead,
   postLead,
   recordPush,
+  holdForManualReview,
   drainFailedPushes,
   REPLAY_TRIGGER_TAG,
 };

@@ -143,6 +143,19 @@
 [functions."sync-listings"]
   schedule = "*/30 * * * *"
 
+# Retries website leads Lofty refused (lib/_lofty.js drainFailedPushes), on its
+# own schedule. 2026-10-04 (re-audit): this ran FIRST inside the 30-minute sync
+# above, with no deadline, in the same 30 seconds Netlify gives a scheduled
+# function -- so a slow Lofty could get the run killed before the queue was
+# written back (an accepted lead replayed next run: a duplicate note and a
+# re-fired tag) and before her listings were refreshed. Its own function now,
+# exactly as on the Little Lady site: a 20-second budget, at most 3 leads a run,
+# a create-only lease so two schedules never replay the same lead at once.
+# Offset from this site's :00/:30 sync and from the Little Lady's :15/:45 drain,
+# so neither competes with the other for Lofty.
+[functions."lofty-queue-drain"]
+  schedule = "5,35 * * * *"
+
 # Clean, shareable, indexable URL for one listing:
 #   /listing/IRE1234567  ->  netlify/functions/listing-page.js
 #

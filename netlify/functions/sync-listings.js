@@ -88,7 +88,6 @@ const {
   fetchMediaResponse, writeCachedPhoto, photoCacheKey, isThrottled, isMediaThrottled,
   listPhotoDemand, clearPhotoDemand,
 } = require("./lib/_media");
-const { drainFailedPushes } = require("./lib/_lofty");
 const { runMineSync } = require("./lib/_lofty-listings");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
@@ -1058,24 +1057,21 @@ exports.VERDICT_KEY = VERDICT_KEY;
 // ---- 2026-09-28: Lofty is the listing source now ---------------------------
 // When LISTINGS_SOURCE is "lofty" (the default -- see _mls-shared.js) this
 // schedule stops talking to MLS Grid entirely: no crawl, no photo caching, no
-// backfill. It keeps the one job that was never about MLS Grid (retrying queued
-// website leads into Lofty) and refreshes Christine's own listings from Lofty
+// backfill. It refreshes Christine's own listings from Lofty
 // (lib/_lofty-listings.js runMineSync -- two requests). The home search for
 // every other listing is her Lofty site's job now (lib/_home-search.js).
 // Everything below this function is the MLS Grid path, untouched, for
 // LISTINGS_SOURCE=mlsgrid.
+//
+// 2026-10-04 (re-audit): retrying queued website leads into Lofty used to run
+// here FIRST, with no deadline, inside the same 30 seconds Netlify allows -- so a
+// slow Lofty could get this run killed before the queue was written back (an
+// accepted lead replayed next run: a duplicate note, a re-fired tag) and before
+// her listings were refreshed at all. That is lofty-queue-drain.js's own
+// schedule now, as on the Little Lady site.
 async function loftyScheduledRun() {
   const store = getBlobStore(getStore);
   const apiKey = process.env.LOFTY_API_KEY;
-  try {
-    const drained = await drainFailedPushes(store, apiKey);
-    if (drained.attempted) {
-      console.log(`sync-listings: retried ${drained.attempted} queued Lofty lead(s), ` +
-        `${drained.recovered} recovered, ${drained.stillQueued} still queued.`);
-    }
-  } catch (err) {
-    console.error("sync-listings: Lofty queue drain failed (ignored):", err && err.message);
-  }
   if (!apiKey) {
     console.error("sync-listings: LOFTY_API_KEY not set, so her listings can't be refreshed.");
     return { statusCode: 200, body: "no Lofty key configured" };
@@ -1120,8 +1116,8 @@ exports.handler = async () => {
 };
 
 // The MLS Grid path. opts.background: running after her Lofty listings, for the
-// market data only -- the Lofty lead queue was already drained this run, and the
-// overnight photo backfill has nothing to do (it stands down under Lofty).
+// market data only -- the overnight photo backfill has nothing to do (it stands
+// down under Lofty).
 //
 // 2026-09-30 (API audit; the shared MLS Grid account was suspended for over-use on
 // 2026-08-01): in the background run nothing asks for photos any more. The town
@@ -1211,23 +1207,15 @@ async function mlsGridRun(opts) {
       `${cleanup.slimmed} slimmed, ${cleanup.dropped} dropped.`);
   }
 
-  // ---- Retry any website lead that failed to reach Lofty ----------------
-  // 2026-08-15 (Christine: "submitted - but still didnt come into lofty"). A
-  // lead that fails the live push is queued with its full payload; this drains
-  // that queue so it arrives on a later run instead of waiting for someone to
-  // notice. Deliberately first, tiny (at most 3 per run), and fully isolated:
-  // Lofty has nothing to do with listing replication, so it must never be able
-  // to slow it down or fail it.
-  let loftyDrain = { attempted: 0, recovered: 0 };
-  if (!o.background) try {
-    loftyDrain = await drainFailedPushes(store, process.env.LOFTY_API_KEY);
-    if (loftyDrain.attempted) {
-      console.log(`sync-listings: retried ${loftyDrain.attempted} queued Lofty lead(s), ` +
-        `${loftyDrain.recovered} recovered, ${loftyDrain.stillQueued} still queued.`);
-    }
-  } catch (err) {
-    console.error("sync-listings: Lofty queue drain failed (ignored):", err && err.message);
-  }
+  // ---- Website leads that failed to reach Lofty are NOT retried here --------
+  // From 2026-08-15 (Christine: "submitted - but still didnt come into lofty")
+  // to 2026-10-04 this run drained that queue first (lib/_lofty.js
+  // drainFailedPushes), with no deadline, inside the same 30 seconds Netlify
+  // allows -- so a slow Lofty could get the run killed before the queue was
+  // written back (an accepted lead replayed next run, with a duplicate note and
+  // a re-fired tag) and before any listing work. Lofty has nothing to do with
+  // listing replication and must never slow it down or fail it, so the drain is
+  // its own schedule now: netlify/functions/lofty-queue-drain.js.
 
   let lastRunError = null;
   let httpErrorOccurred = false;
