@@ -71,12 +71,15 @@ function loftyHeaders(apiKey) {
   };
 }
 
-async function loftyRequest(method, path, apiKey, body) {
+// opts.deadline (epoch ms, optional): the call is cut at the deadline when that
+// comes before its own timeout (the queue drain's budget; see lib/_lofty.js).
+async function loftyRequest(method, path, apiKey, body, opts) {
+  const left = ((opts && opts.deadline) || Infinity) - Date.now();
   const res = await fetch(`${LOFTY_BASE_URL}${path}`, {
     method,
     headers: loftyHeaders(apiKey),
     ...(body ? { body: JSON.stringify(body) } : {}),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(Math.max(1, Math.min(TIMEOUT_MS, left))),
   });
   const text = await res.text().catch(() => "");
   let json = null;
@@ -94,7 +97,7 @@ function isLeadMissing(res) {
 }
 
 // POST /notes — NOT /leads/{id}/notes, which 404s. See the header comment.
-async function addLoftyNote(leadId, content, apiKey) {
+async function addLoftyNote(leadId, content, apiKey, opts) {
   if (!leadId || !content || !apiKey) return { attempted: false };
   // leadId is sent as a Number because that is what works in
   // sellerintelligence; Lofty's ids are large but well inside 2^53.
@@ -103,7 +106,7 @@ async function addLoftyNote(leadId, content, apiKey) {
   try {
     const res = await loftyRequest("POST", "/notes", apiKey, {
       leadId: numericId, content,
-    });
+    }, opts);
     // 2026-08-16, from Christine's live /status after a real submission. POST
     // /leads returned leadId 1147334685108095 and reported success -- then
     // POST /notes for that same id came back
@@ -198,10 +201,10 @@ function describeTagShape(payload) {
 // is worse than where it started. So the re-add is retried once and the outcome
 // is reported either way -- and if it still fails, tagRestored is false, which
 // /site-health renders as a real problem rather than swallowing it.
-async function refireLoftyTag(leadId, triggerTag, apiKey) {
+async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
   if (!leadId || !triggerTag || !apiKey) return { attempted: false };
   try {
-    const current = await loftyRequest("GET", `/leads/${leadId}`, apiKey);
+    const current = await loftyRequest("GET", `/leads/${leadId}`, apiKey, null, opts);
     if (!current.ok) {
       // Same ghost-id case as in addLoftyNote, reported under its own step so
       // /status can explain a merge rather than showing two identical 404s and
@@ -247,7 +250,7 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
       // The create/merge did not leave the tag on the lead at all. Adding it now
       // is both the fix and the trigger, in one call.
       const withTag = tags.concat([triggerTag]);
-      const put = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: withTag });
+      const put = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: withTag }, opts);
       return {
         attempted: true, ok: put.ok, step: "added", tagRestored: put.ok,
         tagShape: describeTagShape(current.json), tagsSeen: tags.length,
@@ -257,7 +260,7 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
 
     // Already tagged: take it off, put it back, so "Tag Added" is a real event.
     const without = tags.filter((t) => t !== triggerTag);
-    const off = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: without });
+    const off = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: without }, opts);
     if (!off.ok) {
       // Nothing was changed, so nothing needs undoing -- the lead keeps its tag.
       return {
@@ -266,8 +269,8 @@ async function refireLoftyTag(leadId, triggerTag, apiKey) {
         httpStatus: off.httpStatus, response: off.text,
       };
     }
-    let back = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: tags });
-    if (!back.ok) back = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: tags });
+    let back = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: tags }, opts);
+    if (!back.ok) back = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: tags }, opts);
     if (!back.ok) {
       console.error(`Lofty tag re-add FAILED for lead ${leadId} — "${triggerTag}" is currently off this lead: ` +
         `HTTP ${back.httpStatus} ${back.text}`);
