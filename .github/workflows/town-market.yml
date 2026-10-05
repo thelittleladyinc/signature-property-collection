@@ -77,21 +77,27 @@ jobs:
       # Rebuild so the committed site/ matches the new data. netlify-build.sh
       # regenerates on deploy anyway, but this repo deliberately keeps site/ in
       # git as the fallback and as an honest diff of what a data change produces.
-      - name: Rebuild the site
-        if: steps.creds.outputs.ready == 'true'
-        run: python3 build/build.py
-
+      #
+      # 2026-10-05: this used to be `python3 build/build.py` and then a loop over
+      # the suites. build.py stamps today's date on every page, and only the
+      # deploy ran the freshness step (build/postprocess_freshness.py) after it
+      # -- a step that restores the COMMITTED date, so whatever this job
+      # committed is what went live. The first scheduled run after PR #72
+      # (f883df8) re-dated 74 unchanged pages and all 34 sitemap entries to that
+      # morning. tests/run-all.sh builds the way a deploy does (the deploy's own
+      # scripts/netlify-build.sh: build.py, then the freshness step), runs every
+      # suite, and runs the freshness step once more because one suite rebuilds
+      # site/ itself. One way to regenerate site/, shared with geocode-towns.yml
+      # and scripts/commit-generated.sh; tests/test-honest-dates.js pins it.
+      #
       # 2026-08-17: was `node tests/test-townmarket.js` alone. This job commits
       # a regenerated site/ — 37 town pages on the last run — so it verifies the
       # whole tree, not just the figures it came here to change. The suites take
       # about a second; a rebuild that quietly breaks the mobile grid while the
       # market numbers stay correct is exactly what one suite would miss.
-      - name: Verify the whole tree before publishing
+      - name: Rebuild and verify the whole tree before publishing
         if: steps.creds.outputs.ready == 'true'
-        run: |
-          for t in tests/test-*.js; do node "$t" >/dev/null || { echo "FAILED $t"; node "$t"; exit 1; }
-          done
-          echo "all suites passed"
+        run: bash tests/run-all.sh
 
       # Shared with geocode-towns.yml. Retries a rejected push by rebuilding on
       # top of the new master rather than rebasing generated HTML — see the long

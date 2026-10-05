@@ -4,21 +4,37 @@
 # they survive, and so CI can run them.
 set -u
 cd "$(dirname "$0")/.."
-python3 build/build.py >/dev/null || { echo "build FAILED"; exit 1; }
 # 2026-09-30: build.py stamps today's date on every page, so on any day after the
 # last site/ commit CI's "committed site/ matches the generator" check could only
 # pass by committing a fresh rebuild -- which re-dated every page (PR #70 moved
-# all 34 sitemap entries to 2026-09-30 with no content change). Netlify already
-# runs this step after the build (scripts/netlify-build.sh); running it here too
+# all 34 sitemap entries to 2026-09-30 with no content change). Netlify runs the
+# freshness step after the build (scripts/netlify-build.sh); running it here too
 # means the check compares like with like: unchanged pages keep their committed
 # date, and only a page whose content really changed shows up as out of date.
-python3 build/postprocess_freshness.py >/dev/null || { echo "freshness step FAILED"; exit 1; }
+#
+# 2026-10-05: the build is the deploy's own script now, not build.py plus a copy
+# of the freshness step. The scheduled town-market job, the geocode job and
+# scripts/commit-generated.sh each had their own `python3 build/build.py` with
+# no freshness step after it, and the first scheduled run after PR #72 committed
+# 74 unchanged pages and all 34 sitemap entries re-dated to that morning -- which
+# the deploy's freshness step then faithfully restored as the "committed" date.
+# Those three run this file now, so there is exactly one way to regenerate site/
+# and it is the way a deploy does it (tests/test-honest-dates.js pins that).
+bash scripts/netlify-build.sh >/dev/null || { echo "build FAILED"; exit 1; }
 fail=0
 for t in tests/test-*.js; do
   printf "%-28s " "$(basename "$t" .js)"
   out="$(node "$t" 2>&1)"
   if printf '%s' "$out" | grep -q "All checks passed"; then echo "ok"
   else echo "FAILED"; printf '%s\n' "$out" | grep -E "FAIL" | head -5; fail=1; fi
+done
+# 2026-10-05: the node:test suites (tests/test-*.cjs) were run by nothing -- the
+# glob above is .js only -- so the texting-preference consent suite that PR #78
+# edited was never in CI. `node --test` exits non-zero when any test fails.
+for t in tests/test-*.cjs; do
+  printf "%-28s " "$(basename "$t" .cjs)"
+  if node --test "$t" >/dev/null 2>&1; then echo "ok"
+  else echo "FAILED"; node --test "$t" 2>&1 | grep -E "^not ok" | head -5; fail=1; fi
 done
 [ "$fail" -eq 0 ] && echo "All suites passed." || echo "Some suites FAILED."
 # Some suites rebuild site/ themselves to restore what they experimented on
@@ -56,6 +72,6 @@ print(f"\nCurrent: {html_files} html files on disk · {len(spots)} local spots o
       f"{town_pages} town pages ({town_names} distinct town names) "
       f"· {views:,} video views + {reviews:,} review views "
       f"· {tours} listing tours on {tour_pages} town pages "
-      f"· {len(glob.glob('tests/test-*.js'))} test suites")
+      f"· {len(glob.glob('tests/test-*.js')) + len(glob.glob('tests/test-*.cjs'))} test suites")
 PYEOF
 exit "$fail"
