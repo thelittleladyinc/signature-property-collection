@@ -89,14 +89,12 @@ jobs:
             python3 build/tools/geocode_towns.py
           fi
 
-      - name: Rebuild so the committed site carries the new schema
-        run: python3 build/build.py
-
-      - name: Verify nothing else broke
-        run: |
-          for t in tests/test-*.js; do node "$t" >/dev/null || { echo "FAILED $t"; exit 1; }
-          done
-          echo "all suites passed"
+      # 2026-10-05: was `python3 build/build.py` and then a loop over the suites,
+      # with no freshness step between -- so every unchanged page came out dated
+      # today and that date got committed (see the note in town-market.yml).
+      # tests/run-all.sh builds exactly the way a deploy does and runs every suite.
+      - name: Rebuild so the committed site carries the new schema, and verify nothing else broke
+        run: bash tests/run-all.sh
 
       # 2026-08-17, second failure of this workflow: everything above succeeded --
       # 36 towns geocoded, 37 pages rebuilt, 26 suites green, commit created --

@@ -49,18 +49,21 @@ ATTEMPTS=4
 git config user.name "github-actions[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-run_suites() {
+rebuild_and_verify() {
   # The pre-commit verification in each workflow ran against the PRE-rebase
   # content. After rebuilding onto a moved master the output is different, so it
   # gets verified again rather than trusted.
-  local t
-  for t in tests/test-*.js; do
-    if ! node "$t" >/dev/null 2>&1; then
-      echo "::error::$t fails after rebuilding onto the updated master. Nothing pushed."
-      node "$t" || true
-      return 1
-    fi
-  done
+  #
+  # 2026-10-05: this was a bare `python3 build/build.py` followed by a loop over
+  # the suites. build.py stamps today's date on every page and only the deploy
+  # ran the freshness step after it, so a retry here committed every unchanged
+  # page re-dated to today. tests/run-all.sh is the one place that regenerates
+  # site/ -- the way a deploy does, freshness step included -- and runs every
+  # suite, so a retry now produces exactly what the first attempt would have.
+  if ! bash tests/run-all.sh; then
+    echo "::error::The tree rebuilt onto the updated master fails to build or fails a suite. Nothing pushed."
+    return 1
+  fi
   echo "  all suites pass against the rebuilt tree"
 }
 
@@ -106,8 +109,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
   done
   rm -rf "$tmp"
 
-  python3 build/build.py >/dev/null
-  run_suites || exit 1
+  rebuild_and_verify || exit 1
 
   if git diff --quiet -- "${DATA_FILES[@]}" site && \
      [ -z "$(git ls-files --others --exclude-standard -- "${DATA_FILES[@]}" site)" ]; then
