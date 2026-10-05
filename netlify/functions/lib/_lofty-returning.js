@@ -104,7 +104,9 @@ async function call(method, path, apiKey, rawBody, opts) {
       method,
       headers: headers(apiKey),
       ...(rawBody != null ? { body: rawBody } : {}),
-      signal: o.signal || AbortSignal.timeout(CALL_TIMEOUT_MS),
+      // opts.deadline (epoch ms, optional): cut at the deadline when it comes
+      // before CALL_TIMEOUT_MS (the queue drain's budget; see lib/_lofty.js).
+      signal: o.signal || AbortSignal.timeout(Math.max(1, Math.min(CALL_TIMEOUT_MS, (o.deadline || Infinity) - Date.now()))),
     });
     const text = await res.text().catch(() => "");
     return { ok: res.ok, httpStatus: res.status, text };

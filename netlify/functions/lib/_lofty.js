@@ -101,6 +101,15 @@ const POST_TIMEOUT_MS = 6000;
 // attempt runs past it, and the minimal-shape retry is skipped when less than
 // this much time is left (the lead is then emailed and queued like any failure).
 const MIN_RETRY_MS = 1500;
+// 2026-10-05 (re-audit): the steps after a replayed create (finishReplay) took
+// no deadline, so a slow Lofty could carry a drain past its budget into
+// Netlify's kill -- and a killed run never wrote the queue back, so a lead Lofty
+// had already accepted was replayed again (a second note, a second trigger-tag
+// re-fire). Now every follow-up call is capped at the deadline, and a step
+// starts only with this much time left: otherwise it and the steps after it go
+// back on the queue entry (followupsPending, with the accepted contact's id as
+// loftyId) for the next run to finish on their own.
+const FOLLOWUP_MIN_MS = 5000;
 
 async function postOnce(body, apiKey, timeoutMs = POST_TIMEOUT_MS) {
   let res;
@@ -258,86 +267,115 @@ async function drainWithLease(store, apiKey, opts) {
   const remaining = [];
   let attempted = 0;
   let recovered = 0;
+  let deferred = 0;
+  let finished = 0;
   let consentHeld = 0;
   let heldForReview = 0;
-  for (const entry of queue) {
-    if (!entry) continue;
-    // 2026-10-04: an entry an earlier drain flagged for review used to stay here,
-    // taking one of the 25 queue slots for ever. It moves to the held-lead record
-    // (and stays here only if that record could not be written).
-    if (entry.manualReview) {
-      const moved = await holdForManualReview(store, { ...entry, reason: entry.reason || entry.heldReason || "identity needs manual review" });
-      if (moved) heldForReview += 1; else remaining.push(entry);
-      continue;
-    }
-    if (!entry.lead || attempted >= MAX_DRAIN_PER_RUN || deadline - Date.now() < MIN_RETRY_MS) {
-      remaining.push(entry);
-      continue;
-    }
-    attempted += 1;
-    // 2026-09-29: a replay never REPLACES tags. By the time it runs the contact
-    // may exist -- a create that timed out on our side can still have landed in
-    // Lofty -- and `tags` would wipe anything added since. `tagsAdd` only adds.
-    const lead = { ...entry.lead };
-    const email = lead.email || (Array.isArray(lead.emails) && lead.emails[0]);
-    const identity = await findExistingLead(email, consentPhoneOf(lead), apiKey,
-      { budgetMs: Math.max(1, Math.min(2000, deadline - Date.now())) });
-    if (identity.manualReview) {
-      // Held, not retried (holdForManualReview above). Kept in this queue only
-      // if the held-lead record could not be written, so it is never lost.
-      const flagged = { ...entry, manualReview: true, heldReason: identity.error, reason: identity.error };
-      if (await holdForManualReview(store, flagged)) heldForReview += 1; else remaining.push(flagged);
-      console.warn("Queued Lofty lead held: identity needs manual review.");
-      continue;
-    }
-    if (Array.isArray(lead.tags)) {
-      lead.tagsAdd = [...new Set([...(lead.tagsAdd || []), ...lead.tags])];
-      delete lead.tags;
-    }
-    const result = await postLead(lead, apiKey, { deadline });
-    if (result.ok) {
-      recovered += 1;
-      console.log(`Recovered a queued Lofty lead from "${entry.formName}" (${result.payloadShape} shape).`);
-      const newId = leadIdFromResponse(result.responseBody);
-      // The surviving contact: the one the lookup found, else the create's id.
-      const target = identity.leadId || newId;
-      // A create can merge into an already-textable contact. Check no-yes
-      // submissions too, so an unconsented new number turns texting off.
-      {
-        const consent = await applyTextingPreference(target, consentPhoneOf(entry.lead), entry.smsConsent === true, apiKey, { deadline });
-        if (entry.smsConsent === true && !consent.textingEnabled) {
-          consentHeld += 1;
-          console.warn(`Queued Lofty lead from "${entry.formName}": texting not turned on -- ${consent.textingNotEnabled || consent.reason || consent.error || "not applied"}.`);
-        }
+  let i = 0;
+  try {
+    for (; i < queue.length; i++) {
+      const entry = queue[i];
+      if (!entry) continue;
+      // 2026-10-04: an entry an earlier drain flagged for review used to stay here,
+      // taking one of the 25 queue slots for ever. It moves to the held-lead record
+      // (and stays here only if that record could not be written).
+      if (entry.manualReview) {
+        const moved = await holdForManualReview(store, { ...entry, reason: entry.reason || entry.heldReason || "identity needs manual review" });
+        if (moved) heldForReview += 1; else remaining.push(entry);
+        continue;
       }
-      // 2026-10-03: finish what the live form path does after a create, so a
-      // lead that needed a retry is not a lesser lead. Each step is best-effort
-      // and stops at the deadline; none can undo the recovery above.
-      await finishReplay(entry, lead, { identity, newId, target, apiKey, store, deadline });
-    } else {
-      remaining.push({ ...entry, lastRetryAt: new Date().toISOString(), ...result });
+      // 2026-10-05: Lofty accepted this lead on a run that ran out of time before
+      // its follow-up steps (finishReplay). Only the steps still owed run: no
+      // lookup, no create, no second note.
+      if (entry.loftyId) {
+        if (deadline - Date.now() < FOLLOWUP_MIN_MS) { remaining.push(entry); continue; }
+        const replay = entry.replay || {};
+        const kept = await finishReplay(entry, entry.lead || {}, {
+          identity: replay.identity || {}, newId: replay.newId || null, steps: replay.steps,
+          pending: Array.isArray(entry.followupsPending) ? entry.followupsPending : [],
+          target: entry.loftyId, apiKey, store, deadline,
+        });
+        if (kept) { deferred += 1; remaining.push(kept); } else finished += 1;
+        continue;
+      }
+      if (!entry.lead || attempted >= MAX_DRAIN_PER_RUN || deadline - Date.now() < MIN_RETRY_MS) {
+        remaining.push(entry);
+        continue;
+      }
+      attempted += 1;
+      // 2026-09-29: a replay never REPLACES tags. By the time it runs the contact
+      // may exist -- a create that timed out on our side can still have landed in
+      // Lofty -- and `tags` would wipe anything added since. `tagsAdd` only adds.
+      const lead = { ...entry.lead };
+      const email = lead.email || (Array.isArray(lead.emails) && lead.emails[0]);
+      const identity = await findExistingLead(email, consentPhoneOf(lead), apiKey,
+        { budgetMs: Math.max(1, Math.min(2000, deadline - Date.now())) });
+      if (identity.manualReview) {
+        // Held, not retried (holdForManualReview above). Kept in this queue only
+        // if the held-lead record could not be written, so it is never lost.
+        const flagged = { ...entry, manualReview: true, heldReason: identity.error, reason: identity.error };
+        if (await holdForManualReview(store, flagged)) heldForReview += 1; else remaining.push(flagged);
+        console.warn("Queued Lofty lead held: identity needs manual review.");
+        continue;
+      }
+      if (Array.isArray(lead.tags)) {
+        lead.tagsAdd = [...new Set([...(lead.tagsAdd || []), ...lead.tags])];
+        delete lead.tags;
+      }
+      const result = await postLead(lead, apiKey, { deadline });
+      if (result.ok) {
+        recovered += 1;
+        console.log(`Recovered a queued Lofty lead from "${entry.formName}" (${result.payloadShape} shape).`);
+        const newId = leadIdFromResponse(result.responseBody);
+        // The surviving contact: the one the lookup found, else the create's id.
+        const target = identity.leadId || newId;
+        // A create can merge into an already-textable contact. Check no-yes
+        // submissions too, so an unconsented new number turns texting off.
+        {
+          const consent = await applyTextingPreference(target, consentPhoneOf(entry.lead), entry.smsConsent === true, apiKey, { deadline });
+          if (entry.smsConsent === true && !consent.textingEnabled) {
+            consentHeld += 1;
+            console.warn(`Queued Lofty lead from "${entry.formName}": texting not turned on -- ${consent.textingNotEnabled || consent.reason || consent.error || "not applied"}.`);
+          }
+        }
+        // 2026-10-03: finish what the live form path does after a create, so a
+        // lead that needed a retry is not a lesser lead. Each step is best-effort
+        // and stops at the deadline; none can undo the recovery above. What the
+        // budget cannot start goes back on the entry for the next run.
+        const kept = await finishReplay(entry, lead, { identity, newId, target, apiKey, store, deadline, accepted: result });
+        if (kept) { deferred += 1; remaining.push(kept); }
+      } else {
+        remaining.push({ ...entry, lastRetryAt: new Date().toISOString(), ...result });
+      }
     }
-  }
-  // Anything a form queued while this ran (recordPush puts it first) is kept.
-  const entryKey = (e) => `${e && e.at}|${e && e.formName}`;
-  const taken = new Set(queue.map(entryKey));
-  const latest = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
-  const arrived = (Array.isArray(latest) ? latest : []).filter((e) => e && !taken.has(entryKey(e)));
-  await store.setJSON(FAILED_PUSH_KEY, arrived.concat(remaining).slice(0, MAX_QUEUED_FAILURES)).catch(() => {});
-  if (attempted) {
-    await store.setJSON(LAST_PUSH_KEY, {
-      at: new Date().toISOString(),
-      formName: "(queued retry)",
-      ok: recovered > 0,
-      httpStatus: recovered > 0 ? 200 : "retry failed",
-      responseBody: `${recovered} of ${attempted} queued lead(s) recovered; ${remaining.length} still queued.` +
-        (heldForReview ? ` ${heldForReview} held for identity review (see /status).` : "") +
-        (consentHeld ? ` Texting left off on ${consentHeld} that said yes to texts (see the function log).` : ""),
-      payloadShape: "queued retry",
-    }).catch(() => {});
+  } finally {
+    // Written back whatever happened above, so a throw mid-run cannot put a lead
+    // Lofty already accepted in front of the next run. Entries this run never
+    // reached stay as they were (queue.slice(i) is empty once the loop is done),
+    // and anything a form queued while this ran (recordPush puts it first) is kept.
+    const entryKey = (e) => `${e && e.at}|${e && e.formName}`;
+    const taken = new Set(queue.map(entryKey));
+    const latest = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
+    const arrived = (Array.isArray(latest) ? latest : []).filter((e) => e && !taken.has(entryKey(e)));
+    await store.setJSON(FAILED_PUSH_KEY, arrived.concat(remaining, queue.slice(i).filter(Boolean)).slice(0, MAX_QUEUED_FAILURES)).catch(() => {});
+    if (attempted || deferred || finished) {
+      await store.setJSON(LAST_PUSH_KEY, {
+        at: new Date().toISOString(),
+        formName: "(queued retry)",
+        ok: recovered > 0 || !attempted,
+        httpStatus: recovered > 0 || !attempted ? 200 : "retry failed",
+        responseBody: `${recovered} of ${attempted} queued lead(s) recovered; ${remaining.length} still queued.` +
+          (deferred ? ` ${deferred} accepted by Lofty with follow-up steps left for the next run.` : "") +
+          (finished ? ` ${finished} finished the follow-up steps an earlier run ran out of time for.` : "") +
+          (heldForReview ? ` ${heldForReview} held for identity review (see /status).` : "") +
+          (consentHeld ? ` Texting left off on ${consentHeld} that said yes to texts (see the function log).` : ""),
+        payloadShape: "queued retry",
+      }).catch(() => {});
+    }
   }
   return {
     attempted, recovered, stillQueued: remaining.length,
+    ...(deferred ? { deferred } : {}), ...(finished ? { finished } : {}),
     ...(heldForReview ? { heldForReview } : {}), ...(consentHeld ? { consentHeld } : {}),
   };
 }
@@ -347,36 +385,65 @@ async function drainWithLease(store, apiKey, opts) {
 // a brand-new contact (so the Smart Plan fires), a Call task + push for a
 // returning contact, and -- only for a contact proven new -- the website
 // fields and inquiry, when the queued entry carried the form data.
+//
+// In this order, each only with FOLLOWUP_MIN_MS left and every call capped at
+// the deadline. The first step the budget cannot start ends the run: it and
+// the later steps still owed go back on the queue entry as followupsPending,
+// with the accepted contact (loftyId) and what this run learned (replay), and
+// the next run calls this again for those alone -- never a second create,
+// lookup or note. Returns that entry, or null when nothing is owed.
+const FOLLOWUP_STEPS = ["note", "tag", "returning", "fields", "inquiry"];
+
 async function finishReplay(entry, lead, ctx) {
   const { identity, newId, target, apiKey, store, deadline } = ctx;
-  const time = () => deadline - Date.now() >= MIN_RETRY_MS;
-  const steps = {};
-  try {
-    if (target && lead.notes && time()) steps.note = await addLoftyNote(target, lead.notes, apiKey);
-    if (newId && !identity.leadId && time() && !(steps.note && steps.note.leadMissing)) {
-      steps.tag = await refireLoftyTag(newId, REPLAY_TRIGGER_TAG, apiKey);
-    }
-    const data = entry.formData || null;
-    const label = String(lead.source || entry.formName || "website").replace("The Little Lady Sells Homes - ", "");
-    if (identity.leadId && time()) {
-      steps.returning = await alertReturningLead(identity.leadId, {
+  const o = { deadline };
+  const steps = { ...(ctx.steps || {}) };
+  const owed = Array.isArray(ctx.pending) ? ctx.pending : FOLLOWUP_STEPS;
+  const data = entry.formData || null;
+  const label = String(lead.source || entry.formName || "website").replace("The Little Lady Sells Homes - ", "");
+  const newContact = !!(identity.ok && !identity.anyMatch && newId);
+  const provenNew = () => newContact && !!(steps.note && steps.note.ok);
+  // `owed`: what the step needs at all. `skip`: decided when its turn comes,
+  // from the note's outcome (kept on the entry between runs). `run`: the calls.
+  const plan = {
+    note: { owed: () => !!(target && lead.notes),
+      run: () => addLoftyNote(target, lead.notes, apiKey, o) },
+    tag: { owed: () => !!(newId && !identity.leadId), skip: () => !!(steps.note && steps.note.leadMissing),
+      run: () => refireLoftyTag(newId, REPLAY_TRIGGER_TAG, apiKey, o) },
+    returning: { owed: () => !!identity.leadId,
+      run: () => alertReturningLead(identity.leadId, {
         label: `${label} (queued retry)`,
         name: data ? data.name : [lead.firstName, lead.lastName].filter(Boolean).join(" "),
         phone: data ? data.phone : consentPhoneOf(lead),
         email: data ? data.email : (lead.email || (Array.isArray(lead.emails) && lead.emails[0])),
-      }, apiKey);
-    }
-    const provenNew = !!(identity.ok && !identity.anyMatch && newId && steps.note && steps.note.ok);
-    if (provenNew && data && store && time()) {
-      const ensured = await ensureWebsiteFields(store, apiKey);
-      if (ensured.ok) steps.fields = await setWebsiteFields(newId, websiteFieldValues(lead.source || label, data), apiKey);
-      const inquiry = inquiryFromForm(data);
-      if (inquiry && time()) steps.inquiry = await placeInquiry(newId, inquiry, apiKey);
+      }, apiKey, o) },
+    fields: { owed: () => !!(newContact && data && store), skip: () => !provenNew(),
+      run: async () => {
+        const ensured = await ensureWebsiteFields(store, apiKey, o);
+        if (!ensured.ok) return { attempted: false, reason: "website fields not ensured", ...ensured };
+        return setWebsiteFields(newId, websiteFieldValues(lead.source || label, data), apiKey, o);
+      } },
+    inquiry: { owed: () => !!(newContact && data && store && inquiryFromForm(data)), skip: () => !provenNew(),
+      run: () => placeInquiry(newId, inquiryFromForm(data), apiKey, o) },
+  };
+  const pending = [];
+  try {
+    for (const name of FOLLOWUP_STEPS) {
+      if (!owed.includes(name) || name in steps || !plan[name].owed()) continue;
+      if (pending.length || deadline - Date.now() < FOLLOWUP_MIN_MS) { pending.push(name); continue; }
+      if (plan[name].skip && plan[name].skip()) continue;
+      steps[name] = await plan[name].run();
     }
   } catch (err) {
     console.error(`Queued Lofty lead from "${entry.formName}": a follow-up step failed:`, err && err.message);
   }
-  return steps;
+  if (!pending.length) return null;
+  console.warn(`Queued Lofty lead from "${entry.formName}": accepted by Lofty; out of time for ${pending.join(", ")} (finished next run).`);
+  return {
+    ...entry, lastRetryAt: new Date().toISOString(), ...(ctx.accepted || {}),
+    loftyId: target, followupsPending: pending,
+    replay: { newId: newId || null, identity, steps },
+  };
 }
 
 // The number a queued lead's texting yes came with: the one the form sent.
@@ -390,6 +457,8 @@ module.exports = {
   LOFTY_BASE_URL,
   POST_TIMEOUT_MS,
   MIN_RETRY_MS,
+  FOLLOWUP_MIN_MS,
+  FOLLOWUP_STEPS,
   LAST_PUSH_KEY,
   FAILED_PUSH_KEY,
   DRAIN_LOCK_KEY,
