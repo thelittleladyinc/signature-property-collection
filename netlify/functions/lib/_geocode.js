@@ -12,11 +12,28 @@
 // moment Christine enables billing on the Mapbox account, every new geocode
 // silently switches to the compliant path with no deploy.
 //
-// Cache TTLs in the callers stay at 30 days for now: cached entries don't
-// record which service produced them, and Google-sourced coordinates must
-// still expire per Google's terms. Once the caches have cycled entirely onto
-// Mapbox (30 days after billing is enabled), the TTLs can become permanent.
+// Cache TTLs in the callers stay at 30 days for now: Google-sourced
+// coordinates must still expire per Google's terms. Once the caches have
+// cycled entirely onto Mapbox (30 days after billing is enabled), the TTLs can
+// become permanent.
+//
+// 2026-10-06: every result now says which service placed it -- `provider` is
+// "mapbox" or "google" -- and the three callers store the whole result in their
+// caches, so a cached entry records its own source. Until now it didn't: a
+// Mapbox failure fell back to Google with only a console.warn, and nothing on
+// the stored pin could say afterwards which geocoder had placed it. Entries
+// cached before this change carry no provider (source unknown); they expire
+// within 30 days, and nothing requires the field to be present. It is NOT part
+// of any public pin -- each caller builds its pins field by field (toPin) --
+// and the cached object is only ever read back through toPin.
+//
+// A per-process count of Google fallbacks (a Mapbox failure that Google then
+// served) is logged each time it changes, so a Mapbox account that has quietly
+// stopped answering shows up as a rising number, not just scattered warnings.
+// It resets when the function instance does; it never holds a key or address.
 const GEOCODE_TIMEOUT_MS = 4000;
+
+let googleFallbackCount = 0;
 
 async function mapboxGeocode(address, token) {
   const url = "https://api.mapbox.com/search/geocode/v6/forward?q=" +
@@ -34,6 +51,7 @@ async function mapboxGeocode(address, token) {
     lat: f.geometry.coordinates[1],
     lng: f.geometry.coordinates[0],
     formatted: (f.properties && f.properties.full_address) || address,
+    provider: "mapbox",
   };
 }
 
@@ -47,16 +65,23 @@ async function googleGeocode(address, apiKey) {
     throw new Error(`Geocoding API status ${json.status}: ${json.error_message || "no results"}`);
   }
   const loc = json.results[0].geometry.location;
-  return { lat: loc.lat, lng: loc.lng, formatted: json.results[0].formatted_address };
+  return {
+    lat: loc.lat,
+    lng: loc.lng,
+    formatted: json.results[0].formatted_address,
+    provider: "google",
+  };
 }
 
 // Same signature the three callers already use; googleKey may be undefined.
 async function geocodeAddress(address, googleKey) {
   const mapboxToken = process.env.MAPBOX_PUBLIC_TOKEN;
+  let mapboxFailed = false;
   if (mapboxToken) {
     try {
       return await mapboxGeocode(address, mapboxToken);
     } catch (err) {
+      mapboxFailed = true;
       console.warn(`_geocode: Mapbox permanent path failed (${err && err.message}) — ` +
         "falling back to Google. If this says HTTP 401/403/422, permanent " +
         "geocoding isn't enabled on the Mapbox account yet (needs billing).");
@@ -64,7 +89,18 @@ async function geocodeAddress(address, googleKey) {
   }
   const key = googleKey || process.env.GOOGLE_MAPS_API_KEY;
   if (!key) throw new Error("no geocoder available: neither Mapbox permanent nor GOOGLE_MAPS_API_KEY");
-  return googleGeocode(address, key);
+  const result = await googleGeocode(address, key);
+  if (mapboxFailed) {
+    googleFallbackCount += 1;
+    console.warn(`_geocode: Google served a lookup Mapbox failed (${googleFallbackCount} so far in this process).`);
+  }
+  return result;
 }
 
-module.exports = { geocodeAddress };
+module.exports = {
+  geocodeAddress,
+  _internals: {
+    googleFallbackCount: () => googleFallbackCount,
+    resetGoogleFallbackCount: () => { googleFallbackCount = 0; },
+  },
+};
