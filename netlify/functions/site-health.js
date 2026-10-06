@@ -77,6 +77,18 @@ const LOFTY_TRIGGER_TAG = "Hot Lead - Website";
 const PHOTO_CHECK_KEY = LISTINGS_SOURCE === "lofty" ? "lofty-photo-check.json" : "photo-pipeline-check.json";
 const CLOUDINARY_CHECK_KEY = "cloudinary-usage-check.json";
 
+// 2026-10-06: the three stores where geocoded map pins are cached, for the row that
+// says how many of them Google placed. Duplicated here (like SUSPENSION_KEY above)
+// because the callers don't export them: MUST MATCH GEOCODE_STORE_NAME and
+// GEOCODE_CACHE_TTL_MS in my-listings-geo.js, sold-homes-geocode.js and
+// local-spots.js -- tests/test-geocode-provider.js fails if any of them drifts.
+const GEOCODE_CACHE_STORES = [
+  { store: "my-listings-geocode-cache", label: "your listings" },
+  { store: "sold-homes-geocode-cache", label: "sold homes" },
+  { store: "local-spots-geocode-cache", label: "local spots" },
+];
+const GEOCODE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 // MUST MATCH the cron in netlify.toml's [functions."sync-listings"] block.
 //
 // 2026-08-17: the schedule moved 15 -> 30 minutes and this row did not follow it.
@@ -770,6 +782,82 @@ function publicHeldLeads(list) {
   };
 }
 
+// 2026-10-06 (triage item 9): which geocoder placed the pins now in the caches.
+// lib/_geocode.js tries Mapbox first and quietly falls back to Google, and until it
+// started stamping each result with `provider` there was no way to tell afterwards
+// which one had answered -- which matters because Google's terms cap how long its
+// coordinates may be stored (the 30-day TTLs in the three callers) while Mapbox's
+// permanent tier has no such cap. Read-only: it lists each cache store and reads
+// each entry, writes nothing, and calls no geocoder. Bounded: reads run 25 at a
+// time and stop starting after a short deadline, and the row says so if it stopped
+// early, so a slow store can slow this page by seconds but never hang it.
+//
+// Counts only entries a pin is still being served from (cachedAt inside the TTL);
+// an entry saved before `provider` existed is "source not recorded", never guessed
+// as either. Never turns the page red: Google pins are expected until Mapbox's
+// permanent geocoding is enabled. It does turn this row to the optional (info)
+// state if the stores can't be read, because a count of nothing is not a "0".
+async function geocodeProviderRow(now) {
+  const READ_CONCURRENCY = 25;
+  const DEADLINE_MS = 2500;
+  const startedAt = Date.now();
+  const row = { optional: true, name: "Map pins placed by Google (optional)" };
+  try {
+    const per = [];
+    let skippedUnread = 0;
+    for (const { store: name, label } of GEOCODE_CACHE_STORES) {
+      const store = getBlobStore(getStore, name);
+      let timer;
+      const listed = await Promise.race([
+        store.list(),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`listing ${name} timed out`)), DEADLINE_MS); }),
+      ]).finally(() => clearTimeout(timer));
+      const keys = ((listed && listed.blobs) || []).map((b) => b && b.key).filter(Boolean);
+      const t = { label, google: 0, mapbox: 0, unknown: 0, expired: 0 };
+      let next = 0;
+      const worker = async () => {
+        while (next < keys.length) {
+          if (Date.now() - startedAt > DEADLINE_MS) { skippedUnread += keys.length - next; next = keys.length; return; }
+          const key = keys[next++];
+          const e = await store.get(key, { type: "json" }).catch(() => null);
+          if (!e || typeof e !== "object") continue;
+          // No cachedAt = written under the old forever-cache scheme; the callers
+          // treat it as expired and so does this count.
+          if (!e.cachedAt || now - e.cachedAt >= GEOCODE_CACHE_TTL_MS) { t.expired += 1; continue; }
+          if (e.provider === "google") t.google += 1;
+          else if (e.provider === "mapbox") t.mapbox += 1;
+          else t.unknown += 1;
+        }
+      };
+      await Promise.all(new Array(Math.min(READ_CONCURRENCY, keys.length)).fill(null).map(worker));
+      per.push(t);
+    }
+    const sum = (k) => per.reduce((n, t) => n + t[k], 0);
+    const google = sum("google"), mapbox = sum("mapbox"), unknown = sum("unknown"), expired = sum("expired");
+    const live = google + mapbox + unknown;
+    row.ok = true;
+    if (!live && !expired && !skippedUnread) {
+      row.detail = "No map pins are cached yet, so there is nothing to count.";
+      return row;
+    }
+    const byStore = per
+      .map((t) => `${t.label} ${t.google} of ${t.google + t.mapbox + t.unknown}`)
+      .join(" · ");
+    row.detail = `${google} of ${live} cached map pins in use were placed by Google (by cache: ${byStore}) ` +
+      `and ${mapbox} by Mapbox.` +
+      (unknown ? ` ${unknown} were saved before the source was recorded; they refresh within 30 days.` : "") +
+      " Google's terms limit how long its coordinates may be kept, so the 30-day cache lifetime stays " +
+      "until none are Google's or unrecorded." +
+      (expired ? ` ${expired} older entr${expired === 1 ? "y is" : "ies are"} past 30 days and no longer used.` : "") +
+      (skippedUnread ? ` Counted what could be read in time; ${skippedUnread} entr${skippedUnread === 1 ? "y was" : "ies were"} not read, so treat these as a floor.` : "");
+    return row;
+  } catch (err) {
+    row.ok = false;
+    row.detail = `Could not read the map-pin caches just now (${err && err.message}), so there is no count to show.`;
+    return row;
+  }
+}
+
 exports.handler = async (event) => {
   const store = getBlobStore(getStore);
   const params = (event && event.queryStringParameters) || {};
@@ -1108,6 +1196,8 @@ exports.handler = async (event) => {
         ? " → enable it at console.cloud.google.com/apis/library/places-backend.googleapis.com"
         : ""),
   });
+  // Which of the pins already cached came from Google rather than Mapbox. Read-only.
+  checks.push(await geocodeProviderRow(now));
 
   // ---- The photo chain, end to end ----
   const photoAge = ageNote(photoCheck);

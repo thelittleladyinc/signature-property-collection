@@ -15,6 +15,8 @@
 //   - both services failing still throws, exactly as before;
 //   - the field never reaches a visitor (public pins are built field by field);
 //   - cache entries written BEFORE this change (no provider) are still served.
+// And the /status row (netlify/functions/site-health.js) that counts how many cached
+// pins Google placed: read-only, bounded, never red, and honest when it cannot read.
 // No live call is made: fetch is stubbed before anything is loaded, and the keys
 // used here are made-up strings.
 "use strict";
@@ -59,7 +61,7 @@ const mapboxCalls = () => calls.filter((c) => c.startsWith("https://api.mapbox.c
 const googleCalls = () => calls.filter((c) => c.startsWith("https://maps.googleapis.com/")).length;
 
 // Made-up credentials. The checks below prove they never reach a log line.
-const FAKE_MAPBOX = "pk.test-mapbox-token-0000";
+const FAKE_MAPBOX = "test-mapbox-token-0000";
 const FAKE_GOOGLE = "test-google-key-0000";
 process.env.GOOGLE_MAPS_API_KEY = FAKE_GOOGLE;
 process.env.MAPBOX_PUBLIC_TOKEN = FAKE_MAPBOX;
@@ -261,6 +263,99 @@ function loadFn(name) {
       `${c.pins(body).length} vs ${c.pins(warmBody).length}`);
     check("pin coordinates come from the old entries",
       c.pins(body).every((p) => typeof p.lat === "number" && typeof p.lng === "number"));
+  }
+
+  // =====================================================================
+  // The /status row. Seeded caches in all three stores: live Google, live Mapbox,
+  // a live entry from before provider existed, an expired Google one, and one with
+  // no cachedAt (the old forever-cache scheme).
+  console.log("\n8. /status: how many cached pins Google placed");
+  const DAY = 24 * 60 * 60 * 1000;
+  const nowMs = Date.now();
+  const entry = (provider, ageDays) => ({ lat: 40.4, lng: -105.1, formatted: "x, CO",
+    ...(provider ? { provider } : {}), ...(ageDays == null ? {} : { cachedAt: nowMs - ageDays * DAY }) });
+  const seeded = {
+    "my-listings-geocode-cache": { "1 test st, loveland, co": entry("google", 2), "2 test st, loveland, co": entry("mapbox", 2) },
+    "sold-homes-geocode-cache": {
+      "3 test st, windsor, co": entry("google", 5), "4 test st, windsor, co": entry("google", 5),
+      "5 test st, windsor, co": entry(null, 5),            // live, saved before provider existed
+      "6 test st, windsor, co": entry("google", 45),       // expired
+      "7 test st, windsor, co": entry("google", null),     // no cachedAt: old scheme
+    },
+    "local-spots-geocode-cache": { "8 test st, berthoud, co": entry("mapbox", 1) },
+  };
+  let writes = 0, otherStoreCalls = 0;
+  const statusWorld = (data, { noList, onList } = {}) => {
+    require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, exports: {
+      getStore: (name) => {
+        const m = data && data[name];
+        if (!m) { otherStoreCalls += 1; return { get: async () => null, setJSON: async () => {}, list: async () => ({ blobs: [] }) }; }
+        const st = {
+          get: async (k) => (k in m ? m[k] : null),
+          setJSON: async () => { writes += 1; }, set: async () => { writes += 1; }, delete: async () => { writes += 1; },
+        };
+        if (!noList) st.list = async () => { if (onList) onList(name); return { blobs: Object.keys(m).map((key) => ({ key, etag: "e" })) }; };
+        return st;
+      },
+    } };
+  };
+  const statusRow = async (data, opts, format) => {
+    statusWorld(data, opts);
+    const res = await loadFn("site-health.js")({ queryStringParameters: format === "html" ? {} : { format: "json" } });
+    if (format === "html") return { res };
+    const body = JSON.parse(res.body);
+    return { res, body, row: body.checks.find((c) => /Map pins placed by Google/.test(c.name)) };
+  };
+
+  calls = [];
+  let { res: hres, body: hbody, row } = await statusRow(seeded);
+  check("the page still renders", hres.statusCode === 200);
+  check("the row is there, informational", !!row && row.optional === true && row.ok === true, row && JSON.stringify(row));
+  check("it counts live Google pins: 3 of 6 (expired and old-scheme entries are not 'in use')",
+    row && /^3 of 6 cached map pins in use were placed by Google/.test(row.detail), row && row.detail);
+  check("broken down by cache", row && /your listings 1 of 2 · sold homes 2 of 3 · local spots 0 of 1/.test(row.detail), row && row.detail);
+  check("says how many are Mapbox's and how many predate the field",
+    row && /and 2 by Mapbox/.test(row.detail) && /1 were saved before the source was recorded/.test(row.detail), row && row.detail);
+  check("mentions the entries past 30 days that are no longer used", row && /2 older entries are past 30 days/.test(row.detail), row && row.detail);
+  check("read-only: nothing was written to any store", writes === 0, `${writes} write(s)`);
+  check("read-only: no outbound call from the page", calls.length === 0, calls.join(","));
+  check("no cached address or key text appears in the row or the page's JSON",
+    row && !/test st/i.test(row.detail) && !/test st/i.test(hres.body) && !hres.body.includes(FAKE_GOOGLE) && !hres.body.includes(FAKE_MAPBOX));
+  const hhtml = (await statusRow(seeded, undefined, "html")).res.body;
+  check("the HTML page shows it", /Map pins placed by Google/.test(hhtml) && /3 of 6 cached map pins/.test(hhtml));
+
+  ({ row } = await statusRow({ "my-listings-geocode-cache": {}, "sold-homes-geocode-cache": {}, "local-spots-geocode-cache": {} }));
+  check("empty caches say so rather than printing '0 of 0'", row && row.ok === true && /nothing to count/.test(row.detail), row && row.detail);
+
+  ({ res: hres, row } = await statusRow(seeded, { noList: true }));
+  check("a store that cannot be read gives an info row, not a made-up zero, and the page still renders",
+    hres.statusCode === 200 && row && row.ok === false && row.optional === true && /Could not read/.test(row.detail), row && row.detail);
+
+  // Bounded: when the deadline passes mid-way the row still renders, counts what it
+  // read, and says it stopped. Time is moved by wrapping Date.now for this one page.
+  {
+    const realNow = Date.now;
+    let jump = 0;
+    Date.now = () => realNow() + jump;
+    try {
+      ({ res: hres, row } = await statusRow(seeded, { onList: (name) => { if (name === "sold-homes-geocode-cache") jump = 60 * 1000; } }));
+    } finally { Date.now = realNow; }
+    check("a slow read still renders the page with a row", hres.statusCode === 200 && !!row && row.ok === true, row && row.detail);
+    check("what was read is counted, what was not is named, and it says treat it as a floor",
+      row && /^1 of 2 cached map pins in use were placed by Google/.test(row.detail) &&
+      /6 entries were not read/.test(row.detail) && /floor/.test(row.detail), row && row.detail);
+  }
+
+  // The three callers and /status must agree on store names and the 30-day lifetime
+  // (the callers do not export them, so site-health keeps a copy).
+  const fs = require("fs");
+  const src = (f) => fs.readFileSync(`${FN_DIR}/${f}`, "utf8");
+  const health = src("site-health.js");
+  for (const [f, store] of [["my-listings-geo.js", "my-listings-geocode-cache"], ["sold-homes-geocode.js", "sold-homes-geocode-cache"],
+    ["local-spots.js", "local-spots-geocode-cache"]]) {
+    check(`${f} still uses store "${store}", as site-health expects`, src(f).includes(`GEOCODE_STORE_NAME = "${store}"`) && health.includes(`store: "${store}"`));
+    check(`${f} still has the 30-day lifetime site-health assumes`,
+      src(f).includes("GEOCODE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000") && health.includes("GEOCODE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000"));
   }
 
   restoreWarn();
