@@ -71,10 +71,22 @@ const {
   leadIdFromResponse, findExistingLead, alertReturningLead,
   ensureWebsiteFields, setWebsiteFields, websiteFieldValues, inquiryFromForm, placeInquiry,
 } = require("./_lofty-returning");
-const { addLoftyNote, refireLoftyTag } = require("./_notify");
+const { addLoftyNote, refireLoftyTag, addPlanTags } = require("./_notify");
 
 // Must match submission-created.js TRIGGER_TAG (pinned by tests/test-queue-replay-steps.js).
 const REPLAY_TRIGGER_TAG = "Hot Lead - Website";
+
+// 2026-10-06: the nurture plan a queued lead's form starts (lib/_form-plans.js),
+// as submission-created.js stored it on the queue entry (`plan`). An entry queued
+// before plans existed has none, and starts none. A lead type on the queued body
+// itself (an entry without `plan`) still counts.
+function planOf(entry) {
+  const p = (entry && entry.plan) || null;
+  const lead = (entry && entry.lead) || {};
+  const tags = p && Array.isArray(p.planTags) ? p.planTags.filter((t) => typeof t === "string" && t) : [];
+  const typesFrom = p && Array.isArray(p.leadTypes) ? p.leadTypes : (Array.isArray(lead.leadTypes) ? lead.leadTypes : []);
+  return { planTags: tags, leadTypes: typesFrom.filter((n) => Number.isInteger(n) && n > 0) };
+}
 
 // Strips the full payload down to the least a CRM could possibly need. Used only
 // after Lofty has already refused the full one.
@@ -87,6 +99,11 @@ function minimalLead(body) {
   if (Array.isArray(body.phones) && body.phones[0]) out.phone = body.phones[0];
   if (body.email) out.email = body.email;
   if (body.phone) out.phone = body.phone;
+  // 2026-10-06: the lead type a new contact's nurture plan needs (lib/_form-plans.js)
+  // survives the retry: a plan only enrolls leads whose type is in its scope. It is
+  // only ever on a body for a contact proven new (submission-created.js, and the
+  // replay below re-decides it on its own lookup).
+  if (Array.isArray(body.leadTypes) && body.leadTypes.length) out.leadTypes = body.leadTypes.slice();
   return out;
 }
 
@@ -322,6 +339,17 @@ async function drainWithLease(store, apiKey, opts) {
         lead.tagsAdd = [...new Set([...(lead.tagsAdd || []), ...lead.tags])];
         delete lead.tags;
       }
+      // 2026-10-06: the form's nurture plan, decided again on THIS lookup. The lead
+      // type rides on the create only for a contact this lookup proves new (a
+      // contact found -- or a lookup that couldn't answer -- keeps its own type,
+      // as on the live path); the plan tag never rides on the create (Lofty does
+      // not fire a "Tag Changed" plan for it) and is added after it, in finishReplay.
+      const planned = planOf(entry);
+      delete lead.leadTypes;
+      if (planned.leadTypes.length && identity.ok && !identity.anyMatch) lead.leadTypes = planned.leadTypes.slice();
+      if (Array.isArray(lead.tagsAdd) && planned.planTags.length) {
+        lead.tagsAdd = lead.tagsAdd.filter((t) => !planned.planTags.includes(t));
+      }
       const result = await postLead(lead, apiKey, { deadline });
       if (result.ok) {
         recovered += 1;
@@ -382,9 +410,10 @@ async function drainWithLease(store, apiKey, opts) {
 
 // The steps submission-created.js runs after a successful create, for a
 // replayed lead: the note on the surviving contact, the trigger-tag re-add on
-// a brand-new contact (so the Smart Plan fires), a Call task + push for a
-// returning contact, and -- only for a contact proven new -- the website
-// fields and inquiry, when the queued entry carried the form data.
+// a brand-new contact (so the Smart Plan fires), the form's nurture-plan tag on
+// a contact proven new (2026-10-06, when the entry carries a plan), a Call task
+// + push for a returning contact, and -- only for a contact proven new -- the
+// website fields and inquiry, when the queued entry carried the form data.
 //
 // In this order, each only with FOLLOWUP_MIN_MS left and every call capped at
 // the deadline. The first step the budget cannot start ends the run: it and
@@ -392,7 +421,7 @@ async function drainWithLease(store, apiKey, opts) {
 // with the accepted contact (loftyId) and what this run learned (replay), and
 // the next run calls this again for those alone -- never a second create,
 // lookup or note. Returns that entry, or null when nothing is owed.
-const FOLLOWUP_STEPS = ["note", "tag", "returning", "fields", "inquiry"];
+const FOLLOWUP_STEPS = ["note", "tag", "planTags", "returning", "fields", "inquiry"];
 
 async function finishReplay(entry, lead, ctx) {
   const { identity, newId, target, apiKey, store, deadline } = ctx;
@@ -410,6 +439,16 @@ async function finishReplay(entry, lead, ctx) {
       run: () => addLoftyNote(target, lead.notes, apiKey, o) },
     tag: { owed: () => !!(newId && !identity.leadId), skip: () => !!(steps.note && steps.note.leadMissing),
       run: () => refireLoftyTag(newId, REPLAY_TRIGGER_TAG, apiKey, o) },
+    // Same rule as the live path: only a contact proven new (this lookup found
+    // nobody and the create's own id took the note) gets its plan tag.
+    planTags: { owed: () => !!(newContact && planOf(entry).planTags.length), skip: () => !provenNew(),
+      run: async () => {
+        const r = await addPlanTags(newId, planOf(entry).planTags, apiKey, o);
+        console.log(`Queued Lofty lead from "${entry.formName}": nurture plan tag ` +
+          (r.ok ? `${r.added && r.added.length ? `added (${r.added.join(", ")})` : "already on the lead"}`
+            : `NOT added (${r.step || r.error || "failed"})`) + ` on lead ${newId}.`);
+        return r;
+      } },
     returning: { owed: () => !!identity.leadId,
       run: () => alertReturningLead(identity.leadId, {
         label: `${label} (queued retry)`,

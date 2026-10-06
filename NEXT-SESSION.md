@@ -9,6 +9,32 @@
 > still in the code as the switch-back (`LISTINGS_SOURCE=mlsgrid`) but is not
 > what the live site runs.
 
+> **2026-10-06: website forms start their Lofty nurture plan.**
+> `netlify/functions/lib/_form-plans.js` (byte-identical to The Little Lady
+> repo's copy; `tests/test-form-plans.js` checks it when both checkouts sit side
+> by side) maps each form to a plan. All plan tags are in its `PLAN_TAGS` ("–" is
+> U+2013 EN DASH; S2's "-" is ASCII), so a renamed tag is a one-line edit. This
+> site calls it with `{ site: "signature" }`, so **its** seller forms start the
+> luxury seller plan:
+>
+> | Form on this site | Plan tag | Lead type |
+> |---|---|---|
+> | sellers-page-inquiry, sellers-guide, seller-local-proof, free-home-valuation | `TOF – Luxury / Signature` (SPC-S) | Seller (1) |
+> | listing-inquiry, listing-alert-request, neighborhood-quiz, buyers-page-inquiry, relocation, lifestyle-search, buyers-guide, relocation-guide, luxury-market, concierge-page-inquiry | `TOF – Website Buyer` (B1) | Buyer (2) |
+> | contact, testimonials-page-inquiry (and any unknown form) | none | — |
+>
+> (The full table, including The Little Lady's forms, is in that repo's CLAUDE.md.)
+> Only for a contact **proven new**: the lead type rides on the create (and the
+> minimal retry); the plan tag is never in the create's tags — Lofty does not fire
+> a "Tag Changed → tag added" Smart Plan for a tag sent on the create — and is
+> added after it by `lib/_notify.js addPlanTags` (read, keep every tag, add, one
+> PUT; nothing written when tags can't be read), right after the "Hot Lead -
+> Website" re-add. Returning contacts are unchanged (no lead type, no plan tag;
+> Call task as before). A queued lead carries its `plan`, and the replay
+> (`lib/_lofty.js`) re-decides "new" on its own lookup and adds the tag in
+> `finishReplay` (step `planTags`). **Lofty setting needed:** `TOF – Website
+> Buyer` enrolls nobody until it is added to B1's start tags in Lofty.
+
 Written at the end of a long session, for whoever picks this up next. Nothing here
 is speculation dressed as fact: where something is unverified it says so, and
 where I was wrong earlier it says that too.
