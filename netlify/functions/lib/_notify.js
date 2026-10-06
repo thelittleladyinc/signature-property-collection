@@ -201,8 +201,19 @@ function describeTagShape(payload) {
 // is worse than where it started. So the re-add is retried once and the outcome
 // is reported either way -- and if it still fails, tagRestored is false, which
 // /site-health renders as a real problem rather than swallowing it.
+//
+// 2026-10-06: that promise was not kept for an EXCEPTION. A re-add cut short by
+// the 8s timeout or the queue drain's deadline throws instead of returning not-ok,
+// and the catch below used to return {ok:false, error} with no tagRestored -- so
+// /site-health fell to "The tag from the original push is still there" for a lead
+// whose tag had just been taken off. removeSent / restored track how far the swap
+// got; an exception after the removal call went out, with no confirmed re-add,
+// now reports tagRestored:false (step "refired-unconfirmed"). Nothing about which
+// calls are made, or in what order, changes: only what the catch hands back.
 async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
   if (!leadId || !triggerTag || !apiKey) return { attempted: false };
+  let removeSent = false;
+  let restored = false;
   try {
     const current = await loftyRequest("GET", `/leads/${leadId}`, apiKey, null, opts);
     if (!current.ok) {
@@ -260,6 +271,7 @@ async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
 
     // Already tagged: take it off, put it back, so "Tag Added" is a real event.
     const without = tags.filter((t) => t !== triggerTag);
+    removeSent = true;
     const off = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: without }, opts);
     if (!off.ok) {
       // Nothing was changed, so nothing needs undoing -- the lead keeps its tag.
@@ -271,6 +283,7 @@ async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
     }
     let back = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: tags }, opts);
     if (!back.ok) back = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: tags }, opts);
+    restored = back.ok;
     if (!back.ok) {
       console.error(`Lofty tag re-add FAILED for lead ${leadId} — "${triggerTag}" is currently off this lead: ` +
         `HTTP ${back.httpStatus} ${back.text}`);
@@ -282,6 +295,11 @@ async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
     };
   } catch (err) {
     console.error("Lofty tag refire error:", err && err.message);
+    // The removal went out (or threw, in which case whether it landed is unknown)
+    // and no re-add was confirmed: the lead may be without its trigger tag.
+    if (removeSent && !restored) {
+      return { attempted: true, ok: false, step: "refired-unconfirmed", tagRestored: false, error: String(err && err.message) };
+    }
     return { attempted: true, ok: false, error: String(err && err.message) };
   }
 }

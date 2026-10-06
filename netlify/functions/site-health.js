@@ -1651,8 +1651,17 @@ exports.handler = async (event) => {
       `doesn't recognise (${tag.tagShape || "unknown"}), and overwriting them could have deleted ` +
       `tags on a real client's record. Nothing was changed. Send me this line and I'll fix the reader.`);
   } else if (tag.tagRestored === false) {
-    parts.push(`Trigger tag: the re-add FAILED (${tag.httpStatus || tag.error || "unknown"}) — ` +
-      `the lead is currently missing "Hot Lead - Website". Add it by hand on that lead in Lofty.`);
+    // 2026-10-06: "refired-unconfirmed" is an exception (the 8s timeout, or the queue
+    // drain's deadline) after the removal call went out -- lib/_notify.js
+    // refireLoftyTag. Nobody knows whether the tag is back on the lead, so this
+    // neither says the re-add FAILED nor that the lead is missing it: it says the
+    // swap did not finish and sends her to look.
+    parts.push(tag.step === "refired-unconfirmed"
+      ? `Trigger tag: the re-add did not finish (${redactPersonal(tag.error || "unknown").slice(0, 120)}) — ` +
+        `the tag was being taken off and put back when the call was cut short, and Lofty never confirmed it is back. ` +
+        `Check that lead in Lofty and add "Hot Lead - Website" by hand if it is missing.`
+      : `Trigger tag: the re-add FAILED (${tag.httpStatus || tag.error || "unknown"}) — ` +
+        `the lead is currently missing "Hot Lead - Website". Add it by hand on that lead in Lofty.`);
   } else {
     parts.push(`Trigger tag: unchanged, Lofty refused the edit (${tag.httpStatus || tag.error || "unknown"}). ` +
       "The tag from the original push is still there; only the re-trigger didn't happen.");

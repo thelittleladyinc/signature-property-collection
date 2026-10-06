@@ -36,6 +36,33 @@ let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
 
 (async () => {
+  // 2026-10-06: a re-add cut short by a timeout. The stored record is what the
+  // REAL refireLoftyTag hands back when the removal went out and the re-add threw,
+  // not a hand-typed guess, so this row can't drift from the function. Before the
+  // fix that result had no tagRestored flag and the row said "The tag from the
+  // original push is still there" about a lead whose tag had just been taken off.
+  {
+    const { refireLoftyTag } = require(`${FN_DIR}/lib/_notify.js`);
+    const quiet = console.error;
+    console.error = () => {};
+    const ok = (body) => ({ ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify(body) });
+    let puts = 0;
+    global.fetch = async (url, opts = {}) => {
+      if ((opts.method || "GET") === "GET") return ok({ lead: { leadId: 88, tags: [{ tagName: "Buyer Lead" }, { tagName: "Hot Lead - Website" }] } });
+      if (++puts === 1) return ok({});
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    };
+    const tagResult = await refireLoftyTag(88, "Hot Lead - Website", "k");
+    console.error = quiet;
+    scenarios["re-add cut short by a timeout (tag may be off the lead)"] = {
+      at: "2026-10-06T19:43:00.000Z", formName: "contact", leadEmail: "d@example.com",
+      ok: true, httpStatus: 200, payloadShape: "full", leadId: 88,
+      emailResult: { attempted: true, ok: true },
+      noteResult: { attempted: true, ok: true },
+      tagResult,
+    };
+  }
+
   for (const [label, record] of Object.entries(scenarios)) {
     console.log(`\n${label}`);
     require.cache[blobsPath] = {
@@ -83,6 +110,20 @@ const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures+
     if (label.startsWith("tag left off")) {
       check("enrich row red", enrich.ok === false);
       check("tells her to add the tag by hand", /Add it by hand/.test(enrich.detail), enrich.detail);
+    }
+
+    if (label.startsWith("re-add cut short")) {
+      check("the record is the real function's output: unconfirmed and not restored",
+        record.tagResult.step === "refired-unconfirmed" && record.tagResult.tagRestored === false && record.tagResult.ok === false, JSON.stringify(record.tagResult));
+      check("enrich row red", enrich.ok === false);
+      check("says the re-add did not finish", /re-add did not finish/.test(enrich.detail), enrich.detail);
+      check("tells her to check the lead and add the tag by hand if it is missing",
+        /Check that lead in Lofty and add "Hot Lead - Website" by hand if it is missing/.test(enrich.detail), enrich.detail);
+      check("does NOT say the tag is still there", !/still there/.test(enrich.detail) && !/unchanged/.test(enrich.detail), enrich.detail);
+      check("does not claim the lead IS missing the tag (it may not be)", !/currently missing/.test(enrich.detail) && !/FAILED/.test(enrich.detail), enrich.detail);
+      const tr = parsed.raw && parsed.raw.loftyLast && parsed.raw.loftyLast.tagResult;
+      check("the JSON carries the step and tagRestored:false",
+        !!tr && tr.step === "refired-unconfirmed" && tr.tagRestored === false && tr.ok === false, JSON.stringify(tr));
     }
 
     // The HTML path is what she actually opens.

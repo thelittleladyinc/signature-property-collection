@@ -144,6 +144,41 @@ const CREATE = "POST /v1.0/leads", LOOKUP = "GET /v1.0/leads", NOTE = "POST /v1.
   check("the lead Lofty accepted before the throw is out of the queue; the one not reached is kept",
     q.length === 1 && q[0].formName === "buyers-guide" && !q[0].loftyId, JSON.stringify(q.map((e) => e.formName)));
 
+  console.log("\n7. A re-add cut short during a replay: the replay behaves exactly as it did");
+  // 2026-10-06. refireLoftyTag now reports tagRestored:false (step
+  // "refired-unconfirmed") when the removal went out and the re-add threw. The
+  // replay (finishReplay) stores that result in its steps and reads nothing from it,
+  // so a throwing re-add must leave the queue, the lease, the calls and the /status
+  // line exactly as a re-add that lands does.
+  const pendingTag = () => queued({ loftyId: "777", followupsPending: ["tag"],
+    replay: { newId: "777", identity: { ok: true, anyMatch: false, leadId: null }, steps: { note: { ok: true } } } });
+  lofty = fakeLofty();
+  store = blobStore({ [L.FAILED_PUSH_KEY]: [pendingTag()] });
+  const landed = await L.drainFailedPushes(store, "k", { deadline: Date.now() + 20000 });
+  const landedLine = store.data[L.LAST_PUSH_KEY].responseBody;
+  const landedCalls = lofty.calls.slice();
+  lofty = fakeLofty();
+  const plain = global.fetch;
+  let tagPuts = 0;
+  global.fetch = async (url, init = {}) => {
+    if ((init.method || "GET") === "PUT" && /"tags"/.test(String(init.body)) && ++tagPuts === 2) {
+      lofty.calls.push(TAG);
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    }
+    return plain(url, init);
+  };
+  store = blobStore({ [L.FAILED_PUSH_KEY]: [pendingTag()] });
+  const quiet = console.error;
+  console.error = () => {};
+  const cut = await L.drainFailedPushes(store, "k", { deadline: Date.now() + 20000 });
+  console.error = quiet;
+  check("the same calls in the same order: read, remove, re-add -- nothing added, nothing retried",
+    JSON.stringify(lofty.calls) === JSON.stringify(landedCalls) && lofty.calls.join(",") === `GET /v1.0/leads/777,${TAG},${TAG}`, lofty.calls.join(" | "));
+  check("the entry leaves the queue and the run counts it finished, as when the re-add lands",
+    store.data[L.FAILED_PUSH_KEY].length === 0 && cut.finished === 1 && JSON.stringify(cut) === JSON.stringify(landed), JSON.stringify([cut, landed]));
+  check("the /status line is the same, and the lease is released",
+    store.data[L.LAST_PUSH_KEY].responseBody === landedLine && !(L.DRAIN_LOCK_KEY in store.data), store.data[L.LAST_PUSH_KEY].responseBody);
+
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);
   process.exitCode = failures ? 1 : 0;
 })().catch((e) => { console.error(e); process.exit(1); });
