@@ -286,6 +286,57 @@ async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
   }
 }
 
+// 2026-10-06: adds a form's nurture-plan tag (lib/_form-plans.js) to a lead that
+// already exists, so Lofty records a "Tag Added" and the plan's Smart Plan starts
+// -- a tag sent on the create call does not fire a "Tag Changed" plan.
+//
+// Read-merge-write, with the same guard as refireLoftyTag: the lead's current
+// tags are read first and every one is kept; when they can't be read (tagsFromLead
+// returns null) the lead is NOT touched -- writing a list we couldn't reconcile is
+// how a real client once lost every other tag. A plan tag already on the lead is
+// left exactly where it is (never taken off and put back: this is a first add,
+// not a re-fire). Only the plan tags not there yet go on, in one PUT.
+async function addPlanTags(leadId, planTags, apiKey, opts) {
+  const wanted = Array.from(new Set((Array.isArray(planTags) ? planTags : [])
+    .filter((t) => typeof t === "string" && t.trim())));
+  if (!leadId || !wanted.length || !apiKey) return { attempted: false };
+  try {
+    const current = await loftyRequest("GET", `/leads/${leadId}`, apiKey, null, opts);
+    if (!current.ok) {
+      return {
+        attempted: true, ok: false, step: isLeadMissing(current) ? "lead-missing" : "read",
+        planTags: wanted, added: [], httpStatus: current.httpStatus, response: current.text,
+      };
+    }
+    const tags = tagsFromLead(current.json);
+    if (tags === null) {
+      // Don't touch the lead -- see tagsFromLead and refireLoftyTag.
+      const shape = describeTagShape(current.json);
+      console.error(`Lofty plan tag skipped for lead ${leadId}: ${shape}.`);
+      return {
+        attempted: true, ok: false,
+        step: /no 'tags' field/.test(shape) ? "tags-not-returned" : "unreadable-tags",
+        planTags: wanted, added: [], tagShape: shape,
+      };
+    }
+    const alreadyPresent = wanted.filter((t) => tags.includes(t));
+    const missing = wanted.filter((t) => !tags.includes(t));
+    if (!missing.length) {
+      return { attempted: true, ok: true, step: "already-present", planTags: wanted, added: [], alreadyPresent, tagsSeen: tags.length };
+    }
+    const put = await loftyRequest("PUT", `/leads/${leadId}`, apiKey, { tags: tags.concat(missing) }, opts);
+    if (!put.ok) console.error(`Lofty plan tag add FAILED for lead ${leadId}: HTTP ${put.httpStatus} ${put.text}`);
+    return {
+      attempted: true, ok: put.ok, step: "added", planTags: wanted,
+      added: put.ok ? missing : [], alreadyPresent, tagsSeen: tags.length,
+      httpStatus: put.httpStatus, response: put.ok ? undefined : put.text,
+    };
+  } catch (err) {
+    console.error("Lofty plan tag error:", err && err.message);
+    return { attempted: true, ok: false, planTags: wanted, added: [], error: String(err && err.message) };
+  }
+}
+
 function escapeHtml(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -373,6 +424,7 @@ module.exports = {
   DEFAULT_TO,
   addLoftyNote,
   refireLoftyTag,
+  addPlanTags,
   isLeadMissing,
   tagsFromLead,
   describeTagShape,
