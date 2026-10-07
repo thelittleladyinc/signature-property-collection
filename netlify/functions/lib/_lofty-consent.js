@@ -42,7 +42,12 @@ const LOFTY_API = "https://api.lofty.com";
 const CALL_TIMEOUT_MS = 5000;
 // EN DASH, exactly as the Command Center writes it.
 const CONSENT_TAG = "Consent – SMS Opt-In";
-const isDncTag = (name) => /^consent\s*[-\u2010-\u2015]\s*dnc$/i.test(name.trim());
+// Do Not Contact, in either spelling Christine's Lofty uses: "Consent – DNC" (any dash or
+// case) or the plain "#dnc" tag. "Consent - DNC Email" is a different tag and is not matched.
+// 2026-10-06 (safety review): "#dnc" was missing here, so a lead tagged only #dnc who ticked the
+// texting box could have had texting switched on. Seller Intelligence, Expired Elite and My Lead
+// Pages already read "#dnc" as Do Not Contact.
+const isDncTag = (name) => /^(?:consent\s*[-\u2010-\u2015]\s*dnc|#dnc)$/i.test(String(name == null ? "" : name).trim());
 const SMS_CONSENT_FIELD = "sms_consent";
 
 const YES_VALUE = /^(yes|y|true|on|1|checked|agree|agreed|accept|accepted|opt[-_ ]?in|opted[-_ ]?in|i agree|i consent|i accept)\b/i;
@@ -178,7 +183,7 @@ async function applyTextingPreference(leadId, consentPhone, consentGiven, apiKey
       };
     }
     if (tags && tags.some(isDncTag)) {
-      return disableTexting("dnc", "the lead is tagged Consent - DNC; Do Not Contact wins, SMS consent tag held");
+      return disableTexting("dnc", "the lead is tagged Consent - DNC or #dnc; Do Not Contact wins, SMS consent tag held");
     }
     if (consentGiven === true && consented.length !== 10) {
       return { attempted: true, ok: true, changed: false, textingEnabled: l.cannotText === false, step: "held",

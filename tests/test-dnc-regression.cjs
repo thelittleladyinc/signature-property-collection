@@ -37,6 +37,7 @@ for (const [name, file, listingEngine] of targets) {
     'Consent \u2013 DNC', 'Consent - DNC', 'Consent \u2014 DNC',
     'Consent \u2011 DNC', 'Consent \u2012 DNC',
     '  cOnSeNt - dNc  ', { tagName: 'Consent \u2013 DNC' }, { name: 'Consent - DNC' },
+    '#dnc', '#DNC', '  #dnc  ', { tagName: '#dnc' },
   ];
   for (const dnc of dncTags) {
     for (const cannotText of [true, false, undefined]) {

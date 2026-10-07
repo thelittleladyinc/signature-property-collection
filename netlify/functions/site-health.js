@@ -748,7 +748,7 @@ function publicPushRecord(p) {
   if (p.manualReview) out.manualReview = true;
   if (!p.ok && p.responseBody) out.responseBody = redactPersonal(p.responseBody).slice(0, 240);
   for (const k of ["existing", "emailResult", "noteResult", "tagResult", "returningResult",
-    "fieldsResult", "inquiryResult"]) {
+    "fieldsResult", "inquiryResult", "planResult"]) {
     if (p[k] !== undefined) out[k] = publicStep(p[k]);
   }
   return out;
@@ -1784,6 +1784,38 @@ exports.handler = async (event) => {
       " These are what make a lead that MERGED into an existing contact still show up — " +
       "the case that hid your own test submissions, because they used your account-owner email."),
   });
+
+  // 2026-10-06 (safety review): the nurture plan a form starts (submission-created.js
+  // addPlanTags). The result was recorded with every push but never shown, so a lead whose plan
+  // tag was refused or cut short by a timeout left no trace on this page -- only in the function
+  // log. A plan that was skipped on purpose (returning contact, no plan for this form) is normal
+  // and stays green; a plan tag that was tried and did not land is red, with the tag to add by hand.
+  const planStep = loftyLast && loftyLast.planResult;
+  if (planStep && typeof planStep === "object") {
+    const planTagList = Array.isArray(planStep.planTags) ? planStep.planTags.filter((t) => typeof t === "string").slice(0, 3) : [];
+    const tagText = planTagList.length ? `"${planTagList.join('", "')}"` : "the plan's start tag";
+    const failed = planStep.attempted === true && planStep.ok === false;
+    let planDetail;
+    if (failed) {
+      const why = redactPersonal(String(planStep.step || planStep.error || (planStep.httpStatus ? `HTTP ${planStep.httpStatus}` : "unknown"))).slice(0, 120);
+      planDetail = `Nurture plan: the start tag ${tagText} was NOT added (${why}). That lead is not in its plan -- ` +
+        `open the lead in Lofty and add ${tagText} by hand.`;
+    } else if (planStep.skipped) {
+      planDetail = `Nurture plan: none started (${redactPersonal(String(planStep.skipped)).slice(0, 160)}). That is expected for a returning contact or a form that starts no plan.`;
+    } else if (planStep.ok && Array.isArray(planStep.added) && planStep.added.length) {
+      planDetail = `Nurture plan: start tag ${tagText} added after the lead was created ✓.`;
+    } else if (planStep.ok) {
+      planDetail = `Nurture plan: start tag ${tagText} was already on the lead ✓.`;
+    } else {
+      planDetail = "Nurture plan: not attempted on the last lead.";
+    }
+    checks.push({
+      optional: false,
+      name: "Nurture plan on your last lead",
+      ok: !failed,
+      detail: planDetail,
+    });
+  }
 
   // 2026-08-15: some checks describe an OPTIONAL improvement rather than
   // something broken. Cloudinary is the case that forced this: since the photo
