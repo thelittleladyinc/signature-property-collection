@@ -30,6 +30,31 @@ const scenarios = {
     noteResult: { attempted: true, ok: true },
     tagResult: { attempted: true, ok: false, step: "refired", tagRestored: false, httpStatus: 503 },
   },
+  // 2026-10-06 (safety review): the nurture plan result is shown on this page too.
+  "plan tag added to a new lead": {
+    at: "2026-10-06T21:10:00.000Z", formName: "buyers-page-inquiry", leadEmail: "p1@example.com",
+    ok: true, httpStatus: 200, payloadShape: "full", leadId: 301,
+    emailResult: { attempted: true, ok: true },
+    noteResult: { attempted: true, ok: true },
+    tagResult: { attempted: true, ok: true, step: "refired", tagRestored: true },
+    planResult: { attempted: true, ok: true, step: "added", planTags: ["TOF \u2013 Website Buyer"], added: ["TOF \u2013 Website Buyer"], alreadyPresent: [], tagsSeen: 3 },
+  },
+  "plan tag refused by Lofty (lead not in its plan)": {
+    at: "2026-10-06T21:11:00.000Z", formName: "sellers-guide", leadEmail: "p2@example.com",
+    ok: true, httpStatus: 200, payloadShape: "full", leadId: 302,
+    emailResult: { attempted: true, ok: true },
+    noteResult: { attempted: true, ok: true },
+    tagResult: { attempted: true, ok: true, step: "refired", tagRestored: true },
+    planResult: { attempted: true, ok: false, step: "added", httpStatus: 503, planTags: ["TOF \u2013 Seller Ready to List"], added: [], response: "upstream busy for p2@example.com" },
+  },
+  "plan skipped on purpose (returning contact)": {
+    at: "2026-10-06T21:12:00.000Z", formName: "listing-inquiry", leadEmail: "p3@example.com",
+    ok: true, httpStatus: 200, payloadShape: "full", leadId: 303, inProgress: true,
+    emailResult: { attempted: true, ok: true },
+    noteResult: { attempted: true, ok: true },
+    tagResult: { attempted: false, skipped: "returning-lead-task", tagRestored: true },
+    planResult: { attempted: false, skipped: "returning contact: keeps its own plans and lead type (gets the Call task instead)", planTags: ["TOF \u2013 Website Buyer"] },
+  },
 };
 
 let failures = 0;
@@ -110,6 +135,28 @@ const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures+
     if (label.startsWith("tag left off")) {
       check("enrich row red", enrich.ok === false);
       check("tells her to add the tag by hand", /Add it by hand/.test(enrich.detail), enrich.detail);
+    }
+
+    // The nurture plan row: shown only when the record carries a planResult.
+    {
+      const plan = row("Nurture plan on your last lead");
+      if (label.startsWith("plan tag added")) {
+        check("plan row present and green", !!plan && plan.ok === true, plan && plan.detail);
+        check("plan row names the tag that was added", !!plan && /TOF \u2013 Website Buyer/.test(plan.detail) && /added/.test(plan.detail), plan && plan.detail);
+      } else if (label.startsWith("plan tag refused")) {
+        check("plan row present and RED", !!plan && plan.ok === false, plan && plan.detail);
+        check("plan row says NOT added and tells her which tag to add by hand",
+          !!plan && /NOT added/.test(plan.detail) && /add "TOF \u2013 Seller Ready to List" by hand/.test(plan.detail), plan && plan.detail);
+        check("plan row carries no personal text", !!plan && !/p2@example\.com/.test(plan.detail), plan && plan.detail);
+        const pr = parsed.raw && parsed.raw.loftyLast && parsed.raw.loftyLast.planResult;
+        check("the JSON carries the plan result", !!pr && pr.ok === false && pr.step === "added", JSON.stringify(pr));
+        check("the JSON plan result has no personal text", !!pr && !/p2@example\.com/.test(JSON.stringify(pr)), JSON.stringify(pr));
+      } else if (label.startsWith("plan skipped")) {
+        check("plan row present and green (skipped on purpose)", !!plan && plan.ok === true, plan && plan.detail);
+        check("plan row says none started", !!plan && /none started/.test(plan.detail), plan && plan.detail);
+      } else {
+        check("no plan row on a record that carries no plan result", !plan);
+      }
     }
 
     if (label.startsWith("re-add cut short")) {
