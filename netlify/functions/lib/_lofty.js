@@ -263,8 +263,19 @@ async function releaseDrainLease(store) {
 
 // opts.deadline (epoch ms, optional): no replay starts, and none runs, past it --
 // so a caller with a hard time limit finishes and writes the queue back.
+// 2026-10-07: an off switch for the queue replay that does not mean taking the
+// Lofty key away from the whole site. LOFTY_QUEUE_DRAIN=off (also false, 0, no,
+// pause, paused) stops every replay: this site's scheduled drain and, on
+// Signature, the drain inside its 30-minute sync. Unset, or any other value,
+// leaves it running exactly as before. The queue itself is left untouched, so
+// turning it back on replays what waited.
+function queueDrainOff() {
+  return /^(off|false|0|no|pause|paused)$/i.test(String(process.env.LOFTY_QUEUE_DRAIN || "").trim());
+}
+
 async function drainFailedPushes(store, apiKey, opts) {
   if (!apiKey) return { attempted: 0, recovered: 0 };
+  if (queueDrainOff()) return { attempted: 0, recovered: 0, paused: true };
   const peek = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
   if (!peek.length) return { attempted: 0, recovered: 0 };
   if (!(await takeDrainLease(store))) return { attempted: 0, recovered: 0, locked: true };
@@ -508,5 +519,6 @@ module.exports = {
   recordPush,
   holdForManualReview,
   drainFailedPushes,
+  queueDrainOff,
   REPLAY_TRIGGER_TAG,
 };
