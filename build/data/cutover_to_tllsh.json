@@ -1,0 +1,114 @@
+{
+  "_comment": [
+    "Signature -> The Little Lady Sells Homes cutover map (2026-10-08). NOTHING here redirects until a group number is added to active_groups.",
+    "Each group is one cutover step: the main site flips its canonical for the Collection pages in the group, then Signature starts forwarding them within the same hour.",
+    "pages maps a Signature path to the path it forwards to on https://www.thelittleladysellshomes.com. The 46 pages in PRUNED_TO_TLLSH (build.py) already forward and are not repeated here.",
+    "extra_rules are pattern rules that are not pages (Netlify placeholders allowed). Each becomes a forced 301 like a page.",
+    "Run docs/CUTOVER-RUNBOOK.md before activating a group. Group order is proposed by page type and should be re-ordered with Search Console data once the domain is verified."
+  ],
+  "active_groups": [],
+  "groups": {
+    "1": {
+      "name": "The moved blog posts and the blog index",
+      "pages": {
+        "/blog/index.html": "/blog/index.html",
+        "/blog/june-2026-northern-colorado-luxury-market-report.html": "/blog/june-2026-northern-colorado-luxury-market-report.html",
+        "/blog/psychology-of-pricing-luxury-homes-northern-colorado.html": "/blog/psychology-of-pricing-luxury-homes-northern-colorado.html",
+        "/blog/wildfires-and-colorados-luxury-real-estate-market-lessons-from-marshall-waldo-high-park-and-black-forest.html": "/blog/wildfires-and-colorados-luxury-real-estate-market-lessons-from-marshall-waldo-high-park-and-black-forest.html"
+      }
+    },
+    "2": {
+      "name": "Resort buyer pages and lifestyle pages (horse, riverfront, golf)",
+      "pages": {
+        "/vail-co-buyers-agent.html": "/signature-property-collection/vail-co-buyers-agent.html",
+        "/breckenridge-co-buyers-agent.html": "/signature-property-collection/breckenridge-co-buyers-agent.html",
+        "/steamboat-springs-co-buyers-agent.html": "/signature-property-collection/steamboat-springs-co-buyers-agent.html",
+        "/winter-park-co-buyers-agent.html": "/signature-property-collection/winter-park-co-buyers-agent.html",
+        "/northern-colorado-horse-property.html": "/signature-property-collection/northern-colorado-horse-property.html",
+        "/northern-colorado-riverfront-homes.html": "/signature-property-collection/northern-colorado-riverfront-homes.html",
+        "/northern-colorado-golf-course-homes.html": "/signature-property-collection/northern-colorado-golf-course-homes.html"
+      }
+    },
+    "3": {
+      "name": "Luxury town pages, luxury market, concierge, home tours and the two luxury guides",
+      "pages": {
+        "/loveland-luxury-homes.html": "/signature-property-collection/loveland-luxury-homes.html",
+        "/fort-collins-luxury-homes.html": "/signature-property-collection/fort-collins-luxury-homes.html",
+        "/windsor-luxury-homes.html": "/signature-property-collection/windsor-luxury-homes.html",
+        "/estes-park-luxury-homes.html": "/signature-property-collection/estes-park-luxury-homes.html",
+        "/luxury-market.html": "/signature-property-collection/luxury-market.html",
+        "/concierge-experience.html": "/signature-property-collection/concierge-experience.html",
+        "/luxury-home-tours.html": "/signature-property-collection/luxury-home-tours.html",
+        "/guides/selling-a-luxury-home-northern-colorado-2026.html": "/signature-property-collection/selling-a-luxury-home-northern-colorado-2026.html",
+        "/guides/best-luxury-real-estate-agent-northern-colorado.html": "/signature-property-collection/how-to-choose-a-luxury-real-estate-agent.html"
+      }
+    },
+    "4": {
+      "name": "Buyers, sellers and the expired-listings page (printed books and letters)",
+      "pages": {
+        "/buyers.html": "/signature-property-collection/buyers.html",
+        "/sellers.html": "/signature-property-collection/sellers.html",
+        "/expired-listings.html": "/signature-property-collection/expired-listings.html"
+      }
+    },
+    "5": {
+      "name": "Every page that already has the same address on the main site, plus home search and listing links",
+      "pages": {
+        "/about.html": "/about.html",
+        "/accessibility.html": "/accessibility.html",
+        "/communities/larimer/windsor.html": "/communities/larimer/windsor.html",
+        "/communities/loveland/boyd-lake-north-loveland.html": "/communities/loveland/boyd-lake-north-loveland.html",
+        "/communities/loveland/buckhorn-subdivisions-loveland.html": "/communities/loveland/buckhorn-subdivisions-loveland.html",
+        "/communities/loveland/downtown-loveland-real-estate.html": "/communities/loveland/downtown-loveland-real-estate.html",
+        "/communities/loveland/kinston-centerra-loveland.html": "/communities/loveland/kinston-centerra-loveland.html",
+        "/communities/loveland/lakes-at-centerra-loveland.html": "/communities/loveland/lakes-at-centerra-loveland.html",
+        "/communities/loveland/mariana-butte-loveland.html": "/communities/loveland/mariana-butte-loveland.html",
+        "/communities/loveland/namaqua-hills-loveland.html": "/communities/loveland/namaqua-hills-loveland.html",
+        "/communities/loveland/pyrenees-french-country-loveland.html": "/communities/loveland/pyrenees-french-country-loveland.html",
+        "/communities/loveland/thompson-valley-loveland.html": "/communities/loveland/thompson-valley-loveland.html",
+        "/communities/loveland/waterfront-at-boyd-lake-loveland.html": "/communities/loveland/waterfront-at-boyd-lake-loveland.html",
+        "/communities/loveland/west-loveland-riverfront-homes.html": "/communities/loveland/west-loveland-riverfront-homes.html",
+        "/contact.html": "/contact.html",
+        "/current-listings.html": "/current-listings.html",
+        "/downsizing-in-northern-colorado.html": "/downsizing-in-northern-colorado.html",
+        "/explore.html": "/explore.html",
+        "/free-home-valuation.html": "/free-home-valuation.html",
+        "/guides/best-places-to-retire-in-northern-colorado.html": "/guides/best-places-to-retire-in-northern-colorado.html",
+        "/guides/buy-like-a-pro.html": "/guides/buy-like-a-pro.html",
+        "/guides/buyers-guide.html": "/guides/buyers-guide.html",
+        "/guides/cost-to-develop-raw-land-colorado.html": "/guides/cost-to-develop-raw-land-colorado.html",
+        "/guides/multi-generational-homes-northern-colorado.html": "/guides/multi-generational-homes-northern-colorado.html",
+        "/guides/northern-colorado-relocation-guide.html": "/guides/northern-colorado-relocation-guide.html",
+        "/guides/sell-your-home-fast.html": "/guides/sell-your-home-fast.html",
+        "/guides/sellers-guide.html": "/guides/sellers-guide.html",
+        "/guides/upsizing-into-a-new-home.html": "/guides/upsizing-into-a-new-home.html",
+        "/how-to-choose-a-real-estate-agent.html": "/how-to-choose-a-real-estate-agent.html",
+        "/lifestyle-search.html": "/lifestyle-search.html",
+        "/listing-video-portfolio.html": "/listing-video-portfolio.html",
+        "/mortgage-calculator.html": "/mortgage-calculator.html",
+        "/northern-colorado-market-report.html": "/northern-colorado-market-report.html",
+        "/past-sales.html": "/past-sales.html",
+        "/press-recognition.html": "/press-recognition.html",
+        "/privacy-policy.html": "/privacy-policy.html",
+        "/relocation.html": "/relocation.html",
+        "/search-homes.html": "/signature-property-collection/search-homes.html",
+        "/seller-local-proof.html": "/seller-local-proof.html",
+        "/sold-homes-map.html": "/sold-homes-map.html",
+        "/testimonials.html": "/testimonials.html"
+      },
+      "extra_rules": [
+        {
+          "from": "/listing/:id",
+          "to": "/listing/:id"
+        }
+      ]
+    },
+    "6": {
+      "name": "The thank-you page and the home page (last)",
+      "pages": {
+        "/thank-you.html": "/thank-you.html",
+        "/index.html": "/signature-property-collection/index.html"
+      }
+    }
+  }
+}
