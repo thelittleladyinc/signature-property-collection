@@ -3799,6 +3799,21 @@ PRUNED_TO_TLLSH = frozenset([
     "/communities/index.html",
 ])
 
+# 2026-10-08: the page-by-page cutover of everything else (build/cutover.py,
+# build/data/cutover_to_tllsh.json, docs/CUTOVER-RUNBOOK.md). Nothing in it
+# redirects until a group number is listed under "active_groups" in that file,
+# and with the list empty every line below is a no-op: the redirect lines, the
+# sitemap and the guard are byte-for-byte what they were.
+# Loaded by path, not by name: tests import this file from a script whose sys.path
+# does not include build/, and a plain `import cutover` fails there.
+import importlib.util as _ilu
+_cutover_spec = _ilu.spec_from_file_location(
+    "cutover", os.path.join(os.path.dirname(os.path.abspath(__file__)), "cutover.py"))
+_cutover = _ilu.module_from_spec(_cutover_spec)
+_cutover_spec.loader.exec_module(_cutover)
+_CUTOVER = _cutover.load()
+CUTOVER_ACTIVE_PAGES = frozenset(_cutover.active_pages(_CUTOVER))
+
 # 2026-08-23. Second wave of two-brand consolidation. The prune above moved
 # 46 general-market TOWN pages off Signature entirely. But a deeper duplicate
 # audit showed 25 more Signature pages -- tools (mortgage calculator, home
@@ -13980,7 +13995,7 @@ def build_redirects_and_meta():
         # The 46 pruned community pages force-301 to TLLSH. Listing them in the
         # sitemap tells Google two contradictory things ("crawl this" +
         # "actually it redirects"), so exclude them here.
-        if _p in PRUNED_TO_TLLSH:
+        if _p in PRUNED_TO_TLLSH or _p in CUTOVER_ACTIVE_PAGES:
             _pruned_excluded += 1
             continue
         # 2026-08-23: pages that declare TLLSH as canonical also should not go
@@ -14084,7 +14099,7 @@ def build_redirects_and_meta():
     # exists for the force-301 to fire against) but must never be submitted
     # for indexing.
     unlisted = sorted(on_disk - listed - {"/404.html"} - NOINDEX_PATHS
-                      - _non_canonical - PRUNED_TO_TLLSH
+                      - _non_canonical - PRUNED_TO_TLLSH - CUTOVER_ACTIVE_PAGES
                       - CROSS_BRAND_CANONICAL_TO_TLLSH)
     stale = sorted(listed - on_disk)
     if unlisted:
@@ -14350,6 +14365,11 @@ def build_redirects_and_meta():
     # matter. Any new address-URL redirects should be added explicitly, one
     # line each, above in the _legacy_url_redirects block or its equivalent.
     # (No trailing catch-all rule is appended.)
+
+    # 2026-10-08: the cutover groups that are switched on (none, today) turn
+    # their pages into one-hop forced 301s and point every older rule that ended
+    # on one of those pages straight at the final address. build/cutover.py.
+    redirect_lines = _cutover.apply(redirect_lines, _CUTOVER)
 
     redirects = "\n".join(redirect_lines) + "\n"
     with open(os.path.join(OUT, "_redirects"), "w") as f:
