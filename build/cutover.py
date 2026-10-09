@@ -26,7 +26,7 @@ fire (the same reason PRUNED_TO_TLLSH is forced; see build.py).
 Command line (nothing is written):
 
     python3 build/cutover.py check [--groups all|1,2,...] [--redirects site/_redirects]
-    python3 build/cutover.py verify-targets --tllsh /path/to/main-site-checkout
+    python3 build/cutover.py verify-targets --tllsh /path/to/main-site-checkout [--groups all|1,2,...]
     python3 build/cutover.py list --groups 1,2      # source <TAB> final address <TAB> group
 
 `check` applies the chosen groups to the redirect file the build just wrote and
@@ -263,7 +263,28 @@ def run_check(groups, redirects_path, site_dir):
     return problems
 
 
-def verify_targets(tllsh):
+def cross_brand_problems(build_text, data, groups=None):
+    """Pages the main site still canonicals to Signature (CROSS_BRAND_CANONICAL_TO_SIGNATURE)
+    that a group in play forwards. Once the group is live that canonical would point at a
+    Signature URL that 301s straight back to the page, so the canonical must be flipped first."""
+    m = re.search(r"CROSS_BRAND_CANONICAL_TO_SIGNATURE\s*=\s*frozenset\(\[(.*?)\]\)", build_text, re.S)
+    if not m:
+        return ["CROSS_BRAND_CANONICAL_TO_SIGNATURE was not found in the main site's build/build.py"]
+    paths = re.findall(r'"(/[^"]+)"', m.group(1))
+    in_play = set(_groups(data, groups))
+    problems = []
+    for g in sorted(int(x) for x in data["groups"]):
+        if g not in in_play:
+            continue
+        for p in paths:
+            if p in data["groups"][str(g)]["pages"]:
+                problems.append(
+                    f"group {g}: the main site still canonicals {p} to Signature "
+                    "(CROSS_BRAND_CANONICAL_TO_SIGNATURE); remove it there first and put the page back in the main sitemap")
+    return problems
+
+
+def verify_targets(tllsh, groups=None):
     """Every target exists in a built main site (a file, or a rule that answers it)."""
     data = load()
     site = os.path.join(tllsh, "site")
@@ -315,6 +336,9 @@ def verify_targets(tllsh):
                     problems.append(f"the main site canonicals {key} to Signature's {sig}, which is in no cutover group")
                 elif mapped[sig] != key:
                     problems.append(f"{sig} forwards to {mapped[sig]} but the main site's Collection page is {key}")
+        # Same idea for the 11 Loveland neighbourhood pages: they canonical to Signature at the
+        # SAME address, so a group that forwards them needs that canonical flipped too.
+        problems += cross_brand_problems(text, data, groups)
     return problems
 
 
@@ -340,6 +364,7 @@ def main(argv=None):
     c.add_argument("--site", default=os.path.join(ROOT, "site"))
     v = sub.add_parser("verify-targets")
     v.add_argument("--tllsh", required=True)
+    v.add_argument("--groups", default="active", help="all, active (the file's list), or 1,2,...: whose canonicals must already be flipped")
     li = sub.add_parser("list")
     li.add_argument("--groups", required=True, help="all, or 1,2,...")
     args = ap.parse_args(argv)
@@ -353,7 +378,9 @@ def main(argv=None):
                                                       else [int(x) for x in args.groups.split(",") if x])
         problems = run_check(groups, args.redirects, args.site)
     else:
-        problems = verify_targets(args.tllsh)
+        vg = "all" if args.groups == "all" else (None if args.groups == "active"
+                                                  else [int(x) for x in args.groups.split(",") if x])
+        problems = verify_targets(args.tllsh, vg)
     for p in problems:
         print("FAIL " + p)
     print("All checks passed" if not problems else f"{len(problems)} problem(s)")

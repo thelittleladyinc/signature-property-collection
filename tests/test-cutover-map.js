@@ -59,10 +59,26 @@ for (const g of groups) {
 r = py(["check", "--groups", "all"]);
 check("all groups together: no chain, loop, unforced rule or duplicate; printed-book address lands on the Collection book page", r.ok, r.problems.slice(0, 3).join(" | "));
 
+console.log("\n3b. A canonical to Signature that a live group forwards is caught");
+{
+  const fake = 'CROSS_BRAND_CANONICAL_TO_SIGNATURE = frozenset([\n    "/communities/loveland/boyd-lake-north-loveland.html",\n])';
+  const code = "import os,sys,json; sys.path.insert(0,'build'); import cutover; d=cutover.load(); f=os.environ['FAKE_BUILD']; " +
+    "print(json.dumps([len(cutover.cross_brand_problems(f,d,[])), len(cutover.cross_brand_problems(f,d,[5])), " +
+    "len(cutover.cross_brand_problems(f,d,[1,2,3,4,6])), len(cutover.cross_brand_problems('nothing here',d,[5]))]))";
+  const out = spawnSync("python3", ["-c", code], { cwd: ROOT, encoding: "utf8", env: { ...process.env, FAKE_BUILD: fake } });
+  let got = null; try { got = JSON.parse(out.stdout.trim()); } catch (e) { /* reported below */ }
+  check("no group on: nothing to flip", got && got[0] === 0, `${out.stdout}${out.stderr}`.trim());
+  check("group 5 on and the page still canonicals to Signature: one problem", got && got[1] === 1);
+  check("a group that does not forward that page: no problem", got && got[2] === 0);
+  check("an unreadable main-site build is reported, not ignored", got && got[3] === 1);
+}
+
 console.log("\n4. The targets on the main site");
 if (process.env.TLLSH_CHECKOUT) {
   r = py(["verify-targets", "--tllsh", process.env.TLLSH_CHECKOUT]);
   check("every target exists on the main site and every Collection target is one it still canonicals to Signature", r.ok, r.problems.slice(0, 3).join(" | "));
+  r = py(["verify-targets", "--tllsh", process.env.TLLSH_CHECKOUT, "--groups", "all"]);
+  console.log(`  info canonicals still owed before every group could go live: ${r.problems.filter((p) => p.includes("still canonicals")).length} (flip each group's before it is switched on)`);
 } else {
   console.log("  skip TLLSH_CHECKOUT is not set (point it at a built checkout of the main site to check the targets)");
 }
