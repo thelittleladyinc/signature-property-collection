@@ -19,7 +19,7 @@ reviewed pull request that Christine has OK'd.
 | 2 | 7 | Resort buyer pages (Vail, Breckenridge, Steamboat Springs, Winter Park) and horse, riverfront, golf | 7 |
 | 3 | 9 | Luxury town pages (Loveland, Fort Collins, Windsor, Estes Park), luxury market, concierge, home tours, the two luxury guides | 9 |
 | 4 | 3 | Buyers, sellers, and **expired-listings (the printed books' landing page)** | 3 |
-| 5 | 41 + `/listing/:id` | Every page that already has the same address on the main site (about, relocation, market report, tools, guides, the 11 Loveland neighbourhoods, ...), plus home search and listing links | none (the main site's copy is already its own canonical; the Collection search is a rewrite) |
+| 5 | 41 + `/listing/:id` | Every page that already has the same address on the main site (about, relocation, market report, tools, guides, the 11 Loveland neighbourhoods, ...), plus home search and listing links **11** (the Loveland neighbourhood pages: the main site's `CROSS_BRAND_CANONICAL_TO_SIGNATURE` still points their canonicals at Signature, and they must go back into the main sitemap), plus the listing page (see "Found on Oct 8" below). The Collection search is a rewrite and needs none |
 | 6 | 2 | The thank-you page and the home page. **Last.** | 1 (the Collection hub) |
 
 Order is proposed by page type, quietest first. Re-order it with Search Console click
@@ -45,6 +45,10 @@ data once the domain is verified (Cowork J22).
 * **Targets exist.** With `TLLSH_CHECKOUT=<built main-site checkout>`, the test also
   confirms every target exists there and that every page the main site still
   canonicals to Signature is in the map with the same target.
+* **No canonical left pointing at a page that forwards back.** `python3 build/cutover.py verify-targets
+  --tllsh <built main site> [--groups 5]` fails if the main site still canonicals a page (the 11
+  neighbourhood pages, `CROSS_BRAND_CANONICAL_TO_SIGNATURE`) to Signature while a group in play forwards
+  it. `--groups all` lists what is still owed. Run it in each activation pull request.
 
 ## Before any group (all of these are open today)
 
@@ -106,11 +110,12 @@ Not merged and not deployed: `active_groups` set to `[1, 2, 3, 4, 5, 6]` in a sc
 site rebuilt, and the whole suite run (81 suites), then compared with the same suite on
 unchanged `master`.
 
-* Rules: 66 pages and `/listing/:id` become 198 forced one-hop 301s (each page's `.html`, `/page/`
-  and `/page` forms). They replace 132 older rules for the same addresses, and 17 older rules whose
+* Rules: 66 pages and `/listing/:id` become 198 forced one-hop 301s (65 pages x 3 forms, the home page's
+  2, and `/listing/:id`). They replace 132 older rules for the same addresses, and 17 older rules whose
   destination was a forwarding page (the printed-book `/expiredlisting`, old WordPress paths, the
   blog index) are re-pointed at the final address: 512 rules become 578. No chain, loop,
-  duplicate or unforced rule (`build/cutover.py check --groups all`).
+  duplicate or unforced rule (`build/cutover.py check --groups all`). Netlify counts the toml
+  `/listing/:id` rewrite as one more rule: 513 today, 579 with every group on.
 * **Two suites newly fail, and both are assertions about the pre-cutover behaviour of pages
   that are being forwarded**: `test-home-search` (`/search-homes` is a 200 rewrite; group 5) and
   `test-prettyurls` (`/` is a 200 rewrite to `/index.html`; group 6). The activation pull
@@ -128,10 +133,51 @@ unchanged `master`.
   (`sitemap.xml` is handled). The video sitemap entries move to the main site when each
   Collection page's canonical flips.
 * Internal links on Signature pages that still point at a forwarding page work (they hit
-  the 301), but `tests/test-internal-links.js` is the place that will say if any must be
-  re-pointed. The dry run above shows what it said with every group on.
+  the 301), but `tests/test-internal-links.js` has **no redirect awareness: it does not say**
+  which ones to re-point. Counted on Oct 8, links from still-live Signature pages into pages that
+  newly forward, cumulative by group 1/2/3/4/5: 63 / 84 / 232 / 346 / 71. `feed.xml` (4 group-1 URLs),
+  `llms.txt` (27 of 28 forwarding pages) and `sitemap-videos.xml` (29 entries, 15 already forwarding)
+  need the same attention. Re-point them in each activation pull request.
 * The domain alias (phase f) waits until the main site's pass-through code is gone and
   seven calm days have passed. `/status`, `/site-health` and `/.netlify/functions/*` are
   deliberately never forwarded: callers (newsletter, Expired Elite, Command Center) still
   use them on this domain.
 * The Signature Google Business Profile is removed only after the redirects are live.
+
+## Found on Oct 8 (read-only check of the merged state), to settle before the group named
+
+The merged map is correct and forwards nothing (a build of the merge commit is byte-identical to a
+build of its parent). These are for the activation pull requests:
+
+* **Before group 5, blocker:** the main site canonicals the 11 Loveland neighbourhood pages to
+  Signature (`build/build.py`, `CROSS_BRAND_CANONICAL_TO_SIGNATURE`), and group 5 forwards those same
+  addresses to the main copy, so each canonical would point at a URL that 301s straight back. Remove the
+  11 from that set on the main site and put them back in its sitemap, first. `verify-targets --groups 5`
+  now fails until that is done.
+* **Before group 5, blocker (read from the code, not run):** Signature's listing page
+  (`netlify/functions/listing-page.js`) always sets its canonical to
+  `signaturepropertycollection.com/listing/<id>`, and the main site's `/listing/<id>` still passes
+  through to it while `BACKEND_MODE` does not include `listing-page`. After group 5 that canonical would
+  301 back. Put `listing-page` in `BACKEND_MODE` on the main site first, and confirm its canonical names
+  the main domain.
+* **Before group 1:** the main site sends the legacy `499000`-tag URL to Signature's psychology post
+  (two hops once group 1 is live), and some main-site links hop once (`build/data/blog.json` lines 80,
+  82, 94; two links in `legacy_content/wildfires-and-colorado-home-values.json`;
+  `postprocess_audit_fixes.py` lines 329 to 331). Point them at the main-site address in the group's
+  main-site pull request.
+* **Before group 5:** three targets, `/guides/best-places-to-retire-in-northern-colorado.html`,
+  `/guides/cost-to-develop-raw-land-colorado.html` and
+  `/guides/multi-generational-homes-northern-colorado.html`, are in the main site's `DUPLICATE_MAP`
+  (`postprocess_traffic_growth.py`), which sends them to other pages with unforced 301s. Pick the real
+  target before forwarding to them.
+* **Before the domain alias (phase f):** the main site sends `/expiredlisting` to its generic
+  `/expired-listings.html`, not the Collection book page, so the printed book's QR would land there after
+  the alias. Also still to move: `_sig-proxy.js` and the pass-through functions, `explore-map.js`,
+  the `sameAs` line on 777 pages, the callouts on the home, buyers, sellers and market-report pages,
+  18 town paragraphs, and the `llms.txt` text.
+* **Not a blocker:** the 148 Signature lead forms carry one old unnamed marketing checkbox, not
+  `terms_agree` plus `sms_consent`. `_lofty-consent.js` ignores it and every create stays `cannotText:true`, so
+  it is safe, but it is the old consent wording and only matters while Signature's forms stay live.
+* **Not verified from here (no network):** whether Netlify keeps the query string through a 301; the order
+  Netlify applies `_redirects` and the toml; a form POST hitting a forced 301; `BACKEND_MODE` values on the
+  live sites.
