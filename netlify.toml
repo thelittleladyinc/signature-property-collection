@@ -172,5 +172,11 @@
   status = 200
   force = false
 
-[functions."area-alerts-run"]
-  schedule = "0 */6 * * *"
+# 2026-10-13: area-alerts-run is no longer scheduled. It ran every 6 hours and
+# sent nothing: while listings come from Lofty (her own only) it stops at once
+# ("area alerts paused"), since this site cannot tell anyone what is new in their
+# area, and new map sign-ups are sent to her Lofty home search's Save Search
+# instead (area-alerts.js). The alerts saved before 2026-09-28 are kept,
+# untouched, in the "area-alerts" Blobs store, and each one's unsubscribe link
+# still works; what to do with them is Christine's decision. To send them again:
+# put this schedule back, and only once listings come from the whole market.
