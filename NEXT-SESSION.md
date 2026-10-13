@@ -724,8 +724,7 @@ link**. That is how Dragon Inn (4,000+ views) and A&W were found. Her Takeout
 export is 206 MB and cannot be pulled through the Drive connector — use Gmail
 instead.
 
-**Skip her reviews of other realtors** (Emily Sells Centennial, April Brandon,
-Jeff Kurtz, Miranda Cantin, Alissa Rhoades) — colleagues, not local spots.
+**Skip her reviews of other realtors** — colleagues, not local spots.
 
 ---
 
