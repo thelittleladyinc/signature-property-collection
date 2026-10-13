@@ -16,8 +16,8 @@
 //     and never on a returning contact's, or one the lookup couldn't rule out;
 //   - tags that can't be read are never written;
 //   - a queued lead replayed later gets the same lead type and plan tag;
-//   - lib/_form-plans.js (and lib/_lofty.js) are byte-identical to the other
-//     site's copies.
+//   - lib/_form-plans.js, lib/_lofty.js, lib/_lofty-consent.js and lib/_notify.js
+//     are byte-identical to the other site's copies.
 //
 // The same file runs in both repos; only SITE and SIBLING below differ.
 //
@@ -468,17 +468,20 @@ function blobStore(seed) {
   check("...but not when the note never confirmed the new contact", f.posts.length === 0 && planPuts(f).length === 0);
 
   console.log(`\n13. Same modules as the other site (${SIBLING})`);
-  const other = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib", "_form-plans.js");
-  if (fs.existsSync(other)) {
-    check(`lib/_form-plans.js is byte-identical to ${SIBLING}'s copy`,
-      fs.readFileSync(other, "utf8") === fs.readFileSync(`${FN_DIR}/lib/_form-plans.js`, "utf8"));
-    const otherLofty = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib", "_lofty.js");
-    if (fs.existsSync(otherLofty)) {
-      check(`lib/_lofty.js is byte-identical to ${SIBLING}'s copy`,
-        fs.readFileSync(otherLofty, "utf8") === fs.readFileSync(`${FN_DIR}/lib/_lofty.js`, "utf8"));
+  // 2026-10-13: the two sites share these four files byte for byte (CLAUDE.md).
+  // _lofty-consent.js and _notify.js were not checked, and _notify.js had already
+  // drifted by its four brand lines (now chosen by `site`, see its ALERT_BRANDS),
+  // so a consent or tag fix could land on one site only.
+  const SHARED_LIBS = ["_form-plans.js", "_lofty.js", "_lofty-consent.js", "_notify.js"];
+  const otherLib = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib");
+  if (fs.existsSync(path.join(otherLib, "_form-plans.js"))) {
+    for (const f of SHARED_LIBS) {
+      const theirs = path.join(otherLib, f);
+      check(`lib/${f} is byte-identical to ${SIBLING}'s copy`,
+        fs.existsSync(theirs) && fs.readFileSync(theirs, "utf8") === fs.readFileSync(`${FN_DIR}/lib/${f}`, "utf8"));
     }
   } else {
-    console.log(`  --   ${SIBLING} checkout not present; skipping the _form-plans.js drift check`);
+    console.log(`  --   ${SIBLING} checkout not present; skipping the shared-file drift check (${SHARED_LIBS.join(", ")})`);
   }
 
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} FAILED\n`);

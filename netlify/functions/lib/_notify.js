@@ -59,7 +59,34 @@ const TIMEOUT_MS = 8000;
 // deliver to the Resend account owner's own address -- which here is exactly
 // who we want to reach. Overridable once she verifies her own domain, matching
 // the DIGEST_FROM/DIGEST_TO pattern from sellerintelligence.
-const DEFAULT_FROM = "Signature Property Collection <onboarding@resend.dev>";
+//
+// 2026-10-13: this file is BYTE-IDENTICAL in thelittleladysellshomes and
+// signature-property-collection (tests/test-form-plans.js compares the copies
+// when both checkouts sit side by side). The two copies used to differ only in
+// the alert's brand lines -- its sender name, heading, footer and subject -- so a
+// fix to anything else here could land on one site only. The brand lines are now
+// chosen by `site`, the same option lib/_form-plans.js takes: each site's
+// submission-created.js passes its own ("main" or "signature"), and anything but
+// "signature" is The Little Lady. Each site's alert reads exactly as before.
+const ALERT_BRANDS = Object.freeze({
+  main: Object.freeze({
+    from: "The Little Lady Sells Homes <onboarding@resend.dev>",
+    heading: "NEW LITTLE LADY WEBSITE LEAD",
+    sentBy: "thelittleladysellshomes.com",
+    subjectPrefix: "NEW LITTLE LADY LEAD — ",
+  }),
+  signature: Object.freeze({
+    from: "Signature Property Collection <onboarding@resend.dev>",
+    heading: "New website lead",
+    sentBy: "signaturepropertycollection.com",
+    subjectPrefix: "New website lead: ",
+  }),
+});
+function alertBrand(site) {
+  return site === "signature" ? ALERT_BRANDS.signature : ALERT_BRANDS.main;
+}
+// The Little Lady's default sender; each site's own is alertBrand(site).from.
+const DEFAULT_FROM = ALERT_BRANDS.main.from;
 const DEFAULT_TO = "thelittleladyinc@gmail.com";
 
 function loftyHeaders(apiKey) {
@@ -364,7 +391,8 @@ function escapeHtml(s) {
 // The email she actually reads. Deliberately plain and information-dense: the
 // subject line alone should be enough to decide whether to stop what she's
 // doing, and every way of replying is one tap.
-function alertEmailHtml({ name, email, phone, source, noteText, leadId, stamp }) {
+function alertEmailHtml({ name, email, phone, source, noteText, leadId, stamp, site }) {
+  const brand = alertBrand(site);
   const rows = [
     ["Name", name || "(not given)"],
     ["Email", email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : "(not given)"],
@@ -375,17 +403,18 @@ function alertEmailHtml({ name, email, phone, source, noteText, leadId, stamp })
     `<td style="padding:4px 0"><strong>${v}</strong></td></tr>`).join("");
 
   return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#222;max-width:560px">
-<p style="font-size:18px;margin:0 0 4px"><strong>New website lead</strong></p>
+<p style="font-size:18px;margin:0 0 4px"><strong>${brand.heading}</strong></p>
 <table style="border-collapse:collapse;margin:8px 0 16px">${rows}</table>
 <p style="margin:0 0 4px;color:#666">What they said</p>
 <pre style="white-space:pre-wrap;font:inherit;background:#f6f6f6;padding:12px;border-radius:6px;margin:0">${escapeHtml(noteText)}</pre>
 ${leadId ? `<p style="margin:16px 0 0"><a href="https://app.lofty.com/crm/leads/${escapeHtml(leadId)}">Open this lead in Lofty</a></p>` : ""}
-<p style="margin:20px 0 0;font-size:12px;color:#888">Sent by signaturepropertycollection.com the moment the form was submitted. This does not depend on a Lofty Smart Plan — if this arrives, the lead was captured.</p>
+<p style="margin:20px 0 0;font-size:12px;color:#888">Sent by ${brand.sentBy} the moment the form was submitted. This does not depend on a Lofty Smart Plan — if this arrives, the lead was captured.</p>
 </div>`;
 }
 
 // Emails Christine directly. Independent of Lofty entirely: this is the path
-// that answers "i want to be notified immediatly".
+// that answers "i want to be notified immediatly". details.site picks the brand
+// lines (see ALERT_BRANDS).
 async function sendLeadAlertEmail(details) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { attempted: false, reason: "RESEND_API_KEY not set" };
@@ -394,7 +423,8 @@ async function sendLeadAlertEmail(details) {
     .split(",").map((s) => s.trim()).filter(Boolean);
   const customFrom = String(process.env.LEAD_ALERT_FROM || "").trim();
   const who = details.name || details.email || details.phone || "someone";
-  const subject = `New website lead: ${who}${details.sourceShort ? ` — ${details.sourceShort}` : ""}`;
+  const brand = alertBrand(details.site);
+  const subject = `${brand.subjectPrefix}${who}${details.sourceShort ? ` — ${details.sourceShort}` : ""}`;
 
   const send = async (from) => {
     const res = await fetch(RESEND_ENDPOINT, {
@@ -413,7 +443,7 @@ async function sendLeadAlertEmail(details) {
   };
 
   try {
-    let result = await send(customFrom || DEFAULT_FROM);
+    let result = await send(customFrom || brand.from);
     // 2026-09-30 (API audit): LEAD_ALERT_FROM is how the alert moves off Resend's
     // shared test sender onto her own verified domain. If that sender is refused
     // -- the domain not verified yet (403) or the address malformed (422) -- the
@@ -423,7 +453,7 @@ async function sendLeadAlertEmail(details) {
       console.error(`Resend refused LEAD_ALERT_FROM (HTTP ${result.httpStatus} ${result.response}); ` +
         "resending from the default sender.");
       const first = result;
-      result = { ...(await send(DEFAULT_FROM)), fromFallback: true, customFromRefused: first };
+      result = { ...(await send(brand.from)), fromFallback: true, customFromRefused: first };
     }
     if (!result.ok) console.error(`Resend lead alert failed: HTTP ${result.httpStatus} ${result.response}`);
     return {
@@ -440,6 +470,8 @@ module.exports = {
   LOFTY_BASE_URL,
   DEFAULT_FROM,
   DEFAULT_TO,
+  ALERT_BRANDS,
+  alertBrand,
   addLoftyNote,
   refireLoftyTag,
   addPlanTags,

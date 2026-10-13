@@ -257,6 +257,40 @@ process.env.RESEND_API_KEY = "resend-test-key";
   delete process.env.LEAD_ALERT_FROM;
 })
 
+.then(async () => {
+  // 2026-10-13: lib/_notify.js is byte-identical in both sites now; the brand
+  // lines come from the `site` this site's submission-created.js passes ("signature").
+  console.log("\n8. Every alert carries this site's brand lines (lib/_notify.js is shared)");
+  const BRAND = { from: 'Signature Property Collection <onboarding@resend.dev>', heading: 'New website lead', sentBy: 'Sent by signaturepropertycollection.com', prefix: 'New website lead: ' };
+  stubFetch(({ url, method }) => {
+    if (url.includes("api.resend.com")) return { status: 200, body: { id: "email_9" } };
+    if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 888 } } };
+    if (url.includes("/notes")) return { status: 200, body: {} };
+    if (url.includes("/leads/888") && method === "GET") return { status: 200, body: { data: { tags: [] } } };
+    if (url.includes("/leads/888") && method === "PUT") return { status: 200, body: {} };
+    return { status: 200, body: { leads: [] } };
+  });
+  await loadHandler()(submission({ name: "Brand Test", email: "b@example.com" }));
+  let emails = of("POST", "api.resend.com");
+  check("a new lead's alert: this site's sender, subject, heading and footer",
+    emails.length === 1 && emails[0].body.from === BRAND.from && emails[0].body.subject.startsWith(BRAND.prefix + "Brand Test") &&
+    emails[0].body.html.includes(`<strong>${BRAND.heading}</strong>`) && emails[0].body.html.includes(BRAND.sentBy),
+    emails[0] && JSON.stringify({ from: emails[0].body.from, subject: emails[0].body.subject }));
+  // A lead held for identity review (two contacts carry the email) is emailed too.
+  const two = { leads: [{ leadId: 101, emails: ["held@example.com"] }, { leadId: 102, emails: ["held@example.com"] }] };
+  stubFetch(({ url, method }) => {
+    if (url.includes("api.resend.com")) return { status: 200, body: { id: "email_10" } };
+    if (method === "GET" && /\/v1\.0\/leads\?/.test(url)) return { status: 200, body: /email=/.test(url) ? two : { leads: [] } };
+    return { status: 500, body: { error: "unexpected " + method + " " + url } };
+  });
+  await loadHandler()(submission({ name: "Held Test", email: "held@example.com" }));
+  emails = of("POST", "api.resend.com");
+  check("a held lead's alert: the same brand lines",
+    emails.length === 1 && emails[0].body.from === BRAND.from && emails[0].body.subject.startsWith(BRAND.prefix + "Held Test") &&
+    emails[0].body.html.includes(`<strong>${BRAND.heading}</strong>`) && emails[0].body.html.includes(BRAND.sentBy) &&
+    /MANUAL REVIEW/.test(emails[0].body.html), emails[0] && JSON.stringify({ from: emails[0].body.from, subject: emails[0].body.subject }));
+})
+
 .then(() => {
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} CHECK(S) FAILED\n`);
   process.exit(failures === 0 ? 0 : 1);
