@@ -164,7 +164,7 @@ function resp(status, body) {
   } };
   for (const k of Object.keys(require.cache)) if (k.startsWith(FN_DIR) && k !== blobsPath && !k.endsWith(".json")) delete require.cache[k];
   process.env.LOFTY_API_KEY = "k";
-  process.env.RESEND_API_KEY = "r";
+  process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api"; process.env.HUB_API_KEY = "hub_test";
   const handler = require(`${FN_DIR}/submission-created.js`).handler;
   const event = (email) => ({ body: JSON.stringify({ payload: { form_name: "contact", data: { name: "Pat Buyer", email, phone: "970-555-0100", message: "Hi" } } }) });
   const route = (existingLeads, phoneLeads) => {
@@ -172,10 +172,10 @@ function resp(status, body) {
     const bodies = [];
     const f = async (url, init = {}) => {
       const s = String(url); const m = init.method || "GET";
-      calls.push(`${m} ${s.replace(/^https:\/\/api\.(lofty|resend)\.com/, "")}`.split("?")[0]);
+      calls.push(`${m} ${s.replace(/^https:\/\/(api\.lofty\.com|hub\.example\.test\/functions\/v1\/hub-api)/, "")}`.split("?")[0]);
       if (m === "POST" && /\/v1\.0\/leads$/.test(s)) bodies.push(JSON.parse(init.body));
       if (m === "GET" && /\/v1\.0\/leads\?phone=/.test(s)) return resp(200, { leads: phoneLeads || existingLeads });
-      if (/resend\.com/.test(s)) return resp(200, { id: "e1" });
+      if (/hub\.example\.test/.test(s)) return resp(200, { status: "sent", provider_id: "e1" });
       if (m === "GET" && /\/v1\.0\/leads\?/.test(s)) return resp(200, { leads: existingLeads });
       if (m === "POST" && /\/v1\.0\/leads$/.test(s)) return resp(200, `{"data":{"leadId": ${existingLeads.length ? EXISTING : NEWID}}}`);
       if (/\/notes$/.test(s)) return resp(200, "{}");
@@ -196,7 +196,7 @@ function resp(status, body) {
   let rec = pushes[pushes.length - 1];
   check("returning: looked up first, then the lead pushed as before",
     rt.calls.indexOf("GET /v1.0/leads") === 0 && rt.calls.includes("POST /v1.0/leads"), JSON.stringify(rt.calls));
-  check("returning: backup email still sent", rt.calls.some((c) => /\/emails$/.test(c)));
+  check("returning: backup email still sent", rt.calls.some((c) => /\/v1\/email\/send$/.test(c)));
   check("returning: the note goes to the existing contact", rec.noteResult && rec.noteResult.ok === true && rec.existing.found === true);
   check("returning: task + push, recorded", rt.calls.includes("POST /v2.0/tasks") &&
     rt.calls.includes("POST /v2.0/sales-agent/notification/app-push/send-task-reminder") && rec.returningResult.ok === true);

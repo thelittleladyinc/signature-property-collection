@@ -105,10 +105,10 @@ function fakeLofty({ emailHits = [], phoneHits = [], searchStatus = 200, createS
   let creates = 0;
   f.fetch = async (url, init = {}) => {
     const s = String(url); const m = init.method || "GET";
-    const p = s.replace(/^https:\/\/api\.(lofty|resend)\.com/, "").split("?")[0];
+    const p = s.replace(/^https:\/\/(api\.lofty\.com|hub\.example\.test\/functions\/v1\/hub-api)/, "").split("?")[0];
     const body = init.body ? JSON.parse(init.body) : null;
     f.log.push({ m, p, body });
-    if (/resend\.com/.test(s)) return resp(200, { id: "e1" });
+    if (/hub\.example\.test/.test(s)) return resp(200, { status: "sent", provider_id: "e1" });
     if (m === "GET" && /\/v1\.0\/leads\?/.test(s)) {
       if (searchStatus !== 200) return resp(searchStatus, "down");
       return resp(200, { leads: /email=/.test(s) ? emailHits : phoneHits });
@@ -170,7 +170,7 @@ require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, e
 } };
 for (const k of Object.keys(require.cache)) if (k.startsWith(FN_DIR) && k !== blobsPath && !k.endsWith(".json")) delete require.cache[k];
 process.env.LOFTY_API_KEY = "k";
-process.env.RESEND_API_KEY = "r";
+process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api"; process.env.HUB_API_KEY = "hub_test";
 delete process.env.FLODESK_API_KEY;
 const handler = require(`${FN_DIR}/submission-created.js`).handler;
 const L = require(`${FN_DIR}/lib/_lofty.js`);
@@ -468,6 +468,31 @@ function blobStore(seed) {
   check("...but not when the note never confirmed the new contact", f.posts.length === 0 && planPuts(f).length === 0);
 
   console.log(`\n13. Same modules as the other site (${SIBLING})`);
+  // 2026-10-15: lib/_notify.js is shared too, apart from its four per-site
+  // BRAND_ lines at the top (sender headline, footer domain, subject prefix and
+  // the site's id in the hub's idempotency key). Checked here on its own, so CI
+  // (which has no sibling checkout) still catches a brand line creeping back
+  // into the shared body.
+  const BRAND_LINE = /^const BRAND_(SITE|HEADLINE|DOMAIN|SUBJECT_PREFIX) = "[^"\n]*";$/;
+  const withoutBrand = (text) => text.split("\n").filter((l) => !BRAND_LINE.test(l)).join("\n");
+  const notifyHere = fs.readFileSync(`${FN_DIR}/lib/_notify.js`, "utf8");
+  const brandLines = notifyHere.split("\n").filter((l) => BRAND_LINE.test(l));
+  check("lib/_notify.js keeps exactly four per-site lines, the BRAND_ constants",
+    brandLines.length === 4 && new Set(brandLines.map((l) => l.split(" ")[1])).size === 4, JSON.stringify(brandLines));
+  check("...and names neither site anywhere else in the file",
+    !/little lady|signature property|thelittleladysellshomes\.com|signaturepropertycollection\.com/i.test(withoutBrand(notifyHere)));
+  check("...and no longer calls Resend itself or falls back to its test sender",
+    !/api\.resend\.com|onboarding@resend\.dev|RESEND_API_KEY/.test(notifyHere));
+  const otherNotify = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib", "_notify.js");
+  if (fs.existsSync(otherNotify)) {
+    check(`lib/_notify.js is identical to ${SIBLING}'s copy apart from the four BRAND_ lines`,
+      withoutBrand(fs.readFileSync(otherNotify, "utf8")) === withoutBrand(notifyHere));
+  }
+  const otherConsent = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib", "_lofty-consent.js");
+  if (fs.existsSync(otherConsent)) {
+    check(`lib/_lofty-consent.js is byte-identical to ${SIBLING}'s copy`,
+      fs.readFileSync(otherConsent, "utf8") === fs.readFileSync(`${FN_DIR}/lib/_lofty-consent.js`, "utf8"));
+  }
   const other = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib", "_form-plans.js");
   if (fs.existsSync(other)) {
     check(`lib/_form-plans.js is byte-identical to ${SIBLING}'s copy`,
