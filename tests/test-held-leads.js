@@ -113,13 +113,13 @@ const heldResult = () => ({
   require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, exports: { getStore: () => store } };
   for (const k of Object.keys(require.cache)) if (k.startsWith(FN_DIR) && k !== blobsPath && !k.endsWith(".json")) delete require.cache[k];
   process.env.LOFTY_API_KEY = "k";
-  process.env.RESEND_API_KEY = "r";
+  process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api"; process.env.HUB_API_KEY = "hub_test";
   delete process.env.FLODESK_API_KEY;
   const routes = [];
   global.fetch = async (url, init = {}) => {
     const u = String(url); const m = init.method || "GET";
-    routes.push(`${m} ${u.replace(/^https:\/\/api\.(lofty|resend)\.com/, "").split("?")[0]}`);
-    if (/resend\.com/.test(u)) return resp(200, { id: "e1" });
+    routes.push(`${m} ${u.replace(/^https:\/\/(api\.lofty\.com|hub\.example\.test\/functions\/v1\/hub-api)/, "").split("?")[0]}`);
+    if (/hub\.example\.test/.test(u)) return resp(200, { status: "sent", provider_id: "e1" });
     if (m === "GET" && /\/v1\.0\/leads\?/.test(u)) return resp(200, /email=/.test(u) ? twoMatches : { leads: [] });
     return resp(500, `unexpected ${m} ${u}`);
   };
@@ -127,7 +127,7 @@ const heldResult = () => ({
   const out = await handler({ body: JSON.stringify({ payload: { id: SUBMISSION_ID, number: 17, form_name: "contact", data: PERSON } }) });
   check("answers 200 and says the lead is held", out.statusCode === 200 && /manual review/.test(out.body), JSON.stringify(out));
   check("no create was attempted", !routes.includes("POST /v1.0/leads"), routes.join(" | "));
-  check("the alert email still went out", routes.includes("POST /emails"), routes.join(" | "));
+  check("the alert email still went out", routes.includes("POST /v1/email/send"), routes.join(" | "));
   held = store.data[L.MANUAL_REVIEW_KEY];
   check("the lead is in the held-lead record under Netlify's submission id",
     Array.isArray(held) && held.length === 1 && held[0].submissionId === SUBMISSION_ID && held[0].formName === "contact", JSON.stringify(held));

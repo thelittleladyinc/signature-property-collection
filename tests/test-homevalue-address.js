@@ -16,7 +16,7 @@ global.fetch = async (url, opts = {}) => {
   const r = u.includes("/leads") && opts.method === "POST" ? { data: { leadId: 42 } } : { data: { tags: [] } };
   return { ok: true, status: 200, text: async () => JSON.stringify(r), json: async () => r, headers: { get: () => null } };
 };
-process.env.LOFTY_API_KEY = "k"; process.env.RESEND_API_KEY = "r";
+process.env.LOFTY_API_KEY = "k"; process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api"; process.env.HUB_API_KEY = "hub_test";
 const handler = require(path.join(FN_DIR, "submission-created.js")).handler;
 const { propertyFromAddress } = require(path.join(FN_DIR, "lib/_lead-address.js"));
 const sub = (formName, data) => ({ body: JSON.stringify({ payload: { form_name: formName, data } }) });
