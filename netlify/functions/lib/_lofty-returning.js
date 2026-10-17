@@ -47,9 +47,17 @@
 //     be shared (a spouse), so a phone-only match just blocks the field write
 //     and switches the create call to tagsAdd.
 //   - Responses are parsed whole; only what is stored for /status is cut short.
+//
+// 2026-10-17 (Wave 1b), with LOFTY_VIA_HUB=on (lib/_lofty-hub.js): the lookup is
+// the hub's (findExistingLead asks Lofty nothing itself), "proven new" comes from
+// the hub's answer (leadIdFromResponse), and the Call task still goes out on this
+// site's own key -- the hub has no task route yet -- but only after the hub's
+// consent route says the lead may be called. The website fields and the search
+// wishes stay on this site's own key too (no hub route), for a contact proven new.
 "use strict";
 
 const { inferCountyFromCity } = require("./_mls-shared");
+const { loftyViaHub, hubCreatedLeadId, consentViaHub } = require("./_lofty-hub");
 
 const LOFTY_API = "https://api.lofty.com";
 const CALL_TIMEOUT_MS = 5000;
@@ -85,8 +93,13 @@ function idsFrom(text, key) {
   return out;
 }
 
-// The id a POST /v1.0/leads answer carries, exactly.
+// The id a POST /v1.0/leads answer carries, exactly. On the hub path (a postLead
+// answer from lib/_lofty-hub.js) it is the contact the hub CREATED, and null when
+// the hub found or merged into an existing one -- which is what keeps "proven new"
+// (the plan tag, the website fields) to a contact that really is new.
 function leadIdFromResponse(text) {
+  const viaHub = hubCreatedLeadId(text);
+  if (viaHub !== undefined) return viaHub;
   return idsFrom(text, "leadId")[0] || idsFrom(text, "id")[0] || null;
 }
 
@@ -173,6 +186,11 @@ async function findLeadByPhone(phone, apiKey, opts) {
 //   leadId    the EMAIL match -- the only one used to redirect note/task/link
 //   anyMatch  anyone at all by email or phone (blocks fields, switches to tagsAdd)
 async function findExistingLead(email, phone, apiKey, opts) {
+  // Through the hub: no lookup here. The hub's push looks the person up (email,
+  // then phone), refuses several or loose matches (held for review), and says
+  // whether it created the contact; nothing new is decided from this answer
+  // (the tags are always merged and a lead type is only ever sent on a create).
+  if (loftyViaHub()) return { attempted: false, ok: true, leadId: null, anyMatch: false, via: "hub" };
   try {
     const o = opts || {};
     const signal = AbortSignal.timeout(o.budgetMs || LOOKUP_BUDGET_MS);
@@ -231,6 +249,17 @@ async function alertReturningLead(leadId, details, apiKey, opts) {
   try {
     const o = opts || {};
     if (!apiKey || !leadId) return { attempted: false };
+    // Through the hub: a Call task only for a lead the hub's consent route says
+    // may be called (Do Not Contact, cannotCall, an unreadable tag list or no
+    // answer at all: no task, and nothing is written).
+    if (loftyViaHub()) {
+      const c = await consentViaHub(leadId, o);
+      if (!c.known) return { attempted: false, ok: false, step: "consent", viaHub: true, error: `call task held: ${c.reason}` };
+      if (c.doNotContact || !c.mayCall) {
+        return { attempted: false, ok: false, step: c.doNotContact ? "do-not-contact" : "may-not-call", viaHub: true,
+          skipped: c.doNotContact ? "Do Not Contact: no call task" : "the lead may not be called: no call task" };
+      }
+    }
     const now = o.now ? new Date(o.now) : new Date();
     const body = withId({
       type: "Call",

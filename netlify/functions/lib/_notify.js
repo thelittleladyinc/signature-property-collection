@@ -64,6 +64,13 @@ const BRAND_DOMAIN = "signaturepropertycollection.com";
 const BRAND_SUBJECT_PREFIX = "New website lead: ";
 
 const crypto = require("crypto");
+// 2026-10-17 (Wave 1b): the Lofty work through the hub (OFF unless LOFTY_VIA_HUB
+// is exactly "on") and the router copy (OFF unless LEADS_TO_ROUTER is): see
+// lib/_lofty-hub.js. Do Not Contact and the email opt-out are read with the
+// shared toolkit's one test (lib/suite-kit, a vendored copy).
+const hub = require("./_lofty-hub");
+const { alertReturningLead } = require("./_lofty-returning");
+const { isDncTag, isEmailOptOutTag } = require("./suite-kit/lofty");
 
 const LOFTY_BASE_URL = "https://api.lofty.com/v1.0";
 const TIMEOUT_MS = 8000;
@@ -110,6 +117,9 @@ function isLeadMissing(res) {
 
 // POST /notes — NOT /leads/{id}/notes, which 404s. See the header comment.
 async function addLoftyNote(leadId, content, apiKey, opts) {
+  // Through the hub (lib/_lofty-hub.js): the push already carried the form's
+  // note, so that one is not sent again; any other note goes to /v1/lofty/note.
+  if (hub.loftyViaHub()) return hub.noteViaHub(leadId, content, opts);
   if (!leadId || !content || !apiKey) return { attempted: false };
   // leadId is sent as a Number because that is what works in
   // sellerintelligence; Lofty's ids are large but well inside 2^53.
@@ -204,6 +214,36 @@ function describeTagShape(payload) {
   return `'tags' was an array of ${lead.tags.length} item(s) of type ${kinds.join("/") || "—"}`;
 }
 
+// 2026-10-17: why a lead must not be given a Smart Plan tag, or null. Do Not
+// Contact ("Consent – DNC", "#dnc", "OPTED OUT", "Expired Elite – OPTED OUT", any
+// dash or case -- the shared toolkit's one test) or an email opt-out ("Consent –
+// Unsubscribed", or cannotEmail on the lead): the plans email, and DNC wins.
+function stopContactStep(payload, tags) {
+  if (tags.some(isDncTag)) return "do-not-contact";
+  if (tags.some(isEmailOptOutTag) || leadFromPayload(payload).cannotEmail === true) return "email-opt-out";
+  return null;
+}
+
+// The hub path's stand-in for the re-fire (LOFTY_VIA_HUB=on). For a contact the
+// hub created there is nothing to do: it added the tags after the create, so
+// Lofty records them as added and the Smart Plan starts. A tag already on a
+// contact the hub found cannot be taken off and put back (the hub has no route
+// that removes a tag), so a returning contact gets what one found by email has
+// always got: the Call task and the push to her phone (lib/_lofty-returning.js,
+// this site's own key -- the hub has no task route yet -- and only after the
+// hub's consent route says the lead may be called).
+async function afterHubPush(leadId, apiKey, opts) {
+  const next = hub.afterPush(leadId);
+  if (next.kind === "new") {
+    return { attempted: false, ok: true, viaHub: true, step: "hub-tags-after-create", tagRestored: true };
+  }
+  if (next.kind !== "returning") {
+    return { attempted: false, ok: true, viaHub: true, tagRestored: true, skipped: "no hub answer for this lead in this run; nothing re-fired" };
+  }
+  const task = await alertReturningLead(leadId, next.details, apiKey, opts);
+  return { attempted: !!task.attempted, ok: !!task.ok, viaHub: true, step: "returning-lead-task", tagRestored: true, task };
+}
+
 // Guarantees that `triggerTag` counts as newly ADDED on this lead, so a Smart
 // Plan triggered by it fires even when the lead already carried the tag from a
 // previous enquiry.
@@ -223,6 +263,7 @@ function describeTagShape(payload) {
 // now reports tagRestored:false (step "refired-unconfirmed"). Nothing about which
 // calls are made, or in what order, changes: only what the catch hands back.
 async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
+  if (hub.loftyViaHub()) return afterHubPush(leadId, apiKey, opts);
   if (!leadId || !triggerTag || !apiKey) return { attempted: false };
   let removeSent = false;
   let restored = false;
@@ -266,6 +307,14 @@ async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
         step: notReturned ? "tags-not-returned" : "unreadable-tags",
         tagRestored: true, tagShape: shape,
       };
+    }
+    // 2026-10-17: Do Not Contact wins, and the trigger tag starts a Smart Plan: a
+    // lead that is Do Not Contact or opted out of email is never re-fired. Nothing
+    // is written; the tag the create put on stays where it is.
+    const stop = stopContactStep(current.json, tags);
+    if (stop) {
+      console.warn(`Lofty tag refire held for lead ${leadId}: ${stop}.`);
+      return { attempted: true, ok: false, step: stop, tagRestored: true, tagsSeen: tags.length };
     }
     const had = tags.includes(triggerTag);
 
@@ -327,6 +376,9 @@ async function refireLoftyTag(leadId, triggerTag, apiKey, opts) {
 // left exactly where it is (never taken off and put back: this is a first add,
 // not a re-fire). Only the plan tags not there yet go on, in one PUT.
 async function addPlanTags(leadId, planTags, apiKey, opts) {
+  // Through the hub: a second /v1/lofty/lead (create:false, the plan tag only),
+  // after the hub's consent route says the lead may be emailed. See lib/_lofty-hub.js.
+  if (hub.loftyViaHub()) return hub.planTagsViaHub(leadId, planTags, opts);
   const wanted = Array.from(new Set((Array.isArray(planTags) ? planTags : [])
     .filter((t) => typeof t === "string" && t.trim())));
   if (!leadId || !wanted.length || !apiKey) return { attempted: false };
@@ -348,6 +400,12 @@ async function addPlanTags(leadId, planTags, apiKey, opts) {
         step: /no 'tags' field/.test(shape) ? "tags-not-returned" : "unreadable-tags",
         planTags: wanted, added: [], tagShape: shape,
       };
+    }
+    // 2026-10-17: never a plan tag on a Do Not Contact or email-opted-out lead.
+    const stop = stopContactStep(current.json, tags);
+    if (stop) {
+      console.warn(`Lofty plan tag held for lead ${leadId}: ${stop}.`);
+      return { attempted: true, ok: false, step: stop, planTags: wanted, added: [], tagsSeen: tags.length };
     }
     const alreadyPresent = wanted.filter((t) => tags.includes(t));
     const missing = wanted.filter((t) => !tags.includes(t));
@@ -489,7 +547,20 @@ function readHubAnswer(r) {
 // email_from_allowed; a refused From is asked once more without it, so the hub's
 // own sender carries the alert rather than nothing. Never throws, and never
 // fails the submission: the lead is already in Netlify Forms (and Lofty).
+//
+// 2026-10-17 (Wave 1b): with LEADS_TO_ROUTER=on, the lead is also recorded with
+// the hub's lead router (lib/_lofty-hub.js routerCopy), started alongside the
+// email -- this runs once per submission on every path, held ones included. It
+// never throws, has its own short limit, and changes nothing else; switched off,
+// it makes no call and this returns exactly what it always did.
 async function sendLeadAlertEmail(details) {
+  const routed = hub.routerCopy(details, { site: BRAND_SITE });
+  const result = await sendAlertEmailNow(details);
+  const router = await routed;
+  return router && (router.attempted || router.error || router.skipped) ? { ...result, router } : result;
+}
+
+async function sendAlertEmailNow(details) {
   const endpoint = hubEndpoint(process.env);
   if (!endpoint.url) {
     console.log(`Lead alert email skipped: ${endpoint.reason}.`);
@@ -542,6 +613,7 @@ async function sendLeadAlertEmail(details) {
 }
 
 module.exports = {
+  BRAND_SITE,
   LOFTY_BASE_URL,
   DEFAULT_TO,
   HUB_EMAIL_PATH,

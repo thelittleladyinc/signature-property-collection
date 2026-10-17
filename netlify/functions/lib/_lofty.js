@@ -40,6 +40,21 @@
 //      looked. Until now that lead lived only in the alert email. It is kept
 //      under MANUAL_REVIEW_KEY, with the submission and the reason, where
 //      /status counts it and names the submission ids (never the person).
+//
+//   5. THROUGH THE HUB (2026-10-17, Wave 1b; OFF unless LOFTY_VIA_HUB is exactly
+//      "on"). postLead and the queue replay send the lead to the Seller
+//      Intelligence hub (POST /v1/lofty/lead) instead of Lofty, and never fall
+//      back to LOFTY_API_KEY for it: a hub that can't take it means the queue.
+//      See lib/_lofty-hub.js.
+//
+//   6. ONE DRAIN AT A TIME (2026-10-17). Both sites' scheduled drains can read the
+//      same queue (when this site's Blobs settings point at the other's store).
+//      The lease each takes now carries its own token, a lease left by a dead run
+//      is taken over by a write that only succeeds if nobody else took it first
+//      (Blobs onlyIfMatch on the lease's etag), the winner reads the lease back
+//      before it replays anything, and a drain releases only its own lease. A lead
+//      queued through the hub by the OTHER site is left for that site's drain when
+//      this one is on its own key.
 const LOFTY_BASE_URL = "https://api.lofty.com/v1.0";
 const LAST_PUSH_KEY = "lofty-last-push.json";
 const FAILED_PUSH_KEY = "lofty-failed-pushes.json";
@@ -71,7 +86,9 @@ const {
   leadIdFromResponse, findExistingLead, alertReturningLead,
   ensureWebsiteFields, setWebsiteFields, websiteFieldValues, inquiryFromForm, placeInquiry,
 } = require("./_lofty-returning");
-const { addLoftyNote, refireLoftyTag, addPlanTags } = require("./_notify");
+const { addLoftyNote, refireLoftyTag, addPlanTags, BRAND_SITE } = require("./_notify");
+const { loftyViaHub, pushLeadViaHub, confirmCreated } = require("./_lofty-hub");
+const crypto = require("crypto");
 
 // Must match submission-created.js TRIGGER_TAG (pinned by tests/test-queue-replay-steps.js).
 const REPLAY_TRIGGER_TAG = "Hot Lead - Website";
@@ -153,7 +170,12 @@ async function postOnce(body, apiKey, timeoutMs = POST_TIMEOUT_MS) {
 // Posts a lead, falling back to the minimal payload shape if Lofty rejects the
 // full one as malformed. Returns what happened, including which shape was used.
 // opts.deadline (epoch ms): see MIN_RETRY_MS. Without it, behaves as before.
+// With LOFTY_VIA_HUB=on the lead goes to the hub instead (lib/_lofty-hub.js), and
+// this site's own key is not used for it, not even when the hub can't take it:
+// the caller then queues it as it queues any failed push. `site` marks whose
+// hub-path lead it is, so the other site's own-key drain leaves it alone.
 async function postLead(body, apiKey, opts = {}) {
+  if (loftyViaHub()) return { ...(await pushLeadViaHub(body, opts)), site: BRAND_SITE };
   const deadline = opts.deadline || Infinity;
   const left = () => deadline - Date.now();
   const full = await postOnce(body, apiKey, Math.min(POST_TIMEOUT_MS, left()));
@@ -236,26 +258,63 @@ async function holdForManualReview(store, held) {
 // a lead that failed during an outage arrives on a later run instead of waiting
 // on someone noticing. Bounded and wrapped: any throw is caught by the caller
 // and the queue is simply left for next time.
+//
+// 2026-10-17: the lease is one drain's, provably (6. in the header). Returns the
+// lease taken, or null when another drain holds it or it can't be confirmed.
+//   - Each lease carries a random token.
+//   - A lease older than DRAIN_LOCK_TTL_MS is taken over with a write that only
+//     lands if the lease is still the stale one this drain read (onlyIfMatch on
+//     its etag): two drains that both find the same dead lease can no longer both
+//     take it (the old delete-then-create let the second delete the first's
+//     fresh lease). A store without etags (the tests' in-memory ones) keeps the
+//     old delete-then-create.
+//   - The winner reads the lease back and replays only if its own token is there:
+//     Netlify Blobs reports any answer but 412 to a conditional write as "made",
+//     so "made" alone is not proof. Unreadable means stand aside (fail closed).
+async function readLease(store) {
+  if (typeof store.getWithMetadata === "function") {
+    const r = await store.getWithMetadata(DRAIN_LOCK_KEY, { type: "json" });
+    return r ? { lease: r.data || null, etag: r.etag || null } : { lease: null, etag: null };
+  }
+  return { lease: await store.get(DRAIN_LOCK_KEY, { type: "json" }), etag: null };
+}
+
+async function confirmLease(store, lease) {
+  const now = await store.get(DRAIN_LOCK_KEY, { type: "json" }).catch(() => null);
+  return now && now.token === lease.token ? lease : null;
+}
+
 async function takeDrainLease(store) {
-  const lease = { at: new Date().toISOString() };
+  const lease = { at: new Date().toISOString(), token: crypto.randomUUID(), by: BRAND_SITE };
   try {
     const first = await store.setJSON(DRAIN_LOCK_KEY, lease, { onlyIfNew: true });
-    if (!first || first.modified !== false) return true;
-    const held = await store.get(DRAIN_LOCK_KEY, { type: "json" }).catch(() => null);
-    const age = held && Date.parse(held.at);
-    if (Number.isFinite(age) && Date.now() - age < DRAIN_LOCK_TTL_MS) return false;
-    await store.delete(DRAIN_LOCK_KEY);
-    const again = await store.setJSON(DRAIN_LOCK_KEY, lease, { onlyIfNew: true });
-    return !again || again.modified !== false;
+    if (!first || first.modified !== false) return await confirmLease(store, lease);
+    const held = await readLease(store);
+    const age = held.lease && Date.parse(held.lease.at);
+    if (Number.isFinite(age) && Date.now() - age < DRAIN_LOCK_TTL_MS) return null;
+    if (held.etag) {
+      const swap = await store.setJSON(DRAIN_LOCK_KEY, lease, { onlyIfMatch: held.etag });
+      if (swap && swap.modified === false) return null;
+    } else {
+      await store.delete(DRAIN_LOCK_KEY);
+      const again = await store.setJSON(DRAIN_LOCK_KEY, lease, { onlyIfNew: true });
+      if (again && again.modified === false) return null;
+    }
+    return await confirmLease(store, lease);
   } catch (err) {
     console.error("Lofty queue drain: could not take the lease (skipping this run):", err && err.message);
-    return false;
+    return null;
   }
 }
 
-async function releaseDrainLease(store) {
+// Releases this drain's own lease only: one another drain took over is left alone.
+async function releaseDrainLease(store, lease) {
   try {
-    if (typeof store.delete === "function") await store.delete(DRAIN_LOCK_KEY);
+    if (typeof store.delete !== "function") return;
+    // Unreadable: left to expire rather than risk deleting another drain's lease.
+    const now = await store.get(DRAIN_LOCK_KEY, { type: "json" });
+    if (now && (!lease || now.token !== lease.token)) return;
+    await store.delete(DRAIN_LOCK_KEY);
   } catch (err) {
     // Expires on its own after DRAIN_LOCK_TTL_MS.
   }
@@ -265,10 +324,11 @@ async function releaseDrainLease(store) {
 // so a caller with a hard time limit finishes and writes the queue back.
 // 2026-10-07: an off switch for the queue replay that does not mean taking the
 // Lofty key away from the whole site. LOFTY_QUEUE_DRAIN=off (also false, 0, no,
-// pause, paused) stops every replay: this site's scheduled drain and, on
-// Signature, the drain inside its 30-minute sync. Unset, or any other value,
-// leaves it running exactly as before. The queue itself is left untouched, so
-// turning it back on replays what waited.
+// pause, paused) stops every replay: this site's scheduled drain (each site's
+// lofty-queue-drain.js is the only caller; Signature's 30-minute sync stopped
+// draining on 2026-10-04). Unset, or any other value, leaves it running exactly
+// as before. The queue itself is left untouched, so turning it back on replays
+// what waited.
 function queueDrainOff() {
   return /^(off|false|0|no|pause|paused)$/i.test(String(process.env.LOFTY_QUEUE_DRAIN || "").trim());
 }
@@ -278,11 +338,12 @@ async function drainFailedPushes(store, apiKey, opts) {
   if (queueDrainOff()) return { attempted: 0, recovered: 0, paused: true };
   const peek = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
   if (!peek.length) return { attempted: 0, recovered: 0 };
-  if (!(await takeDrainLease(store))) return { attempted: 0, recovered: 0, locked: true };
+  const lease = await takeDrainLease(store);
+  if (!lease) return { attempted: 0, recovered: 0, locked: true };
   try {
     return await drainWithLease(store, apiKey, opts || {});
   } finally {
-    await releaseDrainLease(store);
+    await releaseDrainLease(store, lease);
   }
 }
 
@@ -293,12 +354,14 @@ async function drainWithLease(store, apiKey, opts) {
   if (!queue.length) return { attempted: 0, recovered: 0 };
 
   const remaining = [];
+  const viaHub = loftyViaHub();
   let attempted = 0;
   let recovered = 0;
   let deferred = 0;
   let finished = 0;
   let consentHeld = 0;
   let heldForReview = 0;
+  let leftForHub = 0;
   let i = 0;
   try {
     for (; i < queue.length; i++) {
@@ -310,6 +373,15 @@ async function drainWithLease(store, apiKey, opts) {
       if (entry.manualReview) {
         const moved = await holdForManualReview(store, { ...entry, reason: entry.reason || entry.heldReason || "identity needs manual review" });
         if (moved) heldForReview += 1; else remaining.push(entry);
+        continue;
+      }
+      // 2026-10-17: a lead the OTHER site queued through the hub (its LOFTY_VIA_HUB
+      // is on) is never replayed with this site's own key; its own drain sends it
+      // through the hub. One this site queued through the hub before its switch was
+      // turned off again is replayed here as before (that is the rollback).
+      if (!viaHub && entry.viaHub === true && entry.site && entry.site !== BRAND_SITE) {
+        leftForHub += 1;
+        remaining.push(entry);
         continue;
       }
       // 2026-10-05: Lofty accepted this lead on a run that ran out of time before
@@ -331,6 +403,15 @@ async function drainWithLease(store, apiKey, opts) {
         continue;
       }
       attempted += 1;
+      if (viaHub) {
+        const r = await replayViaHub(entry, { apiKey, store, deadline });
+        recovered += r.recovered || 0;
+        deferred += r.deferred || 0;
+        consentHeld += r.consentHeld || 0;
+        heldForReview += r.heldForReview || 0;
+        if (r.keep) remaining.push(r.keep);
+        continue;
+      }
       // 2026-09-29: a replay never REPLACES tags. By the time it runs the contact
       // may exist -- a create that timed out on our side can still have landed in
       // Lofty -- and `tags` would wipe anything added since. `tagsAdd` only adds.
@@ -407,8 +488,9 @@ async function drainWithLease(store, apiKey, opts) {
           (deferred ? ` ${deferred} accepted by Lofty with follow-up steps left for the next run.` : "") +
           (finished ? ` ${finished} finished the follow-up steps an earlier run ran out of time for.` : "") +
           (heldForReview ? ` ${heldForReview} held for identity review (see /status).` : "") +
-          (consentHeld ? ` Texting left off on ${consentHeld} that said yes to texts (see the function log).` : ""),
-        payloadShape: "queued retry",
+          (consentHeld ? ` Texting left off on ${consentHeld} that said yes to texts (see the function log).` : "") +
+          (leftForHub ? ` ${leftForHub} queued through the hub by the other site, left for its own drain.` : ""),
+        payloadShape: viaHub ? "queued retry (hub)" : "queued retry",
       }).catch(() => {});
     }
   }
@@ -416,7 +498,59 @@ async function drainWithLease(store, apiKey, opts) {
     attempted, recovered, stillQueued: remaining.length,
     ...(deferred ? { deferred } : {}), ...(finished ? { finished } : {}),
     ...(heldForReview ? { heldForReview } : {}), ...(consentHeld ? { consentHeld } : {}),
+    ...(leftForHub ? { leftForHub } : {}), ...(viaHub ? { viaHub: true } : {}),
   };
+}
+
+// One queued lead replayed through the hub (LOFTY_VIA_HUB=on): the same push the
+// live form path makes (lib/_lofty-hub.js), then the same follow-up steps
+// (finishReplay), with what the hub answered standing in for this site's own
+// lookup. Never this site's own key for the lead, its tags or its note. Returns
+// what to count, and the entry to keep in the queue (keep) when it stays.
+async function replayViaHub(entry, ctx) {
+  const { apiKey, store, deadline } = ctx;
+  const lead = { ...entry.lead };
+  if (Array.isArray(lead.tags)) {
+    lead.tagsAdd = [...new Set([...(lead.tagsAdd || []), ...lead.tags])];
+    delete lead.tags;
+  }
+  const planned = planOf(entry);
+  if (Array.isArray(lead.tagsAdd) && planned.planTags.length) {
+    lead.tagsAdd = lead.tagsAdd.filter((t) => !planned.planTags.includes(t));
+  }
+  // The hub sends a lead type on a create only, so the plan's type rides on every
+  // replay: a contact the hub finds keeps its own.
+  delete lead.leadTypes;
+  if (planned.leadTypes.length) lead.leadTypes = planned.leadTypes.slice();
+  // An earlier hub attempt for this entry that got as far as making the contact.
+  const prior = entry.hub && entry.hub.leadId ? entry.hub : null;
+  const result = await postLead(lead, apiKey, { deadline, withoutNote: !!(prior && prior.noteAdded) });
+  if (!result.ok) {
+    if (result.manualReview) {
+      const flagged = { ...entry, ...result, manualReview: true, heldReason: result.reason, reason: result.reason };
+      if (await holdForManualReview(store, flagged)) {
+        console.warn(`Queued Lofty lead from "${entry.formName}" held by the hub: ${result.reason}.`);
+        return { heldForReview: 1 };
+      }
+      return { keep: flagged };
+    }
+    return { keep: { ...entry, lastRetryAt: new Date().toISOString(), ...result, hub: result.hub || entry.hub } };
+  }
+  const h = result.hub;
+  console.log(`Recovered a queued Lofty lead from "${entry.formName}" through the hub (${h.status}).`);
+  const createdBefore = !!(prior && prior.created && !prior.merged && prior.leadId === h.leadId);
+  if (createdBefore) confirmCreated(h.leadId);
+  const newId = (h.created && !h.merged) || createdBefore ? h.leadId : null;
+  const identity = { ok: true, anyMatch: !newId, leadId: newId ? null : h.leadId, via: "hub" };
+  // The push carried the note (or an earlier attempt did), and on a contact the
+  // hub created it added the tags after the create, so neither step runs again.
+  const steps = { note: { attempted: true, ok: !!(h.noteAdded || (prior && prior.noteAdded)), viaHub: true, step: "with-push" } };
+  if (newId) steps.tag = { attempted: false, ok: true, tagRestored: true, viaHub: true, step: "hub-tags-after-create" };
+  let consentHeld = 0;
+  const consent = await applyTextingPreference(h.leadId, consentPhoneOf(entry.lead), entry.smsConsent === true, apiKey, { deadline });
+  if (entry.smsConsent === true && !consent.textingEnabled) consentHeld = 1;
+  const kept = await finishReplay(entry, lead, { identity, newId, target: h.leadId, apiKey, store, deadline, accepted: result, steps });
+  return { recovered: 1, consentHeld, ...(kept ? { deferred: 1, keep: kept } : {}) };
 }
 
 // The steps submission-created.js runs after a successful create, for a
@@ -454,7 +588,9 @@ async function finishReplay(entry, lead, ctx) {
     // nobody and the create's own id took the note) gets its plan tag.
     planTags: { owed: () => !!(newContact && planOf(entry).planTags.length), skip: () => !provenNew(),
       run: async () => {
-        const r = await addPlanTags(newId, planOf(entry).planTags, apiKey, o);
+        // `person`: who the lead is, for the hub path (it finds a lead by email or
+        // phone); today's path reads only the deadline from these options.
+        const r = await addPlanTags(newId, planOf(entry).planTags, apiKey, { ...o, person: lead });
         console.log(`Queued Lofty lead from "${entry.formName}": nurture plan tag ` +
           (r.ok ? `${r.added && r.added.length ? `added (${r.added.join(", ")})` : "already on the lead"}`
             : `NOT added (${r.step || r.error || "failed"})`) + ` on lead ${newId}.`);
@@ -521,4 +657,7 @@ module.exports = {
   drainFailedPushes,
   queueDrainOff,
   REPLAY_TRIGGER_TAG,
+  DRAIN_LOCK_TTL_MS,
+  takeDrainLease,
+  releaseDrainLease,
 };
