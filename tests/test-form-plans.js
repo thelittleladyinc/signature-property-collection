@@ -264,7 +264,8 @@ function blobStore(seed) {
   const renderedUndecided = [...rendered].filter((n) => !decided.has(n));
   check(`every form rendered on the site (${rendered.size}) has a decision`, rendered.size > 0 && renderedUndecided.length === 0, renderedUndecided.join(", "));
   check("the module's own no-plan list is the one tested here", same([...P.FORMS_WITHOUT_PLAN].sort(), NO_PLAN.slice(0, 5).sort()));
-  check(`this site asks for its own plans (site: "${SITE}")`, submission.includes(`planForSubmission(formName, data, { site: "${SITE}" })`));
+  check(`this site asks for its own plans (site: "${SITE}"), with the value-review switch`,
+    submission.includes(`planForSubmission(formName, data, { site: "${SITE}", valueReviewPlan: valueReviewPlanOn(process.env) })`));
 
   console.log("\n5. A new seller: lead type on the create, plan tag added after it");
   let f = fakeLofty();
@@ -466,6 +467,62 @@ function blobStore(seed) {
   f = fakeLofty({ leads: { [NEWID]: { tags: ["Hot Lead - Website"], phones: [] } } });
   d = await drain(f, deferred({ note: { ok: false } }));
   check("...but not when the note never confirmed the new contact", f.posts.length === 0 && planPuts(f).length === 0);
+
+  console.log("\n12b. VALUE_REVIEW_PLAN=on (Build E): the value forms wait for \"Value Review Sent\" instead of S2");
+  check("the switch is exactly on (spaces and case forgiven), anything else is off",
+    P.valueReviewPlanOn({ VALUE_REVIEW_PLAN: " On " }) && !P.valueReviewPlanOn({}) && !P.valueReviewPlanOn({ VALUE_REVIEW_PLAN: "yes" }) &&
+    !P.valueReviewPlanOn({ VALUE_REVIEW_PLAN: "true" }));
+  check("the HV start tag, character for character (plain ASCII, 17 characters)", P.VALUE_REVIEW_SENT_TAG === "Value Review Sent" &&
+    P.VALUE_REVIEW_SENT_TAG.length === 17 && /^[\x20-\x7e]+$/.test(P.VALUE_REVIEW_SENT_TAG));
+  check("it is not a plan tag the site ever adds", !Object.values(P.PLAN_TAGS).includes(P.VALUE_REVIEW_SENT_TAG));
+  const hv = { planTags: [], leadTypes: [SELLER] };
+  const on = (form, data, site) => {
+    const r = P.planForSubmission(form, data || {}, { site, valueReviewPlan: true });
+    return { planTags: r.planTags, leadTypes: r.leadTypes };
+  };
+  for (const site of ["main", "signature"]) {
+    check(`${site}: home-lead "value" -> Seller lead type, no plan tag`, same(on("home-lead", { looking_to: "value" }, site), hv));
+    check(`${site}: cash-offer keeps S2`, same(on("cash-offer", {}, site), expectPlan(TAG.S2, SELLER)));
+    check(`${site}: home-lead sell / buy unchanged`, same(on("home-lead", { looking_to: "sell" }, site), expectPlan(TAG.S1, SELLER)) &&
+      same(on("home-lead", { looking_to: "buy" }, site), expectPlan(TAG.B1, BUYER)));
+    const others = Object.keys(EXPECT).filter((f) => f !== "free-home-valuation");
+    const moved = others.filter((f) => !same(on(f, {}, site), got(f, {}, site)));
+    check(`${site}: every other form starts exactly what it did`, moved.length === 0, moved.join(", "));
+  }
+  check("main: free-home-valuation -> Seller lead type, no plan tag", same(on("free-home-valuation", {}, "main"), hv));
+  check("signature: free-home-valuation starts BOTH -- the luxury seller plan now, plus the tag \"Luxury\" (Christine, 2026-10-17); HV later",
+    same(on("free-home-valuation", {}, "signature"), { planTags: [TAG.SPC, "Luxury"], leadTypes: [SELLER] }) &&
+    P.planForSubmission("free-home-valuation", {}, { site: "signature", valueReviewPlan: true }).plan === "SPC_LUXURY_VALUE_REVIEW" &&
+    !on("free-home-valuation", {}, "signature").planTags.includes(P.VALUE_REVIEW_SENT_TAG));
+  check("the Luxury tag, character for character (plain ASCII), and it is not a plan's start tag",
+    P.LUXURY_TAG === "Luxury" && /^[\x20-\x7e]+$/.test(P.LUXURY_TAG) && !Object.values(P.PLAN_TAGS).includes(P.LUXURY_TAG));
+  check("signature: only the home-value form gets both; its other seller forms keep the luxury plan alone",
+    ["sellers-page-inquiry", "sellers-guide", "seller-local-proof"].every((f2) => same(on(f2, {}, "signature"), expectPlan(TAG.SPC, SELLER))));
+  check("switch off (no option) = the table as before", same(got("free-home-valuation", {}, "main"), expectPlan(TAG.S2, SELLER)) &&
+    same(got("home-lead", { looking_to: "value" }, "main"), expectPlan(TAG.S2, SELLER)) &&
+    same(got("free-home-valuation", {}, "signature"), expectPlan(TAG.SPC, SELLER)));
+
+  process.env.VALUE_REVIEW_PLAN = "on";
+  f = fakeLofty();
+  out = await submit(f, "free-home-valuation", { address: "123 Main St, Loveland, CO 80538" });
+  rec = last();
+  if (SITE === "main") {
+    check("end to end, switch on: a new home-value lead is created with the Seller lead type and gets no plan tag",
+      same(f.posts[0].leadTypes, [SELLER]) && planPuts(f).length === 0 && rec.planResult && rec.planResult.attempted === false &&
+      /Value Review Sent/.test(rec.planResult.skipped || ""), JSON.stringify({ create: f.posts[0], plan: rec.planResult }));
+    check("...and the log says why", out.lines.some((l) => l.includes('Nurture plan HV_VALUE_REVIEW for "free-home-valuation": skipped -- its plan starts later in Lofty, on the tag "Value Review Sent"')),
+      out.lines.filter((l) => /Nurture plan/.test(l)).join(" | "));
+  } else {
+    check("end to end, switch on: Signature's home-value lead starts the luxury seller plan and gets \"Luxury\" in the same PUT after the create",
+      planPuts(f).length === 1 && planPuts(f)[0].body.tags.includes(TAG.SPC) && planPuts(f)[0].body.tags.includes("Luxury") &&
+      !tagsOnCreate(f.posts[0]).includes("Luxury") && same(f.posts[0].leadTypes, [SELLER]), JSON.stringify({ create: f.posts[0], puts: f.puts }));
+    check("...and the log names both tags", out.lines.some((l) => l.includes(`Nurture plan SPC_LUXURY_VALUE_REVIEW for "free-home-valuation": added tag "${TAG.SPC}", "Luxury"`)),
+      out.lines.filter((l) => /Nurture plan/.test(l)).join(" | "));
+  }
+  f = fakeLofty();
+  await submit(f, "cash-offer", { address: "123 Main St" });
+  check("end to end, switch on: cash-offer still starts S2", planPuts(f).length === 1 && planPuts(f)[0].body.tags.includes(TAG.S2));
+  delete process.env.VALUE_REVIEW_PLAN;
 
   console.log(`\n13. Same modules as the other site (${SIBLING})`);
   // 2026-10-15: lib/_notify.js is shared too, apart from its four per-site
