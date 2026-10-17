@@ -349,6 +349,41 @@ delete process.env.LEAD_ALERT_TO;
     JSON.stringify(e.map((x) => x.body.reply_to)));
 })
 
+.then(async () => {
+  // 2026-10-13: lib/_notify.js is shared with the main site; only its four BRAND_
+  // lines are this site's. Every alert, a held one too, must carry them.
+  console.log("\n9. Every alert carries this site's brand lines (lib/_notify.js is shared)");
+  const BRAND = { heading: "New website lead", sentBy: "Sent by signaturepropertycollection.com", prefix: "New website lead: " };
+  stubFetch(({ url, method }) => {
+    if (url.includes(HUB)) return SENT("email_12");
+    if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 888 } } };
+    if (url.includes("/notes")) return { status: 200, body: {} };
+    if (url.includes("/leads/888") && method === "GET") return { status: 200, body: { data: { tags: [] } } };
+    if (url.includes("/leads/888") && method === "PUT") return { status: 200, body: {} };
+    return { status: 200, body: { leads: [] } };
+  });
+  await loadHandler()(submission({ name: "Brand Test", email: "b@example.com" }, "contact", "sub-brand-0001"));
+  let emails = of("POST", HUB);
+  check("a new lead's alert: this site's subject, heading, footer and key",
+    emails.length === 1 && emails[0].body.subject.startsWith(BRAND.prefix + "Brand Test") &&
+    emails[0].body.html.includes(`<strong>${BRAND.heading}</strong>`) && emails[0].body.html.includes(BRAND.sentBy) &&
+    emails[0].body.idempotency_key.startsWith("lead-alert:signature:"),
+    emails[0] && JSON.stringify({ subject: emails[0].body.subject, key: emails[0].body.idempotency_key }));
+  // A lead held for identity review (two contacts carry the email) is emailed too.
+  const two = { leads: [{ leadId: 101, emails: ["held@example.com"] }, { leadId: 102, emails: ["held@example.com"] }] };
+  stubFetch(({ url, method }) => {
+    if (url.includes(HUB)) return SENT("email_13");
+    if (method === "GET" && /\/v1\.0\/leads\?/.test(url)) return { status: 200, body: /email=/.test(url) ? two : { leads: [] } };
+    return { status: 500, body: { error: "unexpected " + method + " " + url } };
+  });
+  await loadHandler()(submission({ name: "Held Test", email: "held@example.com" }, "contact", "sub-brand-0002"));
+  emails = of("POST", HUB);
+  check("a held lead's alert: the same brand lines",
+    emails.length === 1 && emails[0].body.subject.startsWith(BRAND.prefix + "Held Test") &&
+    emails[0].body.html.includes(`<strong>${BRAND.heading}</strong>`) && emails[0].body.html.includes(BRAND.sentBy) &&
+    /MANUAL REVIEW/.test(emails[0].body.html), emails[0] && JSON.stringify({ subject: emails[0].body.subject }));
+})
+
 .then(() => {
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} CHECK(S) FAILED\n`);
   process.exit(failures === 0 ? 0 : 1);

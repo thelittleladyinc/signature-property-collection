@@ -353,6 +353,11 @@ const HOUR = 3600e3;
   check("a new map alert sign-up is sent to her home search instead", al.ok === false && al.error === "moved" && /thelittleladyhomesearch\.com/.test(al.searchUrl));
   const alRun = await require(`${FN_DIR}/area-alerts-run.js`).handler();
   check("the alert emails are paused", /paused/.test(alRun.body), alRun.body);
+  // 2026-10-13: and no longer woken every 6 hours to say so. The saved alerts stay
+  // in their store, untouched, for Christine to decide on.
+  const toml = require("fs").readFileSync(`${ROOT}/netlify.toml`, "utf8");
+  check("netlify.toml no longer schedules area-alerts-run", !/\[functions\."area-alerts-run"\]/.test(toml) &&
+    !/area-alerts-run"\]\s*\n\s*schedule/.test(toml));
 
   const health = require(`${FN_DIR}/site-health.js`).handler;
   const hres = JSON.parse((await health({ queryStringParameters: { format: "json", probe: "1" } })).body);

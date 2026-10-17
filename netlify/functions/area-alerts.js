@@ -10,8 +10,9 @@
 //
 // POST {email, cities[], label?, minPrice?, maxPrice?} -> saves the alert.
 // GET ?unsub=<id> -> deletes it (the link in every email).
-// Sending happens in area-alerts-run.js on a schedule, via the same Resend
-// account the lead alerts use. CORS wildcard: the TLLSH map posts here
+// Sending happens in area-alerts-run.js, through the Seller Intelligence hub
+// and only with AREA_ALERTS_APPROVED_BY set (unscheduled since 2026-10-13 --
+// see the note at the end of netlify.toml). CORS wildcard: the TLLSH map posts here
 // directly (its _sig-proxy pass-through doesn't forward POST bodies), and an
 // alert signup is public-facing by nature -- rate of abuse is bounded by the
 // one-email-per-address dedupe below and Resend's own limits.

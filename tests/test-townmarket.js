@@ -171,6 +171,12 @@ if (typeof stats.listingsFromBlob === "function") {
   }
 }
 
+// 2026-10-13 (Town Figures Parity, draft A4): the median is whole dollars whether
+// the count is odd or even (an odd count used to keep a listed price's cents).
+check("median of an odd count is rounded to whole dollars", stats.median([500000, 425000.6, 300000]) === 425001);
+check("median of an even count is rounded half up, as before", stats.median([400000, 400001]) === 400001);
+check("median of whole dollars is unchanged", stats.median([3, 1, 2]) === 2 && stats.median([]) === null);
+
 // The other side of the contract: the writer. If someone changes
 // saveListingsCheckpoint to store an array or a wrapper, the assertions above
 // keep passing while the tool goes back to reading nothing.

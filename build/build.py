@@ -3160,8 +3160,9 @@ GOOGLE_REVIEWS_URL = "https://g.page/r/CZbs8kiTCII_EBM"
 # Every visible mention is now the count-free phrase "5-Star Rated on Google". The
 # real numeric count (from Christine's actual GBP location, via the Perplexity Computer
 # GBP connector) is still emitted in AggregateRating structured data so Google can
-# verify it against her live profile. Refresh via: python3 build/refresh_google_reviews.py
-# (which in the Perplexity environment triggers the connector).
+# verify it against her live profile. The file is updated by hand from her Google
+# Business Profile (2026-10-13: the old build/refresh_google_reviews.py was removed --
+# it fetched nothing and no build or workflow ran it).
 try:
     with open(os.path.join(os.path.dirname(__file__), "data", "google_reviews.json")) as _gr_f:
         GOOGLE_REVIEWS_STATS = json.load(_gr_f)

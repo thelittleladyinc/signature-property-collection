@@ -7,3 +7,4 @@ preview_*.png
 notes/
 .env
 .env.*
+!.env.example
