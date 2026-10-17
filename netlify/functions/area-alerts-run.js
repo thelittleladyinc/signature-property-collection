@@ -3,21 +3,31 @@
 // Every 6 hours: for each saved alert, find Active listings in its towns
 // (matchesQuery -- the exact filter the site's own search uses, so an alert
 // can never disagree with the search page), diff against the ids this alert
-// has already seen, and email the new ones via the same Resend account the
-// lead alerts use. First pass for a new alert seeds knownIds and sends
-// nothing -- subscribers get homes that appear AFTER they subscribed, not a
-// dump of the backlog.
+// has already seen, and email the new ones. First pass for a new alert seeds
+// knownIds and sends nothing -- subscribers get homes that appear AFTER they
+// subscribed, not a dump of the backlog.
 //
 // Every email carries a one-click unsubscribe link (GET ?unsub=<id> on
-// area-alerts.js). If RESEND_API_KEY is unset the runner logs and exits
+// area-alerts.js). If the hub is not configured the runner logs and moves on
 // without touching knownIds, so no listing is ever silently marked as seen
 // but never sent.
+//
+// 2026-10-15 (Christine: one transactional sender, the Seller Intelligence
+// hub). This runner no longer calls Resend. An area alert is an email to a lead,
+// sent automatically with no one looking at it, so it may only go out as the
+// hub's kind "lead" (one recipient, an unsubscribe link, at most one lead email
+// per address per day across every app) AND only when someone has approved
+// automatic lead email by name in AREA_ALERTS_APPROVED_BY. Nobody has: that is
+// Christine's decision, not this code's. Until she makes it the runner HOLDS --
+// it sends nothing, touches no alert, and logs AREA_ALERTS_HOLD_REASON.
 const { getStore } = require("@netlify/blobs");
+const crypto = require("crypto");
 const { getBlobStore, LISTINGS_KEY, SYNC_STATE_KEY, matchesQuery, LISTINGS_SOURCE } = require("./lib/_mls-shared");
 const { idxGate } = require("./lib/_idx-display");
+const { hubEndpoint, postToHub, readHubAnswer } = require("./lib/_notify");
 
 const STORE_NAME = "area-alerts";
-const RESEND_ENDPOINT = "https://api.resend.com/emails";
+const AREA_ALERTS_HOLD_REASON = "area alerts need Christine's decision: automatic lead email";
 const MAX_LISTINGS_PER_EMAIL = 10;
 const SITE = "https://signaturepropertycollection.com";
 
@@ -27,6 +37,26 @@ function fmtPrice(p) {
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+}
+
+function unsubscribeUrl(alert) {
+  return `${SITE}/.netlify/functions/area-alerts?unsub=${encodeURIComponent(alert.id)}`;
+}
+
+// Who approved automatic area-alert emails (the hub's approved_by), or null.
+// Unset -- as it is -- means nobody has, and nothing is sent.
+function areaAlertApprover(env) {
+  const v = String((env || process.env).AREA_ALERTS_APPROVED_BY || "").trim();
+  return v && v.length <= 100 ? v : null;
+}
+
+// Once per alert and set of new homes: the hub sends a key once, so a run that
+// is repeated (or overlaps) can never email the same homes twice. Hashes only:
+// the alert id is built from the subscriber's address.
+function areaAlertKey(alert, fresh) {
+  const h = (v) => crypto.createHash("sha256").update(v).digest("hex").slice(0, 24);
+  const ids = fresh.map((l) => String(l.listingId)).sort().join(",");
+  return `area-alert:${h(String(alert.id))}:${h(ids)}`;
 }
 
 // Who sent it, on every alert: Colorado wants the brokerage on advertising,
@@ -41,7 +71,7 @@ function footerHtml(alert) {
     `<a href="${SITE}" style="color:#999">signaturepropertycollection.com</a><br>` +
     (postal ? `${esc(postal)}<br>` : "") +
     `Listing information from IRES MLS, deemed reliable but not guaranteed. Equal Housing Opportunity.<br>` +
-    `<a href="${SITE}/.netlify/functions/area-alerts?unsub=${encodeURIComponent(alert.id)}" ` +
+    `<a href="${unsubscribeUrl(alert)}" ` +
     `style="color:#999">Unsubscribe</a></p>`;
 }
 
@@ -69,6 +99,8 @@ ${footerHtml(alert)}</div>`;
 }
 
 exports.emailHtml = emailHtml; // for tests
+exports.AREA_ALERTS_HOLD_REASON = AREA_ALERTS_HOLD_REASON;
+exports.areaAlertKey = areaAlertKey;
 
 exports.handler = async () => {
   try {
@@ -91,8 +123,7 @@ exports.handler = async () => {
       console.warn("area-alerts-run: IDX display is off (IDX_DISPLAY) — no alerts sent.");
       return { statusCode: 200, body: "skipped: idx display off" };
     }
-    const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.LEAD_ALERT_FROM || "onboarding@resend.dev";
+    const from = String(process.env.LEAD_ALERT_FROM || "").trim();
     const alertStore = getBlobStore(getStore, STORE_NAME);
     const listingStore = getBlobStore(getStore);
 
@@ -104,6 +135,15 @@ exports.handler = async () => {
       return { statusCode: 200, body: `skipped: listing data ${freshGate.reason}` };
     }
 
+    // The hold. Automatic email to subscribers needs a named approver; without
+    // one nothing below runs, so no alert is seeded, sent or marked.
+    const approvedBy = areaAlertApprover(process.env);
+    if (!approvedBy) {
+      console.warn(`area-alerts-run: held — ${AREA_ALERTS_HOLD_REASON} (AREA_ALERTS_APPROVED_BY is not set). None sent.`);
+      return { statusCode: 200, body: `held: ${AREA_ALERTS_HOLD_REASON}` };
+    }
+    const hub = hubEndpoint(process.env);
+
     const index = await alertStore.list().catch(() => null);
     const keys = ((index && index.blobs) || []).map((b) => b.key);
     if (!keys.length) return { statusCode: 200, body: "no alerts" };
@@ -113,6 +153,7 @@ exports.handler = async () => {
     if (!all.length) return { statusCode: 200, body: "no listings" };
 
     let sent = 0;
+    let notSent = 0;
     for (const key of keys) {
       const alert = await alertStore.get(key, { type: "json" }).catch(() => null);
       if (!alert || !alert.email || !Array.isArray(alert.cities)) continue;
@@ -135,30 +176,42 @@ exports.handler = async () => {
       const fresh = matched.filter((l) => !known.has(l.listingId));
       if (!fresh.length) continue;
 
-      if (!apiKey) {
-        console.error("area-alerts-run: RESEND_API_KEY unset — " +
-          `${fresh.length} new listing(s) for ${alert.email} NOT sent, will retry next run.`);
+      if (!hub.url) {
+        console.error(`area-alerts-run: ${hub.reason} — ${fresh.length} new listing(s) for one alert ` +
+          "NOT sent, will retry next run.");
+        notSent += 1;
         continue; // knownIds untouched, so nothing is lost
       }
 
-      const res = await fetch(RESEND_ENDPOINT, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: `Christine Gwinnup <${from}>`,
+      let answer;
+      try {
+        answer = readHubAnswer(await postToHub(hub, {
+          kind: "lead",
           to: [alert.email],
-          subject: `${fresh.length} new home${fresh.length > 1 ? "s" : ""} in ${alert.label}`,
+          subject: `${fresh.length} new home${fresh.length > 1 ? "s" : ""} in ${alert.label}`.replace(/[\r\n]+/g, " ").slice(0, 200),
           html: emailHtml(alert, fresh),
-        }),
-      });
-      if (!res.ok) {
-        console.error(`area-alerts-run: Resend ${res.status} for ${alert.email} — will retry next run.`);
+          ...(from ? { from: `Christine Gwinnup <${from}>` } : {}),
+          approved_by: approvedBy,
+          unsubscribe_url: unsubscribeUrl(alert),
+          idempotency_key: areaAlertKey(alert, fresh),
+        }));
+      } catch (e) {
+        answer = { ok: false, hubStatus: "no_answer" };
+      }
+      // Sent, or already handled under this key (the hub never sends a key twice,
+      // and an unknown delivery is never re-sent): these homes are done.
+      const done = answer.ok || answer.hubStatus === "held";
+      if (!done) {
+        // Counts and the hub's words only -- never the subscriber's address.
+        console.error(`area-alerts-run: hub ${answer.hubStatus}${answer.reason ? ` (${answer.reason})` : ""}` +
+          `${answer.httpStatus && answer.httpStatus !== 200 ? ` HTTP ${answer.httpStatus}` : ""} for one alert — will retry next run.`);
+        notSent += 1;
         continue; // don't mark as seen if the send failed
       }
-      sent += 1;
+      if (answer.hubStatus === "sent") sent += 1;
       await alertStore.setJSON(key, { ...alert, knownIds: matchedIds, lastSentAt: Date.now() });
     }
-    return { statusCode: 200, body: `ok: ${keys.length} alerts, ${sent} emails` };
+    return { statusCode: 200, body: `ok: ${keys.length} alerts, ${sent} emails, ${notSent} not sent` };
   } catch (err) {
     console.error("area-alerts-run error:", err);
     return { statusCode: 200, body: "error: " + (err && err.message) };

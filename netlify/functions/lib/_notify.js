@@ -11,7 +11,8 @@
 // developer.lofty.com is unreachable from the build environment:
 //
 //   1. NOTES ARE THEIR OWN ENDPOINT, and the obvious guess is wrong. From
-//      src/sync/fub-to-lofty-migrate.ts, learned the hard way there:
+//      that repo's old CRM migration script (since retired), learned the hard
+//      way there:
 //        "Lofty notes live at POST /notes with { leadId, content }. The nested
 //         /leads/{id}/notes path 404s (The requested API endpoint does not exist)"
 //      leadId is a NUMBER there, not a string.
@@ -20,10 +21,11 @@
 //      returns the current ones. That project replaces a tier tag on an
 //      existing lead this way, so the round trip is proven.
 //   3. SHE ALREADY HAS RESEND. sellerintelligence sends her daily digest with
-//      it (src/reports/email-digest.ts, RESEND_API_KEY / DIGEST_FROM /
-//      DIGEST_TO, defaulting to thelittleladyinc@gmail.com). So an email
-//      straight to her inbox needs no new vendor, no new account, and no
-//      Lofty automation working correctly.
+//      it, so an email straight to her inbox needs no new vendor, no new
+//      account, and no Lofty automation working correctly. (2026-10-15: the
+//      email now goes through the Seller Intelligence hub, the one sender that
+//      calls Resend -- see sendLeadAlertEmail below. This site holds no Resend
+//      key any more.)
 //
 // Why all three, rather than picking one. The Smart Plan she built is the right
 // tool and it should keep running -- but a notification path that depends on a
@@ -51,43 +53,26 @@
 // result object describing what happened -- recorded for /site-health -- and
 // throws nothing, because the lead is already safe in Netlify Forms and in
 // Lofty by the time any of this runs.
+
+// ---- The only lines that differ between the two sites' copies --------------
+// This file is shared with the other site (thelittleladysellshomes /
+// signature-property-collection). Everything except these four BRAND_ lines is
+// byte-identical there; tests/test-form-plans.js checks that.
+const BRAND_SITE = "signature";
+const BRAND_HEADLINE = "New website lead";
+const BRAND_DOMAIN = "signaturepropertycollection.com";
+const BRAND_SUBJECT_PREFIX = "New website lead: ";
+
+const crypto = require("crypto");
+
 const LOFTY_BASE_URL = "https://api.lofty.com/v1.0";
-const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const TIMEOUT_MS = 8000;
 
-// Resend's shared sandbox sender needs no domain verification, but it will only
-// deliver to the Resend account owner's own address -- which here is exactly
-// who we want to reach. Overridable once she verifies her own domain, matching
-// the DIGEST_FROM/DIGEST_TO pattern from sellerintelligence.
-//
-// 2026-10-13: this file is BYTE-IDENTICAL in thelittleladysellshomes and
-// signature-property-collection (tests/test-form-plans.js compares the copies
-// when both checkouts sit side by side). The two copies used to differ only in
-// the alert's brand lines -- its sender name, heading, footer and subject -- so a
-// fix to anything else here could land on one site only. The brand lines are now
-// chosen by `site`, the same option lib/_form-plans.js takes: each site's
-// submission-created.js passes its own ("main" or "signature"), and anything but
-// "signature" is The Little Lady. Each site's alert reads exactly as before.
-const ALERT_BRANDS = Object.freeze({
-  main: Object.freeze({
-    from: "The Little Lady Sells Homes <onboarding@resend.dev>",
-    heading: "NEW LITTLE LADY WEBSITE LEAD",
-    sentBy: "thelittleladysellshomes.com",
-    subjectPrefix: "NEW LITTLE LADY LEAD — ",
-  }),
-  signature: Object.freeze({
-    from: "Signature Property Collection <onboarding@resend.dev>",
-    heading: "New website lead",
-    sentBy: "signaturepropertycollection.com",
-    subjectPrefix: "New website lead: ",
-  }),
-});
-function alertBrand(site) {
-  return site === "signature" ? ALERT_BRANDS.signature : ALERT_BRANDS.main;
-}
-// The Little Lady's default sender; each site's own is alertBrand(site).from.
-const DEFAULT_FROM = ALERT_BRANDS.main.from;
+// Who the alert goes to when LEAD_ALERT_TO is unset: Christine's own inbox. The
+// hub sends an alert only to an address in its flag email_internal_recipients.
 const DEFAULT_TO = "thelittleladyinc@gmail.com";
+// The hub's send route (sellerintelligence docs/hub-email-social.md).
+const HUB_EMAIL_PATH = "/v1/email/send";
 
 function loftyHeaders(apiKey) {
   return {
@@ -391,8 +376,7 @@ function escapeHtml(s) {
 // The email she actually reads. Deliberately plain and information-dense: the
 // subject line alone should be enough to decide whether to stop what she's
 // doing, and every way of replying is one tap.
-function alertEmailHtml({ name, email, phone, source, noteText, leadId, stamp, site }) {
-  const brand = alertBrand(site);
+function alertEmailHtml({ name, email, phone, source, noteText, leadId, stamp }) {
   const rows = [
     ["Name", name || "(not given)"],
     ["Email", email ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>` : "(not given)"],
@@ -403,75 +387,168 @@ function alertEmailHtml({ name, email, phone, source, noteText, leadId, stamp, s
     `<td style="padding:4px 0"><strong>${v}</strong></td></tr>`).join("");
 
   return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#222;max-width:560px">
-<p style="font-size:18px;margin:0 0 4px"><strong>${brand.heading}</strong></p>
+<p style="font-size:18px;margin:0 0 4px"><strong>${BRAND_HEADLINE}</strong></p>
 <table style="border-collapse:collapse;margin:8px 0 16px">${rows}</table>
 <p style="margin:0 0 4px;color:#666">What they said</p>
 <pre style="white-space:pre-wrap;font:inherit;background:#f6f6f6;padding:12px;border-radius:6px;margin:0">${escapeHtml(noteText)}</pre>
 ${leadId ? `<p style="margin:16px 0 0"><a href="https://app.lofty.com/crm/leads/${escapeHtml(leadId)}">Open this lead in Lofty</a></p>` : ""}
-<p style="margin:20px 0 0;font-size:12px;color:#888">Sent by ${brand.sentBy} the moment the form was submitted. This does not depend on a Lofty Smart Plan — if this arrives, the lead was captured.</p>
+<p style="margin:20px 0 0;font-size:12px;color:#888">Sent by ${BRAND_DOMAIN} the moment the form was submitted. This does not depend on a Lofty Smart Plan — if this arrives, the lead was captured.</p>
 </div>`;
 }
 
-// Emails Christine directly. Independent of Lofty entirely: this is the path
-// that answers "i want to be notified immediatly". details.site picks the brand
-// lines (see ALERT_BRANDS).
-async function sendLeadAlertEmail(details) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { attempted: false, reason: "RESEND_API_KEY not set" };
+// At least as strict as the hub's own address test (contact-rules.ts
+// normEmail), so nothing this sends is refused by the hub for its shape.
+const EMAIL_RE = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
+const isAddress = (v) => typeof v === "string" && EMAIL_RE.test(v.trim());
+// "Name <addr@x>" or "addr@x" -> "addr@x", or null.
+function bareAddress(v) {
+  const s = String(v == null ? "" : v).trim();
+  const m = s.match(/<([^<>]+)>\s*$/);
+  const a = (m ? m[1] : s).trim();
+  return isAddress(a) ? a : null;
+}
 
-  const to = (process.env.LEAD_ALERT_TO || DEFAULT_TO)
-    .split(",").map((s) => s.trim()).filter(Boolean);
+// The hub's base address, or why it can't be used. https only and no user name
+// or password in it, because the key travels in a header to this address.
+// Names the setting, never its value.
+function hubEndpoint(env) {
+  const raw = String((env && env.HUB_API_URL) || "").trim();
+  const key = String((env && env.HUB_API_KEY) || "").trim();
+  const missing = [!raw && "HUB_API_URL", !key && "HUB_API_KEY"].filter(Boolean);
+  if (missing.length) return { reason: `${missing.join(" and ")} not set` };
+  let u;
+  try { u = new URL(raw); } catch (e) { return { reason: "HUB_API_URL is not a valid URL" }; }
+  if (u.protocol !== "https:") return { reason: "HUB_API_URL must start with https://" };
+  if (u.username || u.password) return { reason: "HUB_API_URL must not carry a user name or password" };
+  u.search = ""; u.hash = "";
+  u.pathname = u.pathname.replace(/\/+$/, "") + HUB_EMAIL_PATH;
+  return { url: u.toString(), key };
+}
+
+// Once per submission: the hub sends a given (app, idempotency_key) once, so a
+// retried function -- Netlify re-running submission-created, or the held path
+// and the normal path for the same submission -- can never email her twice.
+// Built from Netlify's own submission id and the form name. A submission
+// without an id (never seen from Netlify) falls back to a hash of what was
+// submitted, so the key still carries no personal data.
+function alertIdempotencyKey(details) {
+  const d = details || {};
+  const safe = (v, n) => String(v == null ? "" : v).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, n);
+  const form = safe(d.formName || d.sourceShort || "form", 60) || "form";
+  const id = safe(d.submissionId, 100);
+  if (id) return `lead-alert:${BRAND_SITE}:${form}:${id}`;
+  const h = crypto.createHash("sha256")
+    .update(JSON.stringify([d.name || "", d.email || "", d.phone || "", d.noteText || ""]))
+    .digest("hex").slice(0, 32);
+  return `lead-alert:${BRAND_SITE}:${form}:h${h}`;
+}
+
+async function postToHub(endpoint, body) {
+  const res = await fetch(endpoint.url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-hub-key": endpoint.key },
+    body: JSON.stringify(body),
+    redirect: "manual", // a redirect is refused: the key goes nowhere else
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const text = await res.text().catch(() => "");
+  let json = null;
+  try { json = JSON.parse(text); } catch (e) { json = null; }
+  return { httpStatus: res.status, json };
+}
+
+// What the hub said, as the small record /site-health reads. Only the hub's
+// status words and reasons are kept -- never an address (a "suppressed" answer
+// lists addresses, which are dropped here).
+function readHubAnswer(r) {
+  const j = (r && r.json) || {};
+  if (r.httpStatus === 200 && typeof j.status === "string") {
+    const out = { httpStatus: 200, hubStatus: j.status };
+    out.ok = j.status === "sent" || (j.status === "duplicate" && j.previous === "sent");
+    if (typeof j.reason === "string") out.reason = j.reason.slice(0, 80);
+    if (j.status === "duplicate") out.previous = typeof j.previous === "string" ? j.previous : "unknown";
+    return out;
+  }
+  const why = typeof j.error === "string" ? j.error.slice(0, 200) : null;
+  return {
+    ok: false, httpStatus: r.httpStatus,
+    hubStatus: r.httpStatus >= 300 && r.httpStatus < 400 ? "redirect_refused" : "http_error",
+    ...(why ? { error: why } : {}),
+  };
+}
+
+// Emails Christine directly. Independent of Lofty entirely: this is the path
+// that answers "i want to be notified immediatly".
+//
+// 2026-10-15 (Christine: one transactional sender): sent through the Seller
+// Intelligence hub as kind "alert" (POST {HUB_API_URL}/v1/email/send, header
+// x-hub-key: HUB_API_KEY). The hub holds the one Resend key, picks the From
+// (its flag email_from), checks the recipient is one of hers, counts the daily
+// cap and sends each idempotency key once. LEAD_ALERT_FROM is passed only when
+// set, and the hub accepts it only if it is its email_from or listed in
+// email_from_allowed; a refused From is asked once more without it, so the hub's
+// own sender carries the alert rather than nothing. Never throws, and never
+// fails the submission: the lead is already in Netlify Forms (and Lofty).
+async function sendLeadAlertEmail(details) {
+  const endpoint = hubEndpoint(process.env);
+  if (!endpoint.url) {
+    console.log(`Lead alert email skipped: ${endpoint.reason}.`);
+    return { attempted: false, via: "hub", reason: endpoint.reason };
+  }
+
+  const listed = (process.env.LEAD_ALERT_TO || DEFAULT_TO).split(",").map((s) => s.trim()).filter(Boolean);
+  const to = Array.from(new Set(listed.map(bareAddress).filter(Boolean))).slice(0, 10);
+  if (!to.length) {
+    console.error("Lead alert email skipped: LEAD_ALERT_TO has no valid address.");
+    return { attempted: false, via: "hub", reason: "LEAD_ALERT_TO has no valid address" };
+  }
   const customFrom = String(process.env.LEAD_ALERT_FROM || "").trim();
   const who = details.name || details.email || details.phone || "someone";
-  const brand = alertBrand(details.site);
-  const subject = `${brand.subjectPrefix}${who}${details.sourceShort ? ` — ${details.sourceShort}` : ""}`;
+  const subject = `${BRAND_SUBJECT_PREFIX}${who}${details.sourceShort ? ` — ${details.sourceShort}` : ""}`
+    .replace(/[\r\n]+/g, " ").trim().slice(0, 200);
 
-  const send = async (from) => {
-    const res = await fetch(RESEND_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        from, to, subject,
-        // Reply hits the buyer directly, so answering is one tap from her phone.
-        ...(details.email ? { reply_to: details.email } : {}),
-        html: alertEmailHtml(details),
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    const text = await res.text().catch(() => "");
-    return { ok: res.ok, httpStatus: res.status, response: text.slice(0, 300) };
+  const message = {
+    kind: "alert",
+    to, subject,
+    // Reply hits the buyer directly, so answering is one tap from her phone.
+    ...(isAddress(details.email) ? { reply_to: String(details.email).trim() } : {}),
+    html: alertEmailHtml(details),
+    idempotency_key: alertIdempotencyKey(details),
   };
 
   try {
-    let result = await send(customFrom || brand.from);
-    // 2026-09-30 (API audit): LEAD_ALERT_FROM is how the alert moves off Resend's
-    // shared test sender onto her own verified domain. If that sender is refused
-    // -- the domain not verified yet (403) or the address malformed (422) -- the
-    // alert goes out once more from the test sender rather than not at all, and
-    // the refusal is kept for /status.
-    if (!result.ok && customFrom && (result.httpStatus === 403 || result.httpStatus === 422)) {
-      console.error(`Resend refused LEAD_ALERT_FROM (HTTP ${result.httpStatus} ${result.response}); ` +
-        "resending from the default sender.");
-      const first = result;
-      result = { ...(await send(brand.from)), fromFallback: true, customFromRefused: first };
+    let result = readHubAnswer(await postToHub(endpoint, customFrom ? { ...message, from: customFrom } : message));
+    // A From the hub does not allow is refused before anything is claimed, so
+    // asking again under the same key (without it) cannot send twice.
+    if (customFrom && result.httpStatus === 400 && /^from /.test(result.error || "")) {
+      console.error("The hub refused LEAD_ALERT_FROM; asking once more with the hub's own sender.");
+      const first = { httpStatus: result.httpStatus, error: result.error };
+      result = { ...readHubAnswer(await postToHub(endpoint, message)), fromFallback: true, customFromRefused: first };
     }
-    if (!result.ok) console.error(`Resend lead alert failed: HTTP ${result.httpStatus} ${result.response}`);
+    const line = `hub ${result.hubStatus}${result.reason ? ` (${result.reason})` : ""}` +
+      `${result.previous ? ` (previous: ${result.previous})` : ""}${result.httpStatus !== 200 ? ` HTTP ${result.httpStatus}` : ""}`;
+    if (result.ok) console.log(`Lead alert email: ${line}.`);
+    else console.error(`Lead alert email NOT confirmed: ${line}.`);
     return {
-      attempted: true, ...result,
-      sender: customFrom && !result.fromFallback ? "custom" : "default",
+      attempted: true, via: "hub", ...result,
+      sender: customFrom && !result.fromFallback ? "custom" : "hub",
     };
   } catch (err) {
-    console.error("Resend lead alert error:", err && err.message);
-    return { attempted: true, ok: false, error: String(err && err.message) };
+    // A timeout after the request went out may still have been sent; the hub
+    // then holds that key, so a retry under it cannot send a second copy.
+    console.error("Lead alert email error (hub):", err && err.name === "TimeoutError" ? "timed out" : (err && err.message));
+    return { attempted: true, via: "hub", ok: false, hubStatus: "no_answer", error: String(err && err.message) };
   }
 }
 
 module.exports = {
   LOFTY_BASE_URL,
-  DEFAULT_FROM,
   DEFAULT_TO,
-  ALERT_BRANDS,
-  alertBrand,
+  HUB_EMAIL_PATH,
+  hubEndpoint,
+  postToHub,
+  readHubAnswer,
+  alertIdempotencyKey,
   addLoftyNote,
   refireLoftyTag,
   addPlanTags,

@@ -721,7 +721,7 @@ function redactPersonal(text) {
 const PUBLIC_STEP_FIELDS = [
   "attempted", "ok", "httpStatus", "step", "skipped", "reason", "leadMissing", "tagRestored",
   "tagsSeen", "tagShape", "found", "via", "anyMatch", "tagField", "leadId", "taskId", "fields",
-  "fromFallback", "sender",
+  "fromFallback", "sender", "hubStatus", "previous",
 ];
 
 function publicStep(r) {
@@ -1415,8 +1415,19 @@ exports.handler = async (event) => {
   // a belt-and-braces backup for the day Lofty itself is down -- worth having
   // eventually, worth nobody's afternoon today. A red X here would be the same
   // crying-wolf mistake the Cloudinary row made.
-  const emailKeySet = !!process.env.RESEND_API_KEY;
+  //
+  // 2026-10-15 (Christine: one transactional sender): the email now goes through
+  // the Seller Intelligence hub (lib/_notify.js sendLeadAlertEmail), so this row
+  // reports the hub -- whether HUB_API_URL and HUB_API_KEY are set, and what the
+  // hub answered for the last lead -- instead of a Resend key. Settings are named,
+  // never shown. Nothing here calls the hub.
+  const hubUrlSet = !!String(process.env.HUB_API_URL || "").trim();
+  const hubKeySet = !!String(process.env.HUB_API_KEY || "").trim();
+  const emailKeySet = hubUrlSet && hubKeySet;
   const lastEmail = loftyLast && loftyLast.emailResult;
+  const leftoverResend = process.env.RESEND_API_KEY
+    ? " RESEND_API_KEY is still set in Netlify but nothing on this site reads it any more; " +
+      "remove it once the hub alert has reached you." : "";
   let emailOk;
   let emailDetail;
   let emailOptional = false;
@@ -1425,37 +1436,52 @@ exports.handler = async (event) => {
     emailOptional = true;
     emailDetail = "Not set up, and nothing is broken by that — your Lofty notification is the " +
       "primary route and it works. This is only a backup for the day Lofty itself is down: " +
-      "a plain email straight from this site, needing no CRM automation to fire. " +
-      "If you ever want it, make a free key at resend.com/api-keys and add RESEND_API_KEY in " +
-      "Netlify → Site configuration → Environment variables. " +
-      "Optional extras: LEAD_ALERT_TO to change or add recipients, LEAD_ALERT_FROM once your " +
-      "own domain is verified in Resend. A simpler backup needing no signup at all: " +
-      "Netlify → Site configuration → Notifications → form submission email.";
+      "a plain email from the Seller Intelligence hub, needing no CRM automation to fire. " +
+      `To switch it on, add ${[!hubUrlSet && "HUB_API_URL", !hubKeySet && "HUB_API_KEY"].filter(Boolean).join(" and ")} in ` +
+      "Netlify → Site configuration → Environment variables (a hub key with the email:send scope; " +
+      "the hub's email switch must be on too). " +
+      "Optional: LEAD_ALERT_TO to change or add recipients (each must be on the hub's internal " +
+      "recipient list), LEAD_ALERT_FROM only for a sender the hub allows. A simpler backup " +
+      "needing no setup at all: Netlify → Site configuration → Notifications → form submission email." +
+      leftoverResend;
   } else if (!lastEmail || !lastEmail.attempted) {
     emailOk = true;
-    emailDetail = "The key is set. No lead has come in since — submit any form once and this row " +
-      "will show whether the email actually left.";
+    // A skip recorded by the hub path (e.g. LEAD_ALERT_TO with no valid address)
+    // is a real problem; one recorded before the switch to the hub is not.
+    const skippedHere = !!(lastEmail && lastEmail.via === "hub" && lastEmail.reason);
+    emailDetail = "The hub settings are set. " +
+      (skippedHere ? `The last lead's email was skipped: ${redactPersonal(lastEmail.reason).slice(0, 120)}. ` : "") +
+      "Submit any form once and this row will show what the hub answered." + leftoverResend;
+    if (skippedHere) emailOk = false;
   } else if (lastEmail.ok) {
     emailOk = true;
-    // 2026-09-30: says which sender was actually used (lib/_notify.js), instead of
-    // always blaming the test sender.
-    emailDetail = `Sent to you at ${loftyLast.at} for the lead from "${loftyLast.formName}". ` +
+    emailDetail = `Sent to you at ${loftyLast.at} for the lead from "${loftyLast.formName}", through the hub` +
+      (lastEmail.hubStatus === "duplicate" ? " (the hub had already sent this submission once, so it did not send it again)" : "") + ". " +
       (lastEmail.sender === "custom"
-        ? "It went from your own verified sender (LEAD_ALERT_FROM)."
+        ? "It went from your LEAD_ALERT_FROM sender."
         : lastEmail.fromFallback
-          ? "Resend REFUSED your LEAD_ALERT_FROM sender " +
-            `(HTTP ${(lastEmail.customFromRefused && lastEmail.customFromRefused.httpStatus) || "?"}), so it went ` +
-            "from the shared onboarding@resend.dev address instead — verify that domain in Resend " +
-            "(Domains) or correct LEAD_ALERT_FROM in Netlify."
-          : "If it isn't in your inbox, check spam — the default sender is Resend's shared " +
-            "onboarding@resend.dev address, which only delivers to the Resend account owner. " +
-            "Verify your domain in Resend and set LEAD_ALERT_FROM in Netlify to send from it.");
+          ? "The hub REFUSED your LEAD_ALERT_FROM sender (it is not the hub's email_from or in " +
+            "email_from_allowed), so it went from the hub's own sender instead — add it to the hub " +
+            "or clear LEAD_ALERT_FROM in Netlify."
+          : "It went from the hub's own sender (its email_from setting). If it isn't in your inbox, check spam.") +
+      leftoverResend;
   } else {
     emailOk = false;
-    emailDetail = `The lead email FAILED at ${loftyLast.at}: ` +
-      `${lastEmail.httpStatus ? `HTTP ${lastEmail.httpStatus} — ` : ""}` +
-      `${redactPersonal(lastEmail.response || lastEmail.error || "(no detail)").slice(0, 240)}. ` +
-      "The lead itself is safe (Netlify Forms and Lofty both have it) — this is only the alert.";
+    const said = lastEmail.via === "hub" || lastEmail.hubStatus
+      ? `the hub answered ${lastEmail.hubStatus || "nothing"}` +
+        `${lastEmail.reason ? ` (${redactPersonal(lastEmail.reason).slice(0, 80)})` : ""}` +
+        `${lastEmail.previous ? ` (previous: ${lastEmail.previous})` : ""}` +
+        `${lastEmail.httpStatus && lastEmail.httpStatus !== 200 ? `, HTTP ${lastEmail.httpStatus}` : ""}` +
+        `${lastEmail.error ? ` — ${redactPersonal(lastEmail.error).slice(0, 200)}` : ""}`
+      : `${lastEmail.httpStatus ? `HTTP ${lastEmail.httpStatus} — ` : ""}` +
+        `${redactPersonal(lastEmail.response || lastEmail.error || "(no detail)").slice(0, 240)}`;
+    const hint = lastEmail.hubStatus === "held"
+      ? " The hub sent it and got no answer, so it will not send it again; check your inbox."
+      : lastEmail.reason === "off" ? " The hub's email switch (email_send_enabled) is off."
+        : lastEmail.reason === "not_internal" ? " LEAD_ALERT_TO names an address that is not on the hub's internal recipient list."
+          : "";
+    emailDetail = `The lead email was NOT confirmed at ${loftyLast.at}: ${said}.${hint} ` +
+      "The lead itself is safe (Netlify Forms and Lofty both have it) — this is only the alert." + leftoverResend;
   }
   // ---- What Lofty says about the last lead, read straight back ------------
   // The row that exists so nobody has to relay a screenshot to find out.

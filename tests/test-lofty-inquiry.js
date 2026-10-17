@@ -54,7 +54,7 @@ function resp(status, body) {
   } };
   for (const k of Object.keys(require.cache)) if (k.startsWith(FN_DIR) && k !== blobsPath && !k.endsWith(".json")) delete require.cache[k];
   process.env.LOFTY_API_KEY = "k";
-  process.env.RESEND_API_KEY = "r";
+  process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api"; process.env.HUB_API_KEY = "hub_test";
   const handler = require(`${FN_DIR}/submission-created.js`).handler;
   const event = (email) => ({ body: JSON.stringify({ payload: { form_name: "listing-alert-request", data: {
     name: "Pat Buyer", email, alert_criteria: "Loveland · $950,000+ · 3+ beds", alert_query: "cities=Loveland&minPrice=950000&beds=3",
@@ -64,8 +64,8 @@ function resp(status, body) {
     const inquiries = [];
     const f = async (url, init = {}) => {
       const s = String(url); const m = init.method || "GET";
-      calls.push(`${m} ${s.replace(/^https:\/\/api\.(lofty|resend)\.com/, "")}`.split("?")[0]);
-      if (/resend\.com/.test(s)) return resp(200, { id: "e1" });
+      calls.push(`${m} ${s.replace(/^https:\/\/(api\.lofty\.com|hub\.example\.test\/functions\/v1\/hub-api)/, "")}`.split("?")[0]);
+      if (/hub\.example\.test/.test(s)) return resp(200, { status: "sent", provider_id: "e1" });
       if (m === "GET" && /\/v1\.0\/leads\?/.test(s)) return resp(200, { leads: existingLeads });
       if (m === "POST" && /\/v1\.0\/leads$/.test(s)) return resp(200, `{"data":{"leadId": ${existingLeads.length ? EXISTING : NEWID}}}`);
       if (/\/inquiry$/.test(s)) { inquiries.push({ url: s, body: JSON.parse(init.body) }); return resp(inquiryStatus, inquiryStatus === 200 ? "{}" : "nope"); }

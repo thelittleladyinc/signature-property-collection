@@ -305,7 +305,9 @@ exports.handler = async (event) => {
         name: data.name, email: data.email, phone: data.phone,
         source: SOURCE_LABELS[formName] || formName, sourceShort: formName,
         noteText: `${body.notes}\n\nMANUAL REVIEW: ${existing.error}. No Lofty contact changed.`,
-        leadId: null, stamp: `${stamp} MT`, site: "signature",
+        leadId: null, stamp: `${stamp} MT`,
+        // The hub sends once per submission (lib/_notify.js alertIdempotencyKey).
+        submissionId, formName,
       });
       let store = null;
       try { store = getBlobStore(getStore, DIAG_STORE); } catch (e) { store = null; }
@@ -369,8 +371,8 @@ exports.handler = async (event) => {
       // need it repeated.
       sourceShort: stampedSource.replace("Signature Property Collection - ", ""),
       noteText: body.notes, leadId: existing.leadId || leadId, stamp: `${stamp} MT`,
-      // Which site's brand lines the alert carries (lib/_notify.js ALERT_BRANDS).
-      site: "signature",
+      // The hub sends once per submission (lib/_notify.js alertIdempotencyKey).
+      submissionId, formName,
     });
 
     if (!result.ok) {

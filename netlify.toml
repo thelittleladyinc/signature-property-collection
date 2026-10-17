@@ -178,5 +178,8 @@
 # area, and new map sign-ups are sent to her Lofty home search's Save Search
 # instead (area-alerts.js). The alerts saved before 2026-09-28 are kept,
 # untouched, in the "area-alerts" Blobs store, and each one's unsubscribe link
-# still works; what to do with them is Christine's decision. To send them again:
-# put this schedule back, and only once listings come from the whole market.
+# still works; what to do with them is Christine's decision. Since 2026-10-15
+# the runner also holds unless AREA_ALERTS_APPROVED_BY names an approver, and it
+# sends only through the Seller Intelligence hub. To send them again: put this
+# schedule back, and only once listings come from the whole market and Christine
+# has named that approver.

@@ -27,7 +27,7 @@ function stubFetch(handler) {
     const method = opts.method || "GET";
     let body = null;
     try { body = opts.body ? JSON.parse(opts.body) : null; } catch (e) {}
-    calls.push({ url: u, method, body, headers: opts.headers || {} });
+    calls.push({ url: u, method, body, headers: opts.headers || {}, redirect: opts.redirect });
     const r = handler({ url: u, method, body });
     return {
       ok: r.status >= 200 && r.status < 300,
@@ -46,9 +46,13 @@ function loadHandler() {
   return require(path.join(FN_DIR, "submission-created.js")).handler;
 }
 
-function submission(data, formName = "contact") {
-  return { body: JSON.stringify({ payload: { form_name: formName, data } }) };
+// Netlify gives every submission an id; the hub's idempotency key is built from it.
+const SUB_ID = "6710a1b2c3d4e5f6a7b8c9d0";
+function submission(data, formName = "contact", id = SUB_ID) {
+  return { body: JSON.stringify({ payload: { form_name: formName, ...(id ? { id } : {}), data } }) };
 }
+const HUB = "hub.example.test";
+const SENT = (id) => ({ status: 200, body: { status: "sent", provider_id: id } });
 
 let failures = 0;
 function check(label, cond, extra) {
@@ -58,13 +62,16 @@ function check(label, cond, extra) {
 const of = (m, p) => calls.filter((c) => c.method === m && c.url.includes(p));
 
 process.env.LOFTY_API_KEY = "lofty-test-key";
-process.env.RESEND_API_KEY = "resend-test-key";
+process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api";
+process.env.HUB_API_KEY = "hub_test_key";
+delete process.env.LEAD_ALERT_FROM;
+delete process.env.LEAD_ALERT_TO;
 
 // === 1. Brand-new lead: tag absent after create → single PUT adds it =========
 (async () => {
   console.log("\n1. Brand-new lead (trigger tag not on the lead yet)");
   stubFetch(({ url, method }) => {
-    if (url.includes("api.resend.com")) return { status: 200, body: { id: "email_1" } };
+    if (url.includes(HUB)) return SENT("email_1");
     if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 555001 } } };
     if (url.includes("/notes") && method === "POST") return { status: 200, body: { data: { noteId: 9 } } };
     if (url.includes("/leads/555001") && method === "GET") return { status: 200, body: { data: { tags: ["Buyer"] } } };
@@ -74,8 +81,8 @@ process.env.RESEND_API_KEY = "resend-test-key";
   const res = await loadHandler()(submission({ name: "Dana Reyes", email: "dana@example.com", phone: "970-555-0100", message: "Looking in Fort Morgan" }));
   check("returns 200 ok", res.statusCode === 200 && res.body === "ok", res.body);
 
-  const emails = of("POST", "api.resend.com");
-  check("emailed her exactly once", emails.length === 1, `${emails.length} calls`);
+  const emails = of("POST", HUB);
+  check("emailed her exactly once, through the hub", emails.length === 1, `${emails.length} calls`);
   if (emails.length) {
     const e = emails[0];
     check("email subject names the lead and source",
@@ -84,7 +91,13 @@ process.env.RESEND_API_KEY = "resend-test-key";
     check("reply_to is the buyer", e.body.reply_to === "dana@example.com", e.body.reply_to);
     check("email body carries the message", e.body.html.includes("Looking in Fort Morgan"));
     check("email body links the Lofty lead", e.body.html.includes("555001"));
-    check("Resend uses Bearer auth", /^Bearer /.test(e.headers.Authorization));
+    check("to the hub's send route", e.url === "https://hub.example.test/functions/v1/hub-api/v1/email/send", e.url);
+    check("the hub key rides in x-hub-key, never in the URL", e.headers["x-hub-key"] === "hub_test_key" && !e.url.includes("hub_test_key"));
+    check("kind alert", e.body.kind === "alert", e.body.kind);
+    check("no From unless LEAD_ALERT_FROM is set (the hub picks it)", !("from" in e.body), e.body.from);
+    check("idempotency key from the form name and Netlify's submission id",
+      new RegExp(`^lead-alert:[a-z]+:contact:${SUB_ID}$`).test(e.body.idempotency_key), e.body.idempotency_key);
+    check("redirects are refused", e.redirect === "manual", e.redirect);
   }
 
   const notes = of("POST", "/notes");
@@ -104,6 +117,8 @@ process.env.RESEND_API_KEY = "resend-test-key";
   }
   const last = stored["lofty-last-push.json"];
   check("health record shows email ok", last && last.emailResult && last.emailResult.ok === true);
+  check("...and what the hub said", last && last.emailResult.hubStatus === "sent" && last.emailResult.via === "hub", JSON.stringify(last && last.emailResult));
+  check("nothing goes to Resend directly", calls.every((c) => !c.url.includes("resend")));
   check("health record shows note ok", last && last.noteResult && last.noteResult.ok === true);
   check("health record shows tag added", last && last.tagResult && last.tagResult.step === "added");
 })()
@@ -112,7 +127,7 @@ process.env.RESEND_API_KEY = "resend-test-key";
 .then(async () => {
   console.log("\n2. Merged lead (already carries the trigger tag — her own test case)");
   stubFetch(({ url, method }) => {
-    if (url.includes("api.resend.com")) return { status: 200, body: { id: "email_2" } };
+    if (url.includes(HUB)) return SENT("email_2");
     if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 1147334685108095 } } };
     if (url.includes("/notes") && method === "POST") return { status: 200, body: {} };
     if (url.includes("/leads/1147334685108095") && method === "GET") {
@@ -144,13 +159,13 @@ process.env.RESEND_API_KEY = "resend-test-key";
 .then(async () => {
   console.log("\n3. Lofty rejects the lead (email must still go out)");
   stubFetch(({ url, method }) => {
-    if (url.includes("api.resend.com")) return { status: 200, body: { id: "email_3" } };
+    if (url.includes(HUB)) return SENT("email_3");
     if (url.includes("/leads") && method === "POST") return { status: 500, body: { error: "lofty is down" } };
     return { status: 404, body: {} };
   });
   const res = await loadHandler()(submission({ name: "Sam Ortiz", email: "sam@example.com", message: "help" }));
   check("returns 200 to the visitor", res.statusCode === 200);
-  check("emailed her anyway", of("POST", "api.resend.com").length === 1);
+  check("emailed her anyway", of("POST", HUB).length === 1);
   check("no note/tag attempted without a lead id",
     of("POST", "/notes").length === 0 && of("PUT", "/leads").length === 0);
   const queue = stored["lofty-failed-pushes.json"];
@@ -164,7 +179,7 @@ process.env.RESEND_API_KEY = "resend-test-key";
   console.log("\n4. Tag removed but re-add fails (the one dangerous case)");
   let putCount = 0;
   stubFetch(({ url, method }) => {
-    if (url.includes("api.resend.com")) return { status: 200, body: {} };
+    if (url.includes(HUB)) return SENT("email_x");
     if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 777 } } };
     if (url.includes("/notes")) return { status: 200, body: {} };
     if (url.includes("/leads/777") && method === "GET") return { status: 200, body: { data: { tags: ["Hot Lead - Website"] } } };
@@ -185,7 +200,7 @@ process.env.RESEND_API_KEY = "resend-test-key";
 .then(async () => {
   console.log("\n5. Lofty refuses the tag edit entirely (nothing lost)");
   stubFetch(({ url, method }) => {
-    if (url.includes("api.resend.com")) return { status: 200, body: {} };
+    if (url.includes(HUB)) return SENT("email_x");
     if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 888 } } };
     if (url.includes("/notes")) return { status: 200, body: {} };
     if (url.includes("/leads/888") && method === "GET") return { status: 200, body: { data: { tags: ["Hot Lead - Website"] } } };
@@ -198,32 +213,42 @@ process.env.RESEND_API_KEY = "resend-test-key";
   check("tag reported as still present", t.tagRestored === true && t.step === "remove", JSON.stringify(t));
 })
 
-// === 6. No Resend key → degrades quietly, Lofty path untouched ==============
+// === 6. Hub not configured → degrades quietly, Lofty path untouched =========
 .then(async () => {
-  console.log("\n6. RESEND_API_KEY missing (must not break the lead push)");
-  delete process.env.RESEND_API_KEY;
-  stubFetch(({ url, method }) => {
-    if (url.includes("api.resend.com")) return { status: 500, body: "should never be called" };
+  console.log("\n6. HUB_API_URL / HUB_API_KEY missing (must not break the lead push)");
+  delete process.env.HUB_API_KEY;
+  const lofty = ({ url, method }) => {
+    if (url.includes(HUB)) return { status: 500, body: "should never be called" };
     if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 999 } } };
     if (url.includes("/notes")) return { status: 200, body: {} };
     if (url.includes("/leads/999") && method === "GET") return { status: 200, body: { data: { tags: [] } } };
     if (url.includes("/leads/999") && method === "PUT") return { status: 200, body: {} };
     return { status: 404, body: {} };
-  });
+  };
+  stubFetch(lofty);
   const res = await loadHandler()(submission({ name: "No Email", email: "n@example.com" }));
   check("still returns ok", res.statusCode === 200 && res.body === "ok");
-  check("no Resend call attempted", of("POST", "api.resend.com").length === 0);
-  check("recorded as not attempted, with the reason",
-    stored["lofty-last-push.json"].emailResult.attempted === false, JSON.stringify(stored["lofty-last-push.json"].emailResult));
+  check("no hub call attempted", of("POST", HUB).length === 0);
+  check("recorded as not attempted, naming the missing setting",
+    stored["lofty-last-push.json"].emailResult.attempted === false &&
+    stored["lofty-last-push.json"].emailResult.reason === "HUB_API_KEY not set", JSON.stringify(stored["lofty-last-push.json"].emailResult));
   check("Lofty note + tag still ran", of("POST", "/notes").length === 1 && of("PUT", "/leads/999").length === 1);
-  process.env.RESEND_API_KEY = "resend-test-key";
+
+  process.env.HUB_API_KEY = "hub_test_key";
+  process.env.HUB_API_URL = "http://hub.example.test/functions/v1/hub-api";
+  stubFetch(lofty);
+  await loadHandler()(submission({ name: "No Email", email: "n@example.com" }));
+  check("a plain-http HUB_API_URL is refused before any call (the key would travel in the clear)",
+    of("POST", HUB).length === 0 && /https/.test(stored["lofty-last-push.json"].emailResult.reason),
+    JSON.stringify(stored["lofty-last-push.json"].emailResult));
+  process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api";
 })
 
-// === 7. LEAD_ALERT_FROM: her own sender, with the test sender as the fallback ===
-// 2026-09-30 (API audit). Setting the variable before the domain is verified in
-// Resend must not cost her the alert.
+// === 7. LEAD_ALERT_FROM: passed to the hub only when set ======================
+// The hub accepts it only if it is its email_from or in email_from_allowed. A
+// refused From must not cost her the alert: asked once more without it.
 .then(async () => {
-  console.log("\n7. LEAD_ALERT_FROM (her own verified sender)");
+  console.log("\n7. LEAD_ALERT_FROM (a sender the hub may or may not allow)");
   process.env.LEAD_ALERT_FROM = "Christine <leads@example.com>";
   const lofty = ({ url, method }) => {
     if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 777 } } };
@@ -232,63 +257,131 @@ process.env.RESEND_API_KEY = "resend-test-key";
     if (url.includes("/leads/777") && method === "PUT") return { status: 200, body: {} };
     return { status: 404, body: {} };
   };
-  stubFetch((r) => (r.url.includes("api.resend.com") ? { status: 200, body: { id: "email_7" } } : lofty(r)));
+  stubFetch((r) => (r.url.includes(HUB) ? SENT("email_7") : lofty(r)));
   await loadHandler()(submission({ name: "Sender Test", email: "s@example.com" }));
-  let emails = of("POST", "api.resend.com");
-  check("one email, from her own sender", emails.length === 1 && emails[0].body.from === process.env.LEAD_ALERT_FROM,
+  let emails = of("POST", HUB);
+  check("one email, naming her sender", emails.length === 1 && emails[0].body.from === process.env.LEAD_ALERT_FROM,
     JSON.stringify(emails.map((e) => e.body.from)));
   check("recorded as her own sender", stored["lofty-last-push.json"].emailResult.sender === "custom");
 
   stubFetch((r) => {
-    if (r.url.includes("api.resend.com")) {
-      return r.body.from === process.env.LEAD_ALERT_FROM
-        ? { status: 403, body: { name: "validation_error", message: "The example.com domain is not verified." } }
-        : { status: 200, body: { id: "email_8" } };
+    if (r.url.includes(HUB)) {
+      return r.body.from
+        ? { status: 400, body: { error: "from is not an address the hub allows (flags email_from / email_from_allowed)" } }
+        : SENT("email_8");
     }
     return lofty(r);
   });
   await loadHandler()(submission({ name: "Sender Test", email: "s@example.com" }));
-  emails = of("POST", "api.resend.com");
+  emails = of("POST", HUB);
   const er = stored["lofty-last-push.json"].emailResult;
-  check("a refused sender is retried once from the default", emails.length === 2 &&
-    /onboarding@resend\.dev/.test(emails[1].body.from), JSON.stringify(emails.map((e) => e.body.from)));
+  check("a refused sender is asked once more without a From", emails.length === 2 &&
+    !("from" in emails[1].body), JSON.stringify(emails.map((e) => e.body.from)));
+  check("...under the same idempotency key", emails.length === 2 && emails[0].body.idempotency_key === emails[1].body.idempotency_key);
   check("...the alert still counts as sent, and says why", er.ok === true && er.fromFallback === true &&
-    er.customFromRefused.httpStatus === 403, JSON.stringify(er));
+    er.customFromRefused.httpStatus === 400 && er.sender === "hub", JSON.stringify(er));
   delete process.env.LEAD_ALERT_FROM;
 })
 
+// === 8. What the hub can answer, and a retried function ======================
 .then(async () => {
-  // 2026-10-13: lib/_notify.js is byte-identical in both sites now; the brand
-  // lines come from the `site` this site's submission-created.js passes ("signature").
-  console.log("\n8. Every alert carries this site's brand lines (lib/_notify.js is shared)");
-  const BRAND = { from: 'Signature Property Collection <onboarding@resend.dev>', heading: 'New website lead', sentBy: 'Sent by signaturepropertycollection.com', prefix: 'New website lead: ' };
+  console.log("\n8. Hub answers (a retry never sends twice; a failure never fails the form)");
+  const lofty = ({ url, method }) => {
+    if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 4242 } } };
+    if (url.includes("/notes")) return { status: 200, body: {} };
+    if (url.includes("/leads/4242") && method === "GET") return { status: 200, body: { data: { tags: [] } } };
+    if (url.includes("/leads/4242") && method === "PUT") return { status: 200, body: {} };
+    return { status: 404, body: {} };
+  };
+  const logs = [];
+  const orig = { log: console.log, error: console.error, warn: console.warn };
+  const capture = (...a) => logs.push(a.map(String).join(" "));
+  const lead = { name: "Robin Vale", email: "robin.vale@example.com", phone: "970-555-0142", message: "two acres" };
+  const runWith = async (hubReply, data = lead, id = "sub-retry-0001") => {
+    stubFetch((r) => {
+      if (!r.url.includes(HUB)) return lofty(r);
+      if (typeof hubReply === "function") return hubReply(r);
+      return hubReply;
+    });
+    console.log = capture; console.error = capture; console.warn = capture;
+    try { return await loadHandler()(submission(data, "contact", id)); }
+    finally { Object.assign(console, orig); }
+  };
+
+  let res = await runWith(SENT("email_9"));
+  const firstKey = of("POST", HUB)[0].body.idempotency_key;
+  res = await runWith({ status: 200, body: { status: "duplicate", previous: "sent", provider_id: "email_9" } });
+  let er = stored["lofty-last-push.json"].emailResult;
+  check("a retried function asks under the same key", of("POST", HUB)[0].body.idempotency_key === firstKey, firstKey);
+  check("...and the hub's duplicate counts as already sent", er.ok === true && er.hubStatus === "duplicate" && er.previous === "sent", JSON.stringify(er));
+
+  const answers = [
+    ["switch off", { status: 200, body: { status: "not_sent", reason: "off" } }, "not_sent"],
+    ["on the opt-out list", { status: 200, body: { status: "not_sent", reason: "suppressed", suppressed: [{ email: "thelittleladyinc@gmail.com", reason: "manual" }] } }, "not_sent"],
+    ["Resend refused it", { status: 200, body: { status: "failed", reason: "auth_or_domain" } }, "failed"],
+    ["sent, no answer", { status: 200, body: { status: "held", reason: "unknown_delivery" } }, "held"],
+    ["hub down", { status: 503, body: { error: "hub unavailable; nothing sent" } }, "http_error"],
+    ["wrong key", { status: 401, body: { error: "unauthorized" } }, "http_error"],
+    ["a redirect", { status: 302, body: "" }, "redirect_refused"],
+  ];
+  for (const [label, reply, want] of answers) {
+    res = await runWith(reply);
+    er = stored["lofty-last-push.json"].emailResult;
+    check(`${label}: the form still succeeds, the lead still reaches Lofty`, res.statusCode === 200 && res.body === "ok" && of("POST", "/notes").length === 1, res.body);
+    check(`${label}: recorded as not confirmed (${want})`, er.ok === false && er.hubStatus === want, JSON.stringify(er));
+    check(`${label}: no address kept in the record`, !/@/.test(JSON.stringify(er)), JSON.stringify(er));
+  }
+  res = await runWith(() => { throw new Error("network down"); });
+  er = stored["lofty-last-push.json"].emailResult;
+  check("the hub unreachable: the form still succeeds", res.statusCode === 200 && res.body === "ok" && er.ok === false && er.hubStatus === "no_answer", JSON.stringify(er));
+  const alertLogs = logs.filter((l) => /lead alert/i.test(l));
+  check("the alert's log lines name statuses only: no name, email or phone", alertLogs.length > 0 &&
+    !alertLogs.some((l) => /robin|vale|@|970-555-0142|9705550142/i.test(l)), alertLogs.join(" | "));
+
+  // No submission id (never seen from Netlify): still one key per submission, with no personal data in it.
+  await runWith(SENT("email_10"), lead, null);
+  const k = of("POST", HUB)[0].body.idempotency_key;
+  check("without a submission id the key is a hash, never the lead's details",
+    /^lead-alert:[a-z]+:contact:h[0-9a-f]{32}$/.test(k) && !/robin|example|970/i.test(k), k);
+  await runWith(SENT("email_11"), { ...lead, email: "robin at example dot com" }, "sub-bad-email-01");
+  const e = of("POST", HUB);
+  check("a malformed lead email is left off reply_to rather than costing the alert", e.length === 1 && !("reply_to" in e[0].body),
+    JSON.stringify(e.map((x) => x.body.reply_to)));
+})
+
+.then(async () => {
+  // 2026-10-13: lib/_notify.js is shared with the main site; only its four BRAND_
+  // lines are this site's. Every alert, a held one too, must carry them.
+  console.log("\n9. Every alert carries this site's brand lines (lib/_notify.js is shared)");
+  const BRAND = { heading: "New website lead", sentBy: "Sent by signaturepropertycollection.com", prefix: "New website lead: " };
   stubFetch(({ url, method }) => {
-    if (url.includes("api.resend.com")) return { status: 200, body: { id: "email_9" } };
+    if (url.includes(HUB)) return SENT("email_12");
     if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 888 } } };
     if (url.includes("/notes")) return { status: 200, body: {} };
     if (url.includes("/leads/888") && method === "GET") return { status: 200, body: { data: { tags: [] } } };
     if (url.includes("/leads/888") && method === "PUT") return { status: 200, body: {} };
     return { status: 200, body: { leads: [] } };
   });
-  await loadHandler()(submission({ name: "Brand Test", email: "b@example.com" }));
-  let emails = of("POST", "api.resend.com");
-  check("a new lead's alert: this site's sender, subject, heading and footer",
-    emails.length === 1 && emails[0].body.from === BRAND.from && emails[0].body.subject.startsWith(BRAND.prefix + "Brand Test") &&
-    emails[0].body.html.includes(`<strong>${BRAND.heading}</strong>`) && emails[0].body.html.includes(BRAND.sentBy),
-    emails[0] && JSON.stringify({ from: emails[0].body.from, subject: emails[0].body.subject }));
+  await loadHandler()(submission({ name: "Brand Test", email: "b@example.com" }, "contact", "sub-brand-0001"));
+  let emails = of("POST", HUB);
+  check("a new lead's alert: this site's subject, heading, footer and key",
+    emails.length === 1 && emails[0].body.subject.startsWith(BRAND.prefix + "Brand Test") &&
+    emails[0].body.html.includes(`<strong>${BRAND.heading}</strong>`) && emails[0].body.html.includes(BRAND.sentBy) &&
+    emails[0].body.idempotency_key.startsWith("lead-alert:signature:"),
+    emails[0] && JSON.stringify({ subject: emails[0].body.subject, key: emails[0].body.idempotency_key }));
   // A lead held for identity review (two contacts carry the email) is emailed too.
   const two = { leads: [{ leadId: 101, emails: ["held@example.com"] }, { leadId: 102, emails: ["held@example.com"] }] };
   stubFetch(({ url, method }) => {
-    if (url.includes("api.resend.com")) return { status: 200, body: { id: "email_10" } };
+    if (url.includes(HUB)) return SENT("email_13");
     if (method === "GET" && /\/v1\.0\/leads\?/.test(url)) return { status: 200, body: /email=/.test(url) ? two : { leads: [] } };
     return { status: 500, body: { error: "unexpected " + method + " " + url } };
   });
-  await loadHandler()(submission({ name: "Held Test", email: "held@example.com" }));
-  emails = of("POST", "api.resend.com");
+  await loadHandler()(submission({ name: "Held Test", email: "held@example.com" }, "contact", "sub-brand-0002"));
+  emails = of("POST", HUB);
   check("a held lead's alert: the same brand lines",
-    emails.length === 1 && emails[0].body.from === BRAND.from && emails[0].body.subject.startsWith(BRAND.prefix + "Held Test") &&
+    emails.length === 1 && emails[0].body.subject.startsWith(BRAND.prefix + "Held Test") &&
     emails[0].body.html.includes(`<strong>${BRAND.heading}</strong>`) && emails[0].body.html.includes(BRAND.sentBy) &&
-    /MANUAL REVIEW/.test(emails[0].body.html), emails[0] && JSON.stringify({ from: emails[0].body.from, subject: emails[0].body.subject }));
+    /MANUAL REVIEW/.test(emails[0].body.html), emails[0] && JSON.stringify({ subject: emails[0].body.subject }));
 })
 
 .then(() => {

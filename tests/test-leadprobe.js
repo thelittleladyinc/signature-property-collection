@@ -81,7 +81,7 @@ const cases = [
     }
     process.env.LOFTY_API_KEY = "k";
     process.env.GOOGLE_MAPS_API_KEY = "g";
-    delete process.env.RESEND_API_KEY;
+    delete process.env.HUB_API_URL; delete process.env.HUB_API_KEY;
 
     const seen = [];
     global.fetch = async (url, opts = {}) => {

@@ -72,7 +72,7 @@ function setEnv(vars) {
   delete process.env.GOOGLE_MAPS_API_KEY;
   const realFetch = global.fetch;
   let fetches = [];
-  global.fetch = async (url) => { fetches.push(String(url)); return { ok: true, status: 200, json: async () => ({}) }; };
+  global.fetch = async (url) => { fetches.push(String(url)); return { ok: true, status: 200, json: async () => ({}), text: async () => "{}" }; };
 
   const lib = require(`${FN_DIR}/lib/_idx-display.js`);
   const FRESH = { lastRunAt: iso(HOUR), lastSuccessAt: iso(HOUR) };
@@ -203,7 +203,11 @@ function setEnv(vars) {
 
   console.log("\n8. Area alert emails");
   {
-    process.env.RESEND_API_KEY = "re_test";
+    process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api"; process.env.HUB_API_KEY = "hub_test";
+    // 2026-10-15: the runner sends only through the hub, and only with a named
+    // approver (tests/test-area-alerts-hold.js); one is set here so the IDX gates
+    // are what this section tests.
+    process.env.AREA_ALERTS_APPROVED_BY = "test approver";
     const alert = { id: "a1", email: "buyer@example.com", cities: ["Loveland"], label: "Loveland", knownIds: [] };
     for (const [label, env, state] of [
       ["off", {}, FRESH],
@@ -222,8 +226,13 @@ function setEnv(vars) {
     fetches = [];
     const store = makeStore(FRESH, { alert });
     await load("area-alerts-run.js", store).handler();
-    check("on + fresh: the alert is emailed as before", fetches.length === 1 && /resend/.test(fetches[0]), fetches.join(","));
-    delete process.env.RESEND_API_KEY;
+    check("on + fresh: the alert is emailed as before, through the hub", fetches.length === 1 && /hub\.example\.test\/functions\/v1\/hub-api\/v1\/email\/send$/.test(fetches[0]), fetches.join(","));
+    delete process.env.AREA_ALERTS_APPROVED_BY;
+    fetches = [];
+    const heldStore = makeStore(FRESH, { alert });
+    const held = await load("area-alerts-run.js", heldStore).handler();
+    check("on + fresh but no approver: held, nothing sent or touched", fetches.length === 0 && heldStore.writes.length === 0 && /^held: /.test(held.body), held.body);
+    delete process.env.HUB_API_URL; delete process.env.HUB_API_KEY;
   }
 
   console.log("\n9. sync-listings records lastSuccessAt only on a clean, caught-up run");

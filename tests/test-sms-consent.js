@@ -42,9 +42,9 @@ function fakeLofty({ leads = {}, emailHits = [], phoneHits = [], searchStatus = 
   let creates = 0;
   f.fetch = async (url, init = {}) => {
     const s = String(url); const m = init.method || "GET";
-    const path = s.replace(/^https:\/\/api\.(lofty|resend)\.com/, "").split("?")[0];
+    const path = s.replace(/^https:\/\/(api\.lofty\.com|hub\.example\.test\/functions\/v1\/hub-api)/, "").split("?")[0];
     f.calls.push(`${m} ${path}`);
-    if (/resend\.com/.test(s)) return resp(200, { id: "e1" });
+    if (/hub\.example\.test/.test(s)) return resp(200, { status: "sent", provider_id: "e1" });
     if (m === "GET" && /\/v1\.0\/leads\?/.test(s)) {
       if (searchStatus !== 200) return resp(searchStatus, "down");
       return resp(200, { leads: /email=/.test(s) ? emailHits : phoneHits });
@@ -95,7 +95,7 @@ require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, e
 } };
 for (const k of Object.keys(require.cache)) if (k.startsWith(FN_DIR) && k !== blobsPath && !k.endsWith(".json")) delete require.cache[k];
 process.env.LOFTY_API_KEY = "k";
-process.env.RESEND_API_KEY = "r";
+process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api"; process.env.HUB_API_KEY = "hub_test";
 delete process.env.FLODESK_API_KEY;
 const handler = require(`${FN_DIR}/submission-created.js`).handler;
 const L = require(`${FN_DIR}/lib/_lofty.js`);

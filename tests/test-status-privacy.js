@@ -55,7 +55,7 @@ async function render(last, params) {
     if (k.startsWith(FN_DIR) && k !== blobsPath) delete require.cache[k];
   }
   process.env.LOFTY_API_KEY = "k";
-  process.env.RESEND_API_KEY = "k";
+  process.env.HUB_API_URL = "https://hub.example.test/functions/v1/hub-api"; process.env.HUB_API_KEY = "hub_test";
   global.fetch = async () => { throw new Error("no live calls in this test"); };
   return require(`${FN_DIR}/site-health.js`).handler({ queryStringParameters: params });
 }
