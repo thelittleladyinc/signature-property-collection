@@ -143,6 +143,16 @@
 [functions."sync-listings"]
   schedule = "*/30 * * * *"
 
+# 2026-10-17 (wave 2a): with MLS_SOURCE=hub the market-data copy is read from the
+# Seller Intelligence hub instead of MLS Grid, and the hub's copy can itself be up
+# to ~15 minutes behind MLS Grid -- so reading it only on the 30-minute sync above
+# would see a change up to 45 minutes late. This reads the hub at :15 and :45 as
+# well, so hub mode reads every 15 minutes (worst case ~30, as today). Without
+# MLS_SOURCE=hub it returns at once: MLS Grid's request volume and her Lofty
+# refresh stay exactly as they are. It never calls Lofty. See mls-hub-sync.js.
+[functions."mls-hub-sync"]
+  schedule = "15,45 * * * *"
+
 # Retries website leads Lofty refused (lib/_lofty.js drainFailedPushes), on its
 # own schedule. 2026-10-04 (re-audit): this ran FIRST inside the 30-minute sync
 # above, with no deadline, in the same 30 seconds Netlify gives a scheduled

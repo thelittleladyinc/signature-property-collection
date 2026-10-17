@@ -51,6 +51,8 @@ const {
   resolveMediaFor, fetchMediaResponse, looksPresigned, isThrottled, markUrlUsed,
 } = require("./lib/_media");
 const { checkMlsQuota } = require("./lib/_mls-usage");
+// 2026-10-17 (wave 2a): which MLS source (MLS_SOURCE) and whether the hub is set up.
+const { mlsSource, hubProblem, gridListingsRefused, GRID_VIA_HUB_REFUSAL } = require("./lib/_mls-hub");
 const { cloudinaryDiagnostics } = require("./lib/_cloudinary");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 // Read for the Tour It With Me coverage row below — same file the map reads.
@@ -103,6 +105,11 @@ const GEOCODE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // sync is resumable and a single skipped run is not a fault worth alarming on.
 const SYNC_INTERVAL_MINUTES = 30;
 const SYNC_LATE_AFTER_MINUTES = SYNC_INTERVAL_MINUTES * 2 + 5;
+// 2026-10-17 (wave 2a): with MLS_SOURCE=hub the market-data copy is also read at
+// :15 and :45 (mls-hub-sync.js), so it is read every 15 minutes. MUST MATCH the two
+// crons together (tests/test-mls-via-hub.js checks it). Derived the same way.
+const HUB_SYNC_INTERVAL_MINUTES = 15;
+const HUB_SYNC_LATE_AFTER_MINUTES = HUB_SYNC_INTERVAL_MINUTES * 2 + 5;
 
 // 2026-08-15: Lofty's own API page (Settings > Integrations > API) documents
 // this exact call as its usage example, which makes it the ideal key test --
@@ -152,6 +159,7 @@ async function probeLoftyPhoto(mineListings) {
 // stops, the figures go stale and then drop off the town pages -- nothing a
 // visitor sees breaks.
 function mlsGridMarketDataRow(gridState, now) {
+  if (mlsSource() === "hub") return hubMarketDataRow(gridState, now);
   const tokenSet = !!process.env.MLSGRID_API_TOKEN;
   const off = String(process.env.MLSGRID_MARKET_DATA || "").trim().toLowerCase() === "off";
   const disabled = String(process.env.MLS_DISABLED || "").trim().toLowerCase() === "true";
@@ -173,6 +181,49 @@ function mlsGridMarketDataRow(gridState, now) {
       (gridState && gridState.lastSuccessAt ? `Last complete pass ${gridState.lastSuccessAt}. ` : "") +
       (gridState && gridState.lastRunError ? `Error: ${gridState.lastRunError}. ` : "") +
       "Used only for the town pages' market figures — never shown as listings.",
+  };
+}
+
+// 2026-10-17 (wave 2a): the same row when MLS_SOURCE=hub -- the copy is read
+// from the Seller Intelligence hub every 15 minutes (sync-listings.js at :00/:30,
+// mls-hub-sync.js at :15/:45) and MLS Grid is not called. Reads only the stored
+// state, like every other plain row: no hub call on a page load.
+function hubMarketDataRow(gridState, now) {
+  const row = { optional: true, name: "Market data from the hub refreshing (optional)" };
+  if (String(process.env.MLSGRID_MARKET_DATA || "").trim().toLowerCase() === "off") {
+    return { ...row, ok: false, detail: "Switched off (MLSGRID_MARKET_DATA=off); the town market figures will go stale." };
+  }
+  const problem = hubProblem(process.env);
+  if (problem) {
+    return { ...row, ok: false, detail: `MLS_SOURCE=hub, but ${problem}, so the town market figures can't refresh.` };
+  }
+  const viaHub = !!(gridState && gridState.lastRunVia === "hub");
+  const lastRunAt = viaHub && gridState.lastRunAt ? Date.parse(gridState.lastRunAt) : null;
+  const minutes = lastRunAt ? Math.round((now - lastRunAt) / 60000) : null;
+  const ok = minutes !== null && minutes < HUB_SYNC_LATE_AFTER_MINUTES && !gridState.lastRunError;
+  const stored = gridState && typeof gridState.totalListingsStored === "number"
+    ? `${gridState.totalListingsStored.toLocaleString()} listings in the copy. ` : "";
+  const copy = gridState && gridState.hubCopy && gridState.hubCopy.lastSuccessAt
+    ? `The hub's own copy last refreshed ${gridState.hubCopy.lastSuccessAt}. ` : "";
+  return {
+    ...row,
+    ok,
+    detail: (lastRunAt ? `Last read from the hub ${minutes} minute(s) ago (every ${HUB_SYNC_INTERVAL_MINUTES} minutes). `
+      : "Has not read from the hub yet. ") + stored + copy +
+      (gridState && gridState.lastSuccessAt ? `Last complete pass ${gridState.lastSuccessAt}. ` : "") +
+      (gridState && gridState.lastRunError ? `Error: ${gridState.lastRunError}. ` : "") +
+      "Read through the Seller Intelligence hub (MLS_SOURCE=hub) — no MLS Grid request is made. " +
+      "Used only for the town pages' market figures and the MLS check of your Lofty listings — never shown as listings.",
+  };
+}
+
+// 2026-10-17 (wave 2a): LISTINGS_SOURCE=mlsgrid with MLS_SOURCE=hub is refused
+// (lib/_mls-hub.js), so the MLS Grid listing rows get this red row on top.
+function gridViaHubRefusedRow() {
+  return {
+    name: "MLS source setting",
+    ok: false,
+    detail: `${GRID_VIA_HUB_REFUSAL} Until then no listing is shown on this site and no MLS Grid request is made.`,
   };
 }
 
@@ -259,7 +310,7 @@ function loftyListingRows(state, mineListings, now, alertCount, gridState) {
       : state && state.mlsCheck === "checked"
         ? `All ${mineCount} confirmed against the MLS on the last refresh` +
           (state.mlsUnconfirmed ? ` (${state.mlsUnconfirmed} could not be checked and were kept)` : "") + "."
-        : "Not checked: the MLS check runs only when the MLS Grid market-data run is on (MLSGRID_API_TOKEN set).",
+        : "Not checked: the MLS check runs only when the market-data run is on (MLSGRID_API_TOKEN set, or MLS_SOURCE=hub).",
   });
   const withDetails = (Array.isArray(mineListings) ? mineListings : []).filter((l) => l && l.detailsFor).length;
   rows.push({
@@ -902,7 +953,10 @@ exports.handler = async (event) => {
       enabled: true, force: wantsProbe, store, key: PHOTO_CHECK_KEY,
       probe: () => (LISTINGS_SOURCE === "lofty"
         ? probeLoftyPhoto(mine)
-        : probePhotoPipeline(mine, process.env.MLSGRID_API_TOKEN)),
+        // The MLS Grid photo walk makes MLS Grid requests; refused with MLS_SOURCE=hub.
+        : gridListingsRefused()
+          ? Promise.resolve({ checkedAt: new Date().toISOString(), ok: false, detail: `Not tested: ${GRID_VIA_HUB_REFUSAL}` })
+          : probePhotoPipeline(mine, process.env.MLSGRID_API_TOKEN)),
     }),
     freshen(cachedCloudCheck, {
       enabled: isCloudinaryConfigured(), force: wantsProbe, store, key: CLOUDINARY_CHECK_KEY,
@@ -997,6 +1051,7 @@ exports.handler = async (event) => {
     gridState = await store.get(MLSGRID_KEYS.SYNC_STATE_KEY, { type: "json" }).catch(() => null);
   }
   const checks = LISTINGS_SOURCE === "lofty" ? loftyListingRows(state, mineListings, now, areaAlertCount, gridState) : [
+    ...(gridListingsRefused() ? [gridViaHubRefusedRow()] : []),
     {
       name: "Sync running on schedule",
       ok: !isSuspended && minutesSinceLastRun !== null && minutesSinceLastRun < SYNC_LATE_AFTER_MINUTES,
@@ -1144,6 +1199,7 @@ exports.handler = async (event) => {
         `show nothing and visitors are pointed to ${gate.searchUrl}. Set IDX_DISPLAY=on in Netlify to show them.`,
       no_sync_record: "Held back — no complete refresh has been recorded yet, so the 12-hour freshness rule can't be met.",
       stale: `Held back — the last complete refresh was ${gate.ageHours} hour(s) ago, past the 12-hour IDX limit.`,
+      mls_source_hub: `Held back — ${GRID_VIA_HUB_REFUSAL}`,
     };
     const what = LISTINGS_SOURCE === "lofty" ? "your own listings are showing, from Lofty" : "listings are showing, from MLS Grid";
     checks.push({
