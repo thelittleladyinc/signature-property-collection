@@ -44,6 +44,12 @@ function valueForm(formName, data) {
 
 // The hub's intake address, or why it can't be used. Names the setting, never its value.
 function intakeEndpoint(env) {
+  return hubEndpoint(env, INTAKE_PATH);
+}
+
+// Any hub route the website key may call (intake, and the value review's "What
+// have you updated?" answers): HUB_API_URL + path, with HUB_INTAKE_KEY.
+function hubEndpoint(env, path) {
   const raw = String((env && env.HUB_API_URL) || "").trim();
   const key = String((env && env.HUB_INTAKE_KEY) || "").trim();
   const missing = [!raw && "HUB_API_URL", !key && "HUB_INTAKE_KEY"].filter(Boolean);
@@ -53,7 +59,7 @@ function intakeEndpoint(env) {
   if (u.protocol !== "https:") return { reason: "HUB_API_URL must start with https://" };
   if (u.username || u.password) return { reason: "HUB_API_URL must not carry a user name or password" };
   u.search = ""; u.hash = "";
-  u.pathname = u.pathname.replace(/\/+$/, "") + INTAKE_PATH;
+  u.pathname = u.pathname.replace(/\/+$/, "") + path;
   return { url: u.toString(), key };
 }
 
@@ -121,4 +127,4 @@ async function sendValueFormToHub(args, deps) {
   }
 }
 
-module.exports = { INTAKE_PATH, VALUE_FORMS, hubIntakeOn, valueForm, intakeEndpoint, intakeBody, sendValueFormToHub };
+module.exports = { INTAKE_PATH, VALUE_FORMS, hubIntakeOn, valueForm, intakeEndpoint, hubEndpoint, intakeBody, sendValueFormToHub };
