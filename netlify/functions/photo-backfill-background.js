@@ -70,6 +70,9 @@ exports.handler = async (event) => {
   // is nothing to store -- Lofty's image server holds every photo at a stable,
   // resizable address -- and nothing here may call MLS Grid any more.
   if (LISTINGS_SOURCE === "lofty") return { statusCode: 200, body: "" };
+  // 2026-10-17 (wave 2a): with MLS_SOURCE=hub nothing may call MLS Grid, and the
+  // MLS Grid listing source is refused with it anyway (lib/_mls-hub.js).
+  if (require("./lib/_mls-hub").mlsSource() === "hub") return { statusCode: 200, body: "" };
   const startedAt = Date.now();
   const store = getBlobStore(getStore, BLOB_STORE_NAME);
   const token = process.env.MLSGRID_API_TOKEN;

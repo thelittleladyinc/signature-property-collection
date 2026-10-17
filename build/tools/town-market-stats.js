@@ -99,6 +99,44 @@ function listingsFromBlob(raw) {
   return [];
 }
 
+// The figures themselves, from the stored listings. Pulled out of main() on
+// 2026-10-17 (wave 2a) so tests/test-mls-via-hub.js can prove the copy kept
+// through the hub gives the same towns, counts and medians as the MLS Grid one.
+//
+// Active only. "Pending" and "Active Under Contract" are replicated too (see
+// REPLICATED_STATUSES) but a pending home is not what someone asking "what do
+// homes cost in Severance" is shopping from, and mixing them would quietly
+// drag the median toward whatever sold fastest.
+function townFigures(listings) {
+  const byCity = new Map();
+  for (const l of listings) {
+    if (!l || l.status !== "Active") continue;
+    const city = (l.city || "").trim();
+    if (!city || typeof l.price !== "number" || l.price <= 0) continue;
+    if (!byCity.has(city)) byCity.set(city, []);
+    byCity.get(city).push(l);
+  }
+
+  const towns = {};
+  let skipped = 0;
+  for (const [city, rows] of byCity) {
+    if (rows.length < MIN_SAMPLE) {
+      skipped += 1;
+      continue;
+    }
+    const prices = rows.map((r) => r.price);
+    const ppsf = rows
+      .filter((r) => typeof r.sqft === "number" && r.sqft > 200)
+      .map((r) => r.price / r.sqft);
+    towns[city] = {
+      active: rows.length,
+      median_list: median(prices),
+      median_price_per_sqft: ppsf.length >= MIN_SAMPLE ? Math.round(median(ppsf)) : null,
+    };
+  }
+  return { towns, skipped };
+}
+
 async function main() {
   if (!process.env.BLOBS_SITE_ID || !process.env.BLOBS_TOKEN) {
     console.error("!! BLOBS_SITE_ID / BLOBS_TOKEN not set — cannot read the replicated");
@@ -136,36 +174,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Active only. "Pending" and "Active Under Contract" are replicated too (see
-  // REPLICATED_STATUSES) but a pending home is not what someone asking "what do
-  // homes cost in Severance" is shopping from, and mixing them would quietly
-  // drag the median toward whatever sold fastest.
-  const byCity = new Map();
-  for (const l of listings) {
-    if (!l || l.status !== "Active") continue;
-    const city = (l.city || "").trim();
-    if (!city || typeof l.price !== "number" || l.price <= 0) continue;
-    if (!byCity.has(city)) byCity.set(city, []);
-    byCity.get(city).push(l);
-  }
-
-  const towns = {};
-  let skipped = 0;
-  for (const [city, rows] of byCity) {
-    if (rows.length < MIN_SAMPLE) {
-      skipped += 1;
-      continue;
-    }
-    const prices = rows.map((r) => r.price);
-    const ppsf = rows
-      .filter((r) => typeof r.sqft === "number" && r.sqft > 200)
-      .map((r) => r.price / r.sqft);
-    towns[city] = {
-      active: rows.length,
-      median_list: median(prices),
-      median_price_per_sqft: ppsf.length >= MIN_SAMPLE ? Math.round(median(ppsf)) : null,
-    };
-  }
+  const { towns, skipped } = townFigures(listings);
 
   const out = {
     _README: [
@@ -208,4 +217,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { listingsFromBlob, median, MIN_SAMPLE };
+module.exports = { listingsFromBlob, median, townFigures, MIN_SAMPLE };

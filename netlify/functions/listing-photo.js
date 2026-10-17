@@ -241,6 +241,9 @@ const PLACEHOLDER_TTL = {
   // 2026-09-28: IDX display switched off (lib/_idx-display.js). Short, so photos
   // return within minutes of display being switched back on.
   idx_display_off: 300,
+  // 2026-10-17: LISTINGS_SOURCE=mlsgrid with MLS_SOURCE=hub (refused, see
+  // lib/_mls-hub.js). A setting, so as short as the switch above.
+  mls_source_hub: 300,
   // Temporary by definition. Short, so photos come back as soon as the limit
   // clears -- and the cooldown, not the CDN, is what protects the host meanwhile.
   media_rate_limited: 60,
@@ -340,6 +343,8 @@ function placeholder(reason, debug, extra) {
 const EXPLANATIONS = {
   idx_display_off: "IDX display is switched off on this site (IDX_DISPLAY is not \"on\"), so no stored " +
     "MLS photo is served -- not even one already cached. See lib/_idx-display.js.",
+  mls_source_hub: "MLS_SOURCE=hub is set while listings come from MLS Grid (LISTINGS_SOURCE=mlsgrid). The hub has " +
+    "no photos, so that combination is refused and no MLS photo is served or fetched. See lib/_mls-hub.js.",
   bad_id: "The listing id in the URL isn't a valid MLS id.",
   not_configured: "MLSGRID_API_TOKEN is not set on this deploy, so no photo can be fetched at all.",
   no_media: "MLS Grid returned no photos for this listing. Either the listing genuinely has none, " +
@@ -511,7 +516,9 @@ exports.handler = async (event) => {
   // applies here; the 12-hour freshness guard lives on the endpoints that hand
   // out photo URLs (listings-search, listing-page), which stop issuing them.
   const switchGate = idxGate({ skipFreshness: true });
-  if (!switchGate.allowed) return placeholder("idx_display_off", debug, {});
+  if (!switchGate.allowed) {
+    return placeholder(switchGate.reason === "mls_source_hub" ? "mls_source_hub" : "idx_display_off", debug, {});
+  }
   try {
     const listingId = String(params.id || params.listingId || "").trim();
     if (!listingId || !/^[A-Za-z0-9_-]{3,40}$/.test(listingId)) {
