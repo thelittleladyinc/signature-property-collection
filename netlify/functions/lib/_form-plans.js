@@ -35,9 +35,15 @@
 // Lofty, when the tag "Value Review Sent" is added -- after Christine sends the
 // value review drafted for her (the Seller Intelligence hub adds that tag). So at
 // submission they get the Seller lead type (HV enrolls Seller leads) and no plan
-// tag. cash-offer keeps S2. On the Signature site free-home-valuation keeps the
-// luxury plan below either way: whether it should wait for the review too is
-// Christine's call. Switch off = exactly the table as it was.
+// tag. cash-offer keeps S2. Switch off = exactly the table as it was.
+//
+// 2026-10-17, Christine's call on the Signature site's free-home-valuation, with
+// the same switch on: BOTH plans. It keeps the luxury seller plan (its tag added
+// right after the create, as before), adds the plain tag "Luxury" in the same
+// PUT, and gets HV later on "Value Review Sent" like the other value forms. When
+// each plan's FIRST email goes is set in Lofty, not here: the luxury plan's first
+// email must wait at least 2 days longer than HV's, so the two never land on the
+// same day (CLAUDE.md, "Website forms start their Lofty nurture plan").
 
 // The tag that starts each plan, exactly as the plan's start tag reads in Lofty.
 // Every "–" here is U+2013 EN DASH, copied from the plan names; S2's "-" is a
@@ -58,6 +64,11 @@ const PLAN_TAGS = Object.freeze({
 // never by this site; here so the tests can pin its characters (plain ASCII).
 const VALUE_REVIEW_SENT_TAG = "Value Review Sent";
 
+// The plain tag Christine's Lofty already uses for luxury homes (Expired Elite
+// adds it to $1M+ listings). Not a plan tag: added next to the luxury plan's tag
+// for a Signature home-value request (switch on).
+const LUXURY_TAG = "Luxury";
+
 // Lofty's numeric lead types (`leadTypes` on POST /v1.0/leads).
 const LEAD_TYPE = Object.freeze({ SELLER: 1, BUYER: 2 });
 
@@ -75,6 +86,9 @@ const PLANS = Object.freeze({
   RECRUIT: { tag: PLAN_TAGS.RECRUIT, leadType: null },
   // No tag at submission: HV starts on VALUE_REVIEW_SENT_TAG, added later by the hub.
   HV_VALUE_REVIEW: { tag: null, leadType: LEAD_TYPE.SELLER },
+  // Signature's home-value request, switch on: the luxury plan now, plus the
+  // "Luxury" tag; HV later on VALUE_REVIEW_SENT_TAG.
+  SPC_LUXURY_VALUE_REVIEW: { tag: PLAN_TAGS.SPC_LUXURY, alsoTags: Object.freeze([LUXURY_TAG]), leadType: LEAD_TYPE.SELLER },
 });
 
 // Form name (Netlify form-name) -> plan, the same on both sites.
@@ -167,8 +181,12 @@ function hasOwn(obj, key) {
 }
 
 // The plan key for a submission, or null.
-// With the value-review plan on, these wait for "Value Review Sent" instead.
+// With the value-review plan on, these wait for "Value Review Sent" instead ...
 const VALUE_REVIEW_FORMS = Object.freeze(["free-home-valuation"]);
+// ... except on the Signature site, where the home-value form starts both plans.
+const SIGNATURE_VALUE_REVIEW_PLAN = Object.freeze({
+  "free-home-valuation": "SPC_LUXURY_VALUE_REVIEW",
+});
 
 function planKeyFor(formName, data, opts) {
   const name = String(formName || "");
@@ -179,6 +197,7 @@ function planKeyFor(formName, data, opts) {
     if (valueReview && intent === "value") return "HV_VALUE_REVIEW";
     return hasOwn(HOME_LEAD_PLAN, intent) ? HOME_LEAD_PLAN[intent] : null;
   }
+  if (site === "signature" && valueReview && hasOwn(SIGNATURE_VALUE_REVIEW_PLAN, name)) return SIGNATURE_VALUE_REVIEW_PLAN[name];
   if (site === "signature" && hasOwn(SIGNATURE_SITE_PLAN, name)) return SIGNATURE_SITE_PLAN[name];
   if (valueReview && VALUE_REVIEW_FORMS.includes(name)) return "HV_VALUE_REVIEW";
   if (hasOwn(FORM_PLAN, name)) return FORM_PLAN[name];
@@ -189,13 +208,15 @@ function planKeyFor(formName, data, opts) {
 //   -> { plan, planTags: string[], leadTypes: number[] }
 // Empty arrays (and plan null) = this submission starts no plan. `site` defaults
 // to "main"; `valueReviewPlan` to false. HV_VALUE_REVIEW has a lead type and no
-// plan tag (its plan starts later, in Lofty). Fresh arrays every call, so a
-// caller can't change the table.
+// plan tag (its plan starts later, in Lofty). planTags is the plan's tag first,
+// then any tag added with it (SPC_LUXURY_VALUE_REVIEW: "Luxury"), all in the one
+// PUT after the create. Fresh arrays every call, so a caller can't change the
+// table.
 function planForSubmission(formName, data, opts) {
   const key = planKeyFor(formName, data, opts);
   const p = key ? PLANS[key] : null;
   if (!p) return { plan: null, planTags: [], leadTypes: [] };
-  return { plan: key, planTags: p.tag ? [p.tag] : [], leadTypes: p.leadType ? [p.leadType] : [] };
+  return { plan: key, planTags: p.tag ? [p.tag, ...(p.alsoTags || [])] : [], leadTypes: p.leadType ? [p.leadType] : [] };
 }
 
 // The switch, read once per submission by submission-created.js: exactly "on"
@@ -214,6 +235,8 @@ module.exports = {
   FORMS_WITHOUT_PLAN,
   VALUE_REVIEW_SENT_TAG,
   VALUE_REVIEW_FORMS,
+  SIGNATURE_VALUE_REVIEW_PLAN,
+  LUXURY_TAG,
   planForSubmission,
   valueReviewPlanOn,
 };

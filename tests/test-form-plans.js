@@ -490,9 +490,17 @@ function blobStore(seed) {
     check(`${site}: every other form starts exactly what it did`, moved.length === 0, moved.join(", "));
   }
   check("main: free-home-valuation -> Seller lead type, no plan tag", same(on("free-home-valuation", {}, "main"), hv));
-  check("signature: free-home-valuation keeps the luxury seller plan (Christine's call)", same(on("free-home-valuation", {}, "signature"), expectPlan(TAG.SPC, SELLER)));
+  check("signature: free-home-valuation starts BOTH -- the luxury seller plan now, plus the tag \"Luxury\" (Christine, 2026-10-17); HV later",
+    same(on("free-home-valuation", {}, "signature"), { planTags: [TAG.SPC, "Luxury"], leadTypes: [SELLER] }) &&
+    P.planForSubmission("free-home-valuation", {}, { site: "signature", valueReviewPlan: true }).plan === "SPC_LUXURY_VALUE_REVIEW" &&
+    !on("free-home-valuation", {}, "signature").planTags.includes(P.VALUE_REVIEW_SENT_TAG));
+  check("the Luxury tag, character for character (plain ASCII), and it is not a plan's start tag",
+    P.LUXURY_TAG === "Luxury" && /^[\x20-\x7e]+$/.test(P.LUXURY_TAG) && !Object.values(P.PLAN_TAGS).includes(P.LUXURY_TAG));
+  check("signature: only the home-value form gets both; its other seller forms keep the luxury plan alone",
+    ["sellers-page-inquiry", "sellers-guide", "seller-local-proof"].every((f2) => same(on(f2, {}, "signature"), expectPlan(TAG.SPC, SELLER))));
   check("switch off (no option) = the table as before", same(got("free-home-valuation", {}, "main"), expectPlan(TAG.S2, SELLER)) &&
-    same(got("home-lead", { looking_to: "value" }, "main"), expectPlan(TAG.S2, SELLER)));
+    same(got("home-lead", { looking_to: "value" }, "main"), expectPlan(TAG.S2, SELLER)) &&
+    same(got("free-home-valuation", {}, "signature"), expectPlan(TAG.SPC, SELLER)));
 
   process.env.VALUE_REVIEW_PLAN = "on";
   f = fakeLofty();
@@ -505,8 +513,11 @@ function blobStore(seed) {
     check("...and the log says why", out.lines.some((l) => l.includes('Nurture plan HV_VALUE_REVIEW for "free-home-valuation": skipped -- its plan starts later in Lofty, on the tag "Value Review Sent"')),
       out.lines.filter((l) => /Nurture plan/.test(l)).join(" | "));
   } else {
-    check("end to end, switch on: Signature's home-value lead still starts the luxury seller plan", planPuts(f).length === 1 &&
-      planPuts(f)[0].body.tags.includes(TAG.SPC), JSON.stringify(f.puts));
+    check("end to end, switch on: Signature's home-value lead starts the luxury seller plan and gets \"Luxury\" in the same PUT after the create",
+      planPuts(f).length === 1 && planPuts(f)[0].body.tags.includes(TAG.SPC) && planPuts(f)[0].body.tags.includes("Luxury") &&
+      !tagsOnCreate(f.posts[0]).includes("Luxury") && same(f.posts[0].leadTypes, [SELLER]), JSON.stringify({ create: f.posts[0], puts: f.puts }));
+    check("...and the log names both tags", out.lines.some((l) => l.includes(`Nurture plan SPC_LUXURY_VALUE_REVIEW for "free-home-valuation": added tag "${TAG.SPC}", "Luxury"`)),
+      out.lines.filter((l) => /Nurture plan/.test(l)).join(" | "));
   }
   f = fakeLofty();
   await submit(f, "cash-offer", { address: "123 Main St" });
