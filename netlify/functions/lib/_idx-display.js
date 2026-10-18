@@ -85,7 +85,15 @@ function lastSuccessMs(state) {
 // { skipFreshness: true } for the photo proxy, which serves images, not facts.
 //
 // Returns { allowed: true } or
-//         { allowed: false, reason: "disabled"|"no_sync_record"|"stale", ... }
+//         { allowed: false, reason: "disabled"|"mls_source_hub"|"no_sync_record"|"stale", ... }
+//
+// 2026-10-17 (wave 2a): "mls_source_hub" is LISTINGS_SOURCE=mlsgrid together
+// with MLS_SOURCE=hub -- refused, fail closed. Those public pages show every
+// brokerage's listings, and the hub has no photos and gives the listing agent
+// ("Listing courtesy of ...") only to a key with an extra scope, so nothing is
+// shown rather than listings without either (lib/_mls-hub.js). Checked before
+// skipFreshness, so the photo proxy stands down too and no MLS Grid photo
+// request is made. Lofty (the default source) with MLS_SOURCE=hub is unaffected.
 function idxGate(opts) {
   const o = opts || {};
   const env = o.env || process.env;
@@ -95,6 +103,9 @@ function idxGate(opts) {
     allowed: false, reason, message: MESSAGE, searchUrl, ...(extra || {}),
   });
   if (!isIdxDisplayOn(env)) return deny("disabled");
+  // Required here, not at the top, so this small file does not load the listings
+  // library until display is on (Node keeps it after the first call).
+  if (require("./_mls-hub").gridListingsRefused(env)) return deny("mls_source_hub");
   if (o.skipFreshness) return { allowed: true, searchUrl };
   const last = lastSuccessMs(o.state);
   if (last == null) return deny("no_sync_record");

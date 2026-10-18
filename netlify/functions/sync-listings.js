@@ -89,6 +89,11 @@ const {
   listPhotoDemand, clearPhotoDemand,
 } = require("./lib/_media");
 const { runMineSync } = require("./lib/_lofty-listings");
+// 2026-10-17 (wave 2a): MLS_SOURCE=hub moves this file's two MLS readers -- the
+// market-data copy and the on-market check -- to the Seller Intelligence hub.
+// See lib/_mls-hub.js and docs/mls-via-hub.md. Unset keeps every MLS Grid path
+// below exactly as it was.
+const mlsHub = require("./lib/_mls-hub");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
 // her own listings are still all serving raw MLS Grid URLs. cacheCoverPhoto
@@ -974,10 +979,16 @@ const VERDICT_TTL_MS = 24 * 60 * 60 * 1000;
 const NEW_LISTING_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_LOOKUPS_PER_RUN = 2;
 
-function makeOnMarketConfirmer({ store, token, now, log, sleepImpl }) {
+// 2026-10-17 (wave 2a): with MLS_SOURCE=hub (decided when the confirmer is made,
+// i.e. once per run) step 2 asks the hub's copy instead -- POST /v1/mls/search
+// with listing_ids, no status filter -- and nothing here calls MLS Grid. Same
+// copy-first order, same cap, pace, cache and grace; a hub that is not set up,
+// not ready or not answering is "unknown", exactly like an MLS Grid failure.
+function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env }) {
   const say = log || console.log;
   const clock = now || Date.now;
   const pause = sleepImpl || sleep;
+  const viaHub = mlsHub.mlsSource(env || process.env) === "hub";
   let gridMine = null;
   let verdicts = null;
   let lookups = 0;
@@ -1029,9 +1040,11 @@ function makeOnMarketConfirmer({ store, token, now, log, sleepImpl }) {
     lookups += 1;
     let verdict;
     try {
-      verdict = await askMlsGrid(id);
+      verdict = viaHub
+        ? await mlsHub.hubOnMarket(mlsHub.makeHubClient(env || process.env, mlsHub.HUB_LOOKUP_TIMEOUT_MS), id)
+        : await askMlsGrid(id);
     } catch (err) {
-      verdict = { onMarket: null, why: `MLS Grid check failed: ${err && err.message}` };
+      verdict = { onMarket: null, why: `${viaHub ? "hub" : "MLS Grid"} check failed: ${err && err.message}` };
     }
     if (verdict.onMarket === false && verdict.status === "not in the feed") {
       const listed = listing.listDate ? Date.parse(listing.listDate) : NaN;
@@ -1089,10 +1102,18 @@ async function loftyScheduledRun() {
 // The MLS Grid market-data run under Lofty: on whenever there is an MLS Grid
 // token, unless MLSGRID_MARKET_DATA=off. MLS_DISABLED still stops it outright
 // (checkMlsQuota below), exactly as it always stopped the MLS Grid path.
+//
+// 2026-10-17 (wave 2a): with MLS_SOURCE=hub the same run reads the hub instead
+// (hubMarketDataRun), so it needs no MLS Grid token: it is on unless
+// MLSGRID_MARKET_DATA=off. A hub that is not set up is not "off" -- the run goes
+// ahead, records why it could not read, and /site-health shows it.
+// MLS_DISABLED is the MLS Grid kill switch and does not apply to the hub (the
+// hub's own switch is its mls_reads_enabled flag).
 function mlsGridMarketDataOn(env) {
   const e = env || process.env;
-  return !!e.MLSGRID_API_TOKEN &&
-    String(e.MLSGRID_MARKET_DATA == null ? "" : e.MLSGRID_MARKET_DATA).trim().toLowerCase() !== "off";
+  const off = String(e.MLSGRID_MARKET_DATA == null ? "" : e.MLSGRID_MARKET_DATA).trim().toLowerCase() === "off";
+  if (mlsHub.mlsSource(e) === "hub") return !off;
+  return !!e.MLSGRID_API_TOKEN && !off;
 }
 exports.mlsGridMarketDataOn = mlsGridMarketDataOn; // for tests
 
@@ -1101,15 +1122,22 @@ exports.handler = async () => {
   // (TIME_BUDGET_MS and the rest, all measured from startedAt) counts the time
   // her Lofty listings took first. Netlify stops a scheduled run at 30 seconds.
   const startedAt = Date.now();
-  if (LISTINGS_SOURCE !== "lofty") return mlsGridRun({ startedAt });
+  const viaHub = mlsHub.mlsSource() === "hub";
+  if (LISTINGS_SOURCE !== "lofty") {
+    // Refused, fail closed: see lib/_mls-hub.js (GRID_VIA_HUB_REFUSAL).
+    if (viaHub) return refuseGridListingsViaHub();
+    return mlsGridRun({ startedAt });
+  }
   const result = await loftyScheduledRun();
   if (mlsGridMarketDataOn()) {
     try {
-      const grid = await mlsGridRun({ startedAt, background: true });
-      console.log("sync-listings (MLS Grid market data):", grid && grid.body);
+      const grid = viaHub
+        ? await hubMarketDataRun({ startedAt })
+        : await mlsGridRun({ startedAt, background: true });
+      console.log(`sync-listings (${viaHub ? "hub" : "MLS Grid"} market data):`, grid && grid.body);
     } catch (err) {
       // Her listings are already refreshed and saved; this only delays the figures.
-      console.error("sync-listings: MLS Grid market-data run failed (her listings are unaffected):", err && err.message);
+      console.error(`sync-listings: ${viaHub ? "hub" : "MLS Grid"} market-data run failed (her listings are unaffected):`, err && err.message);
     }
   }
   return result;
@@ -1140,6 +1168,329 @@ function keepStoredPhotos(mapped, previouslyStored) {
   return mapped;
 }
 exports.keepStoredPhotos = keepStoredPhotos; // for tests
+
+// ---- 2026-10-17 (wave 2a): the market-data copy through the hub ------------
+// MLS_SOURCE=hub. The same copy the MLS Grid background run keeps above --
+// listings.json, mine-listings.json and sync-state.json under the MLS Grid keys,
+// the same record shape (mapListing over the same SELECT_FIELDS), the same rules:
+// REPLICATED_STATUSES stored, every other status and MlgCanView=false removed,
+// OPERATING_COUNTIES applied (never to hers), stored photos kept as they were
+// (keepStoredPhotos) -- read from the Seller Intelligence hub's copy of the IRES
+// feed instead of from MLS Grid. Not one MLS Grid request, so the quota guard
+// and the suspension breaker (both MLS Grid only) are not involved.
+//
+// How it stays in step (the hub's replication contract, docs/mls-via-hub.md):
+//   - INCREMENTAL, the normal case -- and the first run after switching from MLS
+//     Grid, which carries that copy's checkpoint over (the same
+//     ModificationTimestamp values): first GET /v1/mls/deleted since the last
+//     complete pass (listings the hub removed: MLS Grid marked them
+//     MlgCanView=false, or its weekly key check found them gone), then POST
+//     /v1/mls/search ordered by ModificationTimestamp from the checkpoint with
+//     NO status filter, so a listing that sells, expires or is withdrawn comes
+//     back and is removed (the 2026-08-13 prune fix, unchanged). A row this key
+//     may not see comes back as a withheld stub and is removed, exactly like an
+//     MlgCanView=false record from MLS Grid.
+//   - SNAPSHOT, when there is no copy yet or the deletion list no longer reaches
+//     back to the last pass (the hub keeps 30 days): every Active / Active Under
+//     Contract / Pending / Coming Soon listing, and then whatever is stored that
+//     the snapshot did not return is removed. Refused -- nothing removed, copy
+//     not marked current -- if it would keep under half of what is stored or
+//     nothing at all: a ready copy of a real market never halves, so that is a
+//     short answer, never "the market emptied".
+// The checkpoint, and lastSuccessAt with it, moves only once a whole pass has
+// been read. A pass that runs out of time resumes from its saved cursor on the
+// next run, like the MLS Grid crawl's nextLink. Any failure (not configured,
+// unreachable, refused, malformed, not ready) stops the run with the reason in
+// lastRunError and applies nothing from the page that failed.
+//
+// Cadence: this runs inside the 30-minute sync AND from mls-hub-sync.js at :15
+// and :45, so the copy is read every 15 minutes in hub mode (the hub itself is
+// at most ~15 minutes behind MLS Grid). MLS Grid modes are untouched: that
+// function does nothing unless MLS_SOURCE=hub.
+const HUB_DELETED_OVERLAP_MS = 10 * 60 * 1000;
+// After a snapshot the checkpoint is put back to an hour before the hub's own
+// last good pass when the snapshot began, so a change the hub took in while a
+// multi-run snapshot was being read is read again by the first incremental pass.
+const HUB_SNAPSHOT_REWIND_MS = 60 * 60 * 1000;
+const HUB_SNAPSHOT_MIN_KEEP_FRACTION = 0.5;
+// The ids a snapshot has kept so far, across runs. Its own blob so the small
+// state blob that every search reads stays small.
+const HUB_SNAPSHOT_SEEN_KEY = "hub-snapshot-seen.json";
+
+function hubReadError(page) {
+  return Object.assign(new Error(page.why), { keepPass: page.keepPass });
+}
+
+async function hubMarketDataRun(opts) {
+  const o = opts || {};
+  const env = o.env || process.env;
+  const say = o.log || console.log;
+  const startedAt = o.startedAt || Date.now();
+  const store = o.store || getBlobStore(getStore);
+
+  const prev = (await store.get(SYNC_STATE_KEY, { type: "json" })) || {
+    bootstrapped: false, cursor: null, lastModified: null,
+  };
+  const listingsById = (await store.get(LISTINGS_KEY, { type: "json" })) || {};
+  // Same in-memory cleanup as the MLS Grid run, saved before any network call.
+  const cleanup = pruneAndSlimStore(listingsById);
+  if (cleanup.slimmed || cleanup.dropped) await saveListingsCheckpoint(store, listingsById);
+
+  let pass = prev.hubPass && typeof prev.hubPass === "object" ? { ...prev.hubPass } : null;
+  let lastModified = prev.lastModified || null;
+  let bootstrapped = !!prev.bootstrapped;
+  let deletedSince = prev.hubDeletedSince || null;
+  // MLS Grid's own resume link: left alone for a switch back, dropped once a hub
+  // pass has moved the checkpoint past it.
+  let mlsGridCursor = prev.cursor || null;
+  let hubCopy = prev.hubCopy || null;
+  let lastRunError = null;
+  let passComplete = false;
+  let snapshotFinished = false;
+  let pagesFetched = 0;
+  let recordsSeen = 0;
+  let removedByHub = 0;
+  let dirty = false;
+  let seen = null;
+
+  // The deletion list names ListingKey only; the copy is keyed by ListingId.
+  const keyIndex = new Map();
+  const indexKey = (key, id) => {
+    if (!key || !id) return;
+    if (!keyIndex.has(key)) keyIndex.set(key, new Set());
+    keyIndex.get(key).add(id);
+  };
+  for (const [id, l] of Object.entries(listingsById)) indexKey(l && l.listingKey, id);
+  const drop = (listingId, listingKey) => {
+    let n = 0;
+    for (const id of new Set([listingId, listingKey, ...(keyIndex.get(listingKey) || [])])) {
+      if (id && listingsById[id]) { delete listingsById[id]; n += 1; }
+      if (id && seen) seen.delete(id);
+    }
+    if (n) dirty = true;
+    return n;
+  };
+
+  const stateNow = () => ({
+    bootstrapped,
+    cursor: mlsGridCursor,
+    lastModified,
+    lastRunAt: new Date().toISOString(),
+    lastRunVia: "hub",
+    lastRunPagesFetched: pagesFetched,
+    lastRunRecordsSeen: recordsSeen,
+    lastRunRemovedByHub: removedByHub,
+    totalListingsStored: Object.keys(listingsById).length,
+    lastRunStoreSlimmed: cleanup.slimmed,
+    lastRunStoreDropped: cleanup.dropped,
+    lastRunCoverPhotosCached: 0,
+    lastRunStaleListingsRefreshed: 0,
+    lastRunCoversBackfilled: 0,
+    backfillCursor: prev.backfillCursor || 0,
+    totalBackfillCandidates: prev.totalBackfillCandidates || 0,
+    lastRunError,
+    lastSuccessAt: nextLastSuccessAt(prev, { passComplete, lastRunError, httpErrorOccurred: false }, new Date().toISOString()),
+    lastCloudinaryError: null,
+    herOfficeMlsId: prev.herOfficeMlsId || null,
+    lastRunNewlyDiscoveredByOffice: 0,
+    hubPass: pass,
+    hubDeletedSince: deletedSince,
+    hubCopy,
+  });
+  const saveProgress = async () => {
+    if (dirty) await saveListingsCheckpoint(store, listingsById);
+    dirty = false;
+    if (seen && pass && pass.kind === "snapshot") {
+      await store.setJSON(HUB_SNAPSHOT_SEEN_KEY, { passStartedAt: pass.startedAt, ids: [...seen] });
+    }
+    await store.setJSON(SYNC_STATE_KEY, stateNow());
+  };
+
+  const problem = mlsHub.hubProblem(env);
+  if (problem) {
+    lastRunError = `hub: ${problem}`;
+  } else {
+    const client = mlsHub.makeHubClient(env, mlsHub.HUB_PAGE_TIMEOUT_MS);
+    const outOfTime = () => Date.now() - startedAt > TIME_BUDGET_MS;
+    const startSnapshot = (rebuild) => ({
+      kind: "snapshot", rebuild: !!rebuild, startedAt: new Date().toISOString(),
+      storedBefore: Object.keys(listingsById).length, after: null, maxMod: null, copyLastSuccessAt: null,
+    });
+    try {
+      if (!pass) {
+        const since = Date.parse(lastModified || "");
+        pass = (!bootstrapped || !Number.isFinite(since)) ? startSnapshot(false) : {
+          kind: "incremental", startedAt: new Date().toISOString(), since: lastModified,
+          deletedSince: deletedSince || new Date(since - HUB_DELETED_OVERLAP_MS).toISOString(),
+          deletedAfter: null, deletedDone: false, after: null, maxMod: null,
+        };
+      }
+      if (pass.kind === "snapshot") {
+        // A snapshot part-way through needs the ids it has kept so far; without
+        // them its last step would remove listings it already read. So a missing
+        // list restarts the snapshot, and a failed read fails the run.
+        let saved = null;
+        if (pass.after) saved = await store.get(HUB_SNAPSHOT_SEEN_KEY, { type: "json" });
+        if (pass.after && !(saved && saved.passStartedAt === pass.startedAt && Array.isArray(saved.ids))) {
+          say("sync-listings (hub): the snapshot's list of listings read so far is missing — starting the snapshot again.");
+          pass = startSnapshot(pass.rebuild);
+          saved = null;
+        }
+        seen = new Set(saved ? saved.ids : []);
+      }
+
+      // 1. What the hub removed since the last pass (incremental only).
+      while (pass.kind === "incremental" && !pass.deletedDone && !outOfTime()) {
+        const page = mlsHub.readDeletedPage(await client.call("GET", "/v1/mls/deleted", undefined, {
+          since: pass.deletedSince, after: pass.deletedAfter || undefined, limit: mlsHub.HUB_PAGE_SIZE,
+        }));
+        if (!page.ok) throw hubReadError(page);
+        pagesFetched += 1;
+        if (!page.complete) {
+          say(`sync-listings (hub): the hub's deletion list no longer reaches back to ${pass.deletedSince} ` +
+            "(it keeps 30 days) — re-reading the whole copy instead of trusting the gap.");
+          pass = startSnapshot(true);
+          seen = new Set();
+          break;
+        }
+        for (const row of page.rows) {
+          // A deletion older than the version already held does not apply to it
+          // (the listing came back after it was removed).
+          const held = listingsById[row.ListingKey] ||
+            [...(keyIndex.get(row.ListingKey) || [])].map((id) => listingsById[id]).find(Boolean);
+          const heldAt = Date.parse((held && held.modificationTimestamp) || "");
+          const goneAt = Date.parse(row.deleted_at || "");
+          if (Number.isFinite(heldAt) && Number.isFinite(goneAt) && heldAt > goneAt) continue;
+          removedByHub += drop(null, row.ListingKey);
+        }
+        pass.deletedAfter = page.next;
+        if (!page.next) pass.deletedDone = true;
+        await saveProgress();
+      }
+
+      // 2. Every listing changed since the checkpoint (or, for a snapshot, every
+      //    listing in a stored status), oldest change first.
+      let searchDone = false;
+      const searchMayStart = pass.kind === "snapshot" || pass.deletedDone;
+      while (searchMayStart && !searchDone && !outOfTime()) {
+        const body = pass.kind === "snapshot"
+          ? { statuses: REPLICATED_STATUSES.slice(), order: "modified", limit: mlsHub.HUB_PAGE_SIZE }
+          : { order: "modified", modified_since: pass.since, limit: mlsHub.HUB_PAGE_SIZE };
+        if (pass.after) body.after = pass.after;
+        const page = mlsHub.readSearchPage(await client.call("POST", "/v1/mls/search", body));
+        if (!page.ok) throw hubReadError(page);
+        pagesFetched += 1;
+        recordsSeen += page.rows.length;
+        hubCopy = {
+          lastSuccessAt: page.copy.last_success_at || null,
+          ageHours: typeof page.copy.age_hours === "number" ? page.copy.age_hours : null,
+          checkedAt: new Date().toISOString(),
+        };
+        if (pass.kind === "snapshot" && !pass.copyLastSuccessAt) pass.copyLastSuccessAt = page.copy.last_success_at || null;
+        for (const row of page.rows) {
+          const mapped = mapListing(mlsHub.recordFromHubRow(row));
+          // The checkpoint is the last row's ModificationTimestamp, removals included.
+          const t = Date.parse(mapped.modificationTimestamp || "");
+          if (Number.isFinite(t) && !(Date.parse(pass.maxMod || "") >= t)) pass.maxMod = mapped.modificationTimestamp;
+          // From here on, the same per-record rules as the MLS Grid crawl.
+          if (mapped.mlgCanView === false || !REPLICATED_STATUSES.includes(mapped.status)) {
+            removedByHub += drop(mapped.listingId, mapped.listingKey);
+            continue;
+          }
+          if (OPERATING_COUNTIES.size > 0 && mapped.county && !OPERATING_COUNTIES.has(mapped.county) && !isHerListing(mapped)) {
+            drop(mapped.listingId, mapped.listingKey);
+            continue;
+          }
+          if (!mapped.listingId) continue;
+          keepStoredPhotos(mapped, listingsById[mapped.listingId]);
+          mapped.photosRefreshedAt = new Date().toISOString();
+          listingsById[mapped.listingId] = slimForStorage(mapped);
+          indexKey(mapped.listingKey, mapped.listingId);
+          if (seen) seen.add(mapped.listingId);
+          dirty = true;
+        }
+        pass.after = page.next;
+        searchDone = !page.next;
+        if (!searchDone) await saveProgress();
+      }
+
+      // 3. A whole pass read: move the checkpoint.
+      if (searchDone) {
+        if (pass.kind === "snapshot") {
+          const kept = seen.size;
+          if (!kept || kept < HUB_SNAPSHOT_MIN_KEEP_FRACTION * (pass.storedBefore || 0)) {
+            throw Object.assign(new Error(`the hub's full read returned ${kept} listing(s) to keep against ` +
+              `${pass.storedBefore} stored — too few to be the whole market, so nothing stored was removed and ` +
+              "the copy is not marked current"), { keepPass: false });
+          }
+          for (const id of Object.keys(listingsById)) {
+            if (!seen.has(id)) { delete listingsById[id]; removedByHub += 1; dirty = true; }
+          }
+          const floor = Math.min(Date.parse(pass.startedAt),
+            Date.parse(pass.copyLastSuccessAt || "") || Infinity) - HUB_SNAPSHOT_REWIND_MS;
+          const top = Date.parse(pass.maxMod || "");
+          lastModified = new Date(Number.isFinite(top) ? Math.min(top, floor) : floor).toISOString();
+          snapshotFinished = true;
+        } else if (pass.maxMod && !(Date.parse(lastModified || "") >= Date.parse(pass.maxMod))) {
+          lastModified = pass.maxMod;
+        }
+        deletedSince = new Date(Date.parse(pass.startedAt) - HUB_DELETED_OVERLAP_MS).toISOString();
+        bootstrapped = true;
+        mlsGridCursor = null;
+        pass = null;
+        passComplete = true;
+      }
+    } catch (err) {
+      lastRunError = `hub: ${err && err.message}`;
+      if (err && err.keepPass === false) {
+        if (pass && pass.kind === "snapshot") snapshotFinished = true; // its list of ids is no use now
+        pass = null;
+      }
+      console.error(`sync-listings (hub): ${lastRunError}`);
+    }
+  }
+
+  if (dirty) await saveListingsCheckpoint(store, listingsById);
+  if (snapshotFinished) {
+    await store.delete(HUB_SNAPSHOT_SEEN_KEY).catch(() => {});
+  } else if (seen && pass && pass.kind === "snapshot") {
+    await store.setJSON(HUB_SNAPSHOT_SEEN_KEY, { passStartedAt: pass.startedAt, ids: [...seen] });
+  }
+  await store.setJSON(SYNC_STATE_KEY, stateNow());
+
+  say(
+    `sync-listings (hub): ${pagesFetched} page(s), ${recordsSeen} record(s), ` +
+    `pass ${passComplete ? "complete" : lastRunError ? "stopped" : "paused (resumes next run)"}, ` +
+    `${Object.keys(listingsById).length} listing(s) now stored, ${removedByHub} removed` +
+    (lastRunError ? `; ${lastRunError}` : ".")
+  );
+  return {
+    statusCode: 200,
+    body: lastRunError ? `error: ${lastRunError}` : (passComplete ? "ok" : "paused (resumes next run)"),
+  };
+}
+exports.hubMarketDataRun = hubMarketDataRun;
+
+// LISTINGS_SOURCE=mlsgrid with MLS_SOURCE=hub: refused, fail closed. Nothing is
+// read from MLS Grid or the hub, lastSuccessAt is left to age, and the reason is
+// recorded where /site-health's "No MLS Grid errors on last run" row reads it.
+// lib/_idx-display.js already holds every listing back for the same reason.
+async function refuseGridListingsViaHub(opts) {
+  const o = opts || {};
+  const msg = mlsHub.GRID_VIA_HUB_REFUSAL;
+  console.error(`sync-listings: refused — ${msg}`);
+  try {
+    const store = o.store || getBlobStore(getStore);
+    const prev = (await store.get(SYNC_STATE_KEY, { type: "json" })) || {};
+    await store.setJSON(SYNC_STATE_KEY, {
+      ...prev, lastRunAt: new Date().toISOString(), lastRunVia: "refused", lastRunError: msg,
+    });
+  } catch (err) {
+    console.error(`sync-listings: could not record the refusal: ${err && err.message}`);
+  }
+  return { statusCode: 200, body: `refused: ${msg}` };
+}
+exports.refuseGridListingsViaHub = refuseGridListingsViaHub;
 
 async function mlsGridRun(opts) {
   const o = opts || {};
