@@ -47,7 +47,17 @@ const CONSENT_TAG = "Consent – SMS Opt-In";
 // 2026-10-06 (safety review): "#dnc" was missing here, so a lead tagged only #dnc who ticked the
 // texting box could have had texting switched on. Seller Intelligence, Expired Elite and My Lead
 // Pages already read "#dnc" as Do Not Contact.
-const isDncTag = (name) => /^(?:consent\s*[-\u2010-\u2015]\s*dnc|#dnc)$/i.test(String(name == null ? "" : name).trim());
+// 2026-10-17: also "OPTED OUT" and "Expired Elite – OPTED OUT" (any dash or case),
+// the tags Expired Elite writes, exactly as the shared toolkit's isDncTag reads
+// them (lib/suite-kit/lofty.js). A lead carrying one of those is never switched to
+// textable here either. A copy of that one test rather than a require, because
+// tests/test-texting-preference.cjs loads this file through its own module loader;
+// tests/test-lofty-via-hub.js checks the two agree on every spelling.
+const DNC_DASH = "[-\\u2010-\\u2015\\u2212]";
+const DNC_RE = new RegExp(`^(?:consent\\s*${DNC_DASH}\\s*dnc|#dnc|opted\\s+out|expired\\s+elite\\s*${DNC_DASH}\\s*opted\\s+out)$`, "i");
+const isDncTag = (name) => DNC_RE.test(String(name == null ? "" : name).trim().replace(/\s+/g, " "));
+// With LOFTY_VIA_HUB=on texting is never switched on (lib/_lofty-hub.js).
+const { loftyViaHub, textingViaHub } = require("./_lofty-hub");
 const SMS_CONSENT_FIELD = "sms_consent";
 
 const YES_VALUE = /^(yes|y|true|on|1|checked|agree|agreed|accept|accepted|opt[-_ ]?in|opted[-_ ]?in|i agree|i consent|i accept)\b/i;
@@ -144,6 +154,10 @@ const HELD = "texting left off and SMS consent tag held";
 // Read back every submission: Lofty's create can merge into a textable contact.
 // Enable only with a verified yes; turn off for DNC or an unconsented new number.
 async function applyTextingPreference(leadId, consentPhone, consentGiven, apiKey, opts) {
+  // Through the hub (LOFTY_VIA_HUB=on): texting stays off until Lofty approves
+  // 10DLC campaign 12744. A yes is recorded in a note; a new number without one
+  // is switched off by the hub itself, inside its own read-merge-write.
+  if (loftyViaHub()) return textingViaHub(leadId, consentGiven, opts);
   try {
     const o = opts || {};
     const id = String(leadId == null ? "" : leadId).trim();
