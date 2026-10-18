@@ -65,7 +65,8 @@ const { getBlobStore } = require("./lib/_mls-shared");
 const { postLead, recordPush } = require("./lib/_lofty");
 const { applyTextingPreference } = require("./lib/_lofty-consent");
 const { addLoftyNote, refireLoftyTag, addPlanTags, sendLeadAlertEmail } = require("./lib/_notify");
-const { planForSubmission } = require("./lib/_form-plans");
+const { planForSubmission, valueReviewPlanOn, VALUE_REVIEW_SENT_TAG } = require("./lib/_form-plans");
+const { sendValueFormToHub } = require("./lib/_hub-intake");
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
   findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
@@ -275,7 +276,9 @@ exports.handler = async (event) => {
     // does not fire a "Tag Changed" Smart Plan for a tag that arrives with the lead.
     // This is the Signature site, the luxury brand: its own seller forms start the
     // luxury seller plan.
-    const plan = planForSubmission(formName, data, { site: "signature" });
+    // 2026-10-17 (Build E): with VALUE_REVIEW_PLAN=on the homepage "value" choice waits for "Value Review Sent"
+    // instead of S2; this site's free-home-valuation keeps the luxury plan (lib/_form-plans.js).
+    const plan = planForSubmission(formName, data, { site: "signature", valueReviewPlan: valueReviewPlanOn(process.env) });
     body.tags = body.tags.filter((t) => !plan.planTags.includes(t));
 
     // A form with nothing but a name and email (the guide downloads) matches none
@@ -385,7 +388,11 @@ exports.handler = async (event) => {
       // formData rides along so the queue replay can set the website fields and
       // the inquiry exactly as a first-try create would (lib/_lofty.js finishReplay)
       // -- and so does the plan, so a replayed new contact starts the same nurture plan.
-      if (store) await recordPush(store, { ...result, emailResult, submissionId, formData: data, plan }, formName, body);
+      // 2026-10-17 (Build E): a value form still reaches the hub (WEBSITE_TO_HUB_INTAKE), with the
+      // Lofty lead id only when the lookup found the contact; the hub matches by email otherwise.
+      const hubIntake = await sendValueFormToHub({ formName, data, site: "signature", submissionId,
+        createdAt: (payload && payload.payload && payload.payload.created_at) || null, loftyLeadId: existing.leadId || null });
+      if (store) await recordPush(store, { ...result, emailResult, submissionId, formData: data, plan, hubIntake }, formName, body);
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
@@ -411,6 +418,14 @@ exports.handler = async (event) => {
     // 2026-09-29: to the existing contact when there is one (see above).
     const noteTarget = existing.leadId || leadId;
     const noteResult = noteTarget ? await addLoftyNote(noteTarget, body.notes, apiKey) : { attempted: false };
+    // 2026-10-17 (Build E): a value form (free-home-valuation, sellers-page-inquiry, the homepage
+    // "value" choice) also goes to the Seller Intelligence hub, which drafts a value review for
+    // Christine -- new and returning contacts alike (lib/_hub-intake.js, WEBSITE_TO_HUB_INTAKE).
+    // Started here, once the note has confirmed which Lofty lead this is, and awaited before the
+    // last /status record; it never throws and never holds up the steps below.
+    const hubIntake = sendValueFormToHub({ formName, data, site: "signature", submissionId,
+      createdAt: (payload && payload.payload && payload.payload.created_at) || null,
+      loftyLeadId: noteResult.leadMissing ? existing.leadId || null : noteTarget || null });
     const consentTarget = existing.leadId || leadIdFromResponse(result.responseBody) || leadId;
     const consentResult = consentTarget ? await applyTextingPreference(consentTarget, data.phone, false, apiKey)
       : { attempted: false, textingEnabled: false, reason: "no lead id for texting safety check" };
@@ -445,7 +460,8 @@ exports.handler = async (event) => {
     const newLeadId = leadIdFromResponse(result.responseBody);
     const provenNew = !!(existing.ok && !existing.anyMatch && newLeadId && newLeadId === String(leadId) &&
         noteResult.ok && noteTarget === leadId);
-    const planResult = !plan.planTags.length ? { attempted: false, skipped: "no plan for this form" }
+    const planResult = !plan.planTags.length
+      ? { attempted: false, skipped: plan.plan ? `its plan starts later in Lofty, on the tag "${VALUE_REVIEW_SENT_TAG}"` : "no plan for this form" }
       : !provenNew ? { attempted: false, skipped: planSkipReason(existing, newLeadId, leadId, noteResult), planTags: plan.planTags }
       : await addPlanTags(newLeadId, plan.planTags, apiKey);
     console.log(planLogLine(formName, plan, planResult, Array.isArray(body.leadTypes)));
@@ -488,10 +504,15 @@ exports.handler = async (event) => {
       : provenNew ? await placeInquiry(newLeadId, inquiry, apiKey)
       : { attempted: false, reason: "not a proven-new contact; the search is in the note" };
 
+    const hubIntakeResult = await hubIntake;
+    if (hubIntakeResult.attempted) {
+      console.log(`Value review to the hub for "${formName}": ${hubIntakeResult.ok ? `${hubIntakeResult.hubStatus}` +
+        `${hubIntakeResult.reviewStatus ? `, review ${hubIntakeResult.reviewStatus}` : ""}` : `FAILED (${hubIntakeResult.error})`}.`);
+    }
     if (store) {
       await recordPush(store, {
         ...result, leadId, emailResult, noteResult, consentResult, tagResult, planResult, existing: existingSummary,
-        returningResult, fieldsResult, inquiryResult,
+        returningResult, fieldsResult, inquiryResult, hubIntake: hubIntakeResult,
       }, formName, body);
     }
     return { statusCode: 200, body: "ok" };

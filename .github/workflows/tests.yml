@@ -10,14 +10,25 @@
 name: tests
 
 on:
+  # Branch work is tested by the pull_request trigger. A push to a claude/**
+  # branch with an open pull request used to run this twice for the same commit
+  # (once for the push, once for the pull request).
   push:
-    branches: ["master", "claude/**"]
+    branches: ["master"]
   pull_request:
   # So a dependency or platform change that breaks the build is caught even in a
   # week with no commits.
   schedule:
     - cron: "0 13 * * 1"
   workflow_dispatch:
+
+# A newer push to the same pull request cancels the run it replaces. Pushes to
+# master, the weekly run and a manual run are never cancelled. No paths-ignore:
+# tests/test-desclines.js reads docs/YOUTUBE-DESCRIPTION-LINES.md, and this
+# public repo's minutes are free, so a filter would only be a trap.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
