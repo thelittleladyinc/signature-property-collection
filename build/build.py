@@ -2578,7 +2578,7 @@ def _fancy_search_widget(wid, search_cities=None, fixed_city=None, support_deep_
 {_idx_off_js()}
   function renderResults(data, fetchedAt) {{
     if (data.idxUnavailable) {{
-      if (goOnHandoff && data.reason === 'home_search' && /^https?:\/\//i.test(String(data.searchUrl || ''))) {{
+      if (goOnHandoff && data.reason === 'home_search' && /^https?:\\/\\//i.test(String(data.searchUrl || ''))) {{
         goOnHandoff = false;
         if (typeof window.gtag === 'function') window.gtag('event', 'home_search_handoff', {{ page_path: location.pathname, cta_id: 'search-widget', transport_type: 'beacon' }});
         window.location.href = data.searchUrl;
