@@ -208,6 +208,9 @@ function setEnv(vars) {
     // approver (tests/test-area-alerts-hold.js); one is set here so the IDX gates
     // are what this section tests.
     process.env.AREA_ALERTS_APPROVED_BY = "test approver";
+    // 2026-10-18: a run needs the run key (tests/test-area-alerts-run-auth.js); a made-up one here.
+    process.env.AREA_ALERTS_RUN_KEY = "test-area-alerts-run-key-0001";
+    const RUN = { headers: { "x-area-alerts-key": process.env.AREA_ALERTS_RUN_KEY } };
     const alert = { id: "a1", email: "buyer@example.com", cities: ["Loveland"], label: "Loveland", knownIds: [] };
     for (const [label, env, state] of [
       ["off", {}, FRESH],
@@ -217,7 +220,7 @@ function setEnv(vars) {
       setEnv(env);
       fetches = [];
       const store = makeStore(state, { alert });
-      const res = await load("area-alerts-run.js", store).handler();
+      const res = await load("area-alerts-run.js", store).handler(RUN);
       check(`${label}: no email sent`, fetches.length === 0, fetches.join(","));
       check(`${label}: no alert touched (resumes cleanly later)`, store.writes.length === 0);
       check(`${label}: says why`, /skipped/.test(res.body), res.body);
@@ -225,14 +228,14 @@ function setEnv(vars) {
     setEnv({ IDX_DISPLAY: "on" });
     fetches = [];
     const store = makeStore(FRESH, { alert });
-    await load("area-alerts-run.js", store).handler();
+    await load("area-alerts-run.js", store).handler(RUN);
     check("on + fresh: the alert is emailed as before, through the hub", fetches.length === 1 && /hub\.example\.test\/functions\/v1\/hub-api\/v1\/email\/send$/.test(fetches[0]), fetches.join(","));
     delete process.env.AREA_ALERTS_APPROVED_BY;
     fetches = [];
     const heldStore = makeStore(FRESH, { alert });
-    const held = await load("area-alerts-run.js", heldStore).handler();
+    const held = await load("area-alerts-run.js", heldStore).handler(RUN);
     check("on + fresh but no approver: held, nothing sent or touched", fetches.length === 0 && heldStore.writes.length === 0 && /^held: /.test(held.body), held.body);
-    delete process.env.HUB_API_URL; delete process.env.HUB_API_KEY;
+    delete process.env.HUB_API_URL; delete process.env.HUB_API_KEY; delete process.env.AREA_ALERTS_RUN_KEY;
   }
 
   console.log("\n9. sync-listings records lastSuccessAt only on a clean, caught-up run");

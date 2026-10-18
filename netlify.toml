@@ -193,3 +193,10 @@
 # sends only through the Seller Intelligence hub. To send them again: put this
 # schedule back, and only once listings come from the whole market and Christine
 # has named that approver.
+#
+# 2026-10-18: unscheduled, it is an ordinary function anyone could call by URL,
+# so a run now needs the header x-area-alerts-key = AREA_ALERTS_RUN_KEY (unset =
+# nobody can start one; see area-alerts-run.js). Putting the schedule back also
+# means setting RUNS_ON_SCHEDULE to true in area-alerts-run.js, so Netlify's own
+# scheduled runs are let in; tests/test-area-alerts-run-auth.js fails until the
+# two agree.
