@@ -42,18 +42,20 @@ const LOFTY_API = "https://api.lofty.com";
 const CALL_TIMEOUT_MS = 5000;
 // EN DASH, exactly as the Command Center writes it.
 const CONSENT_TAG = "Consent – SMS Opt-In";
-// Do Not Contact, in either spelling Christine's Lofty uses: "Consent – DNC" (any dash or
-// case) or the plain "#dnc" tag. "Consent - DNC Email" is a different tag and is not matched.
+// Texting is a phone path, so it stops on Do Not Contact ("Consent – DNC", any dash or case)
+// AND on the plain "#dnc" tag: "#dnc" is phone only, no calls or texts, email still allowed
+// (Christine, 2026-10-18). "Consent - DNC Email" is a different tag and is not matched.
 // 2026-10-06 (safety review): "#dnc" was missing here, so a lead tagged only #dnc who ticked the
 // texting box could have had texting switched on. Seller Intelligence, Expired Elite and My Lead
 // Pages already read "#dnc" as Do Not Contact.
 // 2026-10-17: also "OPTED OUT" and "Expired Elite – OPTED OUT" (any dash or case),
-// the tags Expired Elite writes, exactly as the shared toolkit's isDncTag reads
+// the tags Expired Elite writes, exactly as the shared toolkit's isPhoneDncTag reads
 // them (lib/suite-kit/lofty.js). A lead carrying one of those is never switched to
 // textable here either. A copy of that one test rather than a require, because
 // tests/test-texting-preference.cjs loads this file through its own module loader;
 // tests/test-lofty-via-hub.js checks the two agree on every spelling.
 const DNC_DASH = "[-\\u2010-\\u2015\\u2212]";
+// #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
 const DNC_RE = new RegExp(`^(?:consent\\s*${DNC_DASH}\\s*dnc|#dnc|opted\\s+out|expired\\s+elite\\s*${DNC_DASH}\\s*opted\\s+out)$`, "i");
 const isDncTag = (name) => DNC_RE.test(String(name == null ? "" : name).trim().replace(/\s+/g, " "));
 // With LOFTY_VIA_HUB=on texting is never switched on (lib/_lofty-hub.js).
@@ -196,6 +198,7 @@ async function applyTextingPreference(leadId, consentPhone, consentGiven, apiKey
         textingNotEnabled: put.ok ? reason : `${reason}; could not turn texting off, manual review required`,
       };
     }
+    // A phone path (texting): #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
     if (tags && tags.some(isDncTag)) {
       return disableTexting("dnc", "the lead is tagged Consent - DNC or #dnc; Do Not Contact wins, SMS consent tag held");
     }
