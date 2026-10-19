@@ -98,11 +98,75 @@ ${rows}${more}
 ${footerHtml(alert)}</div>`;
 }
 
+// Who may start a run (2026-10-18, endpoint audit security flag 10). A
+// scheduled function cannot be called by URL -- Netlify only runs it on its
+// schedule -- but since the schedule was removed (2026-10-13) this is an
+// ordinary function anyone can call at /.netlify/functions/area-alerts-run.
+// Today every run stops at the Lofty pause or the approver hold, but once
+// AREA_ALERTS_APPROVED_BY is set an outsider could start runs at will. So a run
+// now needs one of:
+//   1. the header x-area-alerts-key = AREA_ALERTS_RUN_KEY, for a run started by
+//      hand. Compared in constant time (SHA-256 of both sides, timingSafeEqual).
+//      Unset, or shorter than 16 characters: 503, nobody can start a run.
+//      Missing or wrong: 401. The key's value is never logged or answered.
+//   2. Netlify's scheduled-run marker (a JSON body with next_run), and only
+//      while RUNS_ON_SCHEDULE is true. The marker proves nothing by itself --
+//      anyone can send that body to a public URL -- so it counts only while
+//      netlify.toml schedules this function, which is exactly when Netlify
+//      refuses URL calls to it. tests/test-area-alerts-run-auth.js fails when
+//      this constant and netlify.toml disagree. False: there is no schedule.
+// Same rules as the shared toolkit's checkKey (lib/suite-kit/auth.js), with
+// Node's own crypto so it does not depend on the Node version's Web Crypto.
+const RUN_KEY_HEADER = "x-area-alerts-key";
+const MIN_RUN_KEY_LENGTH = 16;
+const RUNS_ON_SCHEDULE = false;
+
+function headerValue(event, name) {
+  const headers = (event && event.headers) || {};
+  for (const [k, v] of Object.entries(headers)) {
+    if (String(k).toLowerCase() === name) return Array.isArray(v) ? v[0] : v;
+  }
+  return undefined;
+}
+
+function isScheduledRun(event) {
+  if (!event || typeof event.body !== "string" || !event.body) return false;
+  try {
+    const raw = event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body;
+    const body = JSON.parse(raw);
+    return !!body && typeof body === "object" && typeof body.next_run === "string";
+  } catch (e) {
+    return false;
+  }
+}
+
+// null = may run; otherwise the answer to send (nothing else has been read).
+// onSchedule is RUNS_ON_SCHEDULE; a parameter only so the test can try both.
+function runRefusal(event, env, onSchedule = RUNS_ON_SCHEDULE) {
+  if (onSchedule && isScheduledRun(event)) return null;
+  const want = String(env.AREA_ALERTS_RUN_KEY || "").trim();
+  if (want.length < MIN_RUN_KEY_LENGTH) {
+    return { statusCode: 503, body: "AREA_ALERTS_RUN_KEY is not set on this site, so this run is off" };
+  }
+  const got = String(headerValue(event, RUN_KEY_HEADER) || "").trim();
+  const digest = (v) => crypto.createHash("sha256").update(v, "utf8").digest();
+  if (got && crypto.timingSafeEqual(digest(got), digest(want))) return null;
+  return { statusCode: 401, body: "unauthorized" };
+}
+
 exports.emailHtml = emailHtml; // for tests
 exports.AREA_ALERTS_HOLD_REASON = AREA_ALERTS_HOLD_REASON;
 exports.areaAlertKey = areaAlertKey;
+exports.RUN_KEY_HEADER = RUN_KEY_HEADER;
+exports.RUNS_ON_SCHEDULE = RUNS_ON_SCHEDULE;
+exports.runRefusal = runRefusal; // for tests
 
-exports.handler = async () => {
+exports.handler = async (event) => {
+  const refused = runRefusal(event, process.env);
+  if (refused) {
+    console.warn(`area-alerts-run: refused (${refused.statusCode}) — a run needs the ${RUN_KEY_HEADER} header. Nothing read or sent.`);
+    return refused;
+  }
   try {
     // 2026-09-28: IDX display kill switch + 12-hour freshness guard
     // (lib/_idx-display.js). An alert email is IDX display too, so when display

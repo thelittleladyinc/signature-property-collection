@@ -351,7 +351,10 @@ const HOUR = 3600e3;
   const alerts = require(`${FN_DIR}/area-alerts.js`).handler;
   const al = JSON.parse((await alerts({ httpMethod: "POST", body: JSON.stringify({ email: "a@b.co", cities: ["Loveland"] }) })).body);
   check("a new map alert sign-up is sent to her home search instead", al.ok === false && al.error === "moved" && /thelittleladyhomesearch\.com/.test(al.searchUrl));
-  const alRun = await require(`${FN_DIR}/area-alerts-run.js`).handler();
+  // 2026-10-18: a run needs the run key (tests/test-area-alerts-run-auth.js); a made-up one here.
+  process.env.AREA_ALERTS_RUN_KEY = "test-area-alerts-run-key-0001";
+  const alRun = await require(`${FN_DIR}/area-alerts-run.js`).handler({ headers: { "x-area-alerts-key": process.env.AREA_ALERTS_RUN_KEY } });
+  delete process.env.AREA_ALERTS_RUN_KEY;
   check("the alert emails are paused", /paused/.test(alRun.body), alRun.body);
   // 2026-10-13: and no longer woken every 6 hours to say so. The saved alerts stay
   // in their store, untouched, for Christine to decide on.

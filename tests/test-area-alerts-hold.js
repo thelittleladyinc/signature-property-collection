@@ -19,6 +19,8 @@ const HUB_URL = "https://hub.example.test/functions/v1/hub-api";
 const SUBSCRIBER = "buyer.person@example.com";
 const ALERT_ID = "a-" + Buffer.from(SUBSCRIBER).toString("base64url"); // as area-alerts.js builds it
 const FRESH_STATE = { lastRunAt: new Date(Date.now() - 3600e3).toISOString(), lastSuccessAt: new Date(Date.now() - 3600e3).toISOString() };
+// 2026-10-18: a run needs the run key (tests/test-area-alerts-run-auth.js); a made-up one here.
+const RUN_KEY = "test-area-alerts-run-key-0001";
 const LISTING = { listingId: "IRE700001", address: "5 Test Ct", city: "Loveland", state: "CO", price: 1200000, status: "Active", beds: 4, baths: 3, sqft: 3000 };
 
 function makeStore(alert) {
@@ -51,7 +53,7 @@ function stubHub(reply) {
 const logs = [];
 async function run(env, alert, reply) {
   for (const k of ["LISTINGS_SOURCE", "IDX_DISPLAY", "AREA_ALERTS_APPROVED_BY", "HUB_API_URL", "HUB_API_KEY", "LEAD_ALERT_FROM"]) delete process.env[k];
-  Object.assign(process.env, { BLOBS_SITE_ID: "s", BLOBS_TOKEN: "t" }, env);
+  Object.assign(process.env, { BLOBS_SITE_ID: "s", BLOBS_TOKEN: "t", AREA_ALERTS_RUN_KEY: RUN_KEY }, env);
   const store = makeStore(alert);
   require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, exports: { getStore: () => store } };
   for (const k of Object.keys(require.cache)) {
@@ -63,7 +65,7 @@ async function run(env, alert, reply) {
   const cap = (...a) => logs.push(a.map(String).join(" "));
   console.log = cap; console.warn = cap; console.error = cap;
   let res;
-  try { res = await require(`${FN_DIR}/area-alerts-run.js`).handler(); }
+  try { res = await require(`${FN_DIR}/area-alerts-run.js`).handler({ headers: { "x-area-alerts-key": RUN_KEY } }); }
   finally { Object.assign(console, orig); }
   return { res, store };
 }
