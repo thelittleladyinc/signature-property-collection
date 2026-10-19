@@ -20,10 +20,15 @@
 //   - PUT /leads/{id} REPLACES the whole tags (and phones) list, so every write reads the lead first and
 //     PUTs existing + new (read-merge-write). A read that is not this lead, or whose `tags` is missing or
 //     null, is unreadable: nothing is written to tags and any yes to texts is held.
-//   - Do Not Contact wins. A lead is Do Not Contact when it carries `Consent – DNC` or `#dnc` (Christine's
-//     two tags, written together) or `OPTED OUT` / `Expired Elite – OPTED OUT` (any dash, any case). On
-//     such a lead only stop-contact tags are added, texting and email are switched off, every other
-//     requested tag is held, and after the write the DNC tag is checked again (a lost one alerts).
+//   - Do Not Contact wins. A lead is Do Not Contact when it carries `Consent – DNC` or `OPTED OUT` /
+//     `Expired Elite – OPTED OUT` (any dash, any case): no email, no call, no text. On such a lead only
+//     stop-contact tags are added, texting and email are switched off, every other requested tag is held,
+//     and after the write the DNC tag is checked again (a lost one alerts).
+//   - `#dnc` is PHONE ONLY (Christine, 2026-10-18): no calls and no texts on that lead, email still allowed
+//     unless an email opt-out applies. On a `#dnc` lead texting is switched off and any yes to texts is
+//     held; email and the requested tags are left alone; after the write `#dnc` is checked again.
+//     `isDoNotContactTag` answers "may we email?"; `isPhoneDncTag` (`#dnc` plus the full ones) answers
+//     "may we call or text?".
 //   - Email opt-out is the tag `Consent – Unsubscribed` AND `cannotEmail: true`, written together.
 //   - Texting: `cannotText: false` and `Consent – SMS Opt-In` only on an explicit yes, only when every
 //     phone on the lead is the consented number, never on a Do Not Contact lead, and only when the caller
@@ -35,6 +40,9 @@
 //     one process (tests, or one app's own workers).
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NO_LOOKUP_KEY = exports.CONSENT_NO_PHONE = exports.LoftyError = exports.LOOKUP_LIMIT = exports.TEXTING_OFF_REASON = exports.NEW_NUMBER_NOTE = exports.EMAIL_OPTOUT_TAG = exports.DNC_WRITE_TAGS = exports.DNC_HASH_TAG = exports.DNC_TAG = exports.SMS_CONSENT_TAG = exports.LOFTY_API_PREFIX = exports.LOFTY_API_ORIGIN = void 0;
+exports.isDoNotContactTag = isDoNotContactTag;
+exports.isPhoneOnlyDncTag = isPhoneOnlyDncTag;
+exports.isPhoneDncTag = isPhoneDncTag;
 exports.isDncTag = isDncTag;
 exports.isEmailOptOutTag = isEmailOptOutTag;
 exports.isSmsConsentTag = isSmsConsentTag;
@@ -57,6 +65,11 @@ exports.splitName = splitName;
 exports.buildLeadBody = buildLeadBody;
 exports.createResponseMerge = createResponseMerge;
 exports.consentStatus = consentStatus;
+exports.mayEmailLead = mayEmailLead;
+exports.mayCallLead = mayCallLead;
+exports.mayTextLead = mayTextLead;
+exports.tagsAllowEmail = tagsAllowEmail;
+exports.tagsAllowPhone = tagsAllowPhone;
 exports.createLeadResult = createLeadResult;
 exports.getLead = getLead;
 exports.findLeadByEmail = findLeadByEmail;
@@ -81,7 +94,10 @@ const MAX_TAG_LENGTH = 60;
 const MAX_NOTE_LENGTH = 5000;
 /** Lofty's SMS consent tag (EN DASH). */
 exports.SMS_CONSENT_TAG = 'Consent – SMS Opt-In';
-/** Christine's two Do Not Contact tags (EN DASH; plain lower case). A writer always sets BOTH. */
+/**
+ * Christine's two DNC tags (EN DASH; plain lower case). A full Do Not Contact write always sets BOTH.
+ * `Consent – DNC` = no email, no call, no text. `#dnc` = phone only (no calls or texts; email still allowed).
+ */
 exports.DNC_TAG = 'Consent – DNC';
 exports.DNC_HASH_TAG = '#dnc';
 exports.DNC_WRITE_TAGS = [exports.DNC_TAG, exports.DNC_HASH_TAG];
@@ -92,26 +108,49 @@ exports.NEW_NUMBER_NOTE = 'New number added without a yes to texts; texting turn
 /** Why a yes to texts is held while texting is switched off suite-wide. */
 exports.TEXTING_OFF_REASON = 'texting stays off until Lofty approves 10DLC campaign 12744: texting left off, SMS consent tag not added';
 const DASH = '[-\\u2010-\\u2015\\u2212]';
-const DNC_RE = new RegExp(`^(?:consent\\s*${DASH}\\s*dnc|#dnc|opted\\s+out|expired\\s+elite\\s*${DASH}\\s*opted\\s+out)$`, 'i');
+const DO_NOT_CONTACT_RE = new RegExp(`^(?:consent\\s*${DASH}\\s*dnc|opted\\s+out|expired\\s+elite\\s*${DASH}\\s*opted\\s+out)$`, 'i');
+// #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
+const PHONE_ONLY_DNC_RE = /^#dnc$/i;
 const EMAIL_OPTOUT_RE = new RegExp(`^consent\\s*${DASH}\\s*unsubscribed$`, 'i');
 const SMS_CONSENT_RE = new RegExp(`^consent\\s*${DASH}\\s*sms\\s+opt${DASH}?in$`, 'i');
+const tagText = (name) => String(name ?? '').trim().replace(/\s+/g, ' ');
 /**
- * Do Not Contact: "Consent – DNC" or "#dnc" (her two tags), or "OPTED OUT" / "Expired Elite – OPTED OUT",
- * however the dash or the case was typed. "Consent – DNC Email" is a different tag and is not matched.
- * Every "is this lead Do Not Contact?" question goes through this one test.
+ * Full Do Not Contact (no email, no call, no text): "Consent – DNC", "OPTED OUT" or "Expired Elite – OPTED OUT",
+ * whole tag, however the dash or the case was typed. "Consent – DNC Email" is a different tag and is not
+ * matched. NOT `#dnc`, which is phone only. Every "may we email?" question uses this test.
+ */
+function isDoNotContactTag(name) {
+    return DO_NOT_CONTACT_RE.test(tagText(name));
+}
+/** `#dnc` itself (any case, whole tag). */
+function isPhoneOnlyDncTag(name) {
+    // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
+    return PHONE_ONLY_DNC_RE.test(tagText(name));
+}
+/**
+ * No calls and no texts: `#dnc` (phone only) or any full Do Not Contact tag. Every "may we call or text?"
+ * question uses this test.
+ */
+function isPhoneDncTag(name) {
+    // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
+    return isPhoneOnlyDncTag(name) || isDoNotContactTag(name);
+}
+/**
+ * @deprecated Same as isPhoneDncTag (any DNC tag, `#dnc` included), so an older caller stays on the safe side.
+ * Use isDoNotContactTag for an email decision and isPhoneDncTag for a call or text decision.
  */
 function isDncTag(name) {
-    return DNC_RE.test(String(name ?? '').trim().replace(/\s+/g, ' '));
+    return isPhoneDncTag(name);
 }
 function isEmailOptOutTag(name) {
-    return EMAIL_OPTOUT_RE.test(String(name ?? '').trim().replace(/\s+/g, ' '));
+    return EMAIL_OPTOUT_RE.test(tagText(name));
 }
 function isSmsConsentTag(name) {
-    return SMS_CONSENT_RE.test(String(name ?? '').trim().replace(/\s+/g, ' '));
+    return SMS_CONSENT_RE.test(tagText(name));
 }
 /** A tag that only ever STOPS contact. These are the only tags a Do Not Contact lead may still be given. */
 function isStopContactTag(name) {
-    return isDncTag(name) || isEmailOptOutTag(name);
+    return isPhoneDncTag(name) || isEmailOptOutTag(name);
 }
 /** How many results one exact email or phone search asks for. */
 exports.LOOKUP_LIMIT = 5;
@@ -449,9 +488,13 @@ function consentStatus(lead, opts = {}) {
     if (!tagsReadable)
         reasons.push('tag list missing or unreadable: hold');
     const t = tags ?? [];
-    const doNotContact = t.some(isDncTag);
+    const doNotContact = t.some(isDoNotContactTag);
     if (doNotContact)
         reasons.push('Do Not Contact tag');
+    // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
+    const phoneDnc = t.some(isPhoneDncTag);
+    if (phoneDnc && !doNotContact)
+        reasons.push('#dnc tag (phone only: no calls or texts)');
     const optTag = t.some(isEmailOptOutTag);
     const cannotEmail = lead?.cannotEmail === true;
     const cannotText = lead?.cannotText !== false;
@@ -464,15 +507,41 @@ function consentStatus(lead, opts = {}) {
         reasons.push('cannotCall is true');
     const smsConsentTag = t.some(isSmsConsentTag);
     const mayEmail = tagsReadable && !doNotContact && !optTag && !cannotEmail;
-    const mayCall = tagsReadable && !doNotContact && !cannotCall;
-    const mayText = opts.allowTextingOn === true && tagsReadable && !doNotContact && !cannotText && smsConsentTag;
+    const mayCall = tagsReadable && !phoneDnc && !cannotCall;
+    const mayText = opts.allowTextingOn === true && tagsReadable && !phoneDnc && !cannotText && smsConsentTag;
     if (!mayText)
         reasons.push(opts.allowTextingOn === true ? 'texting not allowed on this lead' : 'texting is off until 10DLC campaign 12744 is approved');
     const phones = (leadPhonesForWrite(lead) ?? []).map((p) => (0, contact_ts_1.normPhone)(p)).filter((p) => !!p);
     return {
-        leadId: String(lead?.leadId ?? lead?.id ?? ''), tagsReadable, doNotContact, emailOptOut: optTag || cannotEmail, emailOptOutTag: optTag, cannotEmail, cannotText,
+        leadId: String(lead?.leadId ?? lead?.id ?? ''), tagsReadable, doNotContact, phoneDnc, emailOptOut: optTag || cannotEmail, emailOptOutTag: optTag, cannotEmail, cannotText,
         cannotCall, smsConsentTag, mayEmail, mayCall, mayText, reasons, phones: [...new Set(phones)], emails: [...new Set(leadEmails(lead))],
     };
+}
+/** "May we email this lead?" (tags and cannotEmail; `#dnc` alone does not stop email). Unreadable tags = no. */
+function mayEmailLead(lead) {
+    return consentStatus(lead).mayEmail;
+}
+/** "May we call this lead?" (`#dnc` or a Do Not Contact tag, or cannotCall, stops it). Unreadable tags = no. */
+function mayCallLead(lead) {
+    return consentStatus(lead).mayCall;
+}
+/** "May we text this lead?" Always no unless allowTextingOn (10DLC campaign 12744); `#dnc` stops it. */
+function mayTextLead(lead, opts = {}) {
+    return consentStatus(lead, opts).mayText;
+}
+/**
+ * "May we email?" from a tag list alone (no Lofty flags): readable, no full Do Not Contact tag and no
+ * `Consent – Unsubscribed`. `#dnc` does not stop email. A missing or unreadable list = no (hold).
+ */
+function tagsAllowEmail(rawTags) {
+    const tags = existingTagsForWrite(rawTags);
+    return tags !== null && !tags.some(isDoNotContactTag) && !tags.some(isEmailOptOutTag);
+}
+/** "May we call or text?" from a tag list alone: readable, no `#dnc` and no full Do Not Contact tag. Unreadable = no. */
+function tagsAllowPhone(rawTags) {
+    const tags = existingTagsForWrite(rawTags);
+    // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
+    return tags !== null && !tags.some(isPhoneDncTag);
 }
 // ── lead operations (throw LoftyError) ──────────────────────────────────────
 /** POST /leads (always cannotText:true) and read the response for a merge. */
@@ -588,7 +657,7 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     }
     const existingRead = existingTagsForWrite(lead.tags);
     const out = { tagsAdded: [], emailTurnedOff: false, consentApplied: false, textingNotEnabled: null, wrote: false,
-        textingTurnedOff: false, phoneAdded: false, dncHeld: false, tagsHeld: [], before: lead };
+        textingTurnedOff: false, phoneAdded: false, dncHeld: false, phoneDnc: false, tagsHeld: [], before: lead };
     if (existingRead === null) {
         out.tagsUnreadable = `lead ${leadId}: existing tags unreadable (missing or null); nothing written to tags and any yes held`;
         logger(deps).warn(`${label(deps)} ${out.tagsUnreadable}`);
@@ -596,8 +665,11 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     const existing = existingRead ?? [];
     const body = {};
     const extra = [];
-    const dncBefore = existing.some(isDncTag);
+    const dncBefore = existing.some(isDoNotContactTag);
     const dnc = dncBefore || change.doNotContact === true;
+    // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
+    const phoneDncBefore = existing.some(isPhoneDncTag);
+    const phoneDnc = dnc || phoneDncBefore;
     const phones = leadPhonesForWrite(lead);
     const submitted = change.submittedPhone ?? change.smsConsent?.phone;
     const submittedNorm = (0, contact_ts_1.normPhone)(submitted);
@@ -614,13 +686,15 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     const v = change.smsConsent
         ? (dnc
             ? { applies: false, reason: `the lead is Do Not Contact; Do Not Contact wins over a yes, ${HELD}` }
-            : out.tagsUnreadable
-                ? { applies: false, reason: `the lead's tags could not be read, so Do Not Contact cannot be ruled out: texting left off, ${HELD}` }
-                : deps.allowTextingOn !== true
-                    ? { applies: false, reason: exports.TEXTING_OFF_REASON }
-                    : consentVerdict(lead, change.smsConsent.phone, phonesAfter))
+            : phoneDnc
+                ? { applies: false, reason: `the lead is #dnc (no calls or texts); #dnc wins over a yes, ${HELD}` }
+                : out.tagsUnreadable
+                    ? { applies: false, reason: `the lead's tags could not be read, so Do Not Contact cannot be ruled out: texting left off, ${HELD}` }
+                    : deps.allowTextingOn !== true
+                        ? { applies: false, reason: exports.TEXTING_OFF_REASON }
+                        : consentVerdict(lead, change.smsConsent.phone, phonesAfter))
         : null;
-    let off = dnc;
+    let off = phoneDnc;
     if (!off && submittedKey) {
         if (v && !v.applies)
             off = phonesAfter === null || !phonesAfter.length || !phonesAfter.every(isSubmitted);
@@ -656,6 +730,11 @@ async function mergeIntoLeadNow(leadId, change, deps) {
         out.tagsHeld = mergeTags(existing, requested.filter((t) => !isStopContactTag(cleanTag(t)))).added;
         requested = requested.filter((t) => isStopContactTag(cleanTag(t)));
     }
+    if (phoneDnc) {
+        out.phoneDnc = true;
+        if (phoneDncBefore && !dnc)
+            logger(deps).warn(`${label(deps)} lead ${leadId} is #dnc (phone only): texting off, email and tags left alone`);
+    }
     if (dnc) {
         out.dncHeld = true;
         if (lead.cannotEmail !== true) {
@@ -673,8 +752,10 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     if (Object.keys(body).length) {
         const written = await loftyRequest('PUT', `/leads/${encodeURIComponent(leadId)}`, body, deps);
         out.wrote = true;
-        if (dncBefore || (change.doNotContact && added.some(isDncTag)))
-            out.dncCheck = await confirmDncKept(leadId, written, deps);
+        if (dncBefore || (change.doNotContact && added.some(isDoNotContactTag)))
+            out.dncCheck = await confirmDncKept(leadId, written, deps, 'full');
+        else if (phoneDncBefore)
+            out.dncCheck = await confirmDncKept(leadId, written, deps, 'phone');
     }
     out.tagsAdded = added;
     if (out.textingTurnedOff && newNumber) {
@@ -688,11 +769,16 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     }
     return out;
 }
-function dncLostReason(leadId) {
-    return `lead ${leadId}: the Do Not Contact tag was gone after this write; put ${exports.DNC_TAG} and ${exports.DNC_HASH_TAG} back on the lead in Lofty by hand`;
+function dncLostReason(leadId, kind = 'full') {
+    return kind === 'phone'
+        ? `lead ${leadId}: the ${exports.DNC_HASH_TAG} tag was gone after this write; put ${exports.DNC_HASH_TAG} back on the lead in Lofty by hand`
+        : `lead ${leadId}: the Do Not Contact tag was gone after this write; put ${exports.DNC_TAG} and ${exports.DNC_HASH_TAG} back on the lead in Lofty by hand`;
 }
-/** After a write to a Do Not Contact lead: is a DNC tag still on it? The PUT's answer, else ONE re-read. Never throws. */
-async function confirmDncKept(leadId, written, deps) {
+/**
+ * After a write to a Do Not Contact (`full`) or `#dnc` (`phone`) lead: is that tag still on it? The PUT's answer,
+ * else ONE re-read. Never throws.
+ */
+async function confirmDncKept(leadId, written, deps, kind) {
     const answer = [written?.lead, written?.data, written].find((o) => o && typeof o === 'object' && o.tags !== undefined && o.tags !== null);
     let tags = answer ? existingTagsForWrite(answer.tags) : null;
     if (tags === null) {
@@ -706,14 +792,16 @@ async function confirmDncKept(leadId, written, deps) {
     }
     if (tags === null)
         return 'unverified';
-    if (tags.some(isDncTag))
+    if (tags.some(kind === 'full' ? isDoNotContactTag : isPhoneDncTag))
         return 'kept';
-    logger(deps).warn(`${label(deps)} ${dncLostReason(leadId)}`);
+    logger(deps).warn(`${label(deps)} ${dncLostReason(leadId, kind)}`);
     try {
-        await deps.alert?.('Lofty: Do Not Contact tag missing after a write', [
+        await deps.alert?.(kind === 'full' ? 'Lofty: Do Not Contact tag missing after a write' : 'Lofty: #dnc tag missing after a write', [
             `Lofty lead: ${leadId}`, `Writer: ${deps.label ?? 'suite-kit'}`,
-            `The lead had ${exports.DNC_TAG} or ${exports.DNC_HASH_TAG} before this write and the tag is gone now; another app may have written the lead at the same moment.`,
-            `Put ${exports.DNC_TAG} and ${exports.DNC_HASH_TAG} back on the lead in Lofty by hand.`,
+            kind === 'full'
+                ? `The lead had ${exports.DNC_TAG} (or OPTED OUT) before this write and the tag is gone now; another app may have written the lead at the same moment.`
+                : `The lead had ${exports.DNC_HASH_TAG} (no calls or texts) before this write and the tag is gone now; another app may have written the lead at the same moment.`,
+            kind === 'full' ? `Put ${exports.DNC_TAG} and ${exports.DNC_HASH_TAG} back on the lead in Lofty by hand.` : `Put ${exports.DNC_HASH_TAG} back on the lead in Lofty by hand.`,
         ]);
     }
     catch { /* logged above */ }
@@ -838,11 +926,13 @@ async function applyChange(out, change, email, step, deps) {
             out.emailTurnedOff = true;
         if (m.dncHeld)
             out.dncHeld = true;
+        if (m.phoneDnc)
+            out.phoneDnc = true;
         if (m.tagsHeld.length)
             out.tagsHeld = m.tagsHeld;
         if (m.dncCheck === 'lost') {
             out.dncLost = true;
-            fail(out, step, new LoftyError(dncLostReason(out.leadId)), deps);
+            fail(out, step, new LoftyError(dncLostReason(out.leadId, m.dncHeld ? 'full' : 'phone')), deps);
             return m;
         }
         if (m.tagsUnreadable) {

@@ -70,7 +70,7 @@ const crypto = require("crypto");
 // shared toolkit's one test (lib/suite-kit, a vendored copy).
 const hub = require("./_lofty-hub");
 const { alertReturningLead } = require("./_lofty-returning");
-const { isDncTag, isEmailOptOutTag } = require("./suite-kit/lofty");
+const { isDoNotContactTag, isEmailOptOutTag } = require("./suite-kit/lofty");
 
 const LOFTY_BASE_URL = "https://api.lofty.com/v1.0";
 const TIMEOUT_MS = 8000;
@@ -215,11 +215,14 @@ function describeTagShape(payload) {
 }
 
 // 2026-10-17: why a lead must not be given a Smart Plan tag, or null. Do Not
-// Contact ("Consent – DNC", "#dnc", "OPTED OUT", "Expired Elite – OPTED OUT", any
-// dash or case -- the shared toolkit's one test) or an email opt-out ("Consent –
+// Contact ("Consent – DNC", "OPTED OUT", "Expired Elite – OPTED OUT", any dash or
+// case -- the shared toolkit's isDoNotContactTag) or an email opt-out ("Consent –
 // Unsubscribed", or cannotEmail on the lead): the plans email, and DNC wins.
+// "#dnc" alone does not hold a plan tag: it is phone only (Christine, 2026-10-18);
+// texting goes off on that lead in the consent step (lib/_lofty-consent.js).
 function stopContactStep(payload, tags) {
-  if (tags.some(isDncTag)) return "do-not-contact";
+  // An email path: #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
+  if (tags.some(isDoNotContactTag)) return "do-not-contact";
   if (tags.some(isEmailOptOutTag) || leadFromPayload(payload).cannotEmail === true) return "email-opt-out";
   return null;
 }

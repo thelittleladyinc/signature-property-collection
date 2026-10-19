@@ -16,7 +16,7 @@
     "Aggregates only, and towns under 5 active listings are omitted —",
     "see the compliance note at the top of the generating script."
   ],
-  "generated_at": "2026-10-15",
+  "generated_at": "2026-10-19",
   "source": "IRES MLS",
   "min_sample": 5,
   "towns": {
@@ -26,44 +26,44 @@
       "median_price_per_sqft": null
     },
     "Greeley": {
-      "active": 602,
+      "active": 606,
       "median_list": 425000,
-      "median_price_per_sqft": 216
+      "median_price_per_sqft": 217
     },
     "Frederick": {
-      "active": 135,
-      "median_list": 514999,
-      "median_price_per_sqft": 248
+      "active": 142,
+      "median_list": 510000,
+      "median_price_per_sqft": 253
     },
     "Fort Collins": {
-      "active": 1172,
-      "median_list": 500000,
+      "active": 1184,
+      "median_list": 508400,
       "median_price_per_sqft": 295
     },
     "Boulder": {
-      "active": 939,
+      "active": 945,
       "median_list": 950000,
-      "median_price_per_sqft": 538
+      "median_price_per_sqft": 539
     },
     "Johnstown": {
-      "active": 301,
-      "median_list": 493692,
+      "active": 304,
+      "median_list": 491500,
       "median_price_per_sqft": 244
     },
     "Berthoud": {
-      "active": 271,
-      "median_list": 620000,
+      "active": 276,
+      "median_list": 619950,
       "median_price_per_sqft": 311
     },
     "Fort Lupton": {
-      "active": 163,
-      "median_list": 489150,
-      "median_price_per_sqft": 275
+      "active": 165,
+      "median_list": 485000,
+      "median_price_per_sqft": 272
     },
     "Deer Trail": {
-      "active": 41,
-      "median_list": 349000,
-      "median_price_per_sqft": 255
+      "active": 42,
+      "median_list": 359500,
+      "median_price_per_sqft": 252
     },
     "Cotopaxi": {
       "active": 113,
@@ -71,83 +71,83 @@
       "median_price_per_sqft": 316
     },
     "Aurora": {
-      "active": 2125,
-      "median_list": 449999,
-      "median_price_per_sqft": 249
+      "active": 2163,
+      "median_list": 450000,
+      "median_price_per_sqft": 250
     },
     "Loveland": {
-      "active": 783,
-      "median_list": 500000,
-      "median_price_per_sqft": 285
+      "active": 778,
+      "median_list": 499900,
+      "median_price_per_sqft": 287
     },
     "Severance": {
       "active": 102,
-      "median_list": 489900,
-      "median_price_per_sqft": 233
+      "median_list": 488950,
+      "median_price_per_sqft": 230
     },
     "Jefferson": {
       "active": 99,
       "median_list": 150000,
-      "median_price_per_sqft": 338
+      "median_price_per_sqft": 325
     },
     "Livermore": {
-      "active": 100,
-      "median_list": 387000,
-      "median_price_per_sqft": 330
+      "active": 102,
+      "median_list": 375000,
+      "median_price_per_sqft": 328
     },
     "Fort Morgan": {
       "active": 149,
       "median_list": 350000,
-      "median_price_per_sqft": 197
+      "median_price_per_sqft": 192
     },
     "Red Feather Lakes": {
       "active": 124,
-      "median_list": 209700,
-      "median_price_per_sqft": 315
+      "median_list": 223950,
+      "median_price_per_sqft": 314
     },
     "Keenesburg": {
-      "active": 70,
-      "median_list": 447000,
+      "active": 69,
+      "median_list": 439000,
       "median_price_per_sqft": 259
     },
     "Erie": {
-      "active": 288,
-      "median_list": 699700,
-      "median_price_per_sqft": 288
+      "active": 283,
+      "median_list": 699500,
+      "median_price_per_sqft": 290
     },
     "Longmont": {
-      "active": 581,
-      "median_list": 550000,
+      "active": 576,
+      "median_list": 554500,
       "median_price_per_sqft": 308
     },
     "Golden": {
-      "active": 326,
-      "median_list": 800000,
-      "median_price_per_sqft": 371
+      "active": 323,
+      "median_list": 799999,
+      "median_price_per_sqft": 367
     },
     "Windsor": {
-      "active": 399,
-      "median_list": 605000,
-      "median_price_per_sqft": 259
+      "active": 391,
+      "median_list": 599000,
+      "median_price_per_sqft": 258
     },
     "Nunn": {
-      "active": 37,
-      "median_list": 429999,
-      "median_price_per_sqft": 281
+      "active": 39,
+      "median_list": 459900,
+      "median_price_per_sqft": 293
     },
     "Platteville": {
-      "active": 39,
+      "active": 40,
       "median_list": 385000,
-      "median_price_per_sqft": 318
+      "median_price_per_sqft": 307
     },
     "Pine": {
-      "active": 79,
-      "median_list": 650000,
+      "active": 78,
+      "median_list": 649950,
       "median_price_per_sqft": 359
     },
     "Dacono": {
-      "active": 45,
-      "median_list": 490000,
+      "active": 40,
+      "median_list": 474900,
       "median_price_per_sqft": 269
     },
     "Gardner": {
@@ -156,14 +156,14 @@
       "median_price_per_sqft": 231
     },
     "Arvada": {
-      "active": 618,
+      "active": 632,
       "median_list": 615000,
-      "median_price_per_sqft": 304
+      "median_price_per_sqft": 303
     },
     "Byers": {
-      "active": 33,
-      "median_list": 375000,
-      "median_price_per_sqft": 288
+      "active": 40,
+      "median_list": 342500,
+      "median_price_per_sqft": 279
     },
     "Beulah": {
       "active": 9,
@@ -171,22 +171,22 @@
       "median_price_per_sqft": 221
     },
     "Denver": {
-      "active": 4624,
-      "median_list": 520000,
-      "median_price_per_sqft": 357
+      "active": 4615,
+      "median_list": 525000,
+      "median_price_per_sqft": 356
     },
     "Brush": {
-      "active": 56,
-      "median_list": 302000,
-      "median_price_per_sqft": 202
+      "active": 55,
+      "median_list": 289000,
+      "median_price_per_sqft": 206
     },
     "Strasburg": {
-      "active": 79,
-      "median_list": 459990,
-      "median_price_per_sqft": 257
+      "active": 80,
+      "median_list": 462490,
+      "median_price_per_sqft": 252
     },
     "Nederland": {
-      "active": 78,
+      "active": 79,
       "median_list": 700000,
       "median_price_per_sqft": 385
     },
@@ -196,13 +196,13 @@
       "median_price_per_sqft": 230
     },
     "Evergreen": {
-      "active": 342,
-      "median_list": 850000,
-      "median_price_per_sqft": 390
+      "active": 336,
+      "median_list": 847000,
+      "median_price_per_sqft": 388
     },
     "Bennett": {
-      "active": 148,
-      "median_list": 428075,
+      "active": 149,
+      "median_list": 425900,
       "median_price_per_sqft": 257
     },
     "Avondale": {
@@ -211,34 +211,34 @@
       "median_price_per_sqft": null
     },
     "Lakewood": {
-      "active": 528,
-      "median_list": 546500,
-      "median_price_per_sqft": 299
+      "active": 538,
+      "median_list": 539900,
+      "median_price_per_sqft": 297
     },
     "Estes Park": {
-      "active": 218,
-      "median_list": 702250,
+      "active": 212,
+      "median_list": 719450,
       "median_price_per_sqft": 390
     },
     "Rush": {
-      "active": 8,
-      "median_list": 287000,
+      "active": 10,
+      "median_list": 132000,
       "median_price_per_sqft": null
     },
     "Morrison": {
       "active": 135,
-      "median_list": 825000,
-      "median_price_per_sqft": 354
+      "median_list": 815000,
+      "median_price_per_sqft": 349
     },
     "Thornton": {
-      "active": 448,
-      "median_list": 507885,
-      "median_price_per_sqft": 272
+      "active": 445,
+      "median_list": 500000,
+      "median_price_per_sqft": 273
     },
     "Brighton": {
-      "active": 384,
-      "median_list": 534190,
-      "median_price_per_sqft": 257
+      "active": 392,
+      "median_list": 531695,
+      "median_price_per_sqft": 258
     },
     "Pierce": {
       "active": 21,
@@ -246,9 +246,9 @@
       "median_price_per_sqft": 219
     },
     "Wiggins": {
-      "active": 106,
+      "active": 102,
       "median_list": 312000,
-      "median_price_per_sqft": 247
+      "median_price_per_sqft": 257
     },
     "Orchard": {
       "active": 12,
@@ -256,13 +256,13 @@
       "median_price_per_sqft": 178
     },
     "Englewood": {
-      "active": 352,
+      "active": 347,
       "median_list": 570000,
-      "median_price_per_sqft": 330
+      "median_price_per_sqft": 326
     },
     "Lyons": {
-      "active": 114,
-      "median_list": 732000,
+      "active": 110,
+      "median_list": 722000,
       "median_price_per_sqft": 407
     },
     "Model": {
@@ -271,29 +271,29 @@
       "median_price_per_sqft": null
     },
     "Broomfield": {
-      "active": 393,
+      "active": 397,
       "median_list": 589990,
       "median_price_per_sqft": 300
     },
     "Wellington": {
-      "active": 113,
-      "median_list": 490000,
-      "median_price_per_sqft": 273
+      "active": 111,
+      "median_list": 499500,
+      "median_price_per_sqft": 271
     },
     "Conifer": {
-      "active": 120,
-      "median_list": 767000,
-      "median_price_per_sqft": 369
+      "active": 119,
+      "median_list": 775000,
+      "median_price_per_sqft": 371
     },
     "Ward": {
-      "active": 25,
-      "median_list": 549000,
-      "median_price_per_sqft": 436
+      "active": 24,
+      "median_list": 512000,
+      "median_price_per_sqft": 439
     },
     "Mead": {
-      "active": 84,
+      "active": 88,
       "median_list": 575000,
-      "median_price_per_sqft": 277
+      "median_price_per_sqft": 275
     },
     "Weldona": {
       "active": 22,
@@ -301,14 +301,14 @@
       "median_price_per_sqft": 292
     },
     "Hudson": {
-      "active": 47,
-      "median_list": 740000,
-      "median_price_per_sqft": 386
+      "active": 48,
+      "median_list": 738438,
+      "median_price_per_sqft": 387
     },
     "Lafayette": {
-      "active": 138,
-      "median_list": 585000,
-      "median_price_per_sqft": 372
+      "active": 132,
+      "median_list": 586000,
+      "median_price_per_sqft": 373
     },
     "San Acacio": {
       "active": 10,
@@ -316,9 +316,9 @@
       "median_price_per_sqft": null
     },
     "Timnath": {
-      "active": 120,
-      "median_list": 699575,
-      "median_price_per_sqft": 274
+      "active": 123,
+      "median_list": 699170,
+      "median_price_per_sqft": 273
     },
     "Carr": {
       "active": 31,
@@ -326,8 +326,8 @@
       "median_price_per_sqft": 351
     },
     "Evans": {
-      "active": 100,
-      "median_list": 382000,
+      "active": 102,
+      "median_list": 375000,
       "median_price_per_sqft": 246
     },
     "Moffat": {
@@ -336,14 +336,14 @@
       "median_price_per_sqft": 192
     },
     "Mesita": {
-      "active": 6,
+      "active": 14,
       "median_list": 6500,
       "median_price_per_sqft": null
     },
     "Lake George": {
-      "active": 37,
+      "active": 34,
       "median_list": 475000,
-      "median_price_per_sqft": 355
+      "median_price_per_sqft": 356
     },
     "Ramah": {
       "active": 27,
@@ -351,14 +351,14 @@
       "median_price_per_sqft": 265
     },
     "Bellvue": {
-      "active": 83,
-      "median_list": 400000,
+      "active": 78,
+      "median_list": 372500,
       "median_price_per_sqft": 369
     },
     "Commerce City": {
       "active": 388,
-      "median_list": 500000,
-      "median_price_per_sqft": 246
+      "median_list": 499995,
+      "median_price_per_sqft": 245
     },
     "Jaroso": {
       "active": 13,
@@ -366,9 +366,9 @@
       "median_price_per_sqft": null
     },
     "Ault": {
-      "active": 38,
+      "active": 37,
       "median_list": 439000,
-      "median_price_per_sqft": 284
+      "median_price_per_sqft": 282
     },
     "Coaldale": {
       "active": 7,
@@ -376,8 +376,8 @@
       "median_price_per_sqft": null
     },
     "Littleton": {
-      "active": 989,
-      "median_list": 600000,
+      "active": 1004,
+      "median_list": 599900,
       "median_price_per_sqft": 306
     },
     "La Salle": {
@@ -386,33 +386,33 @@
       "median_price_per_sqft": 224
     },
     "Louisville": {
-      "active": 92,
-      "median_list": 790000,
+      "active": 93,
+      "median_list": 777000,
       "median_price_per_sqft": 405
     },
     "Firestone": {
-      "active": 124,
-      "median_list": 572450,
-      "median_price_per_sqft": 233
+      "active": 121,
+      "median_list": 574900,
+      "median_price_per_sqft": 234
     },
     "Milliken": {
-      "active": 48,
-      "median_list": 489350,
-      "median_price_per_sqft": 266
+      "active": 50,
+      "median_list": 480000,
+      "median_price_per_sqft": 260
     },
     "Greenwood Village": {
-      "active": 60,
-      "median_list": 987500,
-      "median_price_per_sqft": 391
+      "active": 61,
+      "median_list": 995000,
+      "median_price_per_sqft": 396
     },
     "Eaton": {
-      "active": 54,
-      "median_list": 616750,
-      "median_price_per_sqft": 268
+      "active": 55,
+      "median_list": 610000,
+      "median_price_per_sqft": 271
     },
     "Westminster": {
-      "active": 369,
-      "median_list": 525000,
+      "active": 371,
+      "median_list": 524900,
       "median_price_per_sqft": 282
     },
     "Drake": {
@@ -421,19 +421,19 @@
       "median_price_per_sqft": 380
     },
     "Sand Creek Township": {
-      "active": 6,
-      "median_list": 141000,
+      "active": 5,
+      "median_list": 107500,
       "median_price_per_sqft": null
     },
     "Matheson": {
-      "active": 7,
-      "median_list": 244000,
+      "active": 6,
+      "median_list": 221500,
       "median_price_per_sqft": null
     },
     "Lochbuie": {
-      "active": 27,
+      "active": 31,
       "median_list": 474990,
-      "median_price_per_sqft": 254
+      "median_price_per_sqft": 243
     },
     "Molina": {
       "active": 7,
@@ -441,7 +441,7 @@
       "median_price_per_sqft": null
     },
     "Superior": {
-      "active": 77,
+      "active": 81,
       "median_list": 750000,
       "median_price_per_sqft": 368
     },
@@ -451,8 +451,8 @@
       "median_price_per_sqft": 511
     },
     "Gilcrest": {
-      "active": 7,
-      "median_list": 275000,
+      "active": 8,
+      "median_list": 282500,
       "median_price_per_sqft": null
     },
     "Cuchara": {
@@ -461,14 +461,14 @@
       "median_price_per_sqft": 243
     },
     "Niwot": {
-      "active": 37,
-      "median_list": 1500000,
-      "median_price_per_sqft": 404
+      "active": 36,
+      "median_list": 1497500,
+      "median_price_per_sqft": 406
     },
     "Collbran": {
-      "active": 14,
-      "median_list": 369500,
-      "median_price_per_sqft": 312
+      "active": 13,
+      "median_list": 369000,
+      "median_price_per_sqft": 330
     },
     "Gill": {
       "active": 7,
@@ -481,19 +481,19 @@
       "median_price_per_sqft": 466
     },
     "Kersey": {
-      "active": 14,
-      "median_list": 899500,
-      "median_price_per_sqft": 353
+      "active": 17,
+      "median_list": 699000,
+      "median_price_per_sqft": 312
     },
     "Centennial": {
-      "active": 303,
-      "median_list": 625000,
-      "median_price_per_sqft": 282
+      "active": 315,
+      "median_list": 615000,
+      "median_price_per_sqft": 281
     },
     "Laporte": {
-      "active": 18,
-      "median_list": 388500,
-      "median_price_per_sqft": 390
+      "active": 17,
+      "median_list": 365000,
+      "median_price_per_sqft": 382
     },
     "Log Lane Village": {
       "active": 5,
@@ -501,13 +501,13 @@
       "median_price_per_sqft": 173
     },
     "Yoder": {
-      "active": 11,
-      "median_list": 599999,
+      "active": 13,
+      "median_list": 469999,
       "median_price_per_sqft": 307
     },
     "Agate": {
-      "active": 10,
-      "median_list": 141750,
+      "active": 11,
+      "median_list": 145000,
       "median_price_per_sqft": null
     },
     "Las Animas": {
@@ -521,23 +521,23 @@
       "median_price_per_sqft": 333
     },
     "Palmer Lake": {
-      "active": 16,
-      "median_list": 377500,
-      "median_price_per_sqft": 292
+      "active": 19,
+      "median_list": 410000,
+      "median_price_per_sqft": 367
     },
     "Wheat Ridge": {
-      "active": 146,
-      "median_list": 554750,
-      "median_price_per_sqft": 345
+      "active": 145,
+      "median_list": 549000,
+      "median_price_per_sqft": 346
     },
     "Howard": {
-      "active": 15,
-      "median_list": 750000,
+      "active": 16,
+      "median_list": 724500,
       "median_price_per_sqft": 369
     },
     "Grover": {
       "active": 6,
-      "median_list": 128950,
+      "median_list": 127950,
       "median_price_per_sqft": null
     },
     "Glen Haven": {
@@ -557,8 +557,8 @@
     },
     "Watkins": {
       "active": 66,
-      "median_list": 461075,
-      "median_price_per_sqft": 257
+      "median_list": 455000,
+      "median_price_per_sqft": 256
     },
     "Jamestown": {
       "active": 10,
@@ -571,14 +571,14 @@
       "median_price_per_sqft": 984
     },
     "Edgewater": {
-      "active": 22,
-      "median_list": 617500,
-      "median_price_per_sqft": 431
+      "active": 23,
+      "median_list": 625000,
+      "median_price_per_sqft": 407
     },
     "Northglenn": {
-      "active": 59,
+      "active": 57,
       "median_list": 474995,
-      "median_price_per_sqft": 267
+      "median_price_per_sqft": 271
     },
     "Roggen": {
       "active": 7,
@@ -586,19 +586,19 @@
       "median_price_per_sqft": null
     },
     "Cherry Hills Village": {
-      "active": 36,
-      "median_list": 4872500,
-      "median_price_per_sqft": 663
+      "active": 39,
+      "median_list": 4797900,
+      "median_price_per_sqft": 656
     },
     "Henderson": {
-      "active": 20,
-      "median_list": 497000,
-      "median_price_per_sqft": 273
+      "active": 21,
+      "median_list": 485000,
+      "median_price_per_sqft": 271
     },
     "Fraser": {
-      "active": 52,
-      "median_list": 830500,
-      "median_price_per_sqft": 565
+      "active": 56,
+      "median_list": 899000,
+      "median_price_per_sqft": 579
     },
     "Hot Sulphur Springs": {
       "active": 18,
@@ -606,49 +606,49 @@
       "median_price_per_sqft": 419
     },
     "Kremmling": {
-      "active": 51,
-      "median_list": 395000,
+      "active": 50,
+      "median_list": 385000,
       "median_price_per_sqft": 281
     },
     "Tabernash": {
-      "active": 19,
-      "median_list": 929000,
-      "median_price_per_sqft": 523
+      "active": 17,
+      "median_list": 1150000,
+      "median_price_per_sqft": 577
     },
     "Grand Lake": {
-      "active": 89,
+      "active": 87,
       "median_list": 550000,
-      "median_price_per_sqft": 457
+      "median_price_per_sqft": 440
     },
     "Granby": {
-      "active": 121,
-      "median_list": 467000,
-      "median_price_per_sqft": 461
+      "active": 118,
+      "median_list": 462500,
+      "median_price_per_sqft": 466
     },
     "Breckenridge": {
       "active": 151,
-      "median_list": 1175000,
-      "median_price_per_sqft": 899
+      "median_list": 1145000,
+      "median_price_per_sqft": 885
     },
     "Silverthorne": {
-      "active": 99,
-      "median_list": 905000,
-      "median_price_per_sqft": 610
+      "active": 98,
+      "median_list": 860000,
+      "median_price_per_sqft": 597
     },
     "Keystone": {
-      "active": 42,
-      "median_list": 833000,
-      "median_price_per_sqft": 809
+      "active": 41,
+      "median_list": 825000,
+      "median_price_per_sqft": 813
     },
     "Dillon": {
-      "active": 82,
+      "active": 80,
       "median_list": 739000,
-      "median_price_per_sqft": 726
+      "median_price_per_sqft": 720
     },
     "Frisco": {
-      "active": 35,
-      "median_list": 1295000,
-      "median_price_per_sqft": 845
+      "active": 34,
+      "median_list": 1390000,
+      "median_price_per_sqft": 843
     },
     "Vail": {
       "active": 8,
@@ -657,8 +657,8 @@
     },
     "Winter Park": {
       "active": 56,
-      "median_list": 1274500,
-      "median_price_per_sqft": 828
+      "median_list": 1299000,
+      "median_price_per_sqft": 825
     },
     "Oak Creek": {
       "active": 8,
