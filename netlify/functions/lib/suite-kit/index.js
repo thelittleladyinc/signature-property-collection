@@ -25,5 +25,6 @@ __exportStar(require("./auth.js"), exports);
 __exportStar(require("./lofty.js"), exports);
 __exportStar(require("./mls-grid.js"), exports);
 __exportStar(require("./hub.js"), exports);
+__exportStar(require("./google-signin.js"), exports);
 var version_ts_1 = require("./version.js");
 Object.defineProperty(exports, "VERSION", { enumerable: true, get: function () { return version_ts_1.VERSION; } });

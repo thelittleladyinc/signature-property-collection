@@ -2,7 +2,10 @@ export declare const LOFTY_API_ORIGIN = "https://api.lofty.com";
 export declare const LOFTY_API_PREFIX = "/v1.0";
 /** Lofty's SMS consent tag (EN DASH). */
 export declare const SMS_CONSENT_TAG = "Consent \u2013 SMS Opt-In";
-/** Christine's two Do Not Contact tags (EN DASH; plain lower case). A writer always sets BOTH. */
+/**
+ * Christine's two DNC tags (EN DASH; plain lower case). A full Do Not Contact write always sets BOTH.
+ * `Consent – DNC` = no email, no call, no text. `#dnc` = phone only (no calls or texts; email still allowed).
+ */
 export declare const DNC_TAG = "Consent \u2013 DNC";
 export declare const DNC_HASH_TAG = "#dnc";
 export declare const DNC_WRITE_TAGS: readonly ["Consent – DNC", "#dnc"];
@@ -13,9 +16,21 @@ export declare const NEW_NUMBER_NOTE = "New number added without a yes to texts;
 /** Why a yes to texts is held while texting is switched off suite-wide. */
 export declare const TEXTING_OFF_REASON = "texting stays off until Lofty approves 10DLC campaign 12744: texting left off, SMS consent tag not added";
 /**
- * Do Not Contact: "Consent – DNC" or "#dnc" (her two tags), or "OPTED OUT" / "Expired Elite – OPTED OUT",
- * however the dash or the case was typed. "Consent – DNC Email" is a different tag and is not matched.
- * Every "is this lead Do Not Contact?" question goes through this one test.
+ * Full Do Not Contact (no email, no call, no text): "Consent – DNC", "OPTED OUT" or "Expired Elite – OPTED OUT",
+ * whole tag, however the dash or the case was typed. "Consent – DNC Email" is a different tag and is not
+ * matched. NOT `#dnc`, which is phone only. Every "may we email?" question uses this test.
+ */
+export declare function isDoNotContactTag(name: unknown): boolean;
+/** `#dnc` itself (any case, whole tag). */
+export declare function isPhoneOnlyDncTag(name: unknown): boolean;
+/**
+ * No calls and no texts: `#dnc` (phone only) or any full Do Not Contact tag. Every "may we call or text?"
+ * question uses this test.
+ */
+export declare function isPhoneDncTag(name: unknown): boolean;
+/**
+ * @deprecated Same as isPhoneDncTag (any DNC tag, `#dnc` included), so an older caller stays on the safe side.
+ * Use isDoNotContactTag for an email decision and isPhoneDncTag for a call or text decision.
  */
 export declare function isDncTag(name: unknown): boolean;
 export declare function isEmailOptOutTag(name: unknown): boolean;
@@ -189,7 +204,10 @@ export interface ConsentStatus {
     leadId: string;
     /** False when the tag list was missing or unreadable: then nothing below can be relied on, so hold. */
     tagsReadable: boolean;
+    /** A full Do Not Contact tag (`Consent – DNC`, `OPTED OUT`, `Expired Elite – OPTED OUT`): no email, call or text. */
     doNotContact: boolean;
+    /** `#dnc` or a full Do Not Contact tag: no calls and no texts (`#dnc` alone still allows email). */
+    phoneDnc: boolean;
     /** `Consent – Unsubscribed` and/or cannotEmail: true (either stops email). */
     emailOptOut: boolean;
     /** The `Consent – Unsubscribed` tag itself (her opt-out is the tag AND cannotEmail). */
@@ -198,9 +216,9 @@ export interface ConsentStatus {
     cannotText: boolean;
     cannotCall: boolean;
     smsConsentTag: boolean;
-    /** May an app email this lead? Only with a readable tag list, no DNC, no email opt-out. */
+    /** May an app email this lead? Only with a readable tag list, no full Do Not Contact tag, no email opt-out. `#dnc` does not stop email. */
     mayEmail: boolean;
-    /** May an app call this lead? Only with a readable tag list, no DNC, and cannotCall not true. */
+    /** May an app call this lead? Only with a readable tag list, no `#dnc` or Do Not Contact tag, and cannotCall not true. */
     mayCall: boolean;
     /** Texting is off suite-wide (10DLC campaign 12744): always false unless allowTextingOn. */
     mayText: boolean;
@@ -213,6 +231,21 @@ export interface ConsentStatus {
 export declare function consentStatus(lead: any, opts?: {
     allowTextingOn?: boolean;
 }): ConsentStatus;
+/** "May we email this lead?" (tags and cannotEmail; `#dnc` alone does not stop email). Unreadable tags = no. */
+export declare function mayEmailLead(lead: any): boolean;
+/** "May we call this lead?" (`#dnc` or a Do Not Contact tag, or cannotCall, stops it). Unreadable tags = no. */
+export declare function mayCallLead(lead: any): boolean;
+/** "May we text this lead?" Always no unless allowTextingOn (10DLC campaign 12744); `#dnc` stops it. */
+export declare function mayTextLead(lead: any, opts?: {
+    allowTextingOn?: boolean;
+}): boolean;
+/**
+ * "May we email?" from a tag list alone (no Lofty flags): readable, no full Do Not Contact tag and no
+ * `Consent – Unsubscribed`. `#dnc` does not stop email. A missing or unreadable list = no (hold).
+ */
+export declare function tagsAllowEmail(rawTags: unknown): boolean;
+/** "May we call or text?" from a tag list alone: readable, no `#dnc` and no full Do Not Contact tag. Unreadable = no. */
+export declare function tagsAllowPhone(rawTags: unknown): boolean;
 /** POST /leads (always cannotText:true) and read the response for a merge. */
 export declare function createLeadResult(input: LoftyLeadInput, deps: LoftyDeps): Promise<CreatedLead>;
 export declare function getLead(leadId: string, deps: LoftyDeps): Promise<any>;
@@ -267,6 +300,8 @@ export interface LeadChangeResult {
     tagsUnreadable?: string;
     /** The lead is Do Not Contact (before or by this write): only stop-contact tags, texting and email off. */
     dncHeld: boolean;
+    /** The lead is `#dnc` or Do Not Contact: texting off and no calls (`#dnc` alone leaves email and tags alone). */
+    phoneDnc: boolean;
     tagsHeld: string[];
     /** After a write to a Do Not Contact lead: was a DNC tag seen again? */
     dncCheck?: 'kept' | 'lost' | 'unverified';
@@ -315,6 +350,8 @@ export interface LoftyOutcome {
     merged?: boolean;
     mergedFrom?: string;
     dncHeld?: boolean;
+    /** The lead is `#dnc` or Do Not Contact: no calls, no texts (email may still be allowed: see dncHeld). */
+    phoneDnc?: boolean;
     tagsHeld?: string[];
     dncLost?: boolean;
     retryAfterSeconds?: number;
