@@ -47,6 +47,9 @@ const TAG = {
   DS1: `TOF ${EN_DASH} Downsizing`,
   SPC: `TOF ${EN_DASH} Luxury / Signature`,
   RECRUIT: "Agent Recruit",
+  // 2026-10-18: her existing "FSBO – Seller Support (21 Days)" plan's start tag,
+  // as Christine typed it (plain ASCII hyphen). The Little Lady site's tests/test-fsbo-form.js has the rest.
+  FSBO: "Funnel - FSBO",
 };
 const SELLER = 1;
 const BUYER = 2;
@@ -68,6 +71,7 @@ put(["free-home-valuation", "cash-offer"], TAG.S2, SELLER);
 put(["signature-sellers-inquiry", "signature-expired-inquiry"], TAG.SPC, SELLER);
 put(["noco-retirement"], TAG.DS1, SELLER);
 put(["lpt-join", "lpt-join-co", "co-license-guide", "agent-coaching"], TAG.RECRUIT, null);
+put(["fsbo-inquiry"], TAG.FSBO, SELLER);
 const NO_PLAN = ["contact", "testimonials-page-inquiry", "newsletter-signup", "rent-to-own-options",
   "market-conditions-inquiry", "some-form-nobody-has-built-yet", "", "__proto__", "constructor", "toString"];
 // ... except on the Signature site (the luxury brand), where these four start
@@ -206,14 +210,15 @@ function blobStore(seed) {
 
 (async () => {
   console.log("\n1. The plan tags, character for character");
-  check("all eight plan tags, exactly", same(P.PLAN_TAGS, {
+  check("all nine plan tags, exactly", same(P.PLAN_TAGS, {
     B1_WEBSITE_BUYER: TAG.B1, B1_FIRST_TIME: TAG.B1_FIRST_TIME, B1_VA: TAG.B1_VA, S1_SELLER: TAG.S1,
-    S2_OPTIONS: TAG.S2, DS1_DOWNSIZING: TAG.DS1, SPC_LUXURY: TAG.SPC, RECRUIT: TAG.RECRUIT,
+    S2_OPTIONS: TAG.S2, DS1_DOWNSIZING: TAG.DS1, SPC_LUXURY: TAG.SPC, RECRUIT: TAG.RECRUIT, FSBO: TAG.FSBO,
   }), JSON.stringify(P.PLAN_TAGS));
   check("the TOF tags use an EN DASH (U+2013), never a hyphen",
     Object.values(P.PLAN_TAGS).filter((t) => t.startsWith("TOF")).length === 6 &&
     Object.values(P.PLAN_TAGS).filter((t) => t.startsWith("TOF")).every((t) => t.includes(` ${EN_DASH} `) && !t.includes(" - ")));
   check("S2's is a plain ASCII hyphen", P.PLAN_TAGS.S2_OPTIONS === "S2 - Seller Options" && !P.PLAN_TAGS.S2_OPTIONS.includes(EN_DASH));
+  check("so is FSBO's (\"Funnel - FSBO\", as Christine typed it)", P.PLAN_TAGS.FSBO === "Funnel - FSBO" && !P.PLAN_TAGS.FSBO.includes(EN_DASH));
   check("lead types: Seller 1, Buyer 2", P.LEAD_TYPE.SELLER === 1 && P.LEAD_TYPE.BUYER === 2);
 
   console.log("\n2. Every form, on The Little Lady site (main) and on the Signature site");

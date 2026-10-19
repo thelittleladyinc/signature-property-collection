@@ -49,6 +49,15 @@
 // Every "–" here is U+2013 EN DASH, copied from the plan names; S2's "-" is a
 // plain ASCII hyphen. If a plan's tag is ever renamed in Lofty, change the one
 // line here (tests/test-form-plans.js pins the characters).
+//
+// 2026-10-18 (Christine: "Also add a 'Selling it yourself?' form ... that tags
+// Funnel - FSBO and Source - Website"): FSBO is the Smart Plan she already runs in
+// Lofty, "FSBO – Seller Support (21 Days)" -- the FSBO funnel feeds THAT plan (or
+// extends it), never a second FSBO plan. "Funnel - FSBO" must be one of that
+// plan's start tags in Lofty; if the plan starts on another tag, this one line
+// changes to it. Spelled with a plain ASCII hyphen, exactly as she typed it (her
+// "Funnel - ..." tags in Command Center's tag list use the same hyphen); Lofty
+// matches a start tag character for character.
 const PLAN_TAGS = Object.freeze({
   B1_WEBSITE_BUYER: "TOF – Website Buyer",
   B1_FIRST_TIME: "TOF – First Time Buyer",
@@ -58,6 +67,7 @@ const PLAN_TAGS = Object.freeze({
   DS1_DOWNSIZING: "TOF – Downsizing",
   SPC_LUXURY: "TOF – Luxury / Signature",
   RECRUIT: "Agent Recruit",
+  FSBO: "Funnel - FSBO",
 });
 
 // The tag the HV plan starts on. Added by the hub when a value review is sent,
@@ -84,6 +94,7 @@ const PLANS = Object.freeze({
   DS1_DOWNSIZING: { tag: PLAN_TAGS.DS1_DOWNSIZING, leadType: LEAD_TYPE.SELLER },
   SPC_LUXURY: { tag: PLAN_TAGS.SPC_LUXURY, leadType: LEAD_TYPE.SELLER },
   RECRUIT: { tag: PLAN_TAGS.RECRUIT, leadType: null },
+  FSBO: { tag: PLAN_TAGS.FSBO, leadType: LEAD_TYPE.SELLER },
   // No tag at submission: HV starts on VALUE_REVIEW_SENT_TAG, added later by the hub.
   HV_VALUE_REVIEW: { tag: null, leadType: LEAD_TYPE.SELLER },
   // Signature's home-value request, switch on: the luxury plan now, plus the
@@ -143,6 +154,11 @@ const FORM_PLAN = Object.freeze({
   "lpt-join-co": "RECRUIT",
   "co-license-guide": "RECRUIT",
   "agent-coaching": "RECRUIT",
+  // FSBO -- an owner selling it themselves (2026-10-18). Of the two websites only
+  // The Little Lady site renders this form, and only while its build switch
+  // FSBO_FORM is "on" (build/build.py); with the switch off no page carries it,
+  // so this line is never reached.
+  "fsbo-inquiry": "FSBO",
 });
 
 // On the Signature site -- the luxury brand -- its own seller forms start the
