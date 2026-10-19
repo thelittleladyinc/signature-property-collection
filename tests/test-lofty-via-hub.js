@@ -335,13 +335,23 @@ const deadline = () => Date.now() + 15000;
     JSON.stringify(ownCalls));
   check("...and nothing the hub covers went out on the own key", coveredOwn().length === 0);
 
-  reset(fakeHub({ lofty: fakeLofty([{ leadId: 8, emails: ["pat@example.com"], phones: ["+19705550123"], tags: ["#dnc"], cannotText: true }]) }));
+  reset(fakeHub({ lofty: fakeLofty([{ leadId: 8, emails: ["pat@example.com"], phones: ["+19705550123"], tags: [`Consent ${EN} DNC`], cannotText: true }]) }));
   await submit("buyers-guide", person(), "sub-2003");
   const eight = HUB.lofty.leads.get(8);
   check("a returning Do Not Contact lead: the hub holds every tag (Do Not Contact wins)",
-    tagsOf(eight).join() === "#dnc", JSON.stringify(eight.tags));
+    tagsOf(eight).join() === `Consent ${EN} DNC`, JSON.stringify(eight.tags));
   check("...no plan push, no Call task, nothing at all on the own key",
     HUB.leadPushes().length === 1 && ownCalls.length === 0, JSON.stringify(ownCalls));
+
+  // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
+  reset(fakeHub({ lofty: fakeLofty([{ leadId: 18, emails: ["pat@example.com"], phones: ["+19705550123"], tags: ["#dnc"], cannotText: false }]) }));
+  await submit("buyers-guide", person(), "sub-2013");
+  const eighteen = HUB.lofty.leads.get(18);
+  check("a returning #dnc lead (phone only): the form's tags go on, #dnc stays, texting is switched off",
+    ["#dnc", "Hot Lead - Website", "buyers-guide"].every((t) => tagsOf(eighteen).includes(t)) && eighteen.cannotText === true,
+    JSON.stringify(eighteen));
+  check("...but no Call task (the hub's consent route says it may not be called), nothing on the own key",
+    HUB.routes().includes("/v1/lofty/consent") && ownCalls.length === 0, JSON.stringify(ownCalls));
 
   reset(fakeHub({ dnc: ["pat@example.com"] }));
   await submit("buyers-guide", person(), "sub-2004");
@@ -373,10 +383,17 @@ const deadline = () => Date.now() + 15000;
   console.log("\n3. Do Not Contact / opted out on TODAY'S path: no plan tag, no re-fire, no texting");
   env();
   const DNC_SPELLINGS = [`Consent ${EN} DNC`, "#dnc", "#DNC", "consent - dnc", "OPTED OUT", "Opted  Out", `Expired Elite ${EN} OPTED OUT`, "expired elite - opted out"];
-  for (const tag of DNC_SPELLINGS) {
+  for (const tag of DNC_SPELLINGS.filter((t) => !/^#dnc$/i.test(t))) {
     reset(null, fakeLofty([{ leadId: 501, tags: [tag], phones: ["9705550123"], cannotText: true }]));
     const p = await quiet(() => N.addPlanTags("501", [PLAN_B1], "own-key-for-tests"));
     check(`"${tag}": no plan tag (nothing written)`, p.ok === false && p.step === "do-not-contact" && !OWN.calls.some((c) => c.method === "PUT"), JSON.stringify(p));
+  }
+  // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18: a plan (it emails) still starts.
+  for (const tag of ["#dnc", "#DNC"]) {
+    reset(null, fakeLofty([{ leadId: 511, tags: [tag], phones: ["9705550123"], cannotText: true }]));
+    const p = await quiet(() => N.addPlanTags("511", [PLAN_B1], "own-key-for-tests"));
+    check(`"${tag}" alone (phone only): the plan tag goes on, #dnc kept`, p.ok === true &&
+      JSON.stringify(OWN.leads.get(511).tags) === JSON.stringify([tag, PLAN_B1]), JSON.stringify(p));
   }
   for (const [label, seed] of [["\"Consent – Unsubscribed\"", { tags: [`Consent ${EN} Unsubscribed`] }], ["cannotEmail: true", { tags: [], cannotEmail: true }]]) {
     reset(null, fakeLofty([{ leadId: 502, phones: [], cannotText: true, ...seed }]));
