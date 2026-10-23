@@ -255,6 +255,12 @@ function snapshot(store) {
   return { listings: norm, mine, towns: townFigures(Object.values(listings)).towns };
 }
 function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+// A snapshot without some listings (their town figures are unaffected: only Active counts).
+function minus(s, ids) {
+  const listings = { ...s.listings };
+  for (const id of ids) delete listings[id];
+  return { listings, mine: s.mine.filter((id) => !ids.includes(id)), towns: s.towns };
+}
 function diff(a, b) {
   const out = [];
   for (const id of new Set([...Object.keys(a.listings), ...Object.keys(b.listings)])) {
@@ -347,7 +353,7 @@ async function bootstrapPair(hidden) {
     print(`\n2. The same status changes through both paths (the hub ${hidden === "deleted" ? "drops an MlgCanView=false listing and lists it at /v1/mls/deleted" : "answers withheld stubs"})`);
     const { world, gridStore, hubStore } = await bootstrapPair(hidden);
     const steps = [
-      ["first hub run after switching (carries the MLS Grid checkpoint over)", () => {}],
+      ["first hub run after switching (one full snapshot, then incremental)", () => {}],
       ["Coming Soon -> Active (hers)", () => change(world, "K14", { StandardStatus: "Active" })],
       ["Active -> Pending", () => change(world, "K3", { StandardStatus: "Pending" })],
       ["Active -> Active Under Contract", () => change(world, "K9", { StandardStatus: "Active Under Contract" })],
@@ -373,7 +379,16 @@ async function bootstrapPair(hidden) {
       if (h.fetch.grid() !== 0) allGridFree = false;
       const a = snapshot(gridStore);
       const b = snapshot(hubStore);
-      check(`${label}: same listings.json, mine-listings.json and town figures`, same(a, b), diff(a, b));
+      if (label.startsWith("first hub run")) {
+        // The first hub run is a full snapshot, which also holds her Coming Soon
+        // listing at once (MLS Grid's bootstrap cannot ask for that status and
+        // waits for its next change; see section 3). Everything else is the same.
+        check(`${label}: same listings.json, mine-listings.json and town figures, plus her Coming Soon listing`,
+          same(a, minus(b, ["IRE1000014"])) && !a.listings.IRE1000014 && b.listings.IRE1000014 &&
+          b.listings.IRE1000014.status === "Coming Soon" && b.mine.includes("IRE1000014"), diff(a, minus(b, ["IRE1000014"])));
+      } else {
+        check(`${label}: same listings.json, mine-listings.json and town figures`, same(a, b), diff(a, b));
+      }
       const st = hubStore.data.get("sync-state.json");
       check(`${label}: the hub pass completed and is current`, !st.lastRunError && !st.hubPass && st.lastRunVia === "hub" &&
         Date.now() - Date.parse(st.lastSuccessAt) < 60e3, JSON.stringify(st).slice(0, 300));
@@ -443,6 +458,41 @@ async function bootstrapPair(hidden) {
     check("an incomplete deletion list turns into a full re-read in the same run", world.hubLog.slice(before - world.hubCalls).some((l) => /deleted/.test(l)) &&
       !snapshot(stale).listings.IRE1999999 && !s3.lastRunError && !!s3.lastSuccessAt, JSON.stringify(s3).slice(0, 300));
     check("...after which the copy equals the truth", same(snapshot(stale), snapshot(h2)), diff(snapshot(stale), snapshot(h2)));
+
+    // The first hub run after the MLS Grid crawl (2026-10-23): that copy can hold
+    // listings MLS Grid no longer serves (a removal missed while the crawl was
+    // paused). The first hub run reads one full snapshot and drops them; the
+    // runs after it are incremental again.
+    {
+      const pair = await bootstrapPair("deleted");
+      const listingsG = pair.hubStore.data.get("listings.json");
+      listingsG.IRE1888888 = { ...listingsG.IRE1000001, listingId: "IRE1888888", listingKey: "K888888" };
+      pair.hubStore.data.set("listings.json", listingsG);
+      check("(set-up) the MLS Grid copy holds a listing the market no longer has, and no hub check yet",
+        !!pair.hubStore.data.get("listings.json").IRE1888888 && !pair.hubStore.data.get("sync-state.json").hubReconciledAt);
+      pair.world.hubLog = [];
+      const first = await runSync(pair.hubStore, pair.world, HUB_ENV);
+      const s6 = pair.hubStore.data.get("sync-state.json");
+      const firstSearch = first.fetch.calls.find((c) => /\/v1\/mls\/search/.test(c.url));
+      check("the first hub run reads a full snapshot (stored statuses, no checkpoint)", !!firstSearch &&
+        /statuses/.test(firstSearch.init.body) && !/modified_since/.test(firstSearch.init.body), firstSearch && firstSearch.init.body);
+      check("...drops the listing the hub does not have, is current, and records the check",
+        !pair.hubStore.data.get("listings.json").IRE1888888 && !s6.lastRunError && !!s6.lastSuccessAt && !!s6.hubReconciledAt,
+        JSON.stringify(s6).slice(0, 300));
+      await runSync(pair.gridStore, pair.world, GRID_ENV);
+      const gridNow = snapshot(pair.gridStore);
+      const hubNow = snapshot(pair.hubStore);
+      check("...and leaves the MLS Grid crawl's copy, minus that listing, plus her Coming Soon listing",
+        same(gridNow, minus(hubNow, ["IRE1000014"])) && !!hubNow.listings.IRE1000014, diff(gridNow, minus(hubNow, ["IRE1000014"])));
+      change(pair.world, "K5", { StandardStatus: "Pending" });
+      const second = await runSync(pair.hubStore, pair.world, HUB_ENV);
+      const secondSearch = second.fetch.calls.find((c) => /\/v1\/mls\/search/.test(c.url));
+      const s7 = pair.hubStore.data.get("sync-state.json");
+      check("the next hub run is incremental (deletion list, then changes since the checkpoint)",
+        second.fetch.calls.some((c) => /\/v1\/mls\/deleted/.test(c.url)) && !!secondSearch && /modified_since/.test(secondSearch.init.body) &&
+        pair.hubStore.data.get("listings.json").IRE1000005.status === "Pending" && s7.hubReconciledAt === s6.hubReconciledAt,
+        secondSearch && secondSearch.init.body);
+    }
 
     // A short or empty full read is not a market: nothing removed, not current.
     const short = copyOf(h2);
