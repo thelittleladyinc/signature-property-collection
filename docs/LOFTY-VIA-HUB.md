@@ -5,7 +5,7 @@ Two settings on this site's Netlify environment, both off unless set to exactly 
 | Setting | What it does when `on` |
 |---|---|
 | `LOFTY_VIA_HUB` | The form's Lofty work goes through the Seller Intelligence hub (`POST /v1/lofty/lead`, `/v1/lofty/note`, `/v1/lofty/consent`) instead of this site's own `LOFTY_API_KEY`. |
-| `LEADS_TO_ROUTER` | Every form lead (not rent-to-own) is also recorded with the hub's lead router (`POST /v1/router/lead`, source `signature-form`, kind `new`), so Command Center's call list sees it. |
+| `LEADS_TO_ROUTER` | Every form lead is also recorded with the hub's lead router (`POST /v1/router/lead`, source `signature-form`, kind `new`), so Command Center's call list sees it. Rent-to-own leads too: they are Christine's like every other lead (Christine, 2026-10-23), sent with intent `rent_to_own`; the router's rule NEW-RENT-TO-OWN starts no plan until she approves one. |
 
 Both use the settings the lead alert email already uses: `HUB_API_URL` (https) and `HUB_API_KEY` (header `x-hub-key`; never logged). The code is `netlify/functions/lib/_lofty-hub.js`, byte-identical in the Signature repo (`tests/test-lofty-via-hub.js` checks it).
 

@@ -236,7 +236,8 @@ function blobStore(seed) {
     same(got("free-home-valuation"), expectPlan(TAG.S2, SELLER)));
   check("Signature: its seller page, seller guide, local proof and home value start the luxury seller plan",
     Object.keys(SIGNATURE_ONLY).every((f) => same(got(f, {}, "signature"), expectPlan(TAG.SPC, SELLER))));
-  check("rent-to-own is untouched on both sites", same(got("rent-to-own-options", {}, "main"), expectPlan(null, null)) &&
+  check("rent-to-own starts no plan on either site (none until Christine picks one; the lead is hers)",
+    same(got("rent-to-own-options", {}, "main"), expectPlan(null, null)) &&
     same(got("rent-to-own-options", {}, "signature"), expectPlan(null, null)));
   check("agent recruiting forms have a plan tag and NO lead type",
     ["lpt-join", "lpt-join-co", "co-license-guide", "agent-coaching"].every((f) => same(got(f), { planTags: [TAG.RECRUIT], leadTypes: [] })));

@@ -182,8 +182,9 @@ const HOME_LEAD_PLAN = Object.freeze({
 // Forms that deliberately start NO plan (any form not named anywhere in this
 // file starts none either). Listed so the choice is visible, not an accident:
 // a general contact or testimonial note, a newsletter sign-up and the market-
-// conditions question say nothing about buying or selling; rent-to-own leads go
-// to another agent and are left exactly as they are.
+// conditions question say nothing about buying or selling. Rent-to-own leads
+// are Christine's, like every other lead (Christine, 2026-10-23), but start no
+// plan until she picks one (the HP1 rent-to-own plan is off in Lofty).
 const FORMS_WITHOUT_PLAN = Object.freeze([
   "contact",
   "testimonials-page-inquiry",
