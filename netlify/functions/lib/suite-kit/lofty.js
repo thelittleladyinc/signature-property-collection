@@ -38,8 +38,36 @@
 //     the first one's tag. The hub passes a per-lead lease (migration 0055_lofty_lead_lease.sql), so two apps
 //     writing the same lead through the doorway never lose a tag; createMemoryLeadLock() does the same inside
 //     one process (tests, or one app's own workers).
+//
+// 0.5.0 (2026-10-23, Christine: "we don't lose anything at all"): the options the apps' own Lofty code has and the
+// hub's doorway lacked, every one used only when the caller passes it (nothing changes for a caller that does not):
+//   - `lead.property` (street, city, state, ZIP): Lofty's nested `property` object on a create; on an existing lead
+//     only blanks are filled (no address yet, or the same street missing its city / state / ZIP), never overwritten.
+//   - `lead.customAttributes`: Lofty custom fields in the create body (Expired Elite's shape).
+//   - `createTags`: tags IN the create body, on a create only (a "tag added" Smart Plan does not start from them);
+//     never a consent, Do Not Contact or opt-out tag. A create Lofty folds into an existing lead while carrying
+//     tags, an address or custom fields is reported (`createBodyMerged`) and alerted: check that lead by hand.
+//   - `removeTags`: taken off in the same read-merge-write, read back gone; never a protected tag (`isProtectedTag`:
+//     every `Consent – …` tag, Do Not Contact, `#dnc`, `Newsletter Unsubscribed`, `System – Kill All Drips`).
+//   - `leadId`: write to that one known lead (no lookup, never a create).
+//   - `match: 'email_and_phone'` (findLeadNarrowed, Command Center's rule): the ONE email match that also holds the
+//     phone; the phone only on other people's leads refuses (`already_in_lofty`), never merged by phone alone.
+//   - `expectFirstName`: a found lead whose first name is another real name is refused (`name_differs`): nothing
+//     written, no note.
+//   - `loftyRequestText` and a string body (raw JSON), for 64-bit Lofty ids sent and read as digits; DELETE (Lofty's
+//     webhook unsubscribe).
+//   - A write that adds `#dnc` (a number on a Do Not Call list) switches texting off in the same PUT.
+//
+// 0.5.2 (2026-10-23, the side-by-side check): a DRY RUN. Pass `plan: createLoftyPlan()` in LoftyDeps and every
+// function here runs exactly as it would, reads included (each through beforeCall / onCall as usual), but no write is
+// sent: every POST, PUT and DELETE is recorded in the plan (method, Lofty's full path with the lead id in it, the body
+// exactly as it would have gone) and answered the way Lofty answers it, without a network call, beforeCall or onCall.
+// A read of a lead the plan wrote to (a read-back) or would have created is answered from the plan (`readBacks`
+// counts them): the plan's lead is the lead as last read with the planned PUT bodies laid over it. A lead or task the
+// plan would have created carries a stand-in id, shown as `{new_lead_id}` / `{new_task_id}` by plannedRequests() and
+// withPlannedIds(). planningFetch() does the same for code that calls Lofty through a plain fetch.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NO_LOOKUP_KEY = exports.CONSENT_NO_PHONE = exports.LoftyError = exports.LOOKUP_LIMIT = exports.TEXTING_OFF_REASON = exports.NEW_NUMBER_NOTE = exports.EMAIL_OPTOUT_TAG = exports.DNC_WRITE_TAGS = exports.DNC_HASH_TAG = exports.DNC_TAG = exports.SMS_CONSENT_TAG = exports.LOFTY_API_PREFIX = exports.LOFTY_API_ORIGIN = void 0;
+exports.NO_LOOKUP_KEY = exports.CONSENT_NO_PHONE = exports.PLANNED_NEW_TASK_ID = exports.PLANNED_NEW_LEAD_ID = exports.LoftyError = exports.LOOKUP_LIMIT = exports.TEXTING_OFF_REASON = exports.NEW_NUMBER_NOTE = exports.EMAIL_OPTOUT_TAG = exports.DNC_WRITE_TAGS = exports.DNC_HASH_TAG = exports.DNC_TAG = exports.SMS_CONSENT_TAG = exports.LOFTY_API_PREFIX = exports.LOFTY_API_ORIGIN = void 0;
 exports.isDoNotContactTag = isDoNotContactTag;
 exports.isPhoneOnlyDncTag = isPhoneOnlyDncTag;
 exports.isPhoneDncTag = isPhoneDncTag;
@@ -47,9 +75,24 @@ exports.isDncTag = isDncTag;
 exports.isEmailOptOutTag = isEmailOptOutTag;
 exports.isSmsConsentTag = isSmsConsentTag;
 exports.isStopContactTag = isStopContactTag;
+exports.isProtectedTag = isProtectedTag;
+exports.firstNamesDiffer = firstNamesDiffer;
+exports.loftyUnsubscribed = loftyUnsubscribed;
 exports.isLookupRefusal = isLookupRefusal;
+exports.leadProperty = leadProperty;
+exports.cleanCustomAttributes = cleanCustomAttributes;
+exports.createBodyTags = createBodyTags;
 exports.isLoftyConfigured = isLoftyConfigured;
 exports.loftyRequest = loftyRequest;
+exports.loftyRequestText = loftyRequestText;
+exports.createLoftyPlan = createLoftyPlan;
+exports.loftyFullPath = loftyFullPath;
+exports.planRequest = planRequest;
+exports.planSawRead = planSawRead;
+exports.isPlannedId = isPlannedId;
+exports.withPlannedIds = withPlannedIds;
+exports.plannedRequests = plannedRequests;
+exports.planningFetch = planningFetch;
 exports.cleanTag = cleanTag;
 exports.normalizeTags = normalizeTags;
 exports.existingTagsForWrite = existingTagsForWrite;
@@ -74,9 +117,11 @@ exports.createLeadResult = createLeadResult;
 exports.getLead = getLead;
 exports.findLeadByEmail = findLeadByEmail;
 exports.findLeadByPhone = findLeadByPhone;
+exports.findLeadNarrowed = findLeadNarrowed;
 exports.findExistingLead = findExistingLead;
 exports.hasLookupKey = hasLookupKey;
 exports.mergeIntoLead = mergeIntoLead;
+exports.planPropertyFill = planPropertyFill;
 exports.createMemoryLeadLock = createMemoryLeadLock;
 exports.addNote = addNote;
 exports.followMerge = followMerge;
@@ -87,6 +132,7 @@ exports.noteLead = noteLead;
 exports.applyOptOut = applyOptOut;
 exports.lookupConsent = lookupConsent;
 const contact_ts_1 = require("./contact.js");
+const address_ts_1 = require("./address.js");
 exports.LOFTY_API_ORIGIN = 'https://api.lofty.com';
 exports.LOFTY_API_PREFIX = '/v1.0';
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -152,9 +198,46 @@ function isSmsConsentTag(name) {
 function isStopContactTag(name) {
     return isPhoneDncTag(name) || isEmailOptOutTag(name);
 }
+const ANY_CONSENT_RE = new RegExp(`^consent\\s*${DASH}`, 'i');
+const OTHER_PROTECTED_RE = [
+    /^newsletter\s+unsubscribed$/i,
+    new RegExp(`^system\\s*${DASH}\\s*kill\\s+all\\s+drips$`, 'i'),
+];
+/**
+ * A tag no writer may ever take off a lead (0.5.0): every `Consent – …` tag (DNC, Unsubscribed, SMS Opt-In, Spam
+ * Complaint, Bounced, …), the Do Not Contact tags (`OPTED OUT`, `Expired Elite – OPTED OUT`), `#dnc`,
+ * `Newsletter Unsubscribed` and `System – Kill All Drips`; any dash, any case, whole tag.
+ */
+function isProtectedTag(name) {
+    const t = tagText(name);
+    return ANY_CONSENT_RE.test(t) || isStopContactTag(t) || isSmsConsentTag(t) || OTHER_PROTECTED_RE.some((re) => re.test(t));
+}
+/** A first name compared for identity: trimmed, inner spaces collapsed, lower case; the quiz placeholder ("Quiz") and a blank are no name. */
+function realFirstName(v) {
+    const t = (typeof v === 'string' ? v : '').trim().replace(/\s+/g, ' ').toLowerCase();
+    return t === 'quiz' ? '' : t;
+}
+/**
+ * Two real, different first names (Command Center's rule, 0.5.0): a missing or placeholder name on either side is
+ * never a difference.
+ */
+function firstNamesDiffer(a, b) {
+    const x = realFirstName(a);
+    const y = realFirstName(b);
+    return !!x && !!y && x !== y;
+}
+/** Lofty's own `unsubscription` flag on a lead read: true / false, or null when the read does not say (0.5.0). */
+function loftyUnsubscribed(lead) {
+    const v = lead?.unsubscription;
+    if (v === true || v === 1 || v === 'true' || v === '1')
+        return true;
+    if (v === false || v === 0 || v === 'false' || v === '0')
+        return false;
+    return null;
+}
 /** How many results one exact email or phone search asks for. */
 exports.LOOKUP_LIMIT = 5;
-const LOOKUP_REFUSALS = new Set(['several_leads', 'no_exact_match', 'lookup_failed']);
+const LOOKUP_REFUSALS = new Set(['several_leads', 'no_exact_match', 'lookup_failed', 'already_in_lofty']);
 function isLookupRefusal(err) {
     return LOOKUP_REFUSALS.has(String(err?.code ?? ''));
 }
@@ -167,6 +250,8 @@ class LoftyError extends Error {
     lookup;
     /** Seconds to wait (a 429 from Lofty or from beforeCall). */
     retryAfterSeconds;
+    /** name_differs (0.5.0): the first name the lead carries. */
+    nameOnLead;
     constructor(message, status, code, leadIds) {
         super(message);
         this.name = 'LoftyError';
@@ -177,6 +262,55 @@ class LoftyError extends Error {
     }
 }
 exports.LoftyError = LoftyError;
+const cut = (v, max) => (typeof v === 'string' || typeof v === 'number' ? String(v) : '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+/** A clean LeadProperty, or null without a street (0.5.0). */
+function leadProperty(p) {
+    if (!p || typeof p !== 'object')
+        return null;
+    const o = p;
+    const street = cut(o.streetAddress ?? o.street, 200);
+    if (!street)
+        return null;
+    const out = { streetAddress: street };
+    const city = cut(o.city, 60), state = cut(o.state, 30), zip = cut(o.zipCode ?? o.zip, 10);
+    if (city)
+        out.city = city;
+    if (state)
+        out.state = state;
+    if (zip)
+        out.zipCode = zip;
+    return out;
+}
+/** Custom fields for a create body: name 1-60 characters, value a string of at most 250; at most 20 (0.5.0). */
+function cleanCustomAttributes(list) {
+    if (!Array.isArray(list))
+        return [];
+    const out = [];
+    for (const f of list) {
+        const name = cut(f?.attributeName, 60);
+        const raw = f?.value;
+        if (!name || (typeof raw !== 'string' && typeof raw !== 'number') || out.some((x) => x.attributeName === name))
+            continue;
+        out.push({ attributeName: name, value: cut(raw, 250) });
+        if (out.length >= 20)
+            break;
+    }
+    return out;
+}
+/** Tags for a create body: clean, no consent / Do Not Contact / opt-out tag, no repeats, at most 20 (0.5.0). */
+function createBodyTags(list) {
+    const out = [];
+    for (const raw of Array.isArray(list) ? list : []) {
+        const t = cleanTag(raw);
+        if (!t || isProtectedTag(t) || out.some((x) => x.toLowerCase() === t.toLowerCase()))
+            continue;
+        out.push(t);
+        if (out.length >= 20)
+            break;
+    }
+    return out;
+}
 const logger = (deps) => deps.log ?? console;
 const label = (deps) => `[lofty${deps.label ? `:${deps.label}` : ''}]`;
 const clock = (deps) => (deps.now ? deps.now() : Date.now());
@@ -185,12 +319,33 @@ function isLoftyConfigured(deps) {
 }
 /** Low-level request. Throws LoftyError; the message never contains a query string or the key. */
 async function loftyRequest(method, path, body, deps) {
+    const { text } = await loftyRequestText(method, path, body, deps);
+    if (!text)
+        return {};
+    try {
+        return JSON.parse(text);
+    }
+    catch {
+        return {};
+    }
+}
+/**
+ * loftyRequest with Lofty's answer as text (0.5.0), for an id that may not fit a JavaScript number (Lofty ids are
+ * 64-bit). A string `body` is sent exactly as given (raw JSON, e.g. an id written as digits). Throws like loftyRequest.
+ */
+async function loftyRequestText(method, path, body, deps) {
     const key = String(deps.apiKey ?? '').trim();
     if (!key)
         throw new LoftyError('LOFTY_API_KEY not configured', undefined, 'not_configured');
     if (!path.startsWith('/') || path.includes('://') || path.startsWith('//'))
         throw new LoftyError('bad Lofty path');
     const safePath = path.split('?')[0];
+    // 0.5.2, a dry run: a write is recorded and answered here, a read-back from the plan; nothing is sent or counted.
+    if (deps.plan) {
+        const planned = planRequest(deps.plan, method, path, body);
+        if (planned)
+            return planned;
+    }
     // A path that names its own version (e.g. '/v2.0/tasks') is used as is; everything else is under /v1.0.
     const url = `${exports.LOFTY_API_ORIGIN}${/^\/v\d+\.\d+\//.test(path) ? '' : exports.LOFTY_API_PREFIX}${path}`;
     const record = (status, ok, started, error) => {
@@ -217,7 +372,7 @@ async function loftyRequest(method, path, body, deps) {
         res = await fetchImpl(url, {
             method,
             headers: { Authorization: `token ${key}`, 'Content-Type': 'application/json', Accept: 'application/json' },
-            ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+            ...(body !== undefined ? { body: typeof body === 'string' ? body : JSON.stringify(body) } : {}),
             redirect: 'error',
             signal: AbortSignal.timeout(deps.timeoutMs ?? DEFAULT_TIMEOUT_MS),
         });
@@ -238,14 +393,166 @@ async function loftyRequest(method, path, body, deps) {
         }
         throw err;
     }
-    if (!text)
-        return {};
+    if (deps.plan && method === 'GET')
+        planSawRead(deps.plan, path, text);
+    return { status: res.status, text };
+}
+// ── dry run (0.5.2) ─────────────────────────────────────────────────────────
+/** How a dry run's answer shows the lead it would have created (in paths, bodies and the outcome). */
+exports.PLANNED_NEW_LEAD_ID = '{new_lead_id}';
+/** How a dry run's answer shows the task it would have created. */
+exports.PLANNED_NEW_TASK_ID = '{new_task_id}';
+// Inside the run the would-be ids are digits, so every id rule on the way treats them as Lofty's own: the two largest
+// safe integers (exact as JavaScript numbers too). withPlannedIds() turns them into the stand-ins above.
+const SENTINEL_LEAD = '9007199254740991';
+const SENTINEL_TASK = '9007199254740990';
+const SENTINELS = [[SENTINEL_LEAD, exports.PLANNED_NEW_LEAD_ID], [SENTINEL_TASK, exports.PLANNED_NEW_TASK_ID]];
+function createLoftyPlan() {
+    return { writes: [], readBacks: 0, after: new Map(), seen: new Map() };
+}
+/** Lofty's own path for a request path: '/leads/1' -> '/v1.0/leads/1'; a versioned path ('/v2.0/tasks') as is. */
+function loftyFullPath(path) {
+    return /^\/v\d+\.\d+\//.test(path) ? path : `${exports.LOFTY_API_PREFIX}${path}`;
+}
+/** The lead id of '/v1.0/leads/{id}' (exactly that path, no query), else null. */
+function leadOfPath(full) {
+    const m = /^\/v1\.0\/leads\/([^/?#]+)$/.exec(full);
+    if (!m)
+        return null;
     try {
-        return JSON.parse(text);
+        return decodeURIComponent(m[1]);
     }
     catch {
-        return {};
+        return null;
     }
+}
+function planBodyObject(body) {
+    let v = body;
+    if (typeof v === 'string') {
+        try {
+            v = JSON.parse(v);
+        }
+        catch {
+            return null;
+        }
+    }
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+}
+const okText = (text) => ({ status: 200, text });
+/**
+ * A dry run's answer to one request, or null when the request must really be sent (a read the plan cannot answer).
+ * A write is recorded and answered the way Lofty answers it: a create with the stand-in lead id (the plan then holds
+ * the new lead as the create body describes it), a task with the stand-in task id, anything else with {}.
+ */
+function planRequest(plan, method, path, body) {
+    const full = loftyFullPath(path);
+    if (method === 'GET') {
+        const id = leadOfPath(full);
+        if (id !== null && plan.after.has(id)) {
+            plan.readBacks++;
+            return okText(JSON.stringify(plan.after.get(id)));
+        }
+        return null;
+    }
+    plan.writes.push({ method: method, path: full, body: typeof body === 'string' || body === undefined ? body : JSON.parse(JSON.stringify(body)) });
+    const obj = planBodyObject(body);
+    if (method === 'POST' && full === '/v1.0/leads') {
+        const id = Number(SENTINEL_LEAD);
+        plan.after.set(SENTINEL_LEAD, { ...(obj ?? {}), leadId: id, id, tags: Array.isArray(obj?.tags) ? obj.tags : [] });
+        return okText(JSON.stringify({ leadId: id }));
+    }
+    if (method === 'POST' && (full === '/v2.0/tasks' || full === '/v1.0/tasks'))
+        return okText(JSON.stringify({ taskId: Number(SENTINEL_TASK) }));
+    const id = method === 'PUT' ? leadOfPath(full) : null;
+    if (id !== null) {
+        const base = plan.after.get(id) ?? plan.seen.get(id) ?? { leadId: id };
+        plan.after.set(id, { ...base, ...(obj ?? {}) });
+    }
+    return okText('{}');
+}
+/** A real read in a dry run: remember the lead as Lofty returned it, so a later planned PUT starts from it. */
+function planSawRead(plan, path, text) {
+    const id = leadOfPath(loftyFullPath(path));
+    if (id === null)
+        return;
+    let res;
+    try {
+        res = text ? JSON.parse(text) : null;
+    }
+    catch {
+        return;
+    }
+    const lead = res && typeof res === 'object' ? (res.lead && typeof res.lead === 'object' ? res.lead : res.data && typeof res.data === 'object' ? res.data : res) : null;
+    if (lead && String(lead.leadId ?? lead.id ?? '') === id)
+        plan.seen.set(id, lead);
+}
+/** Is this the stand-in id of a lead or task a dry run would have created (digits or the shown form)? */
+function isPlannedId(v) {
+    const s = String(v ?? '');
+    return SENTINELS.some(([d, p]) => s === d || s === p);
+}
+/** Any value with the stand-in ids shown as `{new_lead_id}` / `{new_task_id}` (strings, numbers, nested). */
+function withPlannedIds(v) {
+    if (typeof v === 'string') {
+        let out = v;
+        for (const [d, p] of SENTINELS)
+            out = out.replace(new RegExp(`(?<!\\d)${d}(?!\\d)`, 'g'), p);
+        return out;
+    }
+    if (typeof v === 'number') {
+        for (const [d, p] of SENTINELS)
+            if (v === Number(d))
+                return p;
+        return v;
+    }
+    if (Array.isArray(v))
+        return v.map((x) => withPlannedIds(x));
+    if (v && typeof v === 'object')
+        return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, withPlannedIds(x)]));
+    return v;
+}
+/** A raw JSON text body with the stand-in ids as JSON strings ("{new_task_id}"), so it is still valid JSON. */
+function rawWithPlannedIds(text) {
+    let out = text;
+    for (const [d, p] of SENTINELS)
+        out = out.replace(new RegExp(`"${d}"|(?<![\\d"])${d}(?![\\d"])`, 'g'), JSON.stringify(p));
+    return out;
+}
+/** The writes a dry run would have sent, in order, with the stand-in ids shown. */
+function plannedRequests(plan) {
+    return plan.writes.map((w) => ({ method: w.method, path: withPlannedIds(w.path),
+        body: typeof w.body === 'string' ? rawWithPlannedIds(w.body) : withPlannedIds(w.body) }));
+}
+/**
+ * The same dry run for code that calls Lofty through a plain fetch (the hub's _shared/lofty-lead.ts): a write is
+ * recorded and answered without a network call; a read of a lead the plan wrote to is answered from the plan; any
+ * other read goes to `fetchImpl` after `beforeRead` (throw to refuse it, e.g. the hub's read budget). Lofty's host only.
+ */
+function planningFetch(plan, fetchImpl, opts = {}) {
+    return async (url, init) => {
+        const u = new URL(url);
+        if (u.origin !== exports.LOFTY_API_ORIGIN)
+            throw new LoftyError('a dry run plans Lofty requests only');
+        const method = String(init.method || 'GET').toUpperCase();
+        const path = `${u.pathname}${u.search}`;
+        let body = init.body;
+        if (typeof body === 'string') {
+            try {
+                body = JSON.parse(body);
+            }
+            catch { /* kept as the text it is */ }
+        }
+        const planned = planRequest(plan, method, path, body);
+        if (planned)
+            return { ok: true, status: planned.status, text: async () => planned.text, headers: { get: () => null } };
+        if (opts.beforeRead)
+            await opts.beforeRead();
+        const res = await fetchImpl(url, init);
+        const text = (await Promise.resolve(res.text?.()).catch(() => '')) ?? '';
+        if (res.ok)
+            planSawRead(plan, path, text);
+        return { ok: res.ok, status: res.status, text: async () => text, headers: res.headers };
+    };
 }
 // ── pure helpers ────────────────────────────────────────────────────────────
 /** Clean one tag: string, trimmed, no control chars, capped. '' when unusable. */
@@ -418,10 +725,12 @@ function splitName(name) {
 }
 /**
  * Lead body for POST /v1.0/leads. ALWAYS `cannotText: true`. Email and phone are normalised (E.164);
- * tags are never put in a create body (they go on afterwards by read-merge-write, so a create Lofty folds
- * into an existing Do Not Contact lead cannot start a Smart Plan).
+ * tags are not put in a create body (they go on afterwards by read-merge-write, so a create Lofty folds
+ * into an existing Do Not Contact lead cannot start a Smart Plan) unless the caller passes `createTags`
+ * (0.5.0: Listing Engine's intake senders, whose tags must not start a "tag added" plan). The address
+ * (`property`) and custom fields (`customAttributes`) go in only when given.
  */
-function buildLeadBody(input) {
+function buildLeadBody(input, createTags = []) {
     const body = { firstName: input.firstName || '', lastName: input.lastName || '', cannotText: true };
     const email = (0, contact_ts_1.normEmail)(input.email);
     const phone = (0, contact_ts_1.normPhone)(input.phone);
@@ -441,6 +750,15 @@ function buildLeadBody(input) {
     const assignee = String(input.assignedUserId ?? '').trim();
     if (/^[0-9]{1,20}$/.test(assignee))
         body.assignedUserId = Number.isSafeInteger(Number(assignee)) ? Number(assignee) : assignee;
+    const property = leadProperty(input.property);
+    if (property)
+        body.property = property;
+    const attrs = cleanCustomAttributes(input.customAttributes);
+    if (attrs.length)
+        body.customAttributes = attrs;
+    const tags = createBodyTags(createTags);
+    if (tags.length)
+        body.tags = tags;
     return body;
 }
 const idStr = (v) => (v === undefined || v === null || v === '' ? null : String(v));
@@ -544,9 +862,9 @@ function tagsAllowPhone(rawTags) {
     return tags !== null && !tags.some(isPhoneDncTag);
 }
 // ── lead operations (throw LoftyError) ──────────────────────────────────────
-/** POST /leads (always cannotText:true) and read the response for a merge. */
-async function createLeadResult(input, deps) {
-    const res = await loftyRequest('POST', '/leads', buildLeadBody(input), deps);
+/** POST /leads (always cannotText:true) and read the response for a merge. `createTags`: see buildLeadBody. */
+async function createLeadResult(input, deps, createTags = []) {
+    const res = await loftyRequest('POST', '/leads', buildLeadBody(input, createTags), deps);
     const made = createResponseMerge(res);
     if (!made)
         throw new LoftyError('Lofty POST /leads succeeded but the response had no lead id');
@@ -556,13 +874,13 @@ async function getLead(leadId, deps) {
     const res = await loftyRequest('GET', `/leads/${encodeURIComponent(leadId)}`, undefined, deps);
     return res?.lead ?? res?.data ?? res;
 }
-async function searchLead(field, value, carries, deps) {
-    const what = field === 'email' ? 'this email' : 'this phone number';
-    const refuse = (message, code, status, leadIds) => {
-        const err = new LoftyError(message, status, code, leadIds);
-        err.lookup = field;
-        return err;
-    };
+function lookupRefusal(field, message, code, status, leadIds) {
+    const err = new LoftyError(message, status, code, leadIds);
+    err.lookup = field;
+    return err;
+}
+/** One exact search (up to LOOKUP_LIMIT results): Lofty's list, or a refusal (lookup_failed) when it cannot be read. */
+async function searchRaw(field, value, deps) {
     let res;
     try {
         res = await loftyRequest('GET', `/leads?${field}=${encodeURIComponent(value)}&preciseSearchFlag=true&limit=${exports.LOOKUP_LIMIT}`, undefined, deps);
@@ -570,11 +888,17 @@ async function searchLead(field, value, carries, deps) {
     catch (err) {
         if (err?.code === 'rate_limited' || err?.code === 'not_configured')
             throw err;
-        throw refuse(`lookup_failed: ${err?.message || err}; nothing written (a retry may fix it)`, 'lookup_failed', err?.status);
+        throw lookupRefusal(field, `lookup_failed: ${err?.message || err}; nothing written (a retry may fix it)`, 'lookup_failed', err?.status);
     }
     const list = Array.isArray(res) ? res : (res?.leads ?? res?.data?.leads ?? res?.data);
     if (!Array.isArray(list))
-        throw refuse(`lookup_failed: the ${field} search answered in an unexpected shape; nothing written`, 'lookup_failed');
+        throw lookupRefusal(field, `lookup_failed: the ${field} search answered in an unexpected shape; nothing written`, 'lookup_failed');
+    return list;
+}
+async function searchLead(field, value, carries, deps) {
+    const what = field === 'email' ? 'this email' : 'this phone number';
+    const refuse = (message, code, status, leadIds) => lookupRefusal(field, message, code, status, leadIds);
+    const list = await searchRaw(field, value, deps);
     const exact = list.filter((lead) => lead && typeof lead === 'object' && carries(lead));
     const ids = (leads) => leads.map(leadIdOf).filter((x) => !!x).filter((x, i, all) => all.indexOf(x) === i);
     if (list.length && !exact.length) {
@@ -608,6 +932,58 @@ async function findLeadByPhone(phone, deps) {
     if (!want)
         return null;
     return searchLead('phone', want, (lead) => leadPhoneKeys(lead).includes(want), deps);
+}
+async function searchList(field, value, carries, deps) {
+    const list = await searchRaw(field, value, deps);
+    const exact = list.filter((lead) => lead && typeof lead === 'object' && carries(lead));
+    if (list.length && !exact.length) {
+        const ids = list.map(leadIdOf).filter((x) => !!x).filter((x, i, all) => all.indexOf(x) === i);
+        throw lookupRefusal(field, `no_exact_match: the ${field} search returned ${list.length} lead(s), none carrying this ${field}; nothing written, check in Lofty by hand`, 'no_exact_match', undefined, ids);
+    }
+    const ids = [];
+    const leads = [];
+    for (const lead of exact) {
+        const id = leadIdOf(lead);
+        if (!id)
+            throw lookupRefusal(field, `lookup_failed: an exact ${field} match has no readable lead id; nothing written`, 'lookup_failed');
+        if (!ids.includes(id)) {
+            ids.push(id);
+            leads.push(lead);
+        }
+    }
+    return { exact: leads, ids, full: list.length >= exports.LOOKUP_LIMIT };
+}
+/**
+ * Command Center's rule (0.5.0, pushLead `match: 'email_and_phone'`): both searches run, and the person's lead is the
+ * ONE email match that also holds the phone (every exact phone match counts), or the only email match when nobody has
+ * the phone. Refused, with nothing written and nothing created: a failed or loose search; several such leads; one
+ * candidate among several email matches when either search came back full; a single email match from a full email
+ * search; the phone only on other people's leads (`already_in_lofty`: never merged by phone alone). null = nobody has
+ * the email or the phone.
+ */
+async function findLeadNarrowed(person, deps) {
+    const email = (0, contact_ts_1.normEmail)(person.email);
+    const phone = phoneKey(person.phone);
+    const none = { exact: [], ids: [], full: false };
+    const byEmail = email ? await searchList('email', email, (lead) => leadEmails(lead).includes(email), deps) : none;
+    const byPhone = phone ? await searchList('phone', phone, (lead) => leadPhoneKeys(lead).includes(phone), deps) : none;
+    const candidates = byPhone.ids.length ? byEmail.ids.filter((id) => byPhone.ids.includes(id)) : byEmail.ids;
+    const list = (ids) => ids.join(', ');
+    if (candidates.length > 1) {
+        throw lookupRefusal('email', `several_leads: ${candidates.length} Lofty leads carry this email${byPhone.ids.length ? ' and this phone' : ''} (${list(candidates)}); nothing written, check in Lofty and update the right lead by hand`, 'several_leads', undefined, candidates);
+    }
+    if (candidates.length === 1 && byEmail.ids.length > 1 && (byEmail.full || byPhone.full)) {
+        throw lookupRefusal('email', `several_leads: ${byEmail.ids.length} Lofty leads carry this email (${list(byEmail.ids)}) and a search came back full (${exports.LOOKUP_LIMIT}); nothing written`, 'several_leads', undefined, byEmail.ids);
+    }
+    if (candidates.length === 1 && byEmail.ids.length === 1 && byEmail.full) {
+        throw lookupRefusal('email', `several_leads: the email search came back full (${exports.LOOKUP_LIMIT}); there may be more leads with this email, nothing written`, 'several_leads', undefined, byEmail.ids);
+    }
+    if (!candidates.length && byPhone.ids.length) {
+        throw lookupRefusal('phone', `already_in_lofty: this phone is on Lofty lead(s) ${list(byPhone.ids)}${byEmail.ids.length ? `, and this email on ${list(byEmail.ids)}` : ' without this email'}; never merged by phone alone, nothing written, check in Lofty by hand`, 'already_in_lofty', undefined, byPhone.ids);
+    }
+    if (candidates.length === 1)
+        return { id: candidates[0], lead: byEmail.exact[byEmail.ids.indexOf(candidates[0])], by: 'email' };
+    return null;
 }
 /** The lead a person belongs to: by email first, then (missing or no match) by phone. A refusal throws. */
 async function findExistingLead(person, deps) {
@@ -647,6 +1023,11 @@ async function mergeIntoLeadNow(leadId, change, deps) {
         logger(deps).warn(`${label(deps)} ${msg}`);
         throw new LoftyError(msg);
     }
+    if (change.expectFirstName !== undefined && firstNamesDiffer(lead.firstName, change.expectFirstName)) {
+        const err = new LoftyError(`name_differs: lead ${leadId}'s first name is another real name; nothing written until identity is reviewed`, undefined, 'name_differs', [String(leadId)]);
+        err.nameOnLead = cut(lead.firstName, 60);
+        throw err;
+    }
     if (deps.checkLead) {
         const phonesOnLead = (leadPhonesForWrite(lead) ?? []).map((p) => (0, contact_ts_1.normPhone)(p)).filter((p) => !!p);
         const listed = await deps.checkLead({ leadId: String(leadId), emails: leadEmails(lead), phones: [...new Set(phonesOnLead)] });
@@ -669,7 +1050,8 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     const dnc = dncBefore || change.doNotContact === true;
     // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
     const phoneDncBefore = existing.some(isPhoneDncTag);
-    const phoneDnc = dnc || phoneDncBefore;
+    // 0.5.0: a write that ADDS `#dnc` (a number on a Do Not Call list) switches texting off in the same PUT.
+    const phoneDnc = dnc || phoneDncBefore || (change.addTags ?? []).some((t) => isPhoneDncTag(cleanTag(t)));
     const phones = leadPhonesForWrite(lead);
     const submitted = change.submittedPhone ?? change.smsConsent?.phone;
     const submittedNorm = (0, contact_ts_1.normPhone)(submitted);
@@ -726,6 +1108,8 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     if (change.doNotContact)
         extra.push(...exports.DNC_WRITE_TAGS);
     let requested = [...(change.addTags || []), ...extra];
+    // A tag the caller asks to add is never also taken off (even when a hold keeps it from going on).
+    const addWanted = new Set(requested.map((t) => cleanTag(t).toLowerCase()));
     if (change.holdTags && !dnc) {
         out.tagsHeld = mergeTags(existing, requested.filter((t) => !isStopContactTag(cleanTag(t)))).added;
         requested = requested.filter((t) => isStopContactTag(cleanTag(t)));
@@ -746,9 +1130,27 @@ async function mergeIntoLeadNow(leadId, change, deps) {
         if (dncBefore)
             logger(deps).warn(`${label(deps)} lead ${leadId} is Do Not Contact: texting and email off${out.tagsHeld.length ? `; tags held: ${out.tagsHeld.length}` : ''}`);
     }
-    const { merged, added } = out.tagsUnreadable ? { merged: [], added: [] } : mergeTags(existing, requested);
-    if (added.length)
+    // 0.5.0: tags taken off in the same write (never a protected one, never one this write also adds).
+    const removeWanted = new Set((change.removeTags ?? []).map(cleanTag).filter((t) => t && !isProtectedTag(t)).map((t) => t.toLowerCase()));
+    const removed = out.tagsUnreadable || !removeWanted.size ? [] : existing.filter((t) => {
+        const k = cleanTag(t).toLowerCase();
+        return removeWanted.has(k) && !addWanted.has(k) && !isProtectedTag(t);
+    });
+    const kept = removed.length ? existing.filter((t) => !removed.includes(t)) : existing;
+    const { merged, added } = out.tagsUnreadable ? { merged: [], added: [] } : mergeTags(kept, requested);
+    if (added.length || removed.length)
         body.tags = merged;
+    if (change.fillProperty) {
+        const want = leadProperty(change.fillProperty);
+        if (want && out.tagsUnreadable)
+            out.property = 'held';
+        else if (want) {
+            const plan = planPropertyFill(lead, want);
+            out.property = plan.result;
+            if (plan.body)
+                body.property = plan.body;
+        }
+    }
     if (Object.keys(body).length) {
         const written = await loftyRequest('PUT', `/leads/${encodeURIComponent(leadId)}`, body, deps);
         out.wrote = true;
@@ -756,7 +1158,11 @@ async function mergeIntoLeadNow(leadId, change, deps) {
             out.dncCheck = await confirmDncKept(leadId, written, deps, 'full');
         else if (phoneDncBefore)
             out.dncCheck = await confirmDncKept(leadId, written, deps, 'phone');
+        if (removed.length)
+            out.removeCheck = await confirmRemoved(leadId, removed, deps);
     }
+    if (removed.length)
+        out.tagsRemoved = removed;
     out.tagsAdded = added;
     if (out.textingTurnedOff && newNumber) {
         try {
@@ -768,6 +1174,51 @@ async function mergeIntoLeadNow(leadId, change, deps) {
         }
     }
     return out;
+}
+/** After a write that took tags off: ONE re-read (a 200 is not proof). Never throws. */
+async function confirmRemoved(leadId, removed, deps) {
+    let tags = null;
+    try {
+        const again = await getLead(leadId, deps);
+        const id = again && typeof again === 'object' ? (again.leadId ?? again.id) : undefined;
+        if (id !== undefined && id !== null && String(id) === String(leadId))
+            tags = existingTagsForWrite(again.tags);
+    }
+    catch { /* unverified below */ }
+    if (tags === null)
+        return 'unverified';
+    const gone = new Set(removed.map((t) => cleanTag(t).toLowerCase()));
+    return tags.some((t) => gone.has(cleanTag(t).toLowerCase())) ? 'not_removed' : 'removed';
+}
+/** The address a lead read carries, nested (`property`) or flat. */
+function leadAddressOf(lead) {
+    const nested = lead?.property && typeof lead.property === 'object' ? lead.property : {};
+    const pick = (k) => cut(nested[k], 200) || cut(lead?.[k], 200);
+    return { streetAddress: pick('streetAddress'), city: pick('city'), state: pick('state'), zipCode: pick('zipCode') };
+}
+/**
+ * Fill a lead's address without ever overwriting it (0.5.0): no street on the lead = the whole address goes on
+ * (`filled`); the same street (suite-kit street key) with a blank city, state or ZIP = those blanks are filled, the
+ * rest re-stated as read (`completed`); the same street with nothing blank = `same`; another street = `kept`.
+ */
+function planPropertyFill(lead, want) {
+    const cur = leadAddressOf(lead);
+    if (!cur.streetAddress)
+        return { result: 'filled', body: want };
+    const a = (0, address_ts_1.streetKey)(cur.streetAddress);
+    if (!a || a !== (0, address_ts_1.streetKey)(want.streetAddress))
+        return { result: 'kept', body: null };
+    const next = { streetAddress: cur.streetAddress };
+    let changed = false;
+    for (const k of ['city', 'state', 'zipCode']) {
+        if (cur[k])
+            next[k] = cur[k];
+        else if (want[k]) {
+            next[k] = want[k];
+            changed = true;
+        }
+    }
+    return changed ? { result: 'completed', body: next } : { result: 'same', body: null };
 }
 function dncLostReason(leadId, kind = 'full') {
     return kind === 'phone'
@@ -930,9 +1381,18 @@ async function applyChange(out, change, email, step, deps) {
             out.phoneDnc = true;
         if (m.tagsHeld.length)
             out.tagsHeld = m.tagsHeld;
+        if (m.tagsRemoved?.length)
+            out.tagsRemoved = m.tagsRemoved;
+        if (m.property)
+            out.property = m.property;
         if (m.dncCheck === 'lost') {
             out.dncLost = true;
             fail(out, step, new LoftyError(dncLostReason(out.leadId, m.dncHeld ? 'full' : 'phone')), deps);
+            return m;
+        }
+        if (m.removeCheck && m.removeCheck !== 'removed') {
+            fail(out, step, new LoftyError(`lead ${out.leadId}: ${m.removeCheck === 'not_removed' ? 'a tag that was taken off is still on the lead when read back' : 'the tag removal could not be read back'}; treated as not removed`), deps);
+            out.needsReview = true;
             return m;
         }
         if (m.tagsUnreadable) {
@@ -949,6 +1409,13 @@ async function applyChange(out, change, email, step, deps) {
     }
     catch (err) {
         fail(out, step, err, deps);
+        if (err?.code === 'name_differs') {
+            out.code = 'name_differs';
+            out.needsReview = true;
+            out.matchLeadIds = [String(out.leadId)];
+            if (err.nameOnLead)
+                out.nameOnLead = err.nameOnLead;
+        }
         if (change.smsConsent)
             out.textingNotEnabled = 'the lead could not be read or updated: texting left off, SMS consent tag not added';
     }
@@ -972,7 +1439,8 @@ async function pushLead(args, deps) {
         out.code = 'not_configured';
         return out;
     }
-    if (!hasLookupKey(args.lead)) {
+    const byId = args.leadId !== undefined && /^[0-9]{1,20}$/.test(String(args.leadId)) ? String(args.leadId) : null;
+    if (!byId && !hasLookupKey(args.lead)) {
         out.reason = exports.NO_LOOKUP_KEY;
         out.code = 'no_lookup_key';
         out.needsReview = true;
@@ -980,13 +1448,17 @@ async function pushLead(args, deps) {
         return out;
     }
     let found;
-    try {
-        found = await findExistingLead(args.lead, deps);
-    }
-    catch (err) {
-        if (err?.code === 'rate_limited')
-            return fail(out, 'find lead', err, deps);
-        return refuseLookup(out, err, deps);
+    if (byId)
+        found = { id: byId, lead: null, by: 'email' };
+    else {
+        try {
+            found = args.match === 'email_and_phone' ? await findLeadNarrowed(args.lead, deps) : await findExistingLead(args.lead, deps);
+        }
+        catch (err) {
+            if (err?.code === 'rate_limited')
+                return fail(out, 'find lead', err, deps);
+            return refuseLookup(out, err, deps);
+        }
     }
     const tags = (args.tags ?? []).map(cleanTag).filter(Boolean);
     const consent = args.smsConsent === true ? (phoneKey(args.lead.phone) ? { phone: String(args.lead.phone) } : null) : null;
@@ -995,8 +1467,15 @@ async function pushLead(args, deps) {
     if (found) {
         out.leadId = found.id;
         out.action = 'existing';
-        out.matchedBy = found.by;
-        await applyChange(out, { addTags: tags, smsConsent: consent, submittedPhone: args.lead.phone, emailOptOut: args.emailOptOut === true }, args.lead.email, tags.length ? 'add tags' : 'update lead', deps);
+        out.matchedBy = byId ? 'lead_id' : found.by;
+        const extra = {};
+        if (args.removeTags?.length)
+            extra.removeTags = args.removeTags;
+        if (args.lead.property)
+            extra.fillProperty = args.lead.property;
+        if (args.expectFirstName !== undefined)
+            extra.expectFirstName = args.expectFirstName;
+        await applyChange(out, { addTags: tags, smsConsent: consent, submittedPhone: args.lead.phone, emailOptOut: args.emailOptOut === true, ...extra }, args.lead.email, tags.length ? 'add tags' : 'update lead', deps);
     }
     else {
         if (args.create === false) {
@@ -1004,8 +1483,9 @@ async function pushLead(args, deps) {
             return out;
         }
         let made;
+        const createTags = args.createTags ?? [];
         try {
-            made = await createLeadResult(args.lead, deps);
+            made = await createLeadResult(args.lead, deps, createTags);
         }
         catch (err) {
             return fail(out, 'create lead', err, deps);
@@ -1017,13 +1497,28 @@ async function pushLead(args, deps) {
             if (made.mergedFrom)
                 out.mergedFrom = made.mergedFrom;
         }
+        const sent = buildLeadBody(args.lead, createTags);
+        if (made.merged && (sent.tags !== undefined || sent.property !== undefined || sent.customAttributes !== undefined)) {
+            // Lofty's create REPLACES list fields on the lead it folds into: that lead's own tags may be gone.
+            out.createBodyMerged = true;
+            out.needsReview = true;
+            logger(deps).warn(`${label(deps)} create folded into existing lead ${made.leadId} while carrying tags, an address or custom fields`);
+            try {
+                await deps.alert?.('Lofty: a create carrying tags or fields was folded into an existing lead', [
+                    `Lofty lead: ${made.leadId}`, `Writer: ${deps.label ?? 'suite-kit'}`,
+                    'Lofty may have replaced that lead\'s tags, address or custom fields with the ones the create carried.',
+                    'Check its Do Not Contact, opt-out and plan tags in Lofty by hand.',
+                ]);
+            }
+            catch { /* logged above */ }
+        }
         // Always re-read after a create: the tags go on by read-merge-write, and a create Lofty folded into an
         // existing lead must have that lead's Do Not Contact and numbers decide.
         await applyChange(out, { addTags: tags, smsConsent: consent, submittedPhone: args.lead.phone, viaCreate: !made.merged,
             emailOptOut: args.emailOptOut === true }, args.lead.email, tags.length ? 'add tags' : 'read back new lead', deps);
     }
     const note = noteWithConsent(args.note, out.textingNotEnabled);
-    if (out.leadId && note && note.trim() && !out.dncLost) {
+    if (out.leadId && note && note.trim() && !out.dncLost && out.code !== 'name_differs') {
         try {
             const landed = await addNoteFollowingMerge(out.leadId, note, args.lead.email, deps);
             if (landed !== out.leadId) {

@@ -6,4 +6,5 @@ export * from './lofty.ts';
 export * from './mls-grid.ts';
 export * from './hub.ts';
 export * from './google-signin.ts';
+export * from './parity.ts';
 export { VERSION } from './version.ts';

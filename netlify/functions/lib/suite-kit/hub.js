@@ -11,6 +11,11 @@
 //   - Not configured (no URL or key) answers { ok: false, reason: 'not_configured' } without a network call.
 //   - Every answer is { ok, status, body }. ok is true only for a 2xx JSON answer.
 //
+// 0.5.2 (the side-by-side check, sellerintelligence docs/hub-parity-compare.md): `{ dryRun: true }` on the Lofty write
+// methods sends `dry_run: true` (the hub reads Lofty as for real, writes nothing, and answers the outcome plus
+// `planned`, the Lofty requests it would have sent), and `{ cacheOnly: true }` on rentcast sends `cache_only: true`
+// (a saved answer or `miss` / `stale`; never a RentCast call, never the daily cap).
+//
 // Web-standard fetch only; runs in Node 18+, Deno and the browser (never ship the key to a browser).
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.hubConfigured = hubConfigured;
@@ -62,14 +67,23 @@ function createHubClient(o) {
             return { ok: false, status: res.status, reason: 'refused', body: parsed };
         return { ok: true, status: res.status, body: parsed };
     }
+    /** dry_run: true only when asked (an answer from the dry run is never mistaken for a write: the hub says dry_run: true). */
+    const dry = (b, opts) => (opts?.dryRun === true ? { ...b, dry_run: true } : b);
     return {
         configured,
         call,
         loftyConsent: (p) => call('POST', '/v1/lofty/consent', p),
         loftyMirror: (p) => call('POST', '/v1/lofty/mirror', p),
-        loftyLead: (l) => call('POST', '/v1/lofty/lead', l),
-        loftyNote: (n) => call('POST', '/v1/lofty/note', n),
-        loftyOptOut: (x) => call('POST', '/v1/lofty/opt-out', x),
+        loftyLead: (l, opts) => call('POST', '/v1/lofty/lead', dry(l, opts)),
+        loftyNote: (n, opts) => call('POST', '/v1/lofty/note', dry(n, opts)),
+        loftyOptOut: (x, opts) => call('POST', '/v1/lofty/opt-out', dry(x, opts)),
+        loftyTask: (t, opts) => call('POST', '/v1/lofty/task', dry(t, opts)),
+        loftyFlags: (f, opts) => call('POST', '/v1/lofty/flags', dry(f, opts)),
+        loftyStage: (x, opts) => call('POST', '/v1/lofty/stage', dry(x, opts)),
+        loftyEmailAdd: (e, opts) => call('POST', '/v1/lofty/email-add', dry(e, opts)),
+        loftyFillName: (n, opts) => call('POST', '/v1/lofty/fill-name', dry(n, opts)),
+        loftyRead: (r) => call('POST', '/v1/lofty/read', r),
+        loftyWebhooks: (w) => call('POST', '/v1/lofty/webhooks', w),
         routerLead: (l) => call('POST', '/v1/router/lead', l),
         callList: (limit) => call('GET', '/v1/router/call-list', undefined, { limit }),
         mlsListing: (mls) => call('GET', '/v1/mls/listing', undefined, { mls }),
@@ -77,7 +91,7 @@ function createHubClient(o) {
         mlsMine: () => call('GET', '/v1/mls/mine'),
         mlsExpired: (q = {}) => call('GET', '/v1/mls/expired', undefined, q),
         mlsClosed: (q) => call('GET', '/v1/mls/closed', undefined, q),
-        rentcast: (a) => call('POST', '/v1/lookup/rentcast', a),
+        rentcast: (a, opts) => call('POST', '/v1/lookup/rentcast', opts?.cacheOnly === true ? { ...a, cache_only: true } : a),
         signinAllowed: () => call('GET', '/v1/signin/allowed'),
     };
 }

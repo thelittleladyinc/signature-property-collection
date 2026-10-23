@@ -129,10 +129,24 @@ export type Download = {
     data: Uint8Array;
     contentType: string;
     ms: number;
-} | {
+}
+/**
+ * `stop` set: the photo host refused ('refused': 401, 403, 429, or a redirect the client will not follow) or failed
+ * ('unavailable': 5xx, no answer). Download no more photos this run. `why` says what happened (host and status only,
+ * never the link). `stop` absent: only this photo failed (gone, not an image, empty or too big).
+ */
+ | {
     ok: false;
     status: number;
+    stop?: 'refused' | 'unavailable';
+    why?: string;
 };
+/** Redirects followed on one photo download (Listing Engine's limit too). */
+export declare const MAX_PHOTO_REDIRECTS = 3;
+/** A photo host the job may download from: https, MLS Grid (not its API host) or a suffix in MLS_MEDIA_HOST_SUFFIXES. */
+export declare function hostAllowed(url: string, extraSuffixes?: readonly string[]): boolean;
+/** The only hosts that get the token on a photo download: MLS Grid's media hosts (media.mlsgrid.com, any *.mlsgrid.com), never the API host. */
+export declare function isMlsGridMediaHost(hostname: string): boolean;
 /** Retry-After as milliseconds: whole seconds or an HTTP date; null when absent or unreadable. */
 export declare function parseRetryAfter(header: string | null | undefined, nowMs: number): number | null;
 export declare class MlsClient {
@@ -142,9 +156,19 @@ export declare class MlsClient {
     constructor(deps: ClientDeps);
     /** GET one API page as JSON. Throws on anything but a 2xx JSON object. */
     getJson(url: string, purpose: string): Promise<JsonPage>;
-    /** Download one photo from its MediaURL. No token; not from the API host; one metered request. */
-    download(url: string, purpose: string): Promise<Download>;
+    /**
+     * Download one photo from its MediaURL: one metered request per hop, never retried, never counted by the breaker.
+     * The token goes only to an MLS Grid media host (User-Agent and Authorization: Bearer, MLS Grid's June 1, 2026
+     * rule); redirects are followed by hand, at most MAX_PHOTO_REDIRECTS: to a host that passes hostAllowed(), or to
+     * any other public https host (publicPhotoHop: where MLS Grid stores the file), which gets no token.
+     */
+    download(url: string, purpose: string, o?: {
+        extraHosts?: readonly string[];
+    }): Promise<Download>;
     private scrub;
+    /** One request: deadline, breaker, meter and a bucket slot first; a request-log row after it, also when it failed. */
+    private once;
+    /** One API call (getJson): the token as Bearer, redirects refused, retried and counted by the breaker. */
     private send;
 }
 export { MlsFilterError };
