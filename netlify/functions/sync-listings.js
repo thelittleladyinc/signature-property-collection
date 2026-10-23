@@ -1180,9 +1180,7 @@ exports.keepStoredPhotos = keepStoredPhotos; // for tests
 // and the suspension breaker (both MLS Grid only) are not involved.
 //
 // How it stays in step (the hub's replication contract, docs/mls-via-hub.md):
-//   - INCREMENTAL, the normal case -- and the first run after switching from MLS
-//     Grid, which carries that copy's checkpoint over (the same
-//     ModificationTimestamp values): first GET /v1/mls/deleted since the last
+//   - INCREMENTAL, the normal case: first GET /v1/mls/deleted since the last
 //     complete pass (listings the hub removed: MLS Grid marked them
 //     MlgCanView=false, or its weekly key check found them gone), then POST
 //     /v1/mls/search ordered by ModificationTimestamp from the checkpoint with
@@ -1190,13 +1188,25 @@ exports.keepStoredPhotos = keepStoredPhotos; // for tests
 //     back and is removed (the 2026-08-13 prune fix, unchanged). A row this key
 //     may not see comes back as a withheld stub and is removed, exactly like an
 //     MlgCanView=false record from MLS Grid.
-//   - SNAPSHOT, when there is no copy yet or the deletion list no longer reaches
-//     back to the last pass (the hub keeps 30 days): every Active / Active Under
+//   - SNAPSHOT, when there is no copy yet, when the copy has never been checked
+//     against the hub (hubReconciledAt unset: the first run after switching
+//     from MLS Grid), or when the deletion list no longer reaches back to the
+//     last pass (the hub keeps 30 days): every Active / Active Under
 //     Contract / Pending / Coming Soon listing, and then whatever is stored that
 //     the snapshot did not return is removed. Refused -- nothing removed, copy
 //     not marked current -- if it would keep under half of what is stored or
 //     nothing at all: a ready copy of a real market never halves, so that is a
 //     short answer, never "the market emptied".
+// Why the first hub run re-reads instead of carrying the MLS Grid checkpoint over
+// (2026-10-23): the MLS Grid copy keeps listings MLS Grid has stopped serving.
+// MLS Grid sends a listing's MlgCanView=false record for only about a week, so a
+// removal that arrived while this crawl was paused (the Aug 1 suspension, quota
+// stops) was never seen, refreshOneListing skips a listing MLS Grid no longer
+// returns instead of removing it, and there is no key check against MLS Grid's
+// full list. On Oct 22 the town figures counted 22,881 Active listings in the
+// towns both copies cover against the hub's 21,127 (7.7% more; higher in 88 of
+// 132 towns, lower in 15). One snapshot clears those, after which the hub's
+// deletion list keeps the copy in step.
 // The checkpoint, and lastSuccessAt with it, moves only once a whole pass has
 // been read. A pass that runs out of time resumes from its saved cursor on the
 // next run, like the MLS Grid crawl's nextLink. Any failure (not configured,
@@ -1244,6 +1254,9 @@ async function hubMarketDataRun(opts) {
   // pass has moved the checkpoint past it.
   let mlsGridCursor = prev.cursor || null;
   let hubCopy = prev.hubCopy || null;
+  // Set when a snapshot completes: until then the copy has not been checked
+  // against the hub's, so the next pass is a snapshot (see above).
+  let reconciledAt = prev.hubReconciledAt || null;
   let lastRunError = null;
   let passComplete = false;
   let snapshotFinished = false;
@@ -1296,6 +1309,7 @@ async function hubMarketDataRun(opts) {
     hubPass: pass,
     hubDeletedSince: deletedSince,
     hubCopy,
+    hubReconciledAt: reconciledAt,
   });
   const saveProgress = async () => {
     if (dirty) await saveListingsCheckpoint(store, listingsById);
@@ -1319,7 +1333,8 @@ async function hubMarketDataRun(opts) {
     try {
       if (!pass) {
         const since = Date.parse(lastModified || "");
-        pass = (!bootstrapped || !Number.isFinite(since)) ? startSnapshot(false) : {
+        pass = (!bootstrapped || !Number.isFinite(since)) ? startSnapshot(false)
+          : !reconciledAt ? startSnapshot(true) : {
           kind: "incremental", startedAt: new Date().toISOString(), since: lastModified,
           deletedSince: deletedSince || new Date(since - HUB_DELETED_OVERLAP_MS).toISOString(),
           deletedAfter: null, deletedDone: false, after: null, maxMod: null,
@@ -1431,6 +1446,7 @@ async function hubMarketDataRun(opts) {
           const top = Date.parse(pass.maxMod || "");
           lastModified = new Date(Number.isFinite(top) ? Math.min(top, floor) : floor).toISOString();
           snapshotFinished = true;
+          reconciledAt = new Date().toISOString();
         } else if (pass.maxMod && !(Date.parse(lastModified || "") >= Date.parse(pass.maxMod))) {
           lastModified = pass.maxMod;
         }

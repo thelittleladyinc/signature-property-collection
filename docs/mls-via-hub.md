@@ -20,17 +20,27 @@ two things on this site still read MLS Grid. Both move:
 
 | What | Today (MLS Grid) | With `MLS_SOURCE=hub` |
 |---|---|---|
-| **The market-data copy** behind the town pages' figures (`listings.json`, `mine-listings.json`, `sync-state.json` in the `mls-listings` Blobs store) | `sync-listings.js` every 30 min, after her Lofty listings: bootstrap = `MlgCanView eq true` + Active/AUC/Pending, then `ModificationTimestamp gt <checkpoint>` with no status filter, so a listing that leaves the market comes back and is removed | Same blobs, same record shape, same rules, read from the hub: `GET /v1/mls/deleted` since the last pass, then `POST /v1/mls/search` ordered by `modified` from the same checkpoint, no status filter. Withheld stubs and deletions are removed, exactly like `MlgCanView=false` today. Every 15 min (see Speed). The first hub run carries the MLS Grid copy's checkpoint over; no re-read. |
+| **The market-data copy** behind the town pages' figures (`listings.json`, `mine-listings.json`, `sync-state.json` in the `mls-listings` Blobs store) | `sync-listings.js` every 30 min, after her Lofty listings: bootstrap = `MlgCanView eq true` + Active/AUC/Pending, then `ModificationTimestamp gt <checkpoint>` with no status filter, so a listing that leaves the market comes back and is removed | Same blobs, same record shape, same rules, read from the hub: `GET /v1/mls/deleted` since the last pass, then `POST /v1/mls/search` ordered by `modified` from the same checkpoint, no status filter. Withheld stubs and deletions are removed, exactly like `MlgCanView=false` today. Every 15 min (see Speed). The first hub run reads one full snapshot instead of carrying the MLS Grid copy's checkpoint over (see below), then every run is incremental. |
 | **"Is her Lofty listing really on the market?"** (`makeOnMarketConfirmer`, used by the 30-min sync and `refresh-my-listings`) | 1. in `mine-listings.json` → yes, no request; 2. else one MLS Grid request `ListingId eq …` (`StandardStatus`, `MlgCanView`); at most 2 a run, verdict kept 24 h, 7-day grace for a brand-new listing | Same order, cap, cache and grace; step 2 is `POST /v1/mls/search {listing_ids:[id]}`. |
 
 The same record shape is guaranteed by cutting each hub row down to exactly the fields the MLS Grid crawl
 selects (`SELECT_FIELDS`) and passing it through the same `mapListing()`.
 
-**When the hub copy has no copy yet** (fresh store) or the deletion list no longer reaches back to the last
-pass (the hub keeps 30 days), the run reads a full snapshot (Active, Active Under Contract, Pending, Coming
-Soon) over as many runs as it takes, then removes whatever is stored that the snapshot did not return. A
-snapshot that would keep under half of what is stored, or nothing at all, is refused: nothing removed, the
-copy not marked current, the reason on `/site-health`.
+**When the hub copy has no copy yet** (fresh store), **when the copy has never been checked against the hub**
+(`hubReconciledAt` unset in `sync-state.json`: the first run after switching from MLS Grid), or when the deletion
+list no longer reaches back to the last pass (the hub keeps 30 days), the run reads a full snapshot (Active,
+Active Under Contract, Pending, Coming Soon) over as many runs as it takes, then removes whatever is stored that
+the snapshot did not return, and records `hubReconciledAt`. A snapshot that would keep under half of what is
+stored, or nothing at all, is refused: nothing removed, the copy not marked current, the reason on
+`/site-health`.
+
+**Why the first hub run re-reads (2026-10-23).** The MLS Grid copy keeps listings MLS Grid has stopped serving.
+MLS Grid sends a listing's `MlgCanView=false` record for only about a week, so a removal that arrived while the
+crawl was paused (the Aug 1 suspension, quota stops) was never seen; `refreshOneListing` skips a listing MLS Grid
+no longer returns instead of removing it; and there is no key check against MLS Grid's full list (the hub runs
+one weekly). On Oct 22 this site's town figures counted 22,881 Active listings in the 132 towns both copies cover,
+against the hub's 21,127 (7.7% more; more in 88 towns, fewer in 15, the hub's figures a day newer). The one
+snapshot clears those, so this site's town figures and the hub's agree after the switch.
 
 **Fail closed.** Hub not configured, unreachable, refused (4xx/5xx), not JSON, a malformed row or cursor,
 `503 not_ready`, or a 200 whose `copy.ready` is not true: nothing from that page is applied, the checkpoint
