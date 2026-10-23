@@ -36,11 +36,12 @@
 // the search wishes (inquiry) on a contact proven new, the listings reads and the /status probes.
 //
 // THE ROUTER COPY. LEADS_TO_ROUTER -- exactly "on" -- also records every website form lead with
-// POST /v1/router/lead (source "<site>-form", kind "new", the plan's intent when the form says it, else the
-// form's own intent from ROUTER_FORM_INTENT, and an idempotency key built from Netlify's submission id), so
-// Command Center's call list sees it. Rent-to-own leads are Christine's, like every other lead (Christine,
-// 2026-10-23): they go to the router with intent "rent_to_own", whose rule NEW-RENT-TO-OWN starts no plan
-// until she approves one. It runs alongside the alert email (lib/_notify.js sendLeadAlertEmail), never throws,
+// POST /v1/router/lead (source "<site>-form", kind "new", the form's own intent from ROUTER_FORM_INTENT when it
+// has one, else its plan's intent, and an idempotency key built from Netlify's submission id), so Command
+// Center's call list sees it. Rent-to-own leads are Christine's, like every other lead (Christine, 2026-10-23):
+// they go to the router with intent "rent_to_own", whose rule NEW-RENT-TO-OWN starts no plan until she
+// approves one. Cash-offer and FSBO leads go with their own intents, "seller_cash" and "seller_fsbo"
+// (Christine, 2026-10-23), so the router's rules NEW-SELLER-CASH and NEW-SELLER-FSBO can match them. It runs alongside the alert email (lib/_notify.js sendLeadAlertEmail), never throws,
 // has its own 4-second limit and never changes the Lofty path. Log lines carry no name, email or phone.
 //
 // Key handling: HUB_API_URL must be https; HUB_API_KEY goes in the x-hub-key header only (the vendored toolkit's
@@ -74,11 +75,14 @@ const MAX_HUB_TAGS = 20;
 // What the hub path writes into a push result's responseBody, so lib/_lofty-returning.js leadIdFromResponse can
 // tell "the hub created this contact" from "the hub found an existing one".
 const HUB_MARK = "lofty-hub";
-// The router's intent word for a form that starts no nurture plan but says what the person wants. Rent-to-own
-// leads are Christine's (2026-10-23); this intent puts them under the router's rule NEW-RENT-TO-OWN, which starts
-// no plan until she approves one.
-const ROUTER_FORM_INTENT = Object.freeze({ "rent-to-own-options": "rent_to_own" });
-// The router's intent words for a form's nurture plan (lib/_form-plans.js), when the plan says it.
+// The router's intent word for a form that says what the person wants more exactly than its plan does; it wins
+// over the plan's intent. Rent-to-own leads are Christine's (2026-10-23) and start no plan; this intent puts them
+// under the router's rule NEW-RENT-TO-OWN, which starts no plan until she approves one. A cash offer shares S2
+// with the value forms, so its plan alone would say "home_value"; "seller_cash" is the router's rule
+// NEW-SELLER-CASH (Christine, 2026-10-23).
+const ROUTER_FORM_INTENT = Object.freeze({ "rent-to-own-options": "rent_to_own", "cash-offer": "seller_cash" });
+// The router's intent words for a form's nurture plan (lib/_form-plans.js), when the plan says it. FSBO (the
+// "fsbo-inquiry" form) is the router's rule NEW-SELLER-FSBO (Christine, 2026-10-23).
 const ROUTER_INTENT = Object.freeze({
   B1_WEBSITE_BUYER: "buyer",
   B1_FIRST_TIME: "buyer",
@@ -87,6 +91,7 @@ const ROUTER_INTENT = Object.freeze({
   S2_OPTIONS: "home_value",
   SPC_LUXURY: "seller_luxury",
   DS1_DOWNSIZING: "downsizing",
+  FSBO: "seller_fsbo",
 });
 
 function exactlyOn(v) {
@@ -430,8 +435,8 @@ async function routerCopy(details, opts) {
     }
     const parts = String(d.name || "").trim().split(/\s+/).filter(Boolean);
     const plan = planForSubmission(form, {}, { site: site === "signature" ? "signature" : "main" }).plan;
-    const intent = plan ? ROUTER_INTENT[plan]
-      : Object.prototype.hasOwnProperty.call(ROUTER_FORM_INTENT, form) ? ROUTER_FORM_INTENT[form] : null;
+    const intent = Object.prototype.hasOwnProperty.call(ROUTER_FORM_INTENT, form) ? ROUTER_FORM_INTENT[form]
+      : plan && Object.prototype.hasOwnProperty.call(ROUTER_INTENT, plan) ? ROUTER_INTENT[plan] : null;
     const ans = await client({ env, fetch: o.fetch, timeoutMs: ROUTER_TIMEOUT_MS }).routerLead({
       idempotency_key: routerKey(site, form, d), source: `${site}-form`, kind: "new",
       ...(intent ? { intent } : {}),

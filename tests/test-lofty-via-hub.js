@@ -13,7 +13,8 @@
 //   5. fail closed: hub not configured / unreachable / 503 / rate limited -> nothing on the own key, the lead
 //      queued (or held) with the reason, and the queue replay goes through the hub too;
 //   6. the router copy: off by default, once per submission, rent-to-own included (Christine's lead, intent
-//      rent_to_own), never in the way, no PII in the log;
+//      rent_to_own), cash offer and FSBO with their own intents (seller_cash, seller_fsbo) and the Lofty side
+//      unchanged, never in the way, no PII in the log;
 //   7. the vendored toolkit copy is untouched (its check.mjs), and the shared files match the other site's.
 //
 // The same file runs in both repos; only SITE and SIBLING below differ. Nothing here touches the network.
@@ -546,8 +547,20 @@ const deadline = () => Date.now() + 15000;
     sent.ok === true && HUB.emails.length === 1 && sent.router && sent.router.ok === true && !("skipped" in sent.router));
   check("...and it still starts no nurture plan (none until Christine picks one)",
     P.planForSubmission("rent-to-own-options", {}, { site: SITE === "signature" ? "signature" : "main" }).plan === null);
-  check("the one form intent is rent-to-own's (a form with a plan sends its plan's intent)",
-    JSON.stringify(H.ROUTER_FORM_INTENT) === JSON.stringify({ "rent-to-own-options": "rent_to_own" }));
+  check("the form intents are rent-to-own's and the cash offer's (they win; any other form sends its plan's intent)",
+    JSON.stringify(H.ROUTER_FORM_INTENT) === JSON.stringify({ "rent-to-own-options": "rent_to_own", "cash-offer": "seller_cash" }));
+  reset();
+  await quiet(() => N.sendLeadAlertEmail(details({ formName: "cash-offer", submissionId: "sub-6009" })));
+  check("a cash offer goes to the router as seller_cash (rule NEW-SELLER-CASH), not as its plan's home_value (Christine, 2026-10-23)",
+    HUB.routed.length === 1 && HUB.routed[0].intent === "seller_cash" &&
+    HUB.routed[0].idempotency_key === `${SITE}-form:cash-offer:sub-6009`, JSON.stringify(HUB.routed));
+  check("...and it still starts S2 on this site, like the value forms",
+    P.planForSubmission("cash-offer", {}, { site: SITE === "signature" ? "signature" : "main" }).plan === "S2_OPTIONS");
+  reset();
+  await quiet(() => N.sendLeadAlertEmail(details({ formName: "fsbo-inquiry", submissionId: "sub-6010" })));
+  check("the FSBO form goes to the router as seller_fsbo (rule NEW-SELLER-FSBO; it sent no intent before)",
+    HUB.routed.length === 1 && HUB.routed[0].intent === "seller_fsbo" &&
+    HUB.routed[0].idempotency_key === `${SITE}-form:fsbo-inquiry:sub-6010`, JSON.stringify(HUB.routed));
   reset();
   HUB.routerDown = 503;
   sent = await quiet(() => N.sendLeadAlertEmail(details()));
@@ -569,6 +582,23 @@ const deadline = () => Date.now() + 15000;
     rtoCreate.body.cannotText === true && !("leadTypes" in rtoCreate.body) &&
     (SITE !== "tllsh" || (rtoCreate.body.tags.includes("Buyer Lead") && rtoCreate.body.tags.includes("Rent-to-Own"))),
     JSON.stringify({ routed: HUB.routed, create: rtoCreate && rtoCreate.body }));
+  // A cash offer and an FSBO lead write exactly the same to Lofty with the router copy off and on: the new intents
+  // only change what the router is told.
+  const loftyWrites = () => ownCalls.filter((c) => c.method !== "GET" && !/\/notes$/.test(c.path)).map((c) => `${c.method} ${c.path} ${JSON.stringify(c.body)}`);
+  for (const [form, intent] of [["cash-offer", "seller_cash"], ["fsbo-inquiry", "seller_fsbo"]]) {
+    env();
+    reset(null, fakeLofty());
+    await submit(form, person({ message: "hi" }), "sub-6011");
+    const off = loftyWrites();
+    const offCreate = OWN.calls.find((c) => c.method === "POST" && c.path === "/leads");
+    env({ LEADS_TO_ROUTER: "on" });
+    reset(null, fakeLofty());
+    await submit(form, person({ message: "hi" }), "sub-6011");
+    check(`a ${form} submission through the handler: one router copy with intent ${intent}, the Lofty writes exactly as with the router off`,
+      HUB.routed.length === 1 && HUB.routed[0].intent === intent && !!offCreate && offCreate.body.cannotText === true &&
+      JSON.stringify(offCreate.body.leadTypes) === "[1]" && off.length > 0 && JSON.stringify(loftyWrites()) === JSON.stringify(off),
+      JSON.stringify({ routed: HUB.routed, off, on: loftyWrites() }));
+  }
   env({ LEADS_TO_ROUTER: "on", LOFTY_VIA_HUB: "on" });
   reset();
   await submit("buyers-guide", person(), "sub-6005");
