@@ -12,8 +12,9 @@
 //      Do Not Contact still wins when one of them is an opt-out;
 //   5. fail closed: hub not configured / unreachable / 503 / rate limited -> nothing on the own key, the lead
 //      queued (or held) with the reason, and the queue replay goes through the hub too;
-//   6. the router copy: off by default, once per submission, never for rent-to-own, never in the way, no PII
-//      in the log;
+//   6. the router copy: off by default, once per submission, rent-to-own included (Christine's lead, intent
+//      rent_to_own), cash offer and FSBO with their own intents (seller_cash, seller_fsbo) and the Lofty side
+//      unchanged, never in the way, no PII in the log;
 //   7. the vendored toolkit copy is untouched (its check.mjs), and the shared files match the other site's.
 //
 // The same file runs in both repos; only SITE and SIBLING below differ. Nothing here touches the network.
@@ -228,6 +229,7 @@ global.fetch = async (url, init) => {
 const L = require(`${FN_DIR}/lib/_lofty.js`);
 const N = require(`${FN_DIR}/lib/_notify.js`);
 const H = require(`${FN_DIR}/lib/_lofty-hub.js`);
+const P = require(`${FN_DIR}/lib/_form-plans.js`);
 const C = require(`${FN_DIR}/lib/_lofty-consent.js`);
 const R = require(`${FN_DIR}/lib/_lofty-returning.js`);
 const handler = require(`${FN_DIR}/submission-created.js`).handler;
@@ -536,8 +538,29 @@ const deadline = () => Date.now() + 15000;
   await quiet(() => N.sendLeadAlertEmail(details({ formName: "free-home-valuation", submissionId: "sub-6002" })));
   check("a seller form's intent follows its plan on this site", (HUB.routed[0] || {}).intent === (SITE === "signature" ? "seller_luxury" : "home_value"));
   reset();
-  sent = await quiet(() => N.sendLeadAlertEmail(details({ formName: "rent-to-own-options" })));
-  check("never for the rent-to-own form (it goes to another agent)", !HUB.routed.length && HUB.emails.length === 1 && !!sent.router.skipped);
+  sent = await quiet(() => N.sendLeadAlertEmail(details({ formName: "rent-to-own-options", submissionId: "sub-6006" })));
+  const rto = HUB.routed[0] || {};
+  check("the rent-to-own form is routed like every other form lead (Christine's lead, 2026-10-23), intent rent_to_own",
+    HUB.routed.length === 1 && rto.source === `${SITE}-form` && rto.kind === "new" && rto.intent === "rent_to_own" &&
+    rto.idempotency_key === `${SITE}-form:rent-to-own-options:sub-6006` && rto.email === "pat@example.com", JSON.stringify(rto));
+  check("...the alert email still went out, and the result says the router took it, nothing skipped",
+    sent.ok === true && HUB.emails.length === 1 && sent.router && sent.router.ok === true && !("skipped" in sent.router));
+  check("...and it still starts no nurture plan (none until Christine picks one)",
+    P.planForSubmission("rent-to-own-options", {}, { site: SITE === "signature" ? "signature" : "main" }).plan === null);
+  check("the form intents are rent-to-own's and the cash offer's (they win; any other form sends its plan's intent)",
+    JSON.stringify(H.ROUTER_FORM_INTENT) === JSON.stringify({ "rent-to-own-options": "rent_to_own", "cash-offer": "seller_cash" }));
+  reset();
+  await quiet(() => N.sendLeadAlertEmail(details({ formName: "cash-offer", submissionId: "sub-6009" })));
+  check("a cash offer goes to the router as seller_cash (rule NEW-SELLER-CASH), not as its plan's home_value (Christine, 2026-10-23)",
+    HUB.routed.length === 1 && HUB.routed[0].intent === "seller_cash" &&
+    HUB.routed[0].idempotency_key === `${SITE}-form:cash-offer:sub-6009`, JSON.stringify(HUB.routed));
+  check("...and it still starts S2 on this site, like the value forms",
+    P.planForSubmission("cash-offer", {}, { site: SITE === "signature" ? "signature" : "main" }).plan === "S2_OPTIONS");
+  reset();
+  await quiet(() => N.sendLeadAlertEmail(details({ formName: "fsbo-inquiry", submissionId: "sub-6010" })));
+  check("the FSBO form goes to the router as seller_fsbo (rule NEW-SELLER-FSBO; it sent no intent before)",
+    HUB.routed.length === 1 && HUB.routed[0].intent === "seller_fsbo" &&
+    HUB.routed[0].idempotency_key === `${SITE}-form:fsbo-inquiry:sub-6010`, JSON.stringify(HUB.routed));
   reset();
   HUB.routerDown = 503;
   sent = await quiet(() => N.sendLeadAlertEmail(details()));
@@ -550,6 +573,32 @@ const deadline = () => Date.now() + 15000;
   reset(null, fakeLofty([{ leadId: 21, emails: ["pat@example.com"] }, { leadId: 22, emails: ["pat@example.com"] }]));
   await submit("buyers-guide", person(), "sub-6004");
   check("...and on the held-for-review path too", HUB.routed.length === 1 && (mem["lofty-manual-review.json"] || []).length === 1);
+  reset(null, fakeLofty());
+  await submit("rent-to-own-options", person({ message: "hi" }), "sub-6008");
+  const rtoCreate = OWN.calls.find((c) => c.method === "POST" && c.path === "/leads");
+  check("a rent-to-own submission through the handler: one router copy with intent rent_to_own, the Lofty create as before",
+    HUB.routed.length === 1 && HUB.routed[0].intent === "rent_to_own" &&
+    HUB.routed[0].idempotency_key === `${SITE}-form:rent-to-own-options:sub-6008` && !!rtoCreate &&
+    rtoCreate.body.cannotText === true && !("leadTypes" in rtoCreate.body) &&
+    (SITE !== "tllsh" || (rtoCreate.body.tags.includes("Buyer Lead") && rtoCreate.body.tags.includes("Rent-to-Own"))),
+    JSON.stringify({ routed: HUB.routed, create: rtoCreate && rtoCreate.body }));
+  // A cash offer and an FSBO lead write exactly the same to Lofty with the router copy off and on: the new intents
+  // only change what the router is told.
+  const loftyWrites = () => ownCalls.filter((c) => c.method !== "GET" && !/\/notes$/.test(c.path)).map((c) => `${c.method} ${c.path} ${JSON.stringify(c.body)}`);
+  for (const [form, intent] of [["cash-offer", "seller_cash"], ["fsbo-inquiry", "seller_fsbo"]]) {
+    env();
+    reset(null, fakeLofty());
+    await submit(form, person({ message: "hi" }), "sub-6011");
+    const off = loftyWrites();
+    const offCreate = OWN.calls.find((c) => c.method === "POST" && c.path === "/leads");
+    env({ LEADS_TO_ROUTER: "on" });
+    reset(null, fakeLofty());
+    await submit(form, person({ message: "hi" }), "sub-6011");
+    check(`a ${form} submission through the handler: one router copy with intent ${intent}, the Lofty writes exactly as with the router off`,
+      HUB.routed.length === 1 && HUB.routed[0].intent === intent && !!offCreate && offCreate.body.cannotText === true &&
+      JSON.stringify(offCreate.body.leadTypes) === "[1]" && off.length > 0 && JSON.stringify(loftyWrites()) === JSON.stringify(off),
+      JSON.stringify({ routed: HUB.routed, off, on: loftyWrites() }));
+  }
   env({ LEADS_TO_ROUTER: "on", LOFTY_VIA_HUB: "on" });
   reset();
   await submit("buyers-guide", person(), "sub-6005");
@@ -564,7 +613,7 @@ const deadline = () => Date.now() + 15000;
   check("...and never logs the hub key or the Lofty key", !/console\.[a-z]+\([^)]*(HUB_API_KEY|LOFTY_API_KEY|apiKey)/.test(hubSrc));
   const other = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib");
   if (fs.existsSync(other)) {
-    for (const f of ["_lofty-hub.js", "_lofty-returning.js", "_lofty-consent.js", "_lofty.js", "_form-plans.js"]) {
+    for (const f of ["_lofty-hub.js", "_lofty-returning.js", "_lofty-consent.js", "_lofty.js", "_form-plans.js", "_hub-side-by-side.js"]) {
       check(`lib/${f} is byte-identical to ${SIBLING}'s copy`, fs.readFileSync(path.join(other, f), "utf8") === fs.readFileSync(`${FN_DIR}/lib/${f}`, "utf8"));
     }
     const mine = fs.readdirSync(`${FN_DIR}/lib/suite-kit`).sort();

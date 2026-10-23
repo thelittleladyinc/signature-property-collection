@@ -14,15 +14,21 @@
 // Before EACH request: the deadline, the persisted circuit breaker, the meter (caps below), then one slot
 // from the token bucket (1 request a second, never more). After each request a row goes to the meter store.
 // 429/5xx/network errors are retried with Retry-After or 2, 4, 8 ... s; five failures in a row open the
-// breaker; a 401/403 opens it at once. Redirects are refused; the token goes to api.mlsgrid.com only;
-// photo downloads send no token.
+// breaker; a 401/403 opens it at once. API calls refuse redirects and send the token to api.mlsgrid.com only.
+// Photo downloads (0.4.2, Oct 20, 2026) follow MLS Grid's June 1, 2026 rule: the token as User-Agent (and Bearer),
+// only to an MLS Grid media host (*.mlsgrid.com, never the API host); redirects followed by hand to allowed hosts
+// or (0.4.3) any public https host, where MLS Grid stores the file, without the token, the token decided again at
+// every hop; a photo is never retried and never counts toward the breaker: a
+// refusal (401/403/429, a redirect not followed) or a failed host (5xx, no answer) tells the caller to stop photos.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MlsFilterError = exports.MlsClient = exports.MlsHttpError = exports.DeadlineError = exports.MeterRefusedError = exports.HARD_CAPS = exports.DEFAULT_CAP_FRACTION = exports.HARD_FRACTION = exports.LIMITS = exports.Breaker = exports.BreakerOpenError = exports.BREAKER_MAX_MS = exports.BREAKER_OPEN_MS = exports.BREAKER_THRESHOLD = exports.BREAKER_FLAG = exports.Bucket = exports.RPS_CEILING = exports.DEFAULT_RPS = exports.systemClock = void 0;
+exports.MlsFilterError = exports.MlsClient = exports.MAX_PHOTO_REDIRECTS = exports.MlsHttpError = exports.DeadlineError = exports.MeterRefusedError = exports.HARD_CAPS = exports.DEFAULT_CAP_FRACTION = exports.HARD_FRACTION = exports.LIMITS = exports.Breaker = exports.BreakerOpenError = exports.BREAKER_MAX_MS = exports.BREAKER_OPEN_MS = exports.BREAKER_THRESHOLD = exports.BREAKER_FLAG = exports.Bucket = exports.RPS_CEILING = exports.DEFAULT_RPS = exports.systemClock = void 0;
 exports.clampRps = clampRps;
 exports.parseBreakerUntil = parseBreakerUntil;
 exports.capFraction = capFraction;
 exports.capsFor = capsFor;
 exports.checkMeter = checkMeter;
+exports.hostAllowed = hostAllowed;
+exports.isMlsGridMediaHost = isMlsGridMediaHost;
 exports.parseRetryAfter = parseRetryAfter;
 const mls_filter_ts_1 = require("./mls-filter.js");
 Object.defineProperty(exports, "MlsFilterError", { enumerable: true, get: function () { return mls_filter_ts_1.MlsFilterError; } });
@@ -198,12 +204,21 @@ function checkMeter(m, caps) {
 //      or the last 24 hours reach theirs;
 //   4. the token bucket hands out a slot: 1 request a second, 2 at most.
 // After EACH request (also a failed one) a row goes to mls.request_log, so the
-// meter sees it. 429, 5xx and network errors are retried: Retry-After is
-// honoured, otherwise 2, 4, 8 ... seconds; five failures in a row open the
+// meter sees it. API calls: 429, 5xx and network errors are retried: Retry-After
+// is honoured, otherwise 2, 4, 8 ... seconds; five failures in a row open the
 // breaker. A 401 or 403 opens it at once. The URL must pass assertMlsUrl()
 // (only https://api.mlsgrid.com/v2/<five resources>, one system name, at most
-// five "or"); redirects are refused; the token is sent to api.mlsgrid.com only.
-// Photo downloads send NO token and never go to the API host.
+// five "or"); redirects are refused.
+// Photo downloads (download()) never go to the API host and follow MLS Grid's rule
+// from June 1, 2026: a media download MUST send User-Agent = the OAuth token. Like
+// Listing Engine, the token goes as User-Agent AND Authorization: Bearer, and only
+// to an MLS Grid media host (*.mlsgrid.com, never api.mlsgrid.com); any other photo
+// host (MLS_MEDIA_HOST_SUFFIXES) gets no token. Redirects are followed by hand, at
+// most three, to an allowed host or any other public https host (MLS Grid redirects a
+// photo to where it is stored), and the token is decided again at every hop. A photo
+// is never retried and never counts toward the breaker: a refusal (401,
+// 403, 429, a redirect not followed) or a failed host (5xx, no answer) tells the
+// caller to stop photos for the run, because a photo refusal is not an API outage.
 class MeterRefusedError extends Error {
     reason;
     constructor(reason) {
@@ -232,6 +247,72 @@ exports.MlsHttpError = MlsHttpError;
 const BACKOFF_MS = [2000, 4000, 8000, 16000, 32000];
 const MAX_RETRY_AFTER_MS = 24 * 3600_000;
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024;
+/** Redirects followed on one photo download (Listing Engine's limit too). */
+exports.MAX_PHOTO_REDIRECTS = 3;
+const PHOTO_ACCEPT = 'image/*,*/*;q=0.8';
+/** The User-Agent for a photo host that is not MLS Grid's (it never gets the token). */
+const PLAIN_USER_AGENT = 'Mozilla/5.0 (compatible; LittleLadyHub/1.0)';
+/** A photo host the job may download from: https, MLS Grid (not its API host) or a suffix in MLS_MEDIA_HOST_SUFFIXES. */
+function hostAllowed(url, extraSuffixes = []) {
+    let host;
+    try {
+        const u = new URL(url);
+        if (u.protocol !== 'https:')
+            return false;
+        host = u.hostname.toLowerCase();
+    }
+    catch {
+        return false;
+    }
+    if (host === 'api.mlsgrid.com')
+        return false;
+    return ['mlsgrid.com', ...extraSuffixes].some(s => host === s || host.endsWith(`.${s}`));
+}
+/** The only hosts that get the token on a photo download: MLS Grid's media hosts (media.mlsgrid.com, any *.mlsgrid.com), never the API host. */
+function isMlsGridMediaHost(hostname) {
+    const h = hostname.toLowerCase();
+    return h !== 'api.mlsgrid.com' && h.endsWith('.mlsgrid.com');
+}
+/** One hop of a photo download: an allowed https host on the default port, no user:password. */
+function photoHopAllowed(url, extraSuffixes) {
+    let u;
+    try {
+        u = new URL(url);
+    }
+    catch {
+        return false;
+    }
+    return !u.username && !u.password && u.port === '' && hostAllowed(u.href, extraSuffixes);
+}
+/**
+ * A redirect hop off MLS Grid's own hosts. MLS Grid answers a photo with a redirect (HTTP 307, Oct 20, 2026) to the
+ * place the file is stored, and Listing Engine follows that to any public host without the token. Allowed: https,
+ * the default port, no user:password, a host name with a dot (never an IP address, localhost or an internal name)
+ * and never the API host. Such a host gets no token (photoHeaders).
+ */
+function publicPhotoHop(url) {
+    let u;
+    try {
+        u = new URL(url);
+    }
+    catch {
+        return false;
+    }
+    if (u.protocol !== 'https:' || u.username || u.password || u.port !== '')
+        return false;
+    const h = u.hostname.toLowerCase().replace(/\.$/, '');
+    if (!h.includes('.') || h === 'api.mlsgrid.com')
+        return false;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.startsWith('[') || h.includes(':'))
+        return false;
+    return !/(^|\.)(localhost|local|localdomain|internal|intranet|lan|home\.arpa|in-addr\.arpa|ip6\.arpa)$/.test(h);
+}
+/** MLS Grid (June 1, 2026): User-Agent = the OAuth token, Authorization: Bearer with it. No token to any other host. */
+function photoHeaders(hostname, token) {
+    return isMlsGridMediaHost(hostname)
+        ? { Accept: PHOTO_ACCEPT, 'User-Agent': token, Authorization: `Bearer ${token}` }
+        : { Accept: PHOTO_ACCEPT, 'User-Agent': PLAIN_USER_AGENT };
+}
 /** Retry-After as milliseconds: whole seconds or an HTTP date; null when absent or unreadable. */
 function parseRetryAfter(header, nowMs) {
     if (!header)
@@ -253,7 +334,7 @@ class MlsClient {
     async getJson(url, purpose) {
         (0, mls_filter_ts_1.assertMlsUrl)(url);
         const resource = new URL(url).pathname.split('/').pop() ?? 'unknown';
-        const r = await this.send({ url, resource, purpose, auth: true, media: false });
+        const r = await this.send({ url, resource, purpose });
         if (!r.ok)
             throw new MlsHttpError(r.status, r.detail);
         let body;
@@ -270,79 +351,115 @@ class MlsClient {
         }
         return { body: body, bytes: r.data.byteLength, status: r.status, ms: r.ms };
     }
-    /** Download one photo from its MediaURL. No token; not from the API host; one metered request. */
-    async download(url, purpose) {
-        let u;
-        try {
-            u = new URL(url);
-        }
-        catch {
+    /**
+     * Download one photo from its MediaURL: one metered request per hop, never retried, never counted by the breaker.
+     * The token goes only to an MLS Grid media host (User-Agent and Authorization: Bearer, MLS Grid's June 1, 2026
+     * rule); redirects are followed by hand, at most MAX_PHOTO_REDIRECTS: to a host that passes hostAllowed(), or to
+     * any other public https host (publicPhotoHop: where MLS Grid stores the file), which gets no token.
+     */
+    async download(url, purpose, o = {}) {
+        const extra = o.extraHosts ?? [];
+        if (!photoHopAllowed(url, extra))
             return { ok: false, status: 0 };
+        let at = new URL(url).href;
+        let ms = 0;
+        for (let hop = 0;; hop++) {
+            const host = new URL(at).hostname.toLowerCase();
+            const r = await this.once(at, 'Media', purpose, { headers: photoHeaders(host, this.d.token), redirect: 'manual' });
+            ms += r.ms;
+            const status = r.status;
+            if (status !== null && status >= 300 && status < 400) {
+                let next = null;
+                try {
+                    const loc = r.headers?.get('location');
+                    next = loc ? new URL(loc, at).href : null;
+                }
+                catch {
+                    next = null;
+                }
+                if (next === null || hop >= exports.MAX_PHOTO_REDIRECTS || !(photoHopAllowed(next, extra) || publicPhotoHop(next))) {
+                    const to = next === null ? '' : ` to ${new URL(next).hostname}`;
+                    return { ok: false, status, stop: 'refused', why: `HTTP ${status} from ${host}: redirect${to} not followed` };
+                }
+                at = next;
+                continue;
+            }
+            if (status === null || status >= 500) {
+                return { ok: false, status: status ?? 0, stop: 'unavailable', why: status === null ? `no answer from ${host}` : `HTTP ${status} from ${host}` };
+            }
+            if (status === 401 || status === 403 || status === 429)
+                return { ok: false, status, stop: 'refused', why: `HTTP ${status} from ${host}` };
+            if (status < 200 || status >= 300)
+                return { ok: false, status };
+            if (r.data.byteLength === 0 || r.data.byteLength > MAX_PHOTO_BYTES)
+                return { ok: false, status };
+            const contentType = r.headers?.get('content-type') ?? '';
+            if (!/^image\//i.test(contentType))
+                return { ok: false, status };
+            return { ok: true, data: r.data, contentType: contentType.split(';')[0].trim().toLowerCase(), ms };
         }
-        if (u.protocol !== 'https:' || u.hostname === 'api.mlsgrid.com' || u.username || u.password)
-            return { ok: false, status: 0 };
-        const r = await this.send({ url, resource: 'Media', purpose, auth: false, media: true });
-        if (!r.ok)
-            return { ok: false, status: r.status };
-        if (r.data.byteLength === 0 || r.data.byteLength > MAX_PHOTO_BYTES)
-            return { ok: false, status: r.status };
-        if (!/^image\//i.test(r.contentType))
-            return { ok: false, status: r.status };
-        return { ok: true, data: r.data, contentType: r.contentType.split(';')[0].trim().toLowerCase(), ms: r.ms };
     }
     scrub(text) {
         return text.split(this.d.token).join('[token]').replace(/\s+/g, ' ').slice(0, 200);
     }
+    /** One request: deadline, breaker, meter and a bucket slot first; a request-log row after it, also when it failed. */
+    async once(url, resource, purpose, init) {
+        const d = this.d;
+        if (d.clock.now() >= d.deadline)
+            throw new DeadlineError();
+        d.breaker.assertClosed(d.clock.now());
+        const verdict = checkMeter(await d.db.meter(), d.caps);
+        if (!verdict.ok)
+            throw new MeterRefusedError(verdict.reason);
+        await d.bucket.take();
+        if (d.clock.now() >= d.deadline)
+            throw new DeadlineError();
+        const started = d.clock.now();
+        let status = null;
+        let data = new Uint8Array(0);
+        let headers = null;
+        try {
+            const res = await d.fetch(url, {
+                method: 'GET',
+                headers: init.headers,
+                redirect: init.redirect,
+                signal: AbortSignal.timeout(d.timeoutMs ?? 60_000),
+            });
+            status = res.status;
+            headers = res.headers;
+            data = new Uint8Array(await res.arrayBuffer());
+        }
+        catch {
+            status = null;
+        }
+        const ms = Math.max(d.clock.now() - started, 0);
+        this.requests += 1;
+        this.bytes += data.byteLength;
+        await d.db.logRequest({ resource, purpose, status, bytes: data.byteLength, ms });
+        return { status, data, headers, ms };
+    }
+    /** One API call (getJson): the token as Bearer, redirects refused, retried and counted by the breaker. */
     async send(o) {
         const d = this.d;
         const retry = d.retry !== false;
         for (let attempt = 1;; attempt++) {
-            if (d.clock.now() >= d.deadline)
-                throw new DeadlineError();
-            d.breaker.assertClosed(d.clock.now());
-            const verdict = checkMeter(await d.db.meter(), d.caps);
-            if (!verdict.ok)
-                throw new MeterRefusedError(verdict.reason);
-            await d.bucket.take();
-            if (d.clock.now() >= d.deadline)
-                throw new DeadlineError();
-            const started = d.clock.now();
-            let status = null;
-            let data = new Uint8Array(0);
-            let headers = null;
-            try {
-                const res = await d.fetch(o.url, {
-                    method: 'GET',
-                    headers: o.auth ? { Authorization: `Bearer ${d.token}`, Accept: 'application/json' } : { Accept: 'image/*' },
-                    redirect: 'error',
-                    signal: AbortSignal.timeout(d.timeoutMs ?? 60_000),
-                });
-                status = res.status;
-                headers = res.headers;
-                data = new Uint8Array(await res.arrayBuffer());
-            }
-            catch {
-                status = null;
-            }
-            const ms = Math.max(d.clock.now() - started, 0);
-            this.requests += 1;
-            this.bytes += data.byteLength;
-            await d.db.logRequest({ resource: o.resource, purpose: o.purpose, status, bytes: data.byteLength, ms });
+            const { status, data, headers, ms } = await this.once(o.url, o.resource, o.purpose, {
+                headers: { Authorization: `Bearer ${d.token}`, Accept: 'application/json' },
+                redirect: 'error',
+            });
             if (status !== null && status >= 200 && status < 300) {
                 d.breaker.success();
                 return { ok: true, data, status, contentType: headers?.get('content-type') ?? '', ms };
             }
             const detail = status === null ? 'no answer (network error or timeout)' : this.scrub(new TextDecoder().decode(data));
             const now = d.clock.now();
-            if ((status === 401 || status === 403) && !o.media) {
+            if (status === 401 || status === 403) {
                 await d.breaker.openFor(exports.BREAKER_OPEN_MS, now);
                 throw new BreakerOpenError(d.breaker.until);
             }
             const transient = status === null || status === 429 || status >= 500;
             if (!transient) {
-                // A photo link that expired or vanished is not an MLS Grid outage.
-                if (!o.media)
-                    await d.breaker.failure(now);
+                await d.breaker.failure(now);
                 return { ok: false, status: status ?? 0, detail };
             }
             const opened = await d.breaker.failure(now);

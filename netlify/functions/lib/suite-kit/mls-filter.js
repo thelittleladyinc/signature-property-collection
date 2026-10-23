@@ -19,24 +19,31 @@
 //     is no function for /Media or /Property('key')/Media. Photos come only
 //     from  $expand=Media  on Property.
 //   * An unfiltered request (every URL carries a $filter) or a filter field
-//     outside the proven list: OriginatingSystemName, ModificationTimestamp,
-//     MlgCanView, StandardStatus, ListingKey.
+//     outside the list MLS Grid allows on a Property replication request:
+//     OriginatingSystemName, ModificationTimestamp, MlgCanView, StandardStatus,
+//     ListingId (FILTER_FIELDS). ListingKey is NOT one of them: MLS Grid answered
+//     HTTP 400 "Invalid filter field 'ListingKey'" to the photo refresh on
+//     2026-10-20, so a listing is asked for by its MLS number (ListingId, e.g.
+//     'IRE1059808', exactly as mls.property.listing_id stores it). ListingKey may
+//     still be $select-ed; it is never filtered on. Every URL a builder here makes
+//     is checked against FILTER_FIELDS before it is returned.
 //   * A page size above 5,000 (1,000 when Media is expanded).
 //   * Following a link to another host: followNextLink() returns the
 //     @odata.nextLink UNCHANGED (verbatim), after checking it is an https
 //     api.mlsgrid.com /v2 URL for an allowed resource whose $filter passes the
 //     same rules.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Clause = exports.MlsFilterError = exports.MLS_STATUSES = exports.MAX_TOP_WITH_MEDIA = exports.MAX_TOP = exports.MAX_IN_VALUES = exports.MAX_OR = exports.MLS_RESOURCES = exports.MLS_SYSTEM_NAME = exports.MLS_API_BASE = void 0;
+exports.Clause = exports.MlsFilterError = exports.MLS_STATUSES = exports.FILTER_FIELDS = exports.MAX_TOP_WITH_MEDIA = exports.MAX_TOP = exports.MAX_IN_VALUES = exports.MAX_OR = exports.MLS_RESOURCES = exports.MLS_SYSTEM_NAME = exports.MLS_API_BASE = void 0;
 exports.assertSafeFilter = assertSafeFilter;
 exports.modifiedClause = modifiedClause;
 exports.canViewClause = canViewClause;
 exports.statusInClause = statusInClause;
-exports.listingKeysClause = listingKeysClause;
+exports.listingIdsClause = listingIdsClause;
+exports.filterFields = filterFields;
 exports.buildFilter = buildFilter;
 exports.propertyIncrementalUrl = propertyIncrementalUrl;
 exports.propertyWindowUrl = propertyWindowUrl;
-exports.propertyByKeysUrl = propertyByKeysUrl;
+exports.propertyByListingIdsUrl = propertyByListingIdsUrl;
 exports.propertyKeysUrl = propertyKeysUrl;
 exports.resourceIncrementalUrl = resourceIncrementalUrl;
 exports.lookupUrl = lookupUrl;
@@ -49,6 +56,8 @@ exports.MAX_OR = 5;
 exports.MAX_IN_VALUES = 20;
 exports.MAX_TOP = 5000;
 exports.MAX_TOP_WITH_MEDIA = 1000;
+/** The only fields a $filter built here may name (MLS Grid's Property replication list; ListingKey is not on it). */
+exports.FILTER_FIELDS = ['OriginatingSystemName', 'ModificationTimestamp', 'MlgCanView', 'StandardStatus', 'ListingId'];
 /** StandardStatus words on this IRES feed (with spaces). */
 exports.MLS_STATUSES = [
     'Active', 'Active Under Contract', 'Canceled', 'Closed', 'Coming Soon', 'Expired', 'Hold', 'Pending', 'Withdrawn',
@@ -130,27 +139,40 @@ function statusInClause(statuses) {
             throw new MlsFilterError(`unknown status: ${String(s)}`);
     return new Clause(`${field('StandardStatus', ['StandardStatus'])} in (${[...new Set(statuses)].map(s => `'${s}'`).join(',')})`, PRIVATE);
 }
-function listingKeysClause(keys) {
-    if (!Array.isArray(keys) || keys.length < 1)
-        throw new MlsFilterError('at least one ListingKey is required');
-    if (keys.length > exports.MAX_IN_VALUES)
-        throw new MlsFilterError(`at most ${exports.MAX_IN_VALUES} ListingKeys per request (got ${keys.length})`);
-    for (const k of keys)
+/** ListingId in ('IRE1059808', ...): at most 20 MLS numbers, exactly as MLS Grid (and mls.property.listing_id) spell them. */
+function listingIdsClause(ids) {
+    if (!Array.isArray(ids) || ids.length < 1)
+        throw new MlsFilterError('at least one ListingId is required');
+    if (ids.length > exports.MAX_IN_VALUES)
+        throw new MlsFilterError(`at most ${exports.MAX_IN_VALUES} ListingIds per request (got ${ids.length})`);
+    for (const k of ids)
         if (typeof k !== 'string' || !KEY_RE.test(k))
-            throw new MlsFilterError('a ListingKey has a character that is not allowed');
-    return new Clause(`${field('ListingKey', ['ListingKey'])} in (${[...new Set(keys)].map(k => `'${k}'`).join(',')})`, PRIVATE);
+            throw new MlsFilterError('a ListingId has a character that is not allowed');
+    return new Clause(`${field('ListingId', ['ListingId'])} in (${[...new Set(ids)].map(k => `'${k}'`).join(',')})`, PRIVATE);
+}
+/** The field names a $filter compares (quoted values left out), in order. */
+function filterFields(filter) {
+    const bare = filter.replace(/'[^']*'/g, "''");
+    return [...bare.matchAll(/([A-Za-z][A-Za-z0-9]*)\s+(?:eq|ne|gt|ge|lt|le|in)(?=[\s(])/g)].map(m => m[1]);
+}
+function assertFilterFields(filter) {
+    for (const f of filterFields(filter)) {
+        if (!exports.FILTER_FIELDS.includes(f))
+            throw new MlsFilterError(`filter field not allowed: ${f} (MLS Grid allows only ${exports.FILTER_FIELDS.join(', ')})`);
+    }
+    return filter;
 }
 /** OriginatingSystemName eq 'ires' first, then the clauses, joined with "and". */
 function buildFilter(...clauses) {
     for (const c of clauses)
         if (!(c instanceof Clause))
             throw new MlsFilterError('build every clause with the functions of mls-filter');
-    return assertSafeFilter([ORIGIN_CLAUSE, ...clauses.map(c => c.text)].join(' and '));
+    return assertFilterFields(assertSafeFilter([ORIGIN_CLAUSE, ...clauses.map(c => c.text)].join(' and ')));
 }
 function buildUrl(p) {
     if (!exports.MLS_RESOURCES.includes(p.resource))
         throw new MlsFilterError(`resource not allowed: ${String(p.resource)}`);
-    assertSafeFilter(p.filter);
+    assertFilterFields(assertSafeFilter(p.filter));
     if (p.expandMedia && p.resource !== 'Property')
         throw new MlsFilterError('$expand=Media is only for Property');
     const maxTop = p.expandMedia ? exports.MAX_TOP_WITH_MEDIA : exports.MAX_TOP;
@@ -186,12 +208,12 @@ function propertyWindowUrl(o) {
         select: o.select, expandMedia: o.media === true, top: o.top ?? (o.media ? exports.MAX_TOP_WITH_MEDIA : exports.MAX_TOP), ascending: true,
     });
 }
-/** At most 20 listings by key, optionally with their photos ($expand=Media). */
-function propertyByKeysUrl(o) {
-    const clause = listingKeysClause(o.keys);
+/** At most 20 listings by MLS number (ListingId), optionally with their photos ($expand=Media). */
+function propertyByListingIdsUrl(o) {
+    const clause = listingIdsClause(o.ids);
     return buildUrl({
         resource: 'Property', filter: buildFilter(clause), select: o.select, expandMedia: o.media === true,
-        top: Math.max(new Set(o.keys).size, 1),
+        top: Math.max(new Set(o.ids).size, 1),
     });
 }
 /** Keys of every viewable listing (reconciliation): $select=ListingKey, 5,000 a page. */

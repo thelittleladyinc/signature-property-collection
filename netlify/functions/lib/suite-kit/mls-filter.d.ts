@@ -6,6 +6,8 @@ export declare const MAX_OR = 5;
 export declare const MAX_IN_VALUES = 20;
 export declare const MAX_TOP = 5000;
 export declare const MAX_TOP_WITH_MEDIA = 1000;
+/** The only fields a $filter built here may name (MLS Grid's Property replication list; ListingKey is not on it). */
+export declare const FILTER_FIELDS: readonly ["OriginatingSystemName", "ModificationTimestamp", "MlgCanView", "StandardStatus", "ListingId"];
 /** StandardStatus words on this IRES feed (with spaces). */
 export declare const MLS_STATUSES: readonly ["Active", "Active Under Contract", "Canceled", "Closed", "Coming Soon", "Expired", "Hold", "Pending", "Withdrawn"];
 export declare class MlsFilterError extends Error {
@@ -22,7 +24,10 @@ export type TimestampOp = 'gt' | 'ge' | 'lt' | 'le';
 export declare function modifiedClause(op: TimestampOp, iso: string): Clause;
 export declare function canViewClause(value: boolean): Clause;
 export declare function statusInClause(statuses: readonly string[]): Clause;
-export declare function listingKeysClause(keys: readonly string[]): Clause;
+/** ListingId in ('IRE1059808', ...): at most 20 MLS numbers, exactly as MLS Grid (and mls.property.listing_id) spell them. */
+export declare function listingIdsClause(ids: readonly string[]): Clause;
+/** The field names a $filter compares (quoted values left out), in order. */
+export declare function filterFields(filter: string): string[];
 /** OriginatingSystemName eq 'ires' first, then the clauses, joined with "and". */
 export declare function buildFilter(...clauses: Clause[]): string;
 export interface PropertyUrlOptions {
@@ -42,9 +47,9 @@ export declare function propertyWindowUrl(o: PropertyUrlOptions & {
     from: string;
     until: string;
 }): string;
-/** At most 20 listings by key, optionally with their photos ($expand=Media). */
-export declare function propertyByKeysUrl(o: {
-    keys: readonly string[];
+/** At most 20 listings by MLS number (ListingId), optionally with their photos ($expand=Media). */
+export declare function propertyByListingIdsUrl(o: {
+    ids: readonly string[];
     select?: readonly string[];
     media?: boolean;
 }): string;

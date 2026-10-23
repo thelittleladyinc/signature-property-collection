@@ -781,7 +781,9 @@ async function bootstrapPair(hidden) {
     const shown = health.checks.find((c) => /Listings shown on the website/.test(c.name)) || {};
     check("...says the listings are held back and why", shown.ok === false && /Held back — MLS_SOURCE=hub/.test(shown.detail), shown.detail);
     const photos = health.checks.find((c) => c.name === "Listing photos load end to end") || {};
-    check("...and even ?probe=1 makes no MLS Grid photo request", /Not tested/.test(photos.detail) && f.calls.length === 0, photos.detail);
+    // 2026-10-23: ?probe=1 also runs the hub key check (one GET /v1/health to the hub); that is the only call allowed.
+    const notHubKeyCheck = f.calls.filter((c) => !/\/v1\/health$/.test(new URL(c.url).pathname));
+    check("...and even ?probe=1 makes no MLS Grid photo request", /Not tested/.test(photos.detail) && notHubKeyCheck.length === 0, photos.detail + " " + notHubKeyCheck.map((c) => c.url).join(" "));
   }
 
   setEnv({});

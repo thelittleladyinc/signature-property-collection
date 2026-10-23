@@ -37,9 +37,22 @@ export declare function isEmailOptOutTag(name: unknown): boolean;
 export declare function isSmsConsentTag(name: unknown): boolean;
 /** A tag that only ever STOPS contact. These are the only tags a Do Not Contact lead may still be given. */
 export declare function isStopContactTag(name: unknown): boolean;
+/**
+ * A tag no writer may ever take off a lead (0.5.0): every `Consent – …` tag (DNC, Unsubscribed, SMS Opt-In, Spam
+ * Complaint, Bounced, …), the Do Not Contact tags (`OPTED OUT`, `Expired Elite – OPTED OUT`), `#dnc`,
+ * `Newsletter Unsubscribed` and `System – Kill All Drips`; any dash, any case, whole tag.
+ */
+export declare function isProtectedTag(name: unknown): boolean;
+/**
+ * Two real, different first names (Command Center's rule, 0.5.0): a missing or placeholder name on either side is
+ * never a difference.
+ */
+export declare function firstNamesDiffer(a: unknown, b: unknown): boolean;
+/** Lofty's own `unsubscription` flag on a lead read: true / false, or null when the read does not say (0.5.0). */
+export declare function loftyUnsubscribed(lead: any): boolean | null;
 /** How many results one exact email or phone search asks for. */
 export declare const LOOKUP_LIMIT = 5;
-export type LookupRefusalCode = 'several_leads' | 'no_exact_match' | 'lookup_failed';
+export type LookupRefusalCode = 'several_leads' | 'no_exact_match' | 'lookup_failed' | 'already_in_lofty';
 export declare function isLookupRefusal(err: unknown): boolean;
 export type FetchLike = (url: string, init: {
     method: string;
@@ -111,6 +124,11 @@ export interface LoftyDeps {
         doNotContact?: boolean;
         emailOptOut?: boolean;
     } | null>;
+    /**
+     * 0.5.2, a dry run (createLoftyPlan): no POST, PUT or DELETE is sent; each is recorded in the plan and answered as
+     * Lofty would. Reads still go to Lofty, except a read of a lead the plan wrote to or would have created.
+     */
+    plan?: LoftyPlan;
 }
 export declare class LoftyError extends Error {
     status?: number;
@@ -121,6 +139,8 @@ export declare class LoftyError extends Error {
     lookup?: 'email' | 'phone';
     /** Seconds to wait (a 429 from Lofty or from beforeCall). */
     retryAfterSeconds?: number;
+    /** name_differs (0.5.0): the first name the lead carries. */
+    nameOnLead?: string;
     constructor(message: string, status?: number, code?: string, leadIds?: string[]);
 }
 export interface LoftyLeadInput {
@@ -136,10 +156,95 @@ export interface LoftyLeadInput {
     leadTypes?: number[];
     /** The Lofty user a NEW lead is assigned to (Christine's user id); sent on a create only. */
     assignedUserId?: number | string;
+    /**
+     * The person's own home (0.5.0): Lofty's nested `property` object on a create; on an existing lead only blanks
+     * are filled (see LeadChange.fillProperty). Lofty discards flat address fields.
+     */
+    property?: LeadProperty;
+    /** Lofty custom fields sent in the create body (0.5.0; Expired Elite's shape). Never sent to an existing lead. */
+    customAttributes?: Array<{
+        attributeName: string;
+        value: string;
+    }>;
 }
+/** A lead's address the way Lofty takes it (0.5.0). */
+export interface LeadProperty {
+    streetAddress: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+}
+/** A clean LeadProperty, or null without a street (0.5.0). */
+export declare function leadProperty(p: unknown): LeadProperty | null;
+/** Custom fields for a create body: name 1-60 characters, value a string of at most 250; at most 20 (0.5.0). */
+export declare function cleanCustomAttributes(list: unknown): Array<{
+    attributeName: string;
+    value: string;
+}>;
+/** Tags for a create body: clean, no consent / Do Not Contact / opt-out tag, no repeats, at most 20 (0.5.0). */
+export declare function createBodyTags(list: unknown): string[];
 export declare function isLoftyConfigured(deps: Partial<LoftyDeps> | null | undefined): boolean;
+/** The HTTP methods the client sends (DELETE since 0.5.0: Lofty's webhook unsubscribe). */
+export type LoftyMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 /** Low-level request. Throws LoftyError; the message never contains a query string or the key. */
-export declare function loftyRequest(method: 'GET' | 'POST' | 'PUT', path: string, body: unknown, deps: LoftyDeps): Promise<any>;
+export declare function loftyRequest(method: LoftyMethod, path: string, body: unknown, deps: LoftyDeps): Promise<any>;
+/**
+ * loftyRequest with Lofty's answer as text (0.5.0), for an id that may not fit a JavaScript number (Lofty ids are
+ * 64-bit). A string `body` is sent exactly as given (raw JSON, e.g. an id written as digits). Throws like loftyRequest.
+ */
+export declare function loftyRequestText(method: LoftyMethod, path: string, body: unknown, deps: LoftyDeps): Promise<{
+    status: number;
+    text: string;
+}>;
+/** How a dry run's answer shows the lead it would have created (in paths, bodies and the outcome). */
+export declare const PLANNED_NEW_LEAD_ID = "{new_lead_id}";
+/** How a dry run's answer shows the task it would have created. */
+export declare const PLANNED_NEW_TASK_ID = "{new_task_id}";
+/** One write a dry run would have sent: Lofty's full path ('/v1.0/leads/123', '/v2.0/tasks') and the body as sent. */
+export interface LoftyPlannedRequest {
+    method: 'POST' | 'PUT' | 'DELETE';
+    path: string;
+    /** The JSON body as it would have gone; a raw JSON text body (64-bit ids written as digits) stays that exact text. */
+    body: unknown;
+}
+export interface LoftyPlan {
+    /** Every write, in the order it would have been sent. Use plannedRequests() for an answer. */
+    writes: LoftyPlannedRequest[];
+    /** Reads answered from the plan instead of Lofty (a read-back after a planned write, a read of the planned new lead). */
+    readBacks: number;
+    /** Leads as they would be after the planned writes (lead id -> lead). */
+    after: Map<string, Record<string, unknown>>;
+    /** Leads as last read from Lofty in this run (lead id -> lead). */
+    seen: Map<string, Record<string, unknown>>;
+}
+export declare function createLoftyPlan(): LoftyPlan;
+/** Lofty's own path for a request path: '/leads/1' -> '/v1.0/leads/1'; a versioned path ('/v2.0/tasks') as is. */
+export declare function loftyFullPath(path: string): string;
+/**
+ * A dry run's answer to one request, or null when the request must really be sent (a read the plan cannot answer).
+ * A write is recorded and answered the way Lofty answers it: a create with the stand-in lead id (the plan then holds
+ * the new lead as the create body describes it), a task with the stand-in task id, anything else with {}.
+ */
+export declare function planRequest(plan: LoftyPlan, method: LoftyMethod, path: string, body: unknown): {
+    status: number;
+    text: string;
+} | null;
+/** A real read in a dry run: remember the lead as Lofty returned it, so a later planned PUT starts from it. */
+export declare function planSawRead(plan: LoftyPlan, path: string, text: string): void;
+/** Is this the stand-in id of a lead or task a dry run would have created (digits or the shown form)? */
+export declare function isPlannedId(v: unknown): boolean;
+/** Any value with the stand-in ids shown as `{new_lead_id}` / `{new_task_id}` (strings, numbers, nested). */
+export declare function withPlannedIds<T>(v: T): T;
+/** The writes a dry run would have sent, in order, with the stand-in ids shown. */
+export declare function plannedRequests(plan: LoftyPlan): LoftyPlannedRequest[];
+/**
+ * The same dry run for code that calls Lofty through a plain fetch (the hub's _shared/lofty-lead.ts): a write is
+ * recorded and answered without a network call; a read of a lead the plan wrote to is answered from the plan; any
+ * other read goes to `fetchImpl` after `beforeRead` (throw to refuse it, e.g. the hub's read budget). Lofty's host only.
+ */
+export declare function planningFetch(plan: LoftyPlan, fetchImpl: FetchLike, opts?: {
+    beforeRead?: () => Promise<void>;
+}): FetchLike;
 /** Clean one tag: string, trimmed, no control chars, capped. '' when unusable. */
 export declare function cleanTag(t: unknown): string;
 /** Lenient tag reading for read-only checks: strings, {name}/{tagName}/{tag} objects, or a comma list. */
@@ -188,10 +293,12 @@ export declare function splitName(name: unknown): {
 };
 /**
  * Lead body for POST /v1.0/leads. ALWAYS `cannotText: true`. Email and phone are normalised (E.164);
- * tags are never put in a create body (they go on afterwards by read-merge-write, so a create Lofty folds
- * into an existing Do Not Contact lead cannot start a Smart Plan).
+ * tags are not put in a create body (they go on afterwards by read-merge-write, so a create Lofty folds
+ * into an existing Do Not Contact lead cannot start a Smart Plan) unless the caller passes `createTags`
+ * (0.5.0: Listing Engine's intake senders, whose tags must not start a "tag added" plan). The address
+ * (`property`) and custom fields (`customAttributes`) go in only when given.
  */
-export declare function buildLeadBody(input: LoftyLeadInput): Record<string, unknown>;
+export declare function buildLeadBody(input: LoftyLeadInput, createTags?: string[]): Record<string, unknown>;
 export interface CreatedLead {
     /** The lead to work on: the surviving lead when Lofty merged the create into an existing one. */
     leadId: string;
@@ -246,8 +353,8 @@ export declare function mayTextLead(lead: any, opts?: {
 export declare function tagsAllowEmail(rawTags: unknown): boolean;
 /** "May we call or text?" from a tag list alone: readable, no `#dnc` and no full Do Not Contact tag. Unreadable = no. */
 export declare function tagsAllowPhone(rawTags: unknown): boolean;
-/** POST /leads (always cannotText:true) and read the response for a merge. */
-export declare function createLeadResult(input: LoftyLeadInput, deps: LoftyDeps): Promise<CreatedLead>;
+/** POST /leads (always cannotText:true) and read the response for a merge. `createTags`: see buildLeadBody. */
+export declare function createLeadResult(input: LoftyLeadInput, deps: LoftyDeps, createTags?: string[]): Promise<CreatedLead>;
 export declare function getLead(leadId: string, deps: LoftyDeps): Promise<any>;
 /** A lead found by one exact search: its id and the search result itself. */
 export interface FoundLead {
@@ -259,6 +366,18 @@ export interface FoundLead {
 export declare function findLeadByEmail(email: unknown, deps: LoftyDeps): Promise<FoundLead | null>;
 /** One exact phone search on the last 10 digits: exactly one exact match is the lead, none is null, anything else refuses. */
 export declare function findLeadByPhone(phone: unknown, deps: LoftyDeps): Promise<FoundLead | null>;
+/**
+ * Command Center's rule (0.5.0, pushLead `match: 'email_and_phone'`): both searches run, and the person's lead is the
+ * ONE email match that also holds the phone (every exact phone match counts), or the only email match when nobody has
+ * the phone. Refused, with nothing written and nothing created: a failed or loose search; several such leads; one
+ * candidate among several email matches when either search came back full; a single email match from a full email
+ * search; the phone only on other people's leads (`already_in_lofty`: never merged by phone alone). null = nobody has
+ * the email or the phone.
+ */
+export declare function findLeadNarrowed(person: {
+    email?: unknown;
+    phone?: unknown;
+}, deps: LoftyDeps): Promise<FoundLead | null>;
 /** The lead a person belongs to: by email first, then (missing or no match) by phone. A refusal throws. */
 export declare function findExistingLead(person: {
     email?: unknown;
@@ -286,6 +405,12 @@ export interface LeadChange {
     doNotContact?: boolean;
     /** Hold every requested tag but the opt-out/stop tags (set by checkLead for a person on a shared email opt-out list). */
     holdTags?: boolean;
+    /** 0.5.0: tag names to take off (case-blind, whole tag); a protected tag (isProtectedTag) is never taken off. */
+    removeTags?: string[];
+    /** 0.5.0: fill the lead's address where it is blank (see planPropertyFill); never overwritten. */
+    fillProperty?: LeadProperty;
+    /** 0.5.0: the first name the person gave; another real first name on the lead refuses (name_differs), nothing written. */
+    expectFirstName?: string;
 }
 export interface LeadChangeResult {
     tagsAdded: string[];
@@ -305,6 +430,12 @@ export interface LeadChangeResult {
     tagsHeld: string[];
     /** After a write to a Do Not Contact lead: was a DNC tag seen again? */
     dncCheck?: 'kept' | 'lost' | 'unverified';
+    /** 0.5.0: tags taken off by this write (the lead's own spelling). */
+    tagsRemoved?: string[];
+    /** 0.5.0: after a write that took tags off, one re-read: gone, still there, or not readable. */
+    removeCheck?: 'removed' | 'not_removed' | 'unverified';
+    /** 0.5.0: the address (fillProperty): filled (none before), completed (same street, blanks filled), same, kept (another street), held (tags unreadable). */
+    property?: 'filled' | 'completed' | 'same' | 'kept' | 'held';
     /** The lead as read before the write (for a caller that mirrors it). */
     before: any;
 }
@@ -314,6 +445,15 @@ export interface LeadChangeResult {
  * email-off or DNC flag write still goes through, since it touches no list).
  */
 export declare function mergeIntoLead(leadId: string, change: LeadChange, deps: LoftyDeps): Promise<LeadChangeResult>;
+/**
+ * Fill a lead's address without ever overwriting it (0.5.0): no street on the lead = the whole address goes on
+ * (`filled`); the same street (suite-kit street key) with a blank city, state or ZIP = those blanks are filled, the
+ * rest re-stated as read (`completed`); the same street with nothing blank = `same`; another street = `kept`.
+ */
+export declare function planPropertyFill(lead: any, want: LeadProperty): {
+    result: 'filled' | 'completed' | 'same' | 'kept';
+    body: LeadProperty | null;
+};
 /**
  * One writer per lead inside one process: `lockLead` for LoftyDeps. Writers to the same lead wait their
  * turn (first come, first served); writers to different leads never wait. A writer that waits longer than
@@ -339,10 +479,10 @@ export interface LoftyOutcome {
     reason?: string;
     status?: number;
     /** Why nothing was written: a refused lookup, no lookup key, not configured, or rate limited. */
-    code?: LookupRefusalCode | 'no_lookup_key' | 'not_configured' | 'rate_limited' | 'busy';
+    code?: LookupRefusalCode | 'no_lookup_key' | 'not_configured' | 'rate_limited' | 'busy' | 'name_differs';
     needsReview?: boolean;
     matchLeadIds?: string[];
-    matchedBy?: 'email' | 'phone';
+    matchedBy?: 'email' | 'phone' | 'lead_id';
     consentApplied?: boolean;
     textingNotEnabled?: string;
     textingTurnedOff?: boolean;
@@ -357,6 +497,14 @@ export interface LoftyOutcome {
     retryAfterSeconds?: number;
     /** The lead as last read (for a mirror); null when it was never read. */
     lead?: any;
+    /** 0.5.0: tags taken off the lead (removeTags), read back gone. */
+    tagsRemoved?: string[];
+    /** 0.5.0: the address on an existing lead (see LeadChangeResult.property). */
+    property?: LeadChangeResult['property'];
+    /** 0.5.0, code name_differs: the first name the found lead carries (nothing was written). */
+    nameOnLead?: string;
+    /** 0.5.0: a create carrying tags, an address or custom fields was folded into an existing lead: check that lead. */
+    createBodyMerged?: boolean;
 }
 /** Why nothing was created when there is nothing to look the person up by. */
 export declare const NO_LOOKUP_KEY = "no email and no phone number with 10 digits to look the person up by: not created in Lofty; add them by hand";
@@ -374,6 +522,16 @@ export interface PushLeadArgs {
      * cannotEmail) in the same read-merge-write, so Lofty agrees with the list.
      */
     emailOptOut?: boolean;
+    /** 0.5.0: write to this one known lead: no lookup, never a create. */
+    leadId?: string;
+    /** 0.5.0: 'email_and_phone' = findLeadNarrowed (Command Center's rule). Default: email, then phone. */
+    match?: 'email_then_phone' | 'email_and_phone';
+    /** 0.5.0: see LeadChange.expectFirstName (a found lead only). */
+    expectFirstName?: string;
+    /** 0.5.0: tags to take off in the same read-merge-write (see LeadChange.removeTags). */
+    removeTags?: string[];
+    /** 0.5.0: tags sent IN the create body (a create only, never an existing lead; see buildLeadBody). */
+    createTags?: string[];
 }
 /**
  * Look up (email, then phone), then add to the one existing lead, or create (cannotText:true) and tag the

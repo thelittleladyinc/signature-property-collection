@@ -94,6 +94,9 @@ const { runMineSync } = require("./lib/_lofty-listings");
 // See lib/_mls-hub.js and docs/mls-via-hub.md. Unset keeps every MLS Grid path
 // below exactly as it was.
 const mlsHub = require("./lib/_mls-hub");
+// 2026-10-23: the side-by-side check with the hub (lib/_hub-side-by-side.js, docs/hub-side-by-side.md). OFF unless
+// HUB_SIDE_BY_SIDE lists mls_read; with it on, this run's own Lofty and MLS Grid work is exactly as with it off.
+const { mlsSideBySide } = require("./lib/_hub-side-by-side");
 
 // 2026-08-13 (diagnostics): Christine added the CLOUDINARY_* env vars but
 // her own listings are still all serving raw MLS Grid URLs. cacheCoverPhoto
@@ -1082,7 +1085,7 @@ exports.VERDICT_KEY = VERDICT_KEY;
 // accepted lead replayed next run: a duplicate note, a re-fired tag) and before
 // her listings were refreshed at all. That is lofty-queue-drain.js's own
 // schedule now, as on the Little Lady site.
-async function loftyScheduledRun() {
+async function loftyScheduledRun(side) {
   const store = getBlobStore(getStore);
   const apiKey = process.env.LOFTY_API_KEY;
   if (!apiKey) {
@@ -1091,9 +1094,11 @@ async function loftyScheduledRun() {
   }
   // The MLS check needs an MLS Grid token; without one (or with the market-data
   // run switched off) her listings are shown as Lofty reports them, as before.
-  const confirmOnMarket = mlsGridMarketDataOn()
+  const ownConfirmer = mlsGridMarketDataOn()
     ? makeOnMarketConfirmer({ store, token: process.env.MLSGRID_API_TOKEN })
     : undefined;
+  // The side-by-side check only notes each answer and hands it back unchanged (inert while it is off).
+  const confirmOnMarket = side ? side.wrapConfirmer(ownConfirmer) : ownConfirmer;
   const result = await runMineSync({ store, apiKey, confirmOnMarket });
   console.log("sync-listings (Lofty):", JSON.stringify(result).slice(0, 1500));
   return { statusCode: 200, body: "ok" };
@@ -1128,20 +1133,43 @@ exports.handler = async () => {
     if (viaHub) return refuseGridListingsViaHub();
     return mlsGridRun({ startedAt });
   }
-  const result = await loftyScheduledRun();
+  // Inert (no hub call, nothing wrapped, nothing read) unless HUB_SIDE_BY_SIDE lists mls_read and this run reads
+  // MLS Grid itself.
+  const side = mlsSideBySide({ startedAt, viaHub });
+  const result = await loftyScheduledRun(side);
+  let gridRan = false;
   if (mlsGridMarketDataOn()) {
     try {
       const grid = viaHub
         ? await hubMarketDataRun({ startedAt })
         : await mlsGridRun({ startedAt, background: true });
       console.log(`sync-listings (${viaHub ? "hub" : "MLS Grid"} market data):`, grid && grid.body);
+      gridRan = !viaHub && !!grid && grid.body === "ok";
     } catch (err) {
       // Her listings are already refreshed and saved; this only delays the figures.
       console.error(`sync-listings: ${viaHub ? "hub" : "MLS Grid"} market-data run failed (her listings are unaffected):`, err && err.message);
     }
   }
+  // After this run's own work: her listings' on-market verdicts and a sample of the MLS Grid copy against the hub's
+  // copy (one hub read), within what is left of Netlify's 30 seconds. Never throws.
+  if (side.active) {
+    let store = null;
+    try { store = getBlobStore(getStore); } catch (err) { store = null; }
+    await side.finish({
+      store, gridRan, listingsKey: LISTINGS_KEY, mineKey: MINE_LISTINGS_KEY,
+      statuses: REPLICATED_STATUSES, toStored: storedFromHubRow,
+    });
+  }
   return result;
 };
+
+// A hub row as this file would store it in hub mode (hubMarketDataRun): the same mapListing over the same fields,
+// the stored photo fields kept, the same slimming. Used only by the side-by-side check.
+function storedFromHubRow(row, previouslyStored) {
+  const mapped = mapListing(mlsHub.recordFromHubRow(row));
+  keepStoredPhotos(mapped, previouslyStored);
+  return slimForStorage(mapped);
+}
 
 // The MLS Grid path. opts.background: running after her Lofty listings, for the
 // market data only -- the overnight photo backfill has nothing to do (it stands

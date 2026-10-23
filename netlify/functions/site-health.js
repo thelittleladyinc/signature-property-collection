@@ -52,7 +52,7 @@ const {
 } = require("./lib/_media");
 const { checkMlsQuota } = require("./lib/_mls-usage");
 // 2026-10-17 (wave 2a): which MLS source (MLS_SOURCE) and whether the hub is set up.
-const { mlsSource, hubProblem, gridListingsRefused, GRID_VIA_HUB_REFUSAL } = require("./lib/_mls-hub");
+const { mlsSource, hubProblem, makeHubClient, gridListingsRefused, GRID_VIA_HUB_REFUSAL } = require("./lib/_mls-hub");
 const { cloudinaryDiagnostics } = require("./lib/_cloudinary");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 // Read for the Tour It With Me coverage row below — same file the map reads.
@@ -78,6 +78,8 @@ const LOFTY_TRIGGER_TAG = "Hot Lead - Website";
 // photo verdict can never be shown as if it described Lofty's image server.
 const PHOTO_CHECK_KEY = LISTINGS_SOURCE === "lofty" ? "lofty-photo-check.json" : "photo-pipeline-check.json";
 const CLOUDINARY_CHECK_KEY = "cloudinary-usage-check.json";
+// 2026-10-23: the Seller Intelligence hub key check (probeHubKey below).
+const HUB_CHECK_KEY = "hub-key-check.json";
 
 // 2026-10-06: the three stores where geocoded map pins are cached, for the row that
 // says how many of them Google placed. Duplicated here (like SUSPENSION_KEY above)
@@ -512,6 +514,38 @@ async function probeLoftyKey(apiKey) {
     };
   }
 }
+
+// 2026-10-23 (Christine: "it's very important that we don't lose anything at all").
+// This site's hub key (hub app "signature") has never been used, so nothing showed
+// whether HUB_API_KEY is the right key before anything moves onto the hub. GET
+// /v1/health needs no scope, reads no lead, buys nothing and answers while the hub's
+// data routes are off. Opt-in like every other live check (?probe=1). The key goes in
+// x-hub-key only, through the vendored hub client, and never onto this page: the
+// verdict keeps the HTTP status, our own reason word and the app id the hub names,
+// cut to [a-z0-9-].
+const HUB_APP_ID = "signature";
+async function probeHubKey(env) {
+  const out = { checkedAt: new Date().toISOString() };
+  let a;
+  try {
+    a = await makeHubClient(env, GOOGLE_PROBE_TIMEOUT_MS).call("GET", "/v1/health");
+  } catch (err) {
+    return { ...out, ok: false, httpStatus: "request failed", reason: "unreachable" };
+  }
+  out.httpStatus = a && a.status != null ? a.status : "request failed";
+  if (a && a.ok) {
+    out.app = String((a.body && a.body.app) || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40);
+    out.enabled = a.body.enabled === true;
+    out.ok = out.app === HUB_APP_ID;
+    if (!out.ok) out.reason = "other_app";
+    return out;
+  }
+  out.ok = false;
+  out.reason = (a && a.status === 401) ? "refused"
+    : (a && a.reason === "unreachable") ? "unreachable"
+      : (a && a.reason === "bad_answer") ? "bad_answer" : "not_confirmed";
+  return out;
+}
 // Reads back the LAST lead this site pushed and reports what Lofty says about
 // it. Read-only on purpose -- it creates nothing, changes nothing, and adds no
 // junk contact to her CRM.
@@ -915,7 +949,7 @@ exports.handler = async (event) => {
   const wantsJson = params.format === "json";
 
   const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, loftyHeld, cachedLoftyKey,
-    cachedLoftyLead, cachedPhotoCheck, cachedCloudCheck] = await Promise.all([
+    cachedLoftyLead, cachedPhotoCheck, cachedCloudCheck, cachedHubKey] = await Promise.all([
     store.get(SYNC_STATE_KEY, { type: "json" }),
     store.get(MINE_LISTINGS_KEY, { type: "json" }),
     store.get(SUSPENSION_KEY, { type: "json" }),
@@ -927,6 +961,7 @@ exports.handler = async (event) => {
     store.get(LOFTY_LEAD_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(PHOTO_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(CLOUDINARY_CHECK_KEY, { type: "json" }).catch(() => null),
+    store.get(HUB_CHECK_KEY, { type: "json" }).catch(() => null),
   ]);
 
   // ---- Google key check (opt-in, cached) ----
@@ -971,17 +1006,22 @@ exports.handler = async (event) => {
       enabled: !!loftyApiKey, force: wantsProbe, store, key: LOFTY_LEAD_CHECK_KEY,
       probe: () => probeLoftyLead(loftyApiKey, loftyLast && loftyLast.leadId, LOFTY_TRIGGER_TAG),
     }),
+    // The hub key: one GET /v1/health, only when the hub settings are usable.
+    freshen(cachedHubKey, {
+      enabled: !hubProblem(process.env), force: wantsProbe, store, key: HUB_CHECK_KEY,
+      probe: () => probeHubKey(process.env),
+    }),
   ]);
 
   // If the group overruns, fall back to the cached verdicts and let each row's
   // age note say they are old. A slow third party must never turn this page into
   // a timeout -- an unreachable health page is the least useful kind.
   let probeTimer;
-  const [google, photoCheck, cloudCheck, loftyKeyCheck, loftyLeadCheck] = await Promise.race([
+  const [google, photoCheck, cloudCheck, loftyKeyCheck, loftyLeadCheck, hubKeyCheck] = await Promise.race([
     probeGroup,
     new Promise((resolve) => {
       probeTimer = setTimeout(() => resolve([
-        cachedGoogle, cachedPhotoCheck, cachedCloudCheck, cachedLoftyKey, cachedLoftyLead,
+        cachedGoogle, cachedPhotoCheck, cachedCloudCheck, cachedLoftyKey, cachedLoftyLead, cachedHubKey,
       ]), PROBE_BUDGET_MS);
     }),
   ]);
@@ -1387,12 +1427,45 @@ exports.handler = async (event) => {
     detail: !process.env.LOFTY_API_KEY
       ? "LOFTY_API_KEY isn't set in Netlify."
       : (!loftyKeyCheck
-        ? "Not tested yet — add ?probe=1 to this page's URL to ask Cloudinary about the account directly."
+        ? "Not tested yet — add ?probe=1 to this page's URL to ask Lofty about the key directly."
         : loftyKeyAge.warning + loftyKeyAge.when + (loftyKeyCheck.ok
           ? `Lofty accepted the key (HTTP ${loftyKeyCheck.httpStatus}).`
           : `Lofty REJECTED the key: HTTP ${loftyKeyCheck.httpStatus}. ${loftyKeyCheck.body || ""} ` +
             "Create a key for this website in Lofty → Settings → Integrations → API, " +
             "then replace LOFTY_API_KEY in Netlify with it.")),
+  });
+
+  // ---- Seller Intelligence hub key valid? (2026-10-23) ----
+  // Not set up at all: optional, nothing on this site asks the hub. Set but unusable,
+  // a refused key or another app's key: red, every hub feature would fail. A hub that
+  // could not answer (429, 5xx, no JSON, unreachable) proves nothing either way, so
+  // that reading is optional: the crying-wolf lesson above.
+  const hubSettingsProblem = hubProblem(process.env);
+  const hubNotSetUp = !String(process.env.HUB_API_URL || "").trim() && !String(process.env.HUB_API_KEY || "").trim();
+  const hubKeyAge = ageNote(hubKeyCheck);
+  const hubUnconfirmed = !!(hubKeyCheck && !hubKeyCheck.ok && hubKeyCheck.reason !== "refused" && hubKeyCheck.reason !== "other_app");
+  checks.push({
+    optional: hubNotSetUp || (!!hubKeyCheck && !hubKeyAge.stale && hubUnconfirmed),
+    name: "Seller Intelligence hub key valid",
+    ok: hubSettingsProblem
+      ? false
+      : (!hubKeyCheck || hubKeyAge.stale ? true : hubKeyCheck.ok),
+    detail: hubNotSetUp
+      ? "HUB_API_URL and HUB_API_KEY aren't set in Netlify, so nothing on this site asks the hub."
+      : hubSettingsProblem
+        ? `${hubSettingsProblem}, so nothing on this site can use the hub.`
+        : (!hubKeyCheck
+          ? "Not tested yet — add ?probe=1 to this page's URL to ask the hub about the key directly."
+          : hubKeyAge.warning + hubKeyAge.when + (hubKeyCheck.ok
+            ? `The hub accepted the key (app ${HUB_APP_ID}; hub data routes ${hubKeyCheck.enabled ? "on" : "off"}).`
+            : hubKeyCheck.reason === "refused"
+              ? `The hub REFUSED the key (HTTP ${hubKeyCheck.httpStatus}): it is mistyped or revoked. ` +
+                "Ask for this site's own hub key (app signature) and replace HUB_API_KEY in Netlify with it."
+              : hubKeyCheck.reason === "other_app"
+                ? `HUB_API_KEY is the hub key of app "${hubKeyCheck.app || "unknown"}", not ${HUB_APP_ID}. ` +
+                  "Replace it in Netlify with this site's own hub key."
+                : `The hub did not confirm the key (HTTP ${hubKeyCheck.httpStatus}${hubKeyCheck.reason === "bad_answer" ? ", no JSON" : ""}); ` +
+                  "try ?probe=1 again in a few minutes.")),
   });
 
   // ---- Website leads reaching Lofty ----
@@ -1927,6 +2000,7 @@ exports.handler = async (event) => {
     ["photo chain", photoCheck, true],
     ["Lofty key", loftyKeyCheck, !!loftyApiKey],
     ["last lead in Lofty", loftyLeadCheck, !!loftyApiKey],
+    ["hub key", hubKeyCheck, !hubSettingsProblem],
   ].filter(([, , applicable]) => applicable);
 
   const staleRows = probeRows.filter(([, v]) => ageNote(v).stale).map(([n]) => n);
@@ -1974,7 +2048,7 @@ exports.handler = async (event) => {
         raw: {
           state, suspension, mineCount, mineCloudinaryCount, google,
           loftyLast: publicPushRecord(loftyLast), loftyFailed: publicFailedQueue(loftyFailed), loftyHeld: heldPublic,
-          loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck,
+          loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck, hubKeyCheck,
         },
       }, null, 2),
     };
