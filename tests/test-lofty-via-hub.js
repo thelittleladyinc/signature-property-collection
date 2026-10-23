@@ -613,7 +613,7 @@ const deadline = () => Date.now() + 15000;
   check("...and never logs the hub key or the Lofty key", !/console\.[a-z]+\([^)]*(HUB_API_KEY|LOFTY_API_KEY|apiKey)/.test(hubSrc));
   const other = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib");
   if (fs.existsSync(other)) {
-    for (const f of ["_lofty-hub.js", "_lofty-returning.js", "_lofty-consent.js", "_lofty.js", "_form-plans.js"]) {
+    for (const f of ["_lofty-hub.js", "_lofty-returning.js", "_lofty-consent.js", "_lofty.js", "_form-plans.js", "_hub-side-by-side.js"]) {
       check(`lib/${f} is byte-identical to ${SIBLING}'s copy`, fs.readFileSync(path.join(other, f), "utf8") === fs.readFileSync(`${FN_DIR}/lib/${f}`, "utf8"));
     }
     const mine = fs.readdirSync(`${FN_DIR}/lib/suite-kit`).sort();

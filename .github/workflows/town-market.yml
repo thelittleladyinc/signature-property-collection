@@ -74,6 +74,20 @@ jobs:
           BLOBS_TOKEN: ${{ secrets.BLOBS_TOKEN }}
         run: node build/tools/town-market-stats.js
 
+      # OPTIONAL, off unless the repository variable HUB_SIDE_BY_SIDE lists mls_read (2026-10-23, the side-by-side
+      # check, docs/hub-side-by-side.md): the figures just regenerated against the hub's GET /v1/market/towns, one
+      # ledger row per town (field names only). Read-only, always exits 0, and can never stop or change this job.
+      # Needs the repository variable HUB_API_URL and the secret HUB_API_KEY (names only here).
+      - name: Side-by-side check of the town figures (only when HUB_SIDE_BY_SIDE is set)
+        if: ${{ steps.creds.outputs.ready == 'true' && vars.HUB_SIDE_BY_SIDE != '' }}
+        continue-on-error: true
+        env:
+          HUB_SIDE_BY_SIDE: ${{ vars.HUB_SIDE_BY_SIDE }}
+          HUB_SIDE_BY_SIDE_MAX: ${{ vars.HUB_SIDE_BY_SIDE_MAX }}
+          HUB_API_URL: ${{ vars.HUB_API_URL }}
+          HUB_API_KEY: ${{ secrets.HUB_API_KEY }}
+        run: node build/tools/hub-side-by-side-towns.js
+
       # Rebuild so the committed site/ matches the new data. netlify-build.sh
       # regenerates on deploy anyway, but this repo deliberately keeps site/ in
       # git as the fallback and as an honest diff of what a data change produces.

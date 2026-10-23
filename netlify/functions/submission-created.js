@@ -72,6 +72,9 @@ const {
   findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
   leadIdFromResponse, inquiryFromForm, placeInquiry,
 } = require("./lib/_lofty-returning");
+// 2026-10-23: the side-by-side check with the hub (lib/_hub-side-by-side.js, docs/hub-side-by-side.md). OFF unless
+// HUB_SIDE_BY_SIDE lists lofty_write; it never changes what this function sends to Lofty, when, or what it returns.
+const { leadSideBySide } = require("./lib/_hub-side-by-side");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
 
@@ -160,6 +163,17 @@ function planLogLine(formName, plan, planResult, leadTypeSent) {
 }
 
 exports.handler = async (event) => {
+  // Inert (no hub call, nothing wrapped) unless HUB_SIDE_BY_SIDE lists lofty_write.
+  const side = leadSideBySide({ startedAt: Date.now() });
+  try {
+    return await handleLead(event, side);
+  } finally {
+    // After everything below: compares the hub's dry run with what this function sent, and records the row.
+    await side.finish();
+  }
+};
+
+async function handleLead(event, side) {
   const startedAt = Date.now();
   try {
     const apiKey = process.env.LOFTY_API_KEY;
@@ -294,6 +308,11 @@ exports.handler = async (event) => {
     const homeProperty = homeValueProperty(formName, data);
     if (homeProperty) body.property = homeProperty;
 
+    // The side-by-side check (off unless HUB_SIDE_BY_SIDE lists lofty_write): the hub's dry run of this same push is
+    // asked now, before this function's own lookup and create, and runs alongside them; nothing waits for it.
+    side.lead({ body, plan, data, triggerTag: TRIGGER_TAG, property: homeProperty, submissionId,
+      label: SOURCE_LABELS[formName] || formName });
+
     // 2026-09-29: ask Lofty first whether this person is already a contact
     // (exact email and phone searches, in parallel, capped at 2 seconds in total --
     // lib/_lofty-returning.js). A returning lead's note, call-back task and phone
@@ -301,7 +320,12 @@ exports.handler = async (event) => {
     // instead of the absorbed record a merge hands back. Never throws; if Lofty
     // can't answer in time, everything below runs exactly as before.
     const existing = await findExistingLead(data.email, data.phone, apiKey);
+    side.lookedUp(existing, {
+      label: (SOURCE_LABELS[formName] || formName).replace("Signature Property Collection - ", ""),
+      name: data.name, phone: data.phone, email: data.email,
+    });
     if (existing.manualReview) {
+      side.own({ held: existing.error });
       const held = { ok: false, attempted: false, manualReview: true,
         payloadShape: "held for identity review", responseBody: existing.error };
       const emailResult = await sendLeadAlertEmail({
@@ -379,6 +403,7 @@ exports.handler = async (event) => {
     });
 
     if (!result.ok) {
+      side.own({ failed: true });
       console.error(`Lofty API ${result.httpStatus} (payload shape "${result.payloadShape}"): ${result.responseBody}`);
       // The lead is queued for retry by the next scheduled drain
       // (lofty-queue-drain.js), is sitting in Netlify
@@ -504,6 +529,7 @@ exports.handler = async (event) => {
       : provenNew ? await placeInquiry(newLeadId, inquiry, apiKey)
       : { attempted: false, reason: "not a proven-new contact; the search is in the note" };
 
+    side.own({ existing, newLeadId, leadId, provenNew });
     const hubIntakeResult = await hubIntake;
     if (hubIntakeResult.attempted) {
       console.log(`Value review to the hub for "${formName}": ${hubIntakeResult.ok ? `${hubIntakeResult.hubStatus}` +
@@ -520,4 +546,4 @@ exports.handler = async (event) => {
     console.error("submission-created function error:", err);
     return { statusCode: 200, body: "ok (error logged, see function logs)" };
   }
-};
+}
