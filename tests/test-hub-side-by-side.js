@@ -90,7 +90,7 @@ function fakeLofty(seed, opts) {
 // hub runs: every read as for real, every write planned), against a snapshot of this site's Lofty taken when the
 // question arrives; or by echoing the writes this site made in a run with the check off ("agree"); or by failing. --
 let OWN = fakeLofty();
-const HUB = { mode: "toolkit", asks: [], rows: [], recordFails: null, echo: null, tweak: null, other: [] };
+const HUB = { mode: "toolkit", asks: [], rows: [], recordFails: null, echo: null, tweak: null, other: [], probes: [], realWrites: [] };
 function statusOf(o) { return o.ok ? (o.action === "created" ? "created" : "updated") : o.code === "rate_limited" ? "rate_limited" : "held"; }
 
 async function toolkitLead(b) {
@@ -147,8 +147,22 @@ async function hubHandle(url, init) {
     return res(200, { status: "ok", recorded: b.rows.length });
   }
   if (route === "/v1/lofty/lead" || route === "/v1/lofty/task" || route === "/v1/lofty/note") {
-    HUB.asks.push({ route, body: b });
     const m = HUB.mode;
+    // The dry-run probe, answered as the real hub does: a build with dry_run refuses "probe" (400 naming dry_run)
+    // before it reads anything else or looks at a switch; an older build ("old_hub") answers its usual 400 for the
+    // missing email / lead id. The key check, a dead hub and garbage come first, as on the real one.
+    if (b.dry_run === "probe") {
+      HUB.probes.push(route);
+      if (m === "throw") throw new TypeError("fetch failed");
+      if (m === "hang") return new Promise((resolve, reject) => { if (init.signal) init.signal.addEventListener("abort", () => reject(init.signal.reason)); });
+      if (m === "html") return { ok: true, status: 200, headers: { get: () => null }, text: async () => "<html>gateway</html>" };
+      if (m === 401 || m === 403) return res(m, { error: "refused" });
+      if (m === "old_hub") return res(400, { error: route === "/v1/lofty/task" ? "lead_id is required" : "email or phone is required" });
+      return res(400, { error: "dry_run must be true or false" });
+    }
+    HUB.asks.push({ route, body: b });
+    // An older hub does not know dry_run: a real body would be a REAL write. Recorded so the test can prove none came.
+    if (m === "old_hub") { HUB.realWrites.push(route); return res(200, { status: "created", ok: true, action: "created", lead_id: "1" }); }
     if (m === "throw") throw new TypeError("fetch failed");
     if (m === "hang") {
       return new Promise((resolve, reject) => {
@@ -243,16 +257,17 @@ async function run(name, extraEnv) {
   env(extraEnv);
   OWN = fakeLofty(sc.seed(), sc.lofty);
   ownCalls = [];
-  HUB.asks = []; HUB.rows = []; HUB.other = [];
+  HUB.asks = []; HUB.rows = []; HUB.other = []; HUB.probes = []; HUB.realWrites = [];
   for (const k of Object.keys(mem)) delete mem[k];
   S._internal.resetHourly();
+  if (!HUB.keepProbes) S._internal.resetDryRunProbes();
   const before = global.fetch;
   const startLines = lines.length;
   const result = await quiet(() => handler(event(sc.form, sc.data, `sub-${name}`)));
   return {
     result, fetchRestored: global.fetch === before,
     own: norm(ownCalls), blobs: norm(Object.keys(mem).sort().map((k) => [k, mem[k]])), email: norm(HUB.other),
-    asks: HUB.asks.slice(), rows: HUB.rows.slice(), log: lines.slice(startLines),
+    asks: HUB.asks.slice(), rows: HUB.rows.slice(), probes: HUB.probes.slice(), realWrites: HUB.realWrites.slice(), log: lines.slice(startLines),
     writes: ownCalls.filter((c) => c.method !== "GET").map((c) => {
       let body = null;
       try { body = c.raw ? JSON.parse(c.raw) : null; } catch (e) { body = null; }
@@ -290,7 +305,7 @@ const ON = { HUB_SIDE_BY_SIDE: "lofty_write", HUB_SIDE_BY_SIDE_MAX: "200" };
   const base = {};
   for (const name of Object.keys(SCENARIOS)) {
     base[name] = await run(name, {});
-    check(`${name}, switch unset: no dry run asked, no ledger row, fetch untouched`, base[name].asks.length === 0 && base[name].rows.length === 0 &&
+    check(`${name}, switch unset: no dry run asked, no ledger row, fetch untouched`, base[name].asks.length === 0 && base[name].probes.length === 0 && base[name].rows.length === 0 &&
       base[name].fetchRestored && !base[name].log.some((l) => /Side-by-side/.test(l)));
   }
   check("the scenarios do what they are meant to (new contact created, returning one tasked, twins held, a failed push queued)",
@@ -414,6 +429,34 @@ const ON = { HUB_SIDE_BY_SIDE: "lofty_write", HUB_SIDE_BY_SIDE_MAX: "200" };
   const took = Date.now() - t0;
   check("a hub that never answers: hub_timeout after its own 3 s, and the site's own path is byte-identical",
     sameAs(slow, base.newHome) && slow.rows.length === 1 && slow.rows[0].reason === "hub_timeout" && took < 6000, `${took} ms ${why(slow, base.newHome)} ${JSON.stringify(slow.rows)}`);
+  // An older hub-api that does not know dry_run would ignore it and REALLY write: it must never get a real body.
+  HUB.mode = "old_hub";
+  for (const name of ["newHome", "returning"]) {
+    const r = await run(name, ON);
+    check(`an older hub without dry_run, ${name}: probed, never sent a real body, rows not_compared hub_not_ready, the site's own path byte-identical`,
+      sameAs(r, base[name]) && r.probes.length >= 1 && r.asks.length === 0 && r.realWrites.length === 0 &&
+      r.rows.length >= 1 && r.rows.every((x) => x.outcome === "not_compared" && x.reason === "hub_not_ready"),
+      `${why(r, base[name])} probes ${JSON.stringify(r.probes)} asks ${r.asks.length} real ${JSON.stringify(r.realWrites)} ${JSON.stringify(r.rows)}`);
+  }
+  // The answer is remembered: the next submission does not probe again, and still sends nothing real.
+  HUB.keepProbes = true;
+  const again = await run("newHome", ON);
+  HUB.keepProbes = false;
+  check("an older hub, remembered: no second probe, no real body", again.probes.length === 0 && again.asks.length === 0 && again.realWrites.length === 0 &&
+    again.rows.length === 1 && again.rows[0].reason === "hub_not_ready", `${JSON.stringify(again.probes)} ${JSON.stringify(again.rows)}`);
+  HUB.mode = "toolkit";
+  const fresh = await run("newHome", ON);
+  check("a hub that knows dry_run: one probe per route, then the dry run", fresh.probes.join() === "/v1/lofty/lead" &&
+    fresh.asks.length === 1 && fresh.asks[0].body.dry_run === true && fresh.realWrites.length === 0, `${JSON.stringify(fresh.probes)} ${fresh.asks.length}`);
+  for (const [status, body, want] of [[400, { error: "dry_run must be true or false" }, null], [400, { error: "email or phone is required" }, "hub_not_ready"],
+    [404, { error: "not found" }, "hub_not_ready"], [200, { status: "created" }, "hub_bad_answer"], [503, { error: "the Lofty doorway is switched off" }, "hub_off"]]) {
+    S._internal.resetDryRunProbes();
+    env(ON);
+    const fake = async () => ({ ok: status < 300, status, headers: { get: () => "application/json" }, text: async () => JSON.stringify(body) });
+    const got = await S._internal.dryRunReady("/v1/lofty/lead", process.env, 1000, fake);
+    check(`the probe reads ${status} ${JSON.stringify(body.error || body.status)} as ${want === null ? "ready" : want}`, got === want, String(got));
+  }
+  S._internal.resetDryRunProbes();
   HUB.mode = "toolkit";
   for (const f of [503, "throw"]) {
     HUB.recordFails = f;

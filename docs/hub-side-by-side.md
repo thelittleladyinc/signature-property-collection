@@ -68,8 +68,12 @@ from different days the same way.
 - A hub that is slow, down, refusing or answering garbage gives a `not_compared` row with the reason (`hub_timeout`,
   `hub_unreachable`, `hub_refused`, `hub_off`, `hub_not_ready`, `hub_bad_answer`); the site's own failure gives
   `own_failed`. A failed ledger post is logged as a count and never retried.
-- The Lofty questions go to the hub with `dry_run: true` only: the hub reads Lofty as for real and writes nothing. The
-  MLS and town questions are the hub's ordinary reads. Nothing here writes to Lofty, MLS Grid or this site's Blobs.
+- The Lofty questions go to the hub with `dry_run: true` only: the hub reads Lofty as for real and writes nothing.
+  Before the first one on each route, the route is probed with `{ dry_run: "probe" }`: only a hub-api that knows
+  dry runs (0079) refuses that with a 400 naming `dry_run`. An older hub-api would ignore `dry_run` and really write,
+  so after any other answer it is never sent a real body and the rows read `hub_not_ready` (remembered an hour for
+  a yes, 10 minutes for a no; `dryRunReady` in `lib/_hub-side-by-side.js`). The MLS and town questions are the hub's
+  ordinary reads. Nothing here writes to Lofty, MLS Grid or this site's Blobs.
 - The hub's dry-run answer holds the person's details; it is compared in memory and dropped. Rows carry field names
   only and the record's key only as `parityKey`'s hash; log lines carry counts and field names.
 - With `LOFTY_VIA_HUB=on` (the site already goes through the hub) the Lofty comparison asks nothing; with

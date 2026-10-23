@@ -26,8 +26,10 @@
 //     what they are with it off, whatever the hub does (slow, down, refusing, answering garbage). Every entry point
 //     here is wrapped and never throws.
 //   - It never writes to Lofty, MLS Grid or the hub's own data. The Lofty questions go to the hub with dry_run: true
-//     ONLY (the hub reads Lofty as for real and answers the requests it WOULD send, sending none); the MLS and town
-//     questions are the hub's ordinary reads. The one write is the ledger row.
+//     ONLY (the hub reads Lofty as for real and answers the requests it WOULD send, sending none), and only after a
+//     probe ({ dry_run: "probe" }) shows the hub knows dry_run: an older hub-api would ignore it and really write, so
+//     it is never sent a real body (dryRunReady). The MLS and town questions are the hub's ordinary reads. The one
+//     write is the ledger row.
 //   - Short time limits: 3 s on the form handler (a request path), 8 s in a scheduled job, and never past the
 //     platform's own limit (Netlify: about 10 s for the form handler, 30 s for a scheduled function): with too little
 //     time left the question is not asked (reason "skipped").
@@ -169,6 +171,47 @@ async function ask(make, env, timeoutMs, baseFetch) {
   const at = Date.now();
   if (ans && ans.ok && ans.body && typeof ans.body === "object") return { ok: true, body: ans.body, at };
   return { ok: false, reason: reasonFor(ans, state), status: ans && ans.status, at };
+}
+
+// The dry-run probe. Before the first dry run on a Lofty write route, the route is asked something only a hub that
+// knows dry_run can answer: { dry_run: "probe" }. A hub with the option (0079, toolkit 0.5.2) refuses it with a 400
+// naming dry_run before it reads anything else or looks at a switch (writeRequest in the hub's lofty.ts). An older
+// hub-api does not know dry_run: it would ignore it on a real body and REALLY write (a second lead, task or tag), so
+// it is never sent one. Asked the probe, an older hub answers 400 for the missing email or lead id (nothing written)
+// or 503 for a closed switch. Remembered in this instance's memory: an hour for a yes, 10 minutes for a no; a timeout,
+// an unreachable hub, a 429 or a 5xx other than a closed switch is not remembered. -> null (ready) | a ledger reason
+const DRY_RUN_PROBE_OK_MS = 3600000;
+const DRY_RUN_PROBE_BAD_MS = 600000;
+const dryRunProbes = new Map();
+async function dryRunReady(path, env, timeoutMs, baseFetch) {
+  const seen = dryRunProbes.get(path);
+  if (seen && Date.now() - seen.at < (seen.reason ? DRY_RUN_PROBE_BAD_MS : DRY_RUN_PROBE_OK_MS)) return seen.reason;
+  const { client, state } = hubClient(env, timeoutMs, baseFetch);
+  let ans;
+  try { ans = await client.call("POST", path, { dry_run: "probe" }); } catch (err) { ans = null; }
+  const error = ans && ans.body && typeof ans.body === "object" ? String(ans.body.error || "") : "";
+  let reason;
+  if (ans && ans.status === 400 && /\bdry_run\b/.test(error)) reason = null;
+  // A 2xx to a probe: the route did not check the option, so it is never sent a real body.
+  else if (ans && ans.ok) reason = "hub_bad_answer";
+  // A build without the option (or without the route).
+  else if (ans && (ans.status === 400 || ans.status === 404)) reason = "hub_not_ready";
+  else reason = reasonFor(ans, state);
+  const keep = reason === null || reason === "hub_not_ready" || reason === "hub_bad_answer" || reason === "hub_off" ||
+    !!(ans && (ans.status === 401 || ans.status === 403));
+  if (keep) dryRunProbes.set(path, { reason, at: Date.now() });
+  return reason;
+}
+
+// A dry run on a Lofty write route, only after its probe says the hub knows dry_run; both inside one time limit.
+// -> as ask()
+async function dryRunAsk(path, make, env, timeoutMs, baseFetch) {
+  const started = Date.now();
+  const no = await dryRunReady(path, env, timeoutMs, baseFetch);
+  if (no) return { ok: false, reason: no, at: Date.now() };
+  const left = timeoutMs - (Date.now() - started);
+  if (left < 250) return { ok: false, reason: "hub_timeout", at: Date.now() };
+  return ask(make, env, left, baseFetch);
 }
 
 async function keyFor(text) {
@@ -582,7 +625,7 @@ function makeLeadSide(o) {
         if (askMs() < 500) { st.leadAsk = Promise.resolve({ ok: false, reason: "skipped", at: Date.now() }); return; }
         const ask0 = buildLeadAsk(i, formTags);
         st.ctx.askedTags = ask0.tags;
-        st.leadAsk = ask((c) => c.loftyLead(ask0, { dryRun: true }), o.env, askMs(), baseFetch());
+        st.leadAsk = dryRunAsk("/v1/lofty/lead", (c) => c.loftyLead(ask0, { dryRun: true }), o.env, askMs(), baseFetch());
       } catch (err) { /* never in the way */ }
     },
     // Called once the site's own lookup has answered. A returning contact (found by email) gets the Call task: the
@@ -595,7 +638,7 @@ function makeLeadSide(o) {
         st.taskAskedAt = Date.now();
         if (askMs() < 500) { st.taskAsk = Promise.resolve({ ok: false, reason: "skipped", at: Date.now() }); return; }
         const t = { lead_id: String(existing.leadId), content, due_in_minutes: 30, push_reminder: true };
-        st.taskAsk = ask((c) => c.loftyTask(t, { dryRun: true }), o.env, askMs(), baseFetch());
+        st.taskAsk = dryRunAsk("/v1/lofty/task", (c) => c.loftyTask(t, { dryRun: true }), o.env, askMs(), baseFetch());
       } catch (err) { /* never in the way */ }
     },
     // What the site's own push came to: { held } | { failed } | { existing, newLeadId, leadId, provenNew }.
@@ -969,6 +1012,7 @@ module.exports = {
   _internal: {
     buildLeadAsk, classifyWrite, writesSummary, ownLeadRecord, hubLeadRecord, taskRecordFrom, hubTaskRecord, specFor,
     compareListing, compareOnMarket, townRows, reasonFor, resetHourly, resetWarnings: () => warned.clear(),
+    resetDryRunProbes: () => dryRunProbes.clear(), dryRunReady,
     SPEC_CREATED, SPEC_UPDATED, SPEC_LISTING, SPEC_TOWN,
   },
 };
