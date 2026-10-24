@@ -87,7 +87,7 @@ const {
   ensureWebsiteFields, setWebsiteFields, websiteFieldValues, inquiryFromForm, placeInquiry,
 } = require("./_lofty-returning");
 const { addLoftyNote, refireLoftyTag, addPlanTags, BRAND_SITE } = require("./_notify");
-const { loftyViaHub, pushLeadViaHub, confirmCreated } = require("./_lofty-hub");
+const { loftyViaHub, pushLeadViaHub, confirmCreated, hubExtraResult } = require("./_lofty-hub");
 const crypto = require("crypto");
 
 // Must match submission-created.js TRIGGER_TAG (pinned by tests/test-queue-replay-steps.js).
@@ -524,7 +524,17 @@ async function replayViaHub(entry, ctx) {
   if (planned.leadTypes.length) lead.leadTypes = planned.leadTypes.slice();
   // An earlier hub attempt for this entry that got as far as making the contact.
   const prior = entry.hub && entry.hub.leadId ? entry.hub : null;
-  const result = await postLead(lead, apiKey, { deadline, withoutNote: !!(prior && prior.noteAdded) });
+  // 2026-10-24: the same push the live form path makes, every option included: the
+  // form's tags in the create body except the trigger tag (it goes on after the
+  // create, so its plan starts), the home's address (on the queued body), the
+  // website fields and the search wishes (the hub writes them only on a contact
+  // this push created), and the yes to texts.
+  const data = entry.formData || null;
+  const label = String(lead.source || entry.formName || "website").replace("The Little Lady Sells Homes - ", "");
+  const websiteFields = data ? websiteFieldValues(lead.source || label, data) : [];
+  const inquiry = data ? inquiryFromForm(data) : null;
+  const result = await postLead(lead, apiKey, { deadline, withoutNote: !!(prior && prior.noteAdded),
+    triggerTag: REPLAY_TRIGGER_TAG, websiteFields, inquiry, smsYes: entry.smsConsent === true });
   if (!result.ok) {
     if (result.manualReview) {
       const flagged = { ...entry, ...result, manualReview: true, heldReason: result.reason, reason: result.reason };
@@ -546,6 +556,9 @@ async function replayViaHub(entry, ctx) {
   // hub created it added the tags after the create, so neither step runs again.
   const steps = { note: { attempted: true, ok: !!(h.noteAdded || (prior && prior.noteAdded)), viaHub: true, step: "with-push" } };
   if (newId) steps.tag = { attempted: false, ok: true, tagRestored: true, viaHub: true, step: "hub-tags-after-create" };
+  // The website fields and the search wishes rode on the push: never this site's own key for them.
+  if (websiteFields.length) steps.fields = hubExtraResult("fields", h, websiteFields);
+  if (inquiry) steps.inquiry = hubExtraResult("inquiry", h, inquiry);
   let consentHeld = 0;
   const consent = await applyTextingPreference(h.leadId, consentPhoneOf(entry.lead), entry.smsConsent === true, apiKey, { deadline });
   if (entry.smsConsent === true && !consent.textingEnabled) consentHeld = 1;

@@ -75,6 +75,10 @@ const {
 // 2026-10-23: the side-by-side check with the hub (lib/_hub-side-by-side.js, docs/hub-side-by-side.md). OFF unless
 // HUB_SIDE_BY_SIDE lists lofty_write; it never changes what this function sends to Lofty, when, or what it returns.
 const { leadSideBySide } = require("./lib/_hub-side-by-side");
+// 2026-10-24: with LOFTY_VIA_HUB=on the push carries every option today's own-key
+// path writes (lib/_lofty-hub.js), and the website fields / search wishes are read
+// from the hub's answer instead of being written here.
+const { hubExtraResult } = require("./lib/_lofty-hub");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
 
@@ -363,7 +367,14 @@ async function handleLead(event, side) {
 
     // Both attempts at the create finish by this deadline, so the backup email
     // below always has time to go out (lib/_lofty.js MIN_RETRY_MS).
-    const result = await postLead(body, apiKey, { deadline: startedAt + CREATE_DEADLINE_MS });
+    // 2026-10-24: what the hub path needs to do everything this path does (lib/_lofty-hub.js; ignored on today's
+    // path): the trigger tag (kept out of the create body so it goes on after the create and starts its plan), the
+    // four website fields and the search wishes (the hub writes them only on a contact it created).
+    const websiteFields = websiteFieldValues(SOURCE_LABELS[formName] || formName, data);
+    const hubPushExtras = {
+      triggerTag: TRIGGER_TAG, websiteFields, inquiry: inquiryFromForm(data),
+    };
+    const result = await postLead(body, apiKey, { deadline: startedAt + CREATE_DEADLINE_MS, ...hubPushExtras });
     // The store is only needed for diagnostics, so a Blobs problem must not
     // prevent the push itself -- it's fetched after the lead has already gone.
     let store = null;
@@ -514,7 +525,10 @@ async function handleLead(event, side) {
     // other custom fields is undocumented, so an existing record is never touched.
     // (newLeadId and provenNew are worked out above, before the plan tag.)
     let fieldsResult = { attempted: false };
-    if (provenNew) {
+    if (result.viaHub) {
+      // Through the hub: written by the push itself, only on a contact it created (never this site's own key).
+      fieldsResult = hubExtraResult("fields", result.hub, websiteFields);
+    } else if (provenNew) {
       const ensured = await ensureWebsiteFields(store, apiKey);
       fieldsResult = ensured.ok
         ? await setWebsiteFields(newLeadId, websiteFieldValues(stampedSource, data), apiKey)
@@ -526,6 +540,7 @@ async function handleLead(event, side) {
     // the fields above; lib/_lofty-returning.js explains both.
     const inquiry = inquiryFromForm(data);
     const inquiryResult = !inquiry ? { attempted: false }
+      : result.viaHub ? hubExtraResult("inquiry", result.hub, inquiry)
       : provenNew ? await placeInquiry(newLeadId, inquiry, apiKey)
       : { attempted: false, reason: "not a proven-new contact; the search is in the note" };
 

@@ -58,6 +58,12 @@
 const {
   LOFTY_KEYS, MINE_STATUSES, AGENT_SURNAME, inferCountyFromCity,
 } = require("./_mls-shared");
+// 2026-10-24: with LOFTY_VIA_HUB=on (lib/_lofty-hub.js) both reads go through the
+// Seller Intelligence hub's POST /v1/lofty/read -- the search as resource
+// listing_search, the details as resource listings -- and this site's own key is
+// never sent. The hub answers Lofty's own JSON, so everything below reads it
+// exactly as it reads Lofty's answer today.
+const { loftyViaHub, readViaHub } = require("./_lofty-hub");
 
 const LOFTY_API = "https://api.lofty.com";
 const SEARCH_PATH = "/v2.0/listings/search";
@@ -258,7 +264,41 @@ function slimForStorage(l) {
 
 // ---- HTTP ------------------------------------------------------------------
 
+// The hub read for one of the two Lofty requests this file makes, or null.
+function hubReadFor(method, path, body) {
+  if (method === "POST" && path === SEARCH_PATH) {
+    const b = body || {};
+    return {
+      resource: "listing_search", search_scope: b.searchScope || "all", page_num: b.pageNum || 1, page_size: b.pageSize || PAGE_SIZE,
+      ...(Array.isArray(b.sortFields) ? { sort_fields: b.sortFields } : {}),
+      ...(b.filterConditions && typeof b.filterConditions === "object" ? { filter_conditions: b.filterConditions } : {}),
+    };
+  }
+  if (method === "GET" && path.startsWith(`${DETAILS_PATH}?`)) {
+    const q = new URLSearchParams(path.slice(DETAILS_PATH.length + 1));
+    const ids = String(q.get("mlsListingIds") || "").split(",").map((x) => x.trim()).filter(Boolean);
+    const limit = parseInt(q.get("limit"), 10);
+    return { resource: "listings", mls_ids: ids, ...(Number.isInteger(limit) && limit > 0 ? { limit } : {}) };
+  }
+  return null;
+}
+
+// The same request through the hub. Throws a LoftyError like the direct call, with
+// the status withRetry reads (Lofty's own when the hub passed one on; 429 when the
+// hub is rate limited; 0 when the hub could not be asked).
+async function loftyRequestViaHub(method, path, { body, fetchImpl, timeoutMs } = {}) {
+  const ask = hubReadFor(method, path, body);
+  if (!ask) throw new LoftyError(`no hub read for ${method} ${String(path).split("?")[0]}`, 0);
+  const r = await readViaHub(ask, { fetch: fetchImpl, timeoutMs: timeoutMs || REQUEST_TIMEOUT_MS });
+  if (!r.ok) throw new LoftyError(`Lofty through the hub: ${r.error}`, r.httpStatus, r.status);
+  if (!r.data || typeof r.data !== "object") {
+    throw new LoftyError(`Lofty answered HTTP ${r.httpStatus} with something that is not JSON (through the hub)`, r.httpStatus);
+  }
+  return r.data;
+}
+
 async function loftyRequest(method, path, { apiKey, body, fetchImpl, timeoutMs } = {}) {
+  if (loftyViaHub()) return loftyRequestViaHub(method, path, { body, fetchImpl, timeoutMs });
   const doFetch = fetchImpl || fetch;
   const res = await doFetch(LOFTY_API + path, {
     method,

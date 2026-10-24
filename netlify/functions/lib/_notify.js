@@ -228,13 +228,14 @@ function stopContactStep(payload, tags) {
 }
 
 // The hub path's stand-in for the re-fire (LOFTY_VIA_HUB=on). For a contact the
-// hub created there is nothing to do: it added the tags after the create, so
-// Lofty records them as added and the Smart Plan starts. A tag already on a
-// contact the hub found cannot be taken off and put back (the hub has no route
-// that removes a tag), so a returning contact gets what one found by email has
-// always got: the Call task and the push to her phone (lib/_lofty-returning.js,
-// this site's own key -- the hub has no task route yet -- and only after the
-// hub's consent route says the lead may be called).
+// hub created there is nothing to do: the trigger tag went on after the create
+// (the form's other tags rode in the create body), so Lofty records it as added
+// and the Smart Plan starts. A tag already on a contact the hub found cannot be
+// taken off and put back (the website profile at the hub removes no tag), so a
+// returning contact gets what one found by email has always got: the Call task
+// and the push to her phone -- through the hub's POST /v1/lofty/task since
+// 2026-10-24 (lib/_lofty-returning.js alertReturningLead), which holds it on Do
+// Not Contact, #dnc, cannotCall or an unreadable lead.
 async function afterHubPush(leadId, apiKey, opts) {
   const next = hub.afterPush(leadId);
   if (next.kind === "new") {
