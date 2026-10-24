@@ -1,5 +1,11 @@
 // MLS reads through the Seller Intelligence hub (wave 2a, 2026-10-17). OFF unless MLS_SOURCE is exactly "hub".
 //
+// ONE COPY, BOTH SITES (2026-10-24). Byte-identical in signature-property-collection and thelittleladysellshomes
+// (each site's tests compare it with the other checkout when present). On the Signature site it serves the
+// market-data run and the on-market check in sync-listings.js; on the main site, the same on-market check in
+// lib/_mls-onmarket.js (her listings refreshed by hand there read the Signature site's stored copy). "This site"
+// below means whichever site runs it.
+//
 // WHY. This site, Listing Engine and Expired Elite shared ONE MLS Grid account, and MLS Grid suspends a token for
 // the whole account's traffic (2026-08-01). The hub (sellerintelligence hub-api) now keeps its own copy of the
 // IRES feed and is the one MLS Grid reader; every app asks it instead. docs/mls-via-hub.md has the whole story,
@@ -209,6 +215,70 @@ async function hubOnMarket(client, id) {
   return { onMarket, status, why: onMarket ? "" : `the MLS has it as ${status || "not viewable"}` };
 }
 
+// ---- Her listings the hub removed (2026-10-24, nothing lost) ------------------------------------------------
+// The one place the hub's answer to "is this listing on the market?" was poorer than MLS Grid's. MLS Grid keeps
+// sending a listing it hides (Expired, Canceled, Withdrawn, Hold: MlgCanView=false) for about a week, so its
+// single-listing lookup answers "off the market" with the real status. The hub deletes such a record at once
+// (unless its off-market keep switch is on and the key carries mls:offmarket), so its lookup answers "no record" --
+// and for a listing Lofty says was listed in the last 7 days the confirmers' grace rule turns "no record" into
+// "unknown", which KEEPS the listing on the site. MLS Grid would have hidden it.
+//
+// So the hub market-data run (sync-listings.js hubMarketDataRun) remembers each of HER stored listings it removes,
+// with the reason, in HUB_REMOVED_MINE_KEY ({ [listingId]: { at, status } }, kept HUB_REMOVED_KEEP_DAYS days, a
+// listing forgotten the moment the hub serves it again). In hub mode a confirmer that hears "no record" first asks
+// this memory: a listing the hub removed is "off the market", exactly MLS Grid's answer; anything else goes on to
+// the grace rule as before. Her listings only, so the blob stays a handful of entries.
+const HUB_REMOVED_MINE_KEY = "hub-removed-mine.json";
+const HUB_REMOVED_KEEP_DAYS = 30;
+
+// The memory as stored, or {} for nothing / a malformed blob. A failed READ is the caller's to handle (it must
+// not then write, or it would replace the memory with only this run's entries).
+function removedMemory(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out = {};
+  for (const [id, v] of Object.entries(raw)) {
+    if (id && v && typeof v === "object" && typeof v.at === "string") out[id] = { at: v.at, status: String(v.status || "") };
+  }
+  return out;
+}
+
+// Note one removal (true when the memory changed). `status` is why: the MLS status the hub reported, or a phrase.
+function noteRemoved(memory, listingId, status, nowMs) {
+  if (!memory || !listingId) return false;
+  memory[listingId] = { at: new Date(nowMs || Date.now()).toISOString(), status: String(status || "removed by the MLS") };
+  return true;
+}
+
+// The hub serves it again (back on the market): forget it. True when the memory changed.
+function forgetRemoved(memory, listingId) {
+  if (!memory || !listingId || !Object.prototype.hasOwnProperty.call(memory, listingId)) return false;
+  delete memory[listingId];
+  return true;
+}
+
+// Drop entries older than the keep window. True when the memory changed.
+function pruneRemoved(memory, nowMs) {
+  let changed = false;
+  const limit = (nowMs || Date.now()) - HUB_REMOVED_KEEP_DAYS * 24 * 3600e3;
+  for (const [id, v] of Object.entries(memory || {})) {
+    const t = Date.parse((v && v.at) || "");
+    if (!Number.isFinite(t) || t < limit) { delete memory[id]; changed = true; }
+  }
+  return changed;
+}
+
+// For a confirmer in hub mode: the hub said "no record of it"; did the hub remove it? Returns MLS Grid's answer
+// (off the market, with the status) or null (not remembered: the grace rule decides, as before). Accepts the id
+// with or without the IRE prefix, like the hub.
+function rememberedRemoval(memory, id) {
+  if (!memory) return null;
+  const key = Object.keys(memory).find((k) => sameListingId(k, id));
+  if (!key) return null;
+  const v = memory[key];
+  const status = v.status || "removed by the MLS";
+  return { onMarket: false, status, why: `the MLS no longer shows it (the hub removed it on ${v.at.slice(0, 10)}: ${status})` };
+}
+
 module.exports = {
   mlsSource,
   gridListingsRefused,
@@ -220,6 +290,13 @@ module.exports = {
   recordFromHubRow,
   isWithheld,
   hubOnMarket,
+  HUB_REMOVED_MINE_KEY,
+  HUB_REMOVED_KEEP_DAYS,
+  removedMemory,
+  noteRemoved,
+  forgetRemoved,
+  pruneRemoved,
+  rememberedRemoval,
   HUB_PAGE_SIZE,
   HUB_PAGE_TIMEOUT_MS,
   HUB_LOOKUP_TIMEOUT_MS,

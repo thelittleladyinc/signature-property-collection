@@ -26,6 +26,40 @@ two things on this site still read MLS Grid. Both move:
 The same record shape is guaranteed by cutting each hub row down to exactly the fields the MLS Grid crawl
 selects (`SELECT_FIELDS`) and passing it through the same `mapListing()`.
 
+**The town figures (2026-10-24).** `build/data/town_market.json` (the town pages' active count, median list price
+and median $/sqft) is written by `.github/workflows/town-market.yml` twice a week. By default it is computed from the
+copy above (`build/tools/town-market-stats.js`, Blobs secrets `BLOBS_SITE_ID` / `BLOBS_TOKEN`), so with
+`MLS_SOURCE=hub` it is already hub data. With the GitHub repository **variable** `TOWN_STATS_SOURCE` = `hub` the
+workflow instead takes the hub's own `GET /v1/market/towns` (`town-market-stats.js --source hub`): the same file
+shape, computed by the hub with this script's rules from its one copy, the very numbers the main site
+(thelittleladysellshomes) takes with its own `TOWN_STATS_SOURCE=hub`, and no Blobs secret needed. It needs the
+repository variable `HUB_API_URL` and the repository secret `HUB_API_KEY` (a hub key with the scope `market:read`).
+The answer goes through the main site's checks (shape, `generated_at` a real date that is not in the future, not
+past the 21-day window and not older than the committed file, no town under 5 listings, not more than 5% fewer towns
+than the committed file); on any failure the run fails (red) and the committed file is left as it was, so the pages
+keep their last good figures until build.py's own 21-day limit withholds them. The file then says `via: "hub"`,
+`source: "hub-mls"` and carries the hub's three extra per-town figures (`median_dom`, `pct_reduced`, `new_30d`),
+which build.py does not show. Tests: `tests/test-townmarket-hub.js`.
+
+**Nothing lost on a listing the MLS hides in its first week (2026-10-24).** MLS Grid keeps sending a listing it
+hides (Expired, Canceled, Withdrawn, Hold: `MlgCanView=false`) for about a week, so its single-listing lookup says
+"off the market". The hub deletes such a record at once (unless its off-market keep switch is on and the key has
+`mls:offmarket`), so its lookup says "no record" -- and for a listing Lofty says was listed in the last 7 days the
+grace rule turns "no record" into "unknown", which would have KEPT it on the site. So the hub run remembers each of
+her stored listings it removes, with the reason (`hub-removed-mine.json` in the same Blobs store, kept 30 days,
+forgotten the moment the hub serves the listing again), and in hub mode the check reads that first: a listing the
+hub removed is "off the market", exactly MLS Grid's answer. A brand-new listing the hub has simply not seen yet is
+still "unknown" (grace unchanged). An unreadable memory is never rewritten. `lib/_mls-hub.js`
+(`HUB_REMOVED_MINE_KEY`), tests `tests/test-mls-via-hub.js` section 10.
+
+**Listing pages are dated by their listing (2026-10-24).** `/listing/<id>` is rendered from a shell build.py writes
+at build time, so its `og:updated_time` and `last-modified` tags and the agent entity's `dateModified` carried the
+deploy's date on every listing page. `listing-page.js` now dates the page by the listing's own
+`modificationTimestamp` (the MLS's or Lofty's change time), claims no date when there is none, and drops the agent
+entity's date (as the main site's postprocess does on every static page). The same change stops the listing schema
+being a `<script>` inside the shell's own `<script type="application/ld+json">` (it was unreadable).
+`tests/test-listing-page-dates.js`.
+
 **When the hub copy has no copy yet** (fresh store), **when the copy has never been checked against the hub**
 (`hubReconciledAt` unset in `sync-state.json`: the first run after switching from MLS Grid), or when the deletion
 list no longer reaches back to the last pass (the hub keeps 30 days), the run reads a full snapshot (Active,
@@ -113,7 +147,7 @@ the hub both deleting hidden listings and answering withheld stubs.
 | A change reaches the market-data copy | ≤ 30 min after MLS Grid has it (crawl every 30 min, `*/30`) | ≤ 15 min at the hub + ≤ 15 min until the next read (`*/30` + `15,45`) = **≤ 30 min** |
 | Her Lofty listing hidden once the MLS says off-market | ≤ 60 min (copy ≤ 30, then the next 30-min Lofty refresh reads it) | ≤ 60 min (copy ≤ 30; read by the next Lofty refresh, ≤ 15 or 30 min later) |
 | A single-listing check (only for a listing the copy does not hold) | live MLS Grid answer at the next Lofty refresh (≤ 30 min); kept 24 h | the hub's copy (≤ 15 min behind) at the next Lofty refresh (≤ 45 min); kept 24 h |
-| Town figures on the town pages | `town-market.yml` Mon + Thu 13:20 UTC (≤ ~3.5 days + the copy's lag) | unchanged |
+| Town figures on the town pages | `town-market.yml` Mon + Thu 13:20 UTC (≤ ~3.5 days + the copy's lag) | same schedule; with `TOWN_STATS_SOURCE=hub` the hub's snapshot, which it refreshes after every sync that changed listings (≤ ~3.5 days + up to a day) |
 | Requests per day | MLS Grid: ~48 crawl pages + ≤ 96 lookups (unchanged in MLS Grid mode) | hub: ~192 (one deletion-list + one search call every 15 min) + ≤ 96 lookups; MLS Grid: **0** |
 
 Why the extra run: reading the hub only every 30 minutes would see a change up to 45 minutes late (15 at the
@@ -127,14 +161,14 @@ to sync every 5 minutes on Christine's word, which would make the copy ≤ 20 mi
 
 | Missing / different | This site |
 |---|---|
-| Photos (`Media`) | The copy is market data only; stored photo fields are kept as they were (as the MLS Grid background run already does). No MLS Grid photo is fetched in hub mode. Public MLS listing pages need photos → `LISTINGS_SOURCE=mlsgrid` is refused. |
+| Photos (`Media`) | The copy is market data only; stored photo fields are kept as they were (as the MLS Grid background run already does). No MLS Grid photo is fetched in hub mode. Her own listings' photos come from Lofty (the default listing source), never from MLS Grid, in both modes. Public MLS listing pages for every brokerage need photos → `LISTINGS_SOURCE=mlsgrid` is refused: the hub's photos are on demand (`POST /v1/mls/watch`, at most 25 listings an app by default), not the ~15,000 listings that mode shows. That mode is not in use (Lofty since 2026-09-28). |
 | Agent names without the `mls:agents` scope | Her own listings are told apart by agent name, so a page of rows with no agent fields is **refused** (nothing applied, "the hub key has no mls:agents scope…"). The key needs `mls:agents`. |
 | `PrivateRemarks`, `SyndicationRemarks`, `OnMarketDate`, taxes, HOA, schools, `BathroomsTotalDecimal`, … | Not used by this site. |
 | `PublicRemarks` only on IDX rows | Same as MLS Grid's IDX feed; used for the waterfront / equestrian flags, then dropped for other brokerages' listings. |
 | Extra fields the hub does send (`ListOfficeName`, `ListOfficeMlsId`, coordinates, dates, `OriginalListPrice`) | Not stored, so the record shape stays identical to the MLS Grid copy. `ListOfficeName` (which MLS Grid rejects on this feed) is available if attribution is ever wanted. |
 | Records from MLS systems other than `ires` | This site reads `ires` only either way. |
 | Formats | Prices to the cent, strings trimmed, timestamps ISO with milliseconds, `StandardStatus` falling back to `MlsStatus`. With real IRES data these are the same values; a City with stray spaces or a sub-cent price would be stored trimmed / rounded. |
-| An Expired listing the hub dropped (no `mls:offmarket`) | The on-market check sees "no record" rather than "Expired": still off the market — except a listing Lofty says was listed in the last 7 days, which the grace rule then keeps as "unknown" (MLS Grid would have said off-market). |
+| An Expired listing the hub dropped (no `mls:offmarket`) | The on-market check sees "no record" rather than "Expired": still off the market. For a listing Lofty says was listed in the last 7 days the hub run's memory of her removed listings answers "off the market", as MLS Grid did (see "Nothing lost on a listing the MLS hides in its first week" above); `mls:offmarket` is not needed. |
 | ListingId with or without the `IRE` prefix | The hub matches both; MLS Grid's filter is exact. Lofty's ids always carry the prefix. |
 
 ## Where this site stores and reads the MLS Grid token
@@ -159,13 +193,19 @@ Read at:
 2. This site's hub key needs the scopes **`mls:read`** and **`mls:agents`**. Not `mls:bo` (never for a public
    site) and not `mls:offmarket` (not needed; the site works the same with or without it).
    If this site already has a hub key from the Lofty doorway (wave 1b), add the two scopes to it with
-   `hub_api.grant_key_scopes`; otherwise issue one.
+   `hub_api.grant_key_scopes`; otherwise issue one. The town figures from the hub (optional, step 5) need
+   **`market:read`** on the key held in this repository's GitHub secret `HUB_API_KEY`.
 3. Netlify → signature-property-collection → Site configuration → Environment variables:
    `HUB_API_URL` and `HUB_API_KEY` (already there if wave 1b is on), and **`MLS_SOURCE` = `hub`**.
    Leave `LISTINGS_SOURCE` unset (Lofty). Redeploy so the new :15/:45 schedule is picked up.
 4. Check `/site-health`: the row "Market data from the hub refreshing (optional)" turns green within
    15 minutes and says "no MLS Grid request is made". `/.netlify/functions/mls-usage` should show this site's
    MLS Grid requests falling to zero.
+5. Town figures from the hub (optional; the figures are already hub data after step 3): GitHub → this repository →
+   Settings → Secrets and variables → Actions: variable **`TOWN_STATS_SOURCE` = `hub`**, variable `HUB_API_URL`,
+   secret `HUB_API_KEY` (scope `market:read`). Then Actions → "town market data" → Run workflow: the run says
+   "taking the town figures from the hub" and commits "Refresh town market figures from the hub" when the figures
+   moved. To go back: delete the variable `TOWN_STATS_SOURCE`.
 
 To go back: unset `MLS_SOURCE` (or set it to `mlsgrid`) and redeploy. The copy, its checkpoint and the
 verdict cache carry straight back to MLS Grid; nothing to rebuild (needs `MLSGRID_API_TOKEN` still set).

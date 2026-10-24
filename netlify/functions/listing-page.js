@@ -158,7 +158,24 @@ function render(shellHtml, fields) {
   for (const [key, value] of Object.entries(fields)) {
     out = out.split(`{{${key}}}`).join(value);
   }
-  return out;
+  return datePage(out, fields.DATA_DATE);
+}
+
+// 2026-10-24 ("a build date is not a content modification date"). The shell is
+// generated at build time, so its og:updated_time and last-modified tags and the
+// RealEstateAgent's dateModified all carried the DEPLOY's date -- on every listing
+// page, moved by every deploy, whatever the listing did. A listing page is dated by
+// its own listing instead: the record's modificationTimestamp (the MLS's or Lofty's
+// own change time), and no date at all when there is none (the not-found and
+// unavailable pages). The agent entity carries no date, as on every static page of
+// the main site (its build/postprocess_audit_fixes.py drops it for the same reason).
+function datePage(html, when) {
+  const t = Date.parse(typeof when === "string" ? when : "");
+  const day = Number.isFinite(t) ? new Date(t).toISOString().slice(0, 10) : null;
+  return html
+    .replace(/<meta property="og:updated_time" content="[^"]*">\n?/, day ? `<meta property="og:updated_time" content="${day}">\n` : "")
+    .replace(/<meta name="last-modified" content="[^"]*">\n?/, day ? `<meta name="last-modified" content="${day}">\n` : "")
+    .replace(/("@type":\s*"RealEstateAgent"[\s\S]{0,4000}?),\s*"dateModified":\s*"\d{4}-\d{2}-\d{2}"/, "$1");
 }
 
 // Rule 26 disclaimer -- same content as _mls_disclaimer_html() in build.py.
@@ -732,8 +749,11 @@ exports.handler = async (event) => {
         DESCRIPTION: description,
         CANONICAL: canonical,
         OG_IMAGE: ogImage,
-        SCHEMA: `<script type="application/ld+json">${listingSchema(l, canonical, ogImage)}</script>`,
+        // The shell already wraps {{SCHEMA}} in its own <script type="application/ld+json">; wrapping it here too
+        // nested one script tag inside another and no search engine could read the listing schema (2026-10-24).
+        SCHEMA: listingSchema(l, canonical, ogImage),
         BODY: listingBody(l, state && (state.lastSuccessAt || state.lastRunAt)),
+        DATA_DATE: l.modificationTimestamp || null,
       }),
     };
   } catch (err) {
