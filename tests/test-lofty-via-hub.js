@@ -15,7 +15,14 @@
 //   6. the router copy: off by default, once per submission, rent-to-own included (Christine's lead, intent
 //      rent_to_own), cash offer and FSBO with their own intents (seller_cash, seller_fsbo) and the Lofty side
 //      unchanged, never in the way, no PII in the log;
-//   7. the vendored toolkit copy is untouched (its check.mjs), and the shared files match the other site's.
+//   7. the vendored toolkit copy is untouched (its check.mjs), and the shared files match the other site's;
+//   8. (2026-10-24, Christine: "Move each one, let's start with Lofty ... I need everything live") EVERY own-key
+//      Lofty call goes through the hub with the switch on, with nothing lost: the home-value address, the form's
+//      tags in the create body (only the trigger tag is "added" after the create), the website fields and the
+//      search wishes (only on a contact the hub created), the yes to texts, a long note in parts, the plan tag by
+//      lead id, the returning contact's Call task + push (POST /v1/lofty/task), her listings reads and the /status
+//      probes (POST /v1/lofty/read), and the queue replay with every one of them; the hub's failures queue the
+//      lead (never the own key); the Lofty side-by-side comparison does not run.
 //
 // The same file runs in both repos; only SITE and SIBLING below differ. Nothing here touches the network.
 "use strict";
@@ -47,7 +54,14 @@ function fakeLofty(seed) {
   const leads = new Map((seed || []).map((l) => [l.leadId, JSON.parse(JSON.stringify(l))]));
   const calls = [];
   const notes = [];
+  // Which tags each PUT newly ADDED to a lead (what Lofty counts as "Tag Added", which starts a Smart Plan).
+  const tagEvents = [];
+  const teamFields = new Set();
+  const inquiries = [];
+  const tasks = [];
+  const listings = [];
   let nextId = 9000;
+  const names = (v) => (Array.isArray(v) ? v.map((t) => (typeof t === "string" ? t : t && (t.tagName || t.name))) : []);
   const ten = (v) => String(v && typeof v === "object" ? (v.phone || v.value) : (v == null ? "" : v)).replace(/\D/g, "").slice(-10);
   const emailsOf = (l) => [].concat(l.emails || [], l.email || []).map((e) => String(typeof e === "object" ? e.email || e.value : e).toLowerCase());
   const phonesOf = (l) => [].concat(l.phones || [], l.phone || []).map(ten);
@@ -71,23 +85,38 @@ function fakeLofty(seed) {
     if (method === "PUT" && one) {
       const l = leads.get(Number(one[1]));
       if (!l) return res(404, { message: "not found" });
+      if (body && Array.isArray(body.tags)) {
+        const before = new Set(names(l.tags));
+        const added = names(body.tags).filter((t) => !before.has(t));
+        if (added.length) tagEvents.push({ leadId: l.leadId, added });
+      }
       Object.assign(l, body);
       return res(200, { lead: l });
     }
     if (method === "POST" && p === "/leads") {
       const id = nextId++;
-      leads.set(id, { leadId: id, ...body, tags: [] });
+      // A create keeps the tags it carried (they are on the lead, but Lofty does not count them as "added").
+      leads.set(id, { leadId: id, ...body, tags: Array.isArray(body.tags) ? body.tags.slice() : [] });
       return res(200, { leadId: id });
     }
     if (method === "POST" && p === "/notes") { notes.push(body); return res(200, { noteId: 1 }); }
-    if (/\/v2\.0\/tasks$/.test(u.pathname)) return res(200, { taskId: 77 });
+    if (method === "GET" && p === "/me") return res(200, { userId: 1, account: "test" });
+    if (/\/v2\.0\/listings\/search$/.test(u.pathname)) {
+      return res(200, { listing: listings.map((x) => ({ mlsListingId: x.mlsListingId, mlsOrgId: 1054, agentName: x.agentName })),
+        metadata: { totalCount: listings.length, totalPage: 1, hasMore: false } });
+    }
+    if (method === "GET" && p === "/listing") {
+      const ids = String(u.searchParams.get("mlsListingIds") || "").split(",");
+      return res(200, { listing: listings.filter((x) => ids.includes(x.mlsListingId)) });
+    }
+    if (/\/v2\.0\/tasks$/.test(u.pathname)) { tasks.push({ body: init.body }); return res(200, { taskId: 77 }); }
     if (/send-task-reminder$/.test(u.pathname)) return res(200, { message: "ok" });
-    if (/listCustomField$/.test(u.pathname)) return res(200, { data: [] });
-    if (/custom-field$/.test(u.pathname)) return res(200, {});
-    if (/\/inquiry$/.test(u.pathname)) return res(200, {});
+    if (/listCustomField$/.test(u.pathname)) return res(200, { data: [...teamFields].map((attributeName) => ({ attributeName })) });
+    if (/custom-field$/.test(u.pathname)) { if (body && body.attributeName) teamFields.add(body.attributeName); return res(200, {}); }
+    if (/\/inquiry$/.test(u.pathname)) { inquiries.push({ leadId: (u.pathname.match(/leads\/(\d+)/) || [])[1], body }); return res(200, {}); }
     return res(404, { message: `unknown route ${method} ${p}` });
   }
-  return { fetch, leads, calls, notes };
+  return { fetch, leads, calls, notes, tagEvents, teamFields, inquiries, tasks, listings };
 }
 
 // Hold every GET /leads/{id} until `n` have arrived (or `ms` passed): both writers read before either writes.
@@ -112,6 +141,8 @@ const outcomeJson = (o) => ({
   note_added: o.noteAdded, code: o.code || null, needs_review: o.needsReview === true, match_lead_ids: o.matchLeadIds || [],
   reason: o.reason || null, do_not_contact: o.dncHeld === true, dnc_lost: o.dncLost === true, texting_turned_off: o.textingTurnedOff === true,
   email_turned_off: o.emailTurnedOff === true, merged: o.merged === true, retry_after: o.retryAfterSeconds || null,
+  texting_not_enabled: o.textingNotEnabled || null,
+  ...(o.property ? { address: o.property } : {}), ...(o.createBodyMerged ? { create_body_merged: true } : {}),
 });
 const statusOf = (o) => (o.ok ? (o.action === "created" ? "created" : "updated")
   : o.code === "rate_limited" || o.code === "busy" ? "rate_limited" : o.code === "not_configured" ? "not_configured" : "held");
@@ -122,6 +153,9 @@ function fakeHub(opts) {
     lofty: o.lofty || fakeLofty(), lock: o.lock === null ? undefined : (o.lock || kit.createMemoryLeadLock()),
     dnc: new Set(o.dnc || []), optedOut: new Set(o.optedOut || []), requests: [], emails: [], routed: [],
     down: null, routerDown: null, together: null,
+    // The hub's switches for the parity options and routes (all on live, 2026-10-24): an option asked while its
+    // switch is off is a 503 and nothing is sent, as the real hub answers.
+    optionsOff: new Set(o.optionsOff || []), taskOff: false, readOff: false,
   };
   // One barrier shared by every writer in a race: each lead read waits (up to 600 ms) until two have arrived.
   h.race = () => { h.together = readTogether(h.lofty, 2, 600); };
@@ -153,18 +187,102 @@ function fakeHub(opts) {
     }
     const d = h.deps();
     if (route === "/v1/lofty/lead") {
+      // The real hub's /lead (supabase/functions/hub-api/lofty.ts createLeadRoute + doorwayPush), options included.
+      const asked = ["address", "custom_fields", "inquiry", "create_tags", "lead_id"].filter((k) => b[k] !== undefined && b[k] !== null);
+      const off = asked.filter((k) => h.optionsOff.has(k));
+      if (off.length) return res(503, { error: `${off.join(", ")}: switched off at the hub; nothing sent` });
+      if (h.refuse400 && b[h.refuse400] !== undefined) return res(400, { error: `${h.refuse400} has the wrong shape` });
+      if (b.custom_fields && Object.keys(b.custom_fields).some((k) => !["Website Form", "Website First Page", "Website Form Page", "Website Traffic Source"].includes(k))) {
+        return res(400, { error: "custom field(s) this app does not write" });
+      }
+      h.lastFieldsAsked = b.custom_fields || null;
       const list = h.list(b.email, b.phone);
       const tags = Array.isArray(b.tags) ? b.tags : [];
+      const createTags = Array.isArray(b.create_tags) ? kit.createBodyTags(b.create_tags) : [];
       if (list.doNotContact) {
         const out = await kit.applyOptOut({ kind: "do_not_contact", email: b.email, phone: b.phone }, d);
-        return res(200, { status: "held", held_by: "do_not_contact", tags_dropped: tags, shared_list: list, ...outcomeJson(out) });
+        return res(200, { status: "held", held_by: "do_not_contact", tags_dropped: [...tags, ...createTags], shared_list: list, ...outcomeJson(out) });
       }
+      const property = b.address ? kit.leadProperty({ streetAddress: b.address.street, city: b.address.city, state: b.address.state, zipCode: b.address.zip }) : null;
+      const byId = b.lead_id !== undefined && b.lead_id !== null ? String(b.lead_id) : null;
       const out = await kit.pushLead({
         lead: { firstName: b.first_name || "", lastName: b.last_name || "", email: b.email, phone: b.phone, source: b.source,
-          leadTypes: Array.isArray(b.lead_types) && b.lead_types.length ? b.lead_types : undefined },
-        tags: list.emailBlocked ? [] : tags, note: b.note, smsConsent: false, create: b.create !== false, emailOptOut: list.emailOptOut,
+          leadTypes: Array.isArray(b.lead_types) && b.lead_types.length ? b.lead_types : undefined, ...(property ? { property } : {}) },
+        tags: list.emailBlocked ? [] : tags, note: b.note, smsConsent: b.sms_yes === true, create: b.create !== false && !byId,
+        emailOptOut: list.emailOptOut, ...(byId ? { leadId: byId } : {}), ...(createTags.length && !list.emailBlocked ? { createTags } : {}),
       }, d);
-      return res(200, { status: statusOf(out), held_by: null, tags_dropped: list.emailBlocked ? tags : [], shared_list: list, ...outcomeJson(out) });
+      const extras = {};
+      if (b.custom_fields || b.inquiry) {
+        const created = out.action === "created" && !out.merged && !out.mergedFrom && !!out.leadId;
+        if (created && out.ok) {
+          if (b.custom_fields) {
+            const have = JSON.stringify(await kit.loftyRequest("GET", "/v1.0/teamFeatures/listCustomField", undefined, d));
+            for (const n of Object.keys(b.custom_fields)) {
+              if (!have.includes(JSON.stringify(n))) await kit.loftyRequest("POST", "/v1.0/teamFeatures/custom-field", { attributeName: n, attributeType: "text", value: "" }, d);
+            }
+            await kit.loftyRequest("PUT", `/leads/${out.leadId}`, { customAttributeList: Object.entries(b.custom_fields)
+              .map(([attributeName, value]) => ({ attributeName, attributeType: "text", value })) }, d);
+            extras.fields = "written";
+          }
+          if (b.inquiry) { await kit.loftyRequest("POST", `/leads/${out.leadId}/inquiry`, b.inquiry, d); extras.inquiry = "written"; }
+        } else {
+          const why = created ? "skipped_push_failed" : "skipped_not_new";
+          if (b.custom_fields) extras.fields = why;
+          if (b.inquiry) extras.inquiry = why;
+        }
+      }
+      const dropped = [...(list.emailBlocked ? [...tags, ...createTags] : []), ...(createTags.length && out.action !== "created" && !list.emailBlocked ? createTags : [])];
+      return res(200, { status: statusOf(out), held_by: null, tags_dropped: dropped, shared_list: list, ...outcomeJson(out), ...extras });
+    }
+    if (route === "/v1/lofty/task") {
+      // The real hub's /task (hub-api/lofty-parity.ts taskOnLead): read the lead, hold on Do Not Contact / #dnc /
+      // cannotCall / a phone on the shared list / an unreadable lead, else POST /v2.0/tasks and the push.
+      if (h.taskOff) return res(503, { error: "this route is switched off (flag lofty_tasks_enabled)" });
+      const id = String(b.lead_id == null ? "" : b.lead_id);
+      if (!/^\d+$/.test(id) || !b.content) return res(400, { error: "lead_id and content are required" });
+      h.lastTask = b;
+      let lead;
+      try { lead = await kit.getLead(id, d); } catch (e) { return res(200, { status: "failed", reason: "the lead could not be read: no task" }); }
+      if (!lead || String(lead.leadId) !== id) return res(200, { status: "held", code: "unreadable", reason: "the read returned another lead or none: no task" });
+      const st = kit.consentStatus(lead);
+      if (!st.tagsReadable) return res(200, { status: "held", code: "unreadable", reason: "the lead's tag list cannot be read: no task" });
+      const onList = st.phones.some((ph) => h.dnc.has(ph)) || st.emails.some((e) => h.dnc.has(kit.normEmail(e)));
+      if (st.doNotContact || onList) return res(200, { status: "held", code: "do_not_contact", reason: "Do Not Contact: no task" });
+      if (!st.mayCall) return res(200, { status: "held", code: "may_not_call", reason: st.phoneDnc ? "#dnc (no calls or texts): no call task" : "Lofty says do not call (cannotCall): no call task" });
+      const due = new Date(Date.now() + (Number(b.due_in_minutes) || 1440) * 60000);
+      const raw = JSON.stringify({ type: "Call", content: String(b.content).slice(0, 500), assignedRole: "Agent", endAt: kit.denverIso ? kit.denverIso(due) : due.toISOString(), timeZoneCode: "America/Denver", leadId: "__ID__" }).replace('"__ID__"', id);
+      const t = await kit.loftyRequestText("POST", "/v2.0/tasks", raw, d);
+      const taskId = (/"taskId"\s*:\s*"?(\d+)"?/.exec(t.text) || [])[1] || null;
+      let pushed = null;
+      if (b.push_reminder === true && taskId) {
+        try { await kit.loftyRequestText("POST", "/v2.0/sales-agent/notification/app-push/send-task-reminder", JSON.stringify({ type: "TASK", taskId: Number(taskId) }), d); pushed = true; } catch (e) { pushed = false; }
+      }
+      return res(200, { status: "created", lead_id: id, task_id: taskId, pushed, phone_dnc: st.phoneDnc });
+    }
+    if (route === "/v1/lofty/read") {
+      // The real hub's /read (hub-api/lofty-parity.ts readPath): one Lofty read, Lofty's JSON as data.
+      if (h.readOff) return res(503, { error: "this route is switched off (flag lofty_reads_enabled)" });
+      h.reads = h.reads || [];
+      h.reads.push(b);
+      let m;
+      let path;
+      let body;
+      if (b.resource === "me") { m = "GET"; path = "/me"; }
+      else if (b.resource === "lead") { m = "GET"; path = `/leads/${b.lead_id}`; }
+      else if (b.resource === "listings") { m = "GET"; path = `/v1.0/listing?${new URLSearchParams({ mlsListingIds: (b.mls_ids || []).join(","), limit: String(b.limit || 1) })}`; }
+      else if (b.resource === "listing_search") {
+        m = "POST"; path = "/v2.0/listings/search";
+        body = { searchScope: b.search_scope || "my", pageNum: b.page_num || 1, pageSize: b.page_size || 100,
+          ...(b.sort_fields ? { sortFields: b.sort_fields } : {}), ...(b.filter_conditions ? { filterConditions: b.filter_conditions } : {}) };
+      } else return res(400, { error: "resource must be ..." });
+      try {
+        const r = await kit.loftyRequestText(m, path, body, d);
+        let data = null;
+        try { data = r.text ? JSON.parse(r.text) : null; } catch (e) { data = null; }
+        return res(200, { status: "ok", http_status: r.status || 200, data });
+      } catch (e) {
+        return res(200, e && e.status === 404 ? { status: "not_found", http_status: 404 } : { status: "failed", code: (e && e.code) || null, http_status: (e && e.status) || null });
+      }
     }
     if (route === "/v1/lofty/note") {
       const out = await kit.noteLead(String(b.lead_id), b.content, d);
@@ -202,7 +320,7 @@ require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, e
 for (const k of Object.keys(require.cache)) if (k.startsWith(FN_DIR) && k !== blobsPath && !k.endsWith(".json")) delete require.cache[k];
 
 const ENV_KEYS = ["LOFTY_VIA_HUB", "LEADS_TO_ROUTER", "LOFTY_API_KEY", "HUB_API_URL", "HUB_API_KEY", "LEAD_ALERT_TO", "LEAD_ALERT_FROM",
-  "FLODESK_API_KEY", "LOFTY_QUEUE_DRAIN"];
+  "FLODESK_API_KEY", "LOFTY_QUEUE_DRAIN", "HUB_SIDE_BY_SIDE", "VALUE_REVIEW_PLAN"];
 function env(extra) {
   for (const k of ENV_KEYS) delete process.env[k];
   Object.assign(process.env, { LOFTY_API_KEY: "own-key-for-tests", HUB_API_URL: HUB_URL, HUB_API_KEY: HUB_KEY }, extra || {});
@@ -234,17 +352,13 @@ const C = require(`${FN_DIR}/lib/_lofty-consent.js`);
 const R = require(`${FN_DIR}/lib/_lofty-returning.js`);
 const handler = require(`${FN_DIR}/submission-created.js`).handler;
 
-// What this site may still send on its own key with the switch on (the hub has no route for these yet).
-function allowedOwn(c) {
-  const k = `${c.method} ${c.path}`;
-  if (/^GET \/v1\.0\/teamFeatures\/listCustomField$/.test(k) || /^POST \/v1\.0\/teamFeatures\/custom-field$/.test(k)) return true;
-  if (/^POST \/v1\.0\/leads\/\d+\/inquiry$/.test(k)) return true;
-  if (/^POST \/v2\.0\/tasks$/.test(k) || /^POST \/v2\.0\/sales-agent\/notification\/app-push\/send-task-reminder$/.test(k)) return true;
-  return /^PUT \/v1\.0\/leads\/\d+$/.test(k) && !!c.body && Object.keys(c.body).join() === "customAttributeList";
-}
-const coveredOwn = () => ownCalls.filter((c) => !allowedOwn(c));
+// 2026-10-24: with the switch on, NOTHING goes out on this site's own key any more (the hub has a route for every
+// call: the Call task, the website fields, the search wishes, the listings reads and the /status probes included).
+const coveredOwn = () => ownCalls.slice();
 
+const allHubRequests = [];
 function reset(hub, own) {
+  allHubRequests.push(...HUB.requests);
   HUB = hub || fakeHub();
   OWN = own || fakeLofty();
   ownCalls = [];
@@ -305,20 +419,31 @@ const deadline = () => Date.now() + 15000;
     first.create === true && JSON.stringify(first.lead_types) === "[2]" && first.email === "pat@example.com" &&
     ["Hot Lead - Website", "Website Lead", "buyers-guide"].every((t) => first.tags.includes(t)) && /NEW WEBSITE LEAD/.test(first.note || ""),
     JSON.stringify(first));
-  check("...the plan tag is NOT in that push", !first.tags.includes(PLAN_B1));
+  check("...the plan tag is NOT in that push (not in tags, not in create_tags)", !first.tags.includes(PLAN_B1) &&
+    !(first.create_tags || []).includes(PLAN_B1));
+  check("...the form's tags ride IN the create body too, all but the trigger tag (create_tags)",
+    Array.isArray(first.create_tags) && ["Website Lead", "buyers-guide"].every((t) => first.create_tags.includes(t)) &&
+    !first.create_tags.includes("Hot Lead - Website"), JSON.stringify(first.create_tags));
+  check("...and the four website fields ride on the push (custom_fields), no address for a form without one",
+    first.custom_fields && first.custom_fields["Website Form"] && !first.address && !("sms_yes" in first), JSON.stringify(first.custom_fields));
   const second = pushes[1] || {};
   check("...then the hub's consent route, then a second push with create:false and the plan tag only",
     HUB.routes().indexOf("/v1/lofty/consent") > HUB.routes().indexOf("/v1/lofty/lead") && pushes.length === 2 &&
-    second.create === false && JSON.stringify(second.tags) === JSON.stringify([PLAN_B1]) && !second.note && !second.lead_types,
-    JSON.stringify(HUB.requests.map((x) => [x.route, x.body.create, x.body.tags])));
+    second.create === false && JSON.stringify(second.tags) === JSON.stringify([PLAN_B1]) && !second.note && !second.lead_types &&
+    second.lead_id === "9000" && !second.create_tags && !second.custom_fields,
+    JSON.stringify(HUB.requests.map((x) => [x.route, x.body.create, x.body.tags, x.body.lead_id])));
+  const events9000 = HUB.lofty.tagEvents.filter((e) => e.leadId === 9000).map((e) => e.added.join("+"));
+  check("...in Lofty only the trigger tag counts as ADDED after the create (its plan starts), then the plan tag -- as today",
+    JSON.stringify(events9000) === JSON.stringify(["Hot Lead - Website", PLAN_B1]), JSON.stringify(events9000));
   let made = HUB.lofty.leads.get(9000) || {};
   check("...the new lead carries every tag, the plan tag, its lead type, texting off, and ONE note",
     ["Hot Lead - Website", "Website Lead", "buyers-guide", PLAN_B1].every((t) => tagsOf(made).includes(t)) &&
     JSON.stringify(made.leadTypes) === "[2]" && made.cannotText === true && HUB.lofty.notes.length === 1, JSON.stringify(made));
   check("...the note was not sent a second time (no /v1/lofty/note)", !HUB.routes().includes("/v1/lofty/note"));
   check("...nothing the hub covers went out on this site's own key", coveredOwn().length === 0, JSON.stringify(coveredOwn()));
-  check("...the website fields stay on the own key (no hub route yet), for this proven-new contact only",
-    ownCalls.some((c) => c.method === "PUT" && Object.keys(c.body || {}).join() === "customAttributeList"));
+  check("...the website fields are written by the hub on this proven-new contact (never on the own key)",
+    Array.isArray(made.customAttributeList) && made.customAttributeList.some((f) => f.attributeName === "Website Form") &&
+    !ownCalls.some((c) => c.method === "PUT"), JSON.stringify(made.customAttributeList));
   check("...the alert email goes to Christine only, never to the lead",
     HUB.emails.length === 1 && HUB.emails[0].to.join() === CHRISTINE && !JSON.stringify(HUB.emails[0].to).includes("pat@example.com"));
   let lastPush = mem["lofty-last-push.json"] || {};
@@ -332,9 +457,16 @@ const deadline = () => Date.now() + 15000;
   check("a returning contact: one push, merged onto the existing lead (its tags kept, the form's added)",
     pushes.length === 1 && ["Buyer", "Hot Lead - Website", "buyers-guide"].every((t) => tagsOf(seven).includes(t)), JSON.stringify(seven.tags));
   check("...no plan tag and no change to its own lead type", !tagsOf(seven).includes(PLAN_B1) && JSON.stringify(seven.leadTypes) === "[1]");
-  check("...the Call task goes out on the own key, after the hub's consent route said the lead may be called",
-    HUB.routes().includes("/v1/lofty/consent") && ownCalls.map((c) => c.path).join() === "/v2.0/tasks,/v2.0/sales-agent/notification/app-push/send-task-reminder",
-    JSON.stringify(ownCalls));
+  check("...the Call task + the push to her phone go through the hub's /v1/lofty/task, nothing on the own key",
+    HUB.routes().includes("/v1/lofty/task") && HUB.lofty.calls.some((c) => c.method === "POST" && /\/v2\.0\/tasks$/.test(c.path)) &&
+    HUB.lofty.calls.some((c) => /send-task-reminder$/.test(c.path)) && ownCalls.length === 0,
+    JSON.stringify({ hub: HUB.routes(), own: ownCalls }));
+  check("...the task is the one today's code writes: the lead, due in 30 minutes, the agent's push, the same words",
+    HUB.lastTask && HUB.lastTask.lead_id === "7" && HUB.lastTask.due_in_minutes === 30 && HUB.lastTask.push_reminder === true &&
+    HUB.lastTask.content === R.taskContent({ label: "Buyer's Guide Download", name: "Pat Buyer", phone: "(970) 555-0123", email: "pat@example.com" }).slice(0, 500),
+    JSON.stringify(HUB.lastTask));
+  check("...no website fields or search wishes on a returning contact (the hub wrote none)",
+    !HUB.lofty.calls.some((c) => c.method === "PUT" && c.body && c.body.customAttributeList) && !HUB.lofty.inquiries.length);
   check("...and nothing the hub covers went out on the own key", coveredOwn().length === 0);
 
   reset(fakeHub({ lofty: fakeLofty([{ leadId: 8, emails: ["pat@example.com"], phones: ["+19705550123"], tags: [`Consent ${EN} DNC`], cannotText: true }]) }));
@@ -342,8 +474,8 @@ const deadline = () => Date.now() + 15000;
   const eight = HUB.lofty.leads.get(8);
   check("a returning Do Not Contact lead: the hub holds every tag (Do Not Contact wins)",
     tagsOf(eight).join() === `Consent ${EN} DNC`, JSON.stringify(eight.tags));
-  check("...no plan push, no Call task, nothing at all on the own key",
-    HUB.leadPushes().length === 1 && ownCalls.length === 0, JSON.stringify(ownCalls));
+  check("...no plan push, no Call task (the hub held it: Do Not Contact), nothing at all on the own key",
+    HUB.leadPushes().length === 1 && ownCalls.length === 0 && !HUB.lofty.calls.some((c) => /\/v2\.0\/tasks$/.test(c.path)), JSON.stringify(ownCalls));
 
   // #dnc = phone only (calls/texts); email still allowed — Christine 2026-10-18
   reset(fakeHub({ lofty: fakeLofty([{ leadId: 18, emails: ["pat@example.com"], phones: ["+19705550123"], tags: ["#dnc"], cannotText: false }]) }));
@@ -352,8 +484,8 @@ const deadline = () => Date.now() + 15000;
   check("a returning #dnc lead (phone only): the form's tags go on, #dnc stays, texting is switched off",
     ["#dnc", "Hot Lead - Website", "buyers-guide"].every((t) => tagsOf(eighteen).includes(t)) && eighteen.cannotText === true,
     JSON.stringify(eighteen));
-  check("...but no Call task (the hub's consent route says it may not be called), nothing on the own key",
-    HUB.routes().includes("/v1/lofty/consent") && ownCalls.length === 0, JSON.stringify(ownCalls));
+  check("...but no Call task (the hub's task route holds it: #dnc, may not be called), nothing on the own key",
+    HUB.routes().includes("/v1/lofty/task") && !HUB.lofty.calls.some((c) => /\/v2\.0\/tasks$/.test(c.path)) && ownCalls.length === 0, JSON.stringify(ownCalls));
 
   reset(fakeHub({ dnc: ["pat@example.com"] }));
   await submit("buyers-guide", person(), "sub-2004");
@@ -605,6 +737,280 @@ const deadline = () => Date.now() + 15000;
   check("...and on the hub path (one router copy, one Lofty push and its plan push)", HUB.routed.length === 1 && HUB.leadPushes().length === 2);
 
   // ------------------------------------------------------------------------------------------------------------
+  console.log("\n8. Every own-key Lofty call through the hub (2026-10-24): the same effect, nothing on the own key");
+  env({ LOFTY_VIA_HUB: "on" });
+  const SITE_KEY = SITE === "signature" ? "signature" : "main";
+  const planOf = (form, data) => P.planForSubmission(form, data || {}, { site: SITE_KEY, valueReviewPlan: false });
+  const lastLeadPush = () => HUB.leadPushes().filter((x) => x.create !== false).slice(-1)[0] || {};
+  const HOME = "4821 Elm Street, Loveland, CO 80537";
+  const seedPat = (extra) => fakeLofty([{ leadId: 7, emails: ["pat@example.com"], phones: ["+19705550123"], tags: ["Buyer"], cannotText: true, ...(extra || {}) }]);
+
+  // a. The home-value address (lib/_lead-address.js -> Lofty's `property`).
+  reset();
+  await submit("free-home-valuation", person({ address: HOME }), "sub-8001");
+  let p8 = lastLeadPush();
+  made = HUB.lofty.leads.get(9000) || {};
+  check("the home-value form: the address rides on the push (address: street, city, state, zip)",
+    p8.address && p8.address.street === "4821 Elm Street" && p8.address.city === "Loveland" && p8.address.state === "CO" && p8.address.zip === "80537",
+    JSON.stringify(p8.address));
+  check("...and lands as Lofty's property on the new lead, as today's create sends it",
+    made.property && made.property.streetAddress === "4821 Elm Street" && made.property.city === "Loveland" && made.property.zipCode === "80537",
+    JSON.stringify(made.property));
+  const fhv = planOf("free-home-valuation");
+  check("...the form's plan tag(s) go on after the create, every create texting-off, nothing on the own key",
+    fhv.planTags.length > 0 && fhv.planTags.every((t) => tagsOf(made).includes(t)) && made.cannotText === true && ownCalls.length === 0,
+    JSON.stringify({ plan: fhv.planTags, tags: made.tags, own: ownCalls }));
+  reset(fakeHub({ lofty: seedPat() }));
+  await submit("free-home-valuation", person({ address: HOME }), "sub-8002");
+  check("...a returning contact with no address on file gets it filled (blanks only)",
+    (HUB.lofty.leads.get(7).property || {}).streetAddress === "4821 Elm Street", JSON.stringify(HUB.lofty.leads.get(7).property));
+  reset(fakeHub({ lofty: seedPat({ property: { streetAddress: "9 Other Rd", city: "Berthoud", zipCode: "80513" } }) }));
+  await submit("free-home-valuation", person({ address: HOME }), "sub-8003");
+  check("...and one with another address keeps it (never overwritten)",
+    HUB.lofty.leads.get(7).property.streetAddress === "9 Other Rd", JSON.stringify(HUB.lofty.leads.get(7).property));
+
+  // b. The search wishes (Lofty's inquiry) and the website fields, on a contact proven new.
+  reset();
+  const alertData = person({ alert_criteria: "Loveland, 3+ beds", alert_query: "city=Loveland&minPrice=400000&maxPrice=650000&beds=3",
+    attribution_first_page: "/search-homes.html", attribution_form_page: "/search-homes.html", utm_source: "google" });
+  await submit("listing-alert-request", alertData, "sub-8004");
+  p8 = lastLeadPush();
+  made = HUB.lofty.leads.get(9000) || {};
+  const wantInquiry = R.inquiryFromForm(alertData);
+  check("a saved-search form: the search wishes ride on the push (inquiry), exactly what today's code sends",
+    JSON.stringify(p8.inquiry) === JSON.stringify(wantInquiry) && wantInquiry.priceMin === 400000 && wantInquiry.bedroomsMin === 3, JSON.stringify(p8.inquiry));
+  check("...and the hub writes them on the contact it created (POST /leads/9000/inquiry)",
+    HUB.lofty.inquiries.length === 1 && HUB.lofty.inquiries[0].leadId === "9000" &&
+    JSON.stringify(HUB.lofty.inquiries[0].body) === JSON.stringify(wantInquiry), JSON.stringify(HUB.lofty.inquiries));
+  const wantFields = R.websiteFieldValues(p8.source, alertData);
+  check("...the four website fields too: the same names and values today's code writes",
+    JSON.stringify(Object.entries(p8.custom_fields || {})) === JSON.stringify(wantFields.map((f) => [f.attributeName, f.value])) &&
+    JSON.stringify((made.customAttributeList || []).map((f) => [f.attributeName, f.value])) === JSON.stringify(wantFields.map((f) => [f.attributeName, f.value])),
+    JSON.stringify({ ask: p8.custom_fields, lead: made.customAttributeList }));
+  lastPush = mem["lofty-last-push.json"] || {};
+  check("...and /status records both as written through the hub",
+    lastPush.fieldsResult && lastPush.fieldsResult.ok === true && lastPush.fieldsResult.viaHub === true &&
+    lastPush.inquiryResult && lastPush.inquiryResult.ok === true && lastPush.inquiryResult.viaHub === true,
+    JSON.stringify({ f: lastPush.fieldsResult, i: lastPush.inquiryResult }));
+  check("...nothing on the own key", ownCalls.length === 0, JSON.stringify(ownCalls));
+  reset(fakeHub({ lofty: seedPat() }));
+  await submit("listing-alert-request", alertData, "sub-8005");
+  lastPush = mem["lofty-last-push.json"] || {};
+  check("a returning contact: no website fields and no search wishes written (proven-new rule), /status says why",
+    !HUB.lofty.inquiries.length && !(HUB.lofty.leads.get(7).customAttributeList) &&
+    lastPush.fieldsResult.attempted === false && /created/.test(lastPush.fieldsResult.reason || "") && lastPush.inquiryResult.attempted === false,
+    JSON.stringify({ f: lastPush.fieldsResult, i: lastPush.inquiryResult }));
+
+  // c. A create Lofty folded into another lead: not proven new.
+  reset();
+  HUB.down = { status: "created", ok: true, lead_id: "9100", action: "created", merged: true, note_added: true, tags_added: [],
+    needs_review: true, create_body_merged: true };
+  await submit("buyers-guide", person(), "sub-8006");
+  lastPush = mem["lofty-last-push.json"] || {};
+  check("a create Lofty folded into another lead (merged): no plan-tag push, no consent read, plan skipped with the reason",
+    HUB.leadPushes().length === 1 && !HUB.routes().includes("/v1/lofty/consent") && lastPush.planResult &&
+    /own id/.test(lastPush.planResult.skipped || ""), JSON.stringify({ routes: HUB.routes(), plan: lastPush.planResult }));
+  HUB.down = null;
+
+  // d. The yes to texts.
+  reset();
+  await submit("buyers-guide", person({ sms_consent: "yes" }), "sub-8007");
+  p8 = lastLeadPush();
+  made = HUB.lofty.leads.get(9000) || {};
+  if (SITE === "tllsh") {
+    check("a yes to texts rides on the push (sms_yes): the hub decides and records it in the same note -- ONE note, no second call",
+      p8.sms_yes === true && HUB.lofty.notes.length === 1 && /10DLC campaign 12744/.test(HUB.lofty.notes[0].content) &&
+      /SMS consent: YES/.test(HUB.lofty.notes[0].content) && !HUB.routes().includes("/v1/lofty/note"), JSON.stringify(HUB.lofty.notes));
+  } else {
+    check("this site reads no texting yes (its boxes are required): no sms_yes on the push", !("sms_yes" in p8), JSON.stringify(p8));
+  }
+  check("...texting stays off and the SMS consent tag is never added", made.cannotText === true &&
+    !tagsOf(made).some((t) => kit.isSmsConsentTag(t)) && ownCalls.length === 0, JSON.stringify(made));
+
+  // e. A long note goes in parts; nothing is cut.
+  reset();
+  const longMsg = `Start ${"x".repeat(6200)} end of message`;
+  await submit("contact", person({ message: longMsg }), "sub-8008");
+  const parts8 = HUB.lofty.notes.map((n) => n.content);
+  check("a note longer than the hub keeps (5,000) goes in parts: the push carries the first, /v1/lofty/note the rest",
+    (lastLeadPush().note || "").length <= 5000 && HUB.routes().filter((r) => r === "/v1/lofty/note").length === 1 && parts8.length === 2 &&
+    /^\(note continued, part 2 of 2\)\n/.test(parts8[1] || ""), JSON.stringify(parts8.map((x) => x.length)));
+  const whole8 = parts8[0] + (parts8[1] || "").replace(/^\(note continued, part 2 of 2\)\n/, "");
+  check("...and nothing is lost: the whole message and the note's last line are in Lofty",
+    whole8.includes(longMsg) && (SITE !== "tllsh" || /Terms\/Privacy box: NOT ticked on this submission$/.test(parts8[1] || "")), whole8.slice(-80));
+
+  // f. The returning contact's Call task: what it does when the hub holds it, and when its route is off.
+  reset(fakeHub({ lofty: seedPat({ cannotCall: true }) }));
+  await submit("buyers-guide", person(), "sub-8009");
+  lastPush = mem["lofty-last-push.json"] || {};
+  check("a returning contact Lofty says not to call: the hub holds the task (may not call), nothing on the own key",
+    !HUB.lofty.tasks.length && lastPush.tagResult && lastPush.tagResult.task && lastPush.tagResult.task.step === "may-not-call" && ownCalls.length === 0,
+    JSON.stringify(lastPush.tagResult));
+  reset(fakeHub({ lofty: seedPat() }));
+  HUB.taskOff = true;
+  await submit("buyers-guide", person(), "sub-8010");
+  lastPush = mem["lofty-last-push.json"] || {};
+  check("the hub's task route switched off: the lead is still pushed, the task is reported failed (HTTP 503), never sent on the own key",
+    lastPush.ok === true && lastPush.tagResult && lastPush.tagResult.task && lastPush.tagResult.task.ok === false &&
+    /503/.test(lastPush.tagResult.task.error || "") && ownCalls.length === 0, JSON.stringify(lastPush.tagResult));
+
+  // g. A parity option switched off at the hub: the push is refused (503) and queued with the reason.
+  reset(fakeHub({ optionsOff: ["custom_fields"] }));
+  await submit("buyers-guide", person(), "sub-8011");
+  let q8 = mem["lofty-failed-pushes.json"] || [];
+  check("an option switched off at the hub: nothing created, the lead queued (not held) with the reason, nothing on the own key",
+    q8.length === 1 && /switched off/.test(q8[0].responseBody || "") && !(mem["lofty-manual-review.json"] || []).length &&
+    HUB.lofty.leads.size === 0 && ownCalls.length === 0, JSON.stringify(q8[0] && q8[0].responseBody));
+
+  // h. The queue replay carries every option, and the returning contact's task.
+  reset();
+  HUB.down = 503;
+  const fhvData = person({ address: HOME, attribution_first_page: "/sellers.html", utm_source: "google" });
+  await submit("free-home-valuation", fhvData, "sub-8012");
+  HUB.down = null;
+  dr = await quiet(() => L.drainFailedPushes(store, "own-key-for-tests", { deadline: Date.now() + 20000 }));
+  p8 = lastLeadPush();
+  made = HUB.lofty.leads.get(9000) || {};
+  check("the queue replay through the hub: the address, the create-body tags (not the trigger tag) and the website fields ride along",
+    dr.recovered === 1 && p8.address && p8.address.street === "4821 Elm Street" && Array.isArray(p8.create_tags) &&
+    !p8.create_tags.includes("Hot Lead - Website") && p8.custom_fields && p8.custom_fields["Website First Page"] === "/sellers.html",
+    JSON.stringify({ dr, p8 }));
+  check("...the new lead gets its property, fields, the trigger tag after the create and its plan tag(s); nothing on the own key",
+    made.property && made.property.streetAddress === "4821 Elm Street" && Array.isArray(made.customAttributeList) &&
+    fhv.planTags.every((t) => tagsOf(made).includes(t)) &&
+    JSON.stringify(HUB.lofty.tagEvents.filter((e) => e.leadId === 9000)[0]) === JSON.stringify({ leadId: 9000, added: ["Hot Lead - Website"] }) &&
+    !(mem["lofty-failed-pushes.json"] || []).length && ownCalls.length === 0, JSON.stringify({ tags: made.tags, events: HUB.lofty.tagEvents }));
+  reset(fakeHub({ lofty: seedPat() }));
+  HUB.down = 503;
+  await submit("buyers-guide", person(), "sub-8013");
+  HUB.down = null;
+  dr = await quiet(() => L.drainFailedPushes(store, "own-key-for-tests", { deadline: Date.now() + 20000 }));
+  check("the queue replay of a returning contact: its Call task + push through the hub's /v1/lofty/task, nothing on the own key",
+    dr.recovered === 1 && HUB.lofty.tasks.length === 1 && HUB.routes().includes("/v1/lofty/task") && ownCalls.length === 0,
+    JSON.stringify({ dr, routes: HUB.routes() }));
+
+  // i. Her listings reads (lib/_lofty-listings.js) through POST /v1/lofty/read.
+  const LL = require(`${FN_DIR}/lib/_lofty-listings.js`);
+  reset();
+  HUB.lofty.listings.push({ mlsListingId: "IRE1234567", agentName: "Christine Gwinnup" });
+  const page8 = await quiet(() => LL.searchPage({ apiKey: "own-key-for-tests", scope: "my", pageNum: 1 }));
+  const det8 = await quiet(() => LL.detailsByMlsIds(["IRE1234567"], { apiKey: "own-key-for-tests" }));
+  const reads8 = HUB.reads || [];
+  check("her listings search goes to the hub as listing_search (scope my, 100 a page, the same sort), Lofty's answer read as today",
+    page8.items.length === 1 && page8.items[0].mlsListingId === "IRE1234567" && reads8[0] && reads8[0].resource === "listing_search" &&
+    reads8[0].search_scope === "my" && reads8[0].page_size === 100 && JSON.stringify(reads8[0].sort_fields) === JSON.stringify(["MLS_LIST_DATE_L_DESC"]),
+    JSON.stringify(reads8));
+  check("...the details as listings (the MLS numbers, the same limit), nothing on the own key",
+    det8.get("IRE1234567") && reads8[1] && reads8[1].resource === "listings" && JSON.stringify(reads8[1].mls_ids) === JSON.stringify(["IRE1234567"]) &&
+    reads8[1].limit === 1 && ownCalls.length === 0, JSON.stringify({ reads8, own: ownCalls }));
+  HUB.readOff = true;
+  let threw8 = null;
+  await quiet(() => LL.searchPage({ apiKey: "own-key-for-tests", scope: "my", pageNum: 1 }).catch((e) => { threw8 = e; }));
+  check("...the hub's read switched off: the read fails like a Lofty failure (kept data stays), never the own key",
+    threw8 && threw8.httpStatus === 503 && ownCalls.length === 0, String(threw8 && threw8.message));
+  env();
+  reset();
+  OWN.listings.push({ mlsListingId: "IRE1234567", agentName: "Christine Gwinnup" });
+  await quiet(() => LL.searchPage({ apiKey: "own-key-for-tests", scope: "my", pageNum: 1 }));
+  check("...with the switch off the search goes to Lofty as before (own key), not to the hub",
+    ownCalls.length === 1 && ownCalls[0].path === "/v2.0/listings/search" && !(HUB.reads || []).length, JSON.stringify(ownCalls));
+  env({ LOFTY_VIA_HUB: "on" });
+
+  // j. The /status probes (site-health.js) through POST /v1/lofty/read: me, and the last lead read back.
+  reset();
+  await submit("buyers-guide", person(), "sub-8014");
+  ownCalls = [];
+  HUB.reads = [];
+  const fetchKeep = global.fetch;
+  global.fetch = async (url, init) => {
+    const u = String(url);
+    if (u.startsWith("https://hub.example.test/") || u.startsWith("https://api.lofty.com/")) return fetchKeep(url, init);
+    return { ok: true, status: 200, json: async () => ({}), text: async () => "{}", headers: { get: () => "application/json" } };
+  };
+  let healthRes = null;
+  try {
+    // The Little Lady copy exports localHandler (lib/_backend-mode.js decides who answers); Signature, handler.
+    const healthMod = require(`${FN_DIR}/site-health.js`);
+    const health = healthMod.localHandler || healthMod.handler;
+    healthRes = await quiet(() => health({ queryStringParameters: { format: "json", probe: "1" } }));
+  } finally {
+    global.fetch = fetchKeep;
+  }
+  let keyRow = null;
+  try { keyRow = JSON.parse(healthRes.body).checks.find((c) => c.name === "Lofty API key valid"); } catch (e) { keyRow = null; }
+  check("/status probes through the hub: /me as resource me, the last lead as resource lead, nothing on the own key",
+    HUB.reads.some((x) => x.resource === "me") && HUB.reads.some((x) => x.resource === "lead" && x.lead_id === "9000") &&
+    !ownCalls.length, JSON.stringify({ reads: HUB.reads, own: ownCalls }));
+  check("...and the key row says Lofty answered through the hub", keyRow && keyRow.ok === true &&
+    /through the Seller Intelligence hub/.test(keyRow.detail || ""), JSON.stringify(keyRow));
+
+  // k. With the switch on, the Lofty side-by-side comparison does not run (the site already goes through the hub).
+  const SBS = require(`${FN_DIR}/lib/_hub-side-by-side.js`);
+  check("the side-by-side check is inert with LOFTY_VIA_HUB on (no dry run, no ledger row)",
+    SBS.leadSideBySide({ env: { HUB_SIDE_BY_SIDE: "lofty_write", LOFTY_VIA_HUB: "on", HUB_API_URL: HUB_URL, HUB_API_KEY: HUB_KEY }, log: () => {} }).active === false);
+  env({ LOFTY_VIA_HUB: "on", HUB_SIDE_BY_SIDE: "lofty_write" });
+  reset();
+  await submit("buyers-guide", person(), "sub-8015");
+  check("...through the handler: no dry_run asked and nothing posted to the parity ledger",
+    !HUB.requests.some((x) => x.body && "dry_run" in x.body) && !HUB.routes().includes("/v1/parity/record"), JSON.stringify(HUB.routes()));
+  const sample = { body: { firstName: "Pat", emails: ["pat@example.com"], phones: ["(970) 555-0123"], source: "s", tags: ["Hot Lead - Website", "Website Lead"],
+    notes: "n", property: { streetAddress: "1 A St", zipCode: "80537" } }, plan: { leadTypes: [2] }, data: alertData, label: "L",
+    triggerTag: "Hot Lead - Website", property: { streetAddress: "1 A St", zipCode: "80537" } };
+  check("...and the dry run it used to ask is built by the same builder the real push uses (lib/_lofty-hub.js leadAskFor)",
+    JSON.stringify(SBS._internal.buildLeadAsk(sample, sample.body.tags)) === JSON.stringify(H.leadAskFor(sample.body, {
+      triggerTag: "Hot Lead - Website", leadTypes: [2], note: "n",
+      websiteFields: R.websiteFieldValues("L", alertData), inquiry: R.inquiryFromForm(alertData) })));
+  env({ LOFTY_VIA_HUB: "on" });
+
+  // m. The note splitter, at its edges.
+  check("a note of exactly 5,000 characters goes whole; 5,001 goes in two parts, none over 5,000, nothing lost",
+    H.noteParts("y".repeat(5000)).length === 1 && H.noteParts("y".repeat(5001)).length === 2 &&
+    H.noteParts("y".repeat(12000)).every((x) => x.length <= 5000) &&
+    H.noteParts("y".repeat(12000)).map((x, i) => (i ? x.replace(/^\(note continued, part \d of \d\)\n/, "") : x)).join("") === "y".repeat(12000));
+  const lined = `${"a".repeat(3000)}\n${"b".repeat(3000)}`;
+  check("...cut at a line break when one is near (the line break dropped, every character of text kept)",
+    H.noteParts(lined).length === 2 && H.noteParts(lined)[0] === "a".repeat(3000) && H.noteParts(lined)[1].endsWith("b".repeat(3000)));
+
+  // n. Today's path is unchanged with the switch off: the own key does every step, the hub's Lofty routes are not asked.
+  env();
+  reset(null, fakeLofty());
+  await submit("listing-alert-request", alertData, "sub-8016");
+  const offPaths = ownCalls.map((c) => `${c.method} ${c.path.replace(/\d{3,}/g, "N")}`);
+  check("switch off: the lookup, create, note, re-fire, plan tag, website fields and search wishes all on the own key, as before",
+    ["GET /v1.0/leads", "POST /v1.0/leads", "POST /v1.0/notes", "PUT /v1.0/leads/N", "POST /v1.0/leads/N/inquiry"].every((k) => offPaths.includes(k)) &&
+    ownCalls.some((c) => c.method === "PUT" && c.body && Array.isArray(c.body.customAttributeList)) &&
+    !HUB.routes().some((r) => r.startsWith("/v1/lofty/")), JSON.stringify({ own: offPaths, hub: HUB.routes() }));
+  const offCreate = ownCalls.find((c) => c.method === "POST" && c.path === "/v1.0/leads");
+  check("...the own-key create is today's: cannotText:true, the form's tags (trigger tag included) in the body",
+    offCreate && offCreate.body.cannotText === true && offCreate.body.tags.includes("Hot Lead - Website"), JSON.stringify(offCreate && offCreate.body));
+  env({ LOFTY_VIA_HUB: "on" });
+
+  // o. Never stuck in the queue for an option: odd search values are left out; a push the hub refuses as malformed
+  // (HTTP 400) for an option is asked once more without the options (today's path does the same with Lofty).
+  check("search values the hub would refuse are left out of the push (the note keeps them)",
+    JSON.stringify(H.hubInquiry({ priceMin: 5e9, priceMax: 600000, bedroomsMin: 99, locations: [{ city: "Loveland", state: "CO" }, { city: "Fort Collins 2", state: "CO" }] })) ===
+    JSON.stringify({ locations: [{ city: "Loveland", state: "CO" }], priceMax: 600000 }) && H.hubInquiry({ priceMin: 5e9 }) === null);
+  reset();
+  HUB.refuse400 = "custom_fields";
+  await submit("free-home-valuation", person({ address: HOME }), "sub-8017");
+  const refusedPushes = HUB.leadPushes().filter((x) => x.create !== false);
+  made = HUB.lofty.leads.get(9000) || {};
+  lastPush = mem["lofty-last-push.json"] || {};
+  check("a push refused as malformed (400) for an option: asked once more without the options, the lead created, not queued",
+    refusedPushes.length === 2 && refusedPushes[0].custom_fields && !refusedPushes[1].custom_fields && !refusedPushes[1].address &&
+    !refusedPushes[1].create_tags && HUB.lofty.leads.size === 1 && made.cannotText === true && !(mem["lofty-failed-pushes.json"] || []).length &&
+    lastPush.ok === true && /without/.test(lastPush.payloadShape || "") && ownCalls.length === 0, JSON.stringify({ shape: lastPush.payloadShape, n: refusedPushes.length }));
+  check("...and /status says the fields were not written (they are in the note)",
+    lastPush.fieldsResult && lastPush.fieldsResult.attempted === false && /note/.test(lastPush.fieldsResult.reason || ""), JSON.stringify(lastPush.fieldsResult));
+
+  // l. Never a Do Not Contact tag, never the SMS consent tag, from this site, on any push above.
+  const sentTags = allHubRequests.concat(HUB.requests).filter((x) => x.route === "/v1/lofty/lead")
+    .flatMap((x) => [].concat(x.body.tags || [], x.body.create_tags || []));
+  check("no push from this site ever carried a Do Not Contact / #dnc / opt-out tag or the SMS consent tag",
+    sentTags.length > 0 && !sentTags.some((t) => kit.isDncTag(t) || kit.isDoNotContactTag(t) || kit.isSmsConsentTag(t) || /opted\s*out/i.test(t)),
+    JSON.stringify(sentTags.filter((t) => kit.isDncTag(t) || kit.isSmsConsentTag(t))));
+
+  // ------------------------------------------------------------------------------------------------------------
   console.log("\n7. The vendored toolkit is untouched, and the shared files match the other site's");
   const run = spawnSync(process.execPath, [`${FN_DIR}/lib/suite-kit/check.mjs`], { encoding: "utf8" });
   check("node lib/suite-kit/check.mjs exits 0", run.status === 0 && /suite-kit \d+\.\d+\.\d+/.test(run.stdout), `${run.stdout}${run.stderr}`);
@@ -613,7 +1019,7 @@ const deadline = () => Date.now() + 15000;
   check("...and never logs the hub key or the Lofty key", !/console\.[a-z]+\([^)]*(HUB_API_KEY|LOFTY_API_KEY|apiKey)/.test(hubSrc));
   const other = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib");
   if (fs.existsSync(other)) {
-    for (const f of ["_lofty-hub.js", "_lofty-returning.js", "_lofty-consent.js", "_lofty.js", "_form-plans.js", "_hub-side-by-side.js"]) {
+    for (const f of ["_lofty-hub.js", "_lofty-returning.js", "_lofty-consent.js", "_lofty.js", "_form-plans.js", "_hub-side-by-side.js", "_lofty-listings.js"]) {
       check(`lib/${f} is byte-identical to ${SIBLING}'s copy`, fs.readFileSync(path.join(other, f), "utf8") === fs.readFileSync(`${FN_DIR}/lib/${f}`, "utf8"));
     }
     const mine = fs.readdirSync(`${FN_DIR}/lib/suite-kit`).sort();

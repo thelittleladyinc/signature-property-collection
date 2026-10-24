@@ -55,6 +55,10 @@ const { checkMlsQuota } = require("./lib/_mls-usage");
 const { mlsSource, hubProblem, makeHubClient, gridListingsRefused, GRID_VIA_HUB_REFUSAL } = require("./lib/_mls-hub");
 const { cloudinaryDiagnostics } = require("./lib/_cloudinary");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
+// 2026-10-24: with LOFTY_VIA_HUB=on the two Lofty probes below go through the
+// Seller Intelligence hub (POST /v1/lofty/read: me, lead) -- this site's own key is
+// never sent (lib/_lofty-hub.js).
+const { loftyViaHub, readViaHub } = require("./lib/_lofty-hub");
 // Read for the Tour It With Me coverage row below — same file the map reads.
 const LOCAL_SPOTS = require("./lib/_local-spots.json");
 
@@ -489,7 +493,21 @@ async function probeCloudinaryUsage() {
   }
 }
 
+// The same /me read through the hub (LOFTY_VIA_HUB=on). Kept to the status and a
+// short slice, as below.
+async function probeLoftyKeyViaHub() {
+  const r = await readViaHub({ resource: "me" }, { timeoutMs: GOOGLE_PROBE_TIMEOUT_MS });
+  return {
+    checkedAt: new Date().toISOString(),
+    viaHub: true,
+    ok: r.ok,
+    httpStatus: r.ok ? r.httpStatus : (r.httpStatus || r.status),
+    body: r.ok ? JSON.stringify(r.data == null ? "" : r.data).slice(0, 160) : String(r.error || "").slice(0, 160),
+  };
+}
+
 async function probeLoftyKey(apiKey) {
+  if (loftyViaHub()) return probeLoftyKeyViaHub();
   try {
     const res = await fetch(LOFTY_ME_URL, {
       headers: { "Authorization": `token ${apiKey}` },
@@ -574,16 +592,28 @@ async function probeLoftyLead(apiKey, leadId, triggerTag) {
     return { ...base, ok: false, reason: "no lead has been pushed yet, so there's nothing to read back" };
   }
   try {
-    const res = await fetch(`https://api.lofty.com/v1.0/leads/${leadId}`, {
-      headers: { "Authorization": `token ${apiKey}` },
-      signal: AbortSignal.timeout(GOOGLE_PROBE_TIMEOUT_MS),
-    });
-    const text = await res.text().catch(() => "");
-    if (!res.ok) {
-      return { ...base, ok: false, httpStatus: res.status, body: text.slice(0, 200) };
-    }
     let json = null;
-    try { json = JSON.parse(text); } catch (e) { json = null; }
+    let res;
+    if (loftyViaHub()) {
+      // The same read through the hub (resource lead). Its answer is Lofty's own JSON.
+      const r = await readViaHub({ resource: "lead", lead_id: String(leadId) }, { timeoutMs: GOOGLE_PROBE_TIMEOUT_MS });
+      if (!r.ok) {
+        return { ...base, viaHub: true, ok: false, httpStatus: r.httpStatus || r.status, body: String(r.error || "").slice(0, 200) };
+      }
+      res = { status: r.httpStatus };
+      json = r.data && typeof r.data === "object" ? r.data : null;
+      base.viaHub = true;
+    } else {
+      res = await fetch(`https://api.lofty.com/v1.0/leads/${leadId}`, {
+        headers: { "Authorization": `token ${apiKey}` },
+        signal: AbortSignal.timeout(GOOGLE_PROBE_TIMEOUT_MS),
+      });
+      const text = await res.text().catch(() => "");
+      if (!res.ok) {
+        return { ...base, ok: false, httpStatus: res.status, body: text.slice(0, 200) };
+      }
+      try { json = JSON.parse(text); } catch (e) { json = null; }
+    }
     const lead = (json && (json.data || json)) || {};
     const readable = tagsFromLead(json);
     return {
@@ -1428,7 +1458,12 @@ exports.handler = async (event) => {
       ? "LOFTY_API_KEY isn't set in Netlify."
       : (!loftyKeyCheck
         ? "Not tested yet — add ?probe=1 to this page's URL to ask Lofty about the key directly."
-        : loftyKeyAge.warning + loftyKeyAge.when + (loftyKeyCheck.ok
+        : loftyKeyAge.warning + loftyKeyAge.when + (loftyKeyCheck.viaHub
+          ? (loftyKeyCheck.ok
+            ? `Lofty answered through the Seller Intelligence hub (HTTP ${loftyKeyCheck.httpStatus}); with LOFTY_VIA_HUB on this site's own key is not sent.`
+            : `Lofty through the Seller Intelligence hub FAILED: HTTP ${loftyKeyCheck.httpStatus}. ${loftyKeyCheck.body || ""} ` +
+              "Check the hub's Lofty doorway and reads switches and this site's hub key (HUB_API_KEY, scope lofty:read).")
+          : loftyKeyCheck.ok
           ? `Lofty accepted the key (HTTP ${loftyKeyCheck.httpStatus}).`
           : `Lofty REJECTED the key: HTTP ${loftyKeyCheck.httpStatus}. ${loftyKeyCheck.body || ""} ` +
             "Create a key for this website in Lofty → Settings → Integrations → API, " +

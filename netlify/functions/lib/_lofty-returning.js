@@ -49,15 +49,19 @@
 //   - Responses are parsed whole; only what is stored for /status is cut short.
 //
 // 2026-10-17 (Wave 1b), with LOFTY_VIA_HUB=on (lib/_lofty-hub.js): the lookup is
-// the hub's (findExistingLead asks Lofty nothing itself), "proven new" comes from
-// the hub's answer (leadIdFromResponse), and the Call task still goes out on this
-// site's own key -- the hub has no task route yet -- but only after the hub's
-// consent route says the lead may be called. The website fields and the search
-// wishes stay on this site's own key too (no hub route), for a contact proven new.
+// the hub's (findExistingLead asks Lofty nothing itself) and "proven new" comes from
+// the hub's answer (leadIdFromResponse).
+// 2026-10-24: with LOFTY_VIA_HUB=on nothing in this file uses this site's own key.
+// The Call task + push go through the hub's POST /v1/lofty/task (lib/_lofty-hub.js
+// taskViaHub; the hub holds it on Do Not Contact, #dnc, cannotCall or an unreadable
+// lead), and the website fields and the search wishes ride on the push itself
+// (/v1/lofty/lead custom_fields + inquiry; the hub writes them only on a contact it
+// created, after the note landed). ensureWebsiteFields, setWebsiteFields and
+// placeInquiry then write nothing and say so.
 "use strict";
 
 const { inferCountyFromCity } = require("./_mls-shared");
-const { loftyViaHub, hubCreatedLeadId, consentViaHub } = require("./_lofty-hub");
+const { loftyViaHub, hubCreatedLeadId, taskViaHub } = require("./_lofty-hub");
 
 const LOFTY_API = "https://api.lofty.com";
 const CALL_TIMEOUT_MS = 5000;
@@ -248,18 +252,15 @@ function taskContent(d) {
 async function alertReturningLead(leadId, details, apiKey, opts) {
   try {
     const o = opts || {};
-    if (!apiKey || !leadId) return { attempted: false };
-    // Through the hub: a Call task only for a lead the hub's consent route says
-    // may be called (Do Not Contact, cannotCall, an unreadable tag list or no
-    // answer at all: no task, and nothing is written).
+    // Through the hub: ONE POST /v1/lofty/task (the task, due in 30 minutes, and
+    // the push to the agent's phone). The hub reads the lead first and creates no
+    // task on Do Not Contact, #dnc, cannotCall, a phone on the shared do-not-call
+    // list or a lead it cannot read. Never this site's own key.
     if (loftyViaHub()) {
-      const c = await consentViaHub(leadId, o);
-      if (!c.known) return { attempted: false, ok: false, step: "consent", viaHub: true, error: `call task held: ${c.reason}` };
-      if (c.doNotContact || !c.mayCall) {
-        return { attempted: false, ok: false, step: c.doNotContact ? "do-not-contact" : "may-not-call", viaHub: true,
-          skipped: c.doNotContact ? "Do Not Contact: no call task" : "the lead may not be called: no call task" };
-      }
+      if (!leadId) return { attempted: false, viaHub: true };
+      return taskViaHub(leadId, taskContent(details || {}).slice(0, 500), o);
     }
+    if (!apiKey || !leadId) return { attempted: false };
     const now = o.now ? new Date(o.now) : new Date();
     const body = withId({
       type: "Call",
@@ -318,7 +319,11 @@ function fieldNamesFrom(text) {
 
 // Makes sure the four fields exist on her team; remembered for a week so a form
 // submission normally spends no calls on it.
+const VIA_HUB_FIELDS = "LOFTY_VIA_HUB is on: the website fields ride on the hub's push (custom_fields) for a contact it created";
+const VIA_HUB_INQUIRY = "LOFTY_VIA_HUB is on: the search wishes ride on the hub's push (inquiry) for a contact it created";
+
 async function ensureWebsiteFields(store, apiKey, opts) {
+  if (loftyViaHub()) return { ok: false, viaHub: true, reason: VIA_HUB_FIELDS };
   try {
     const o = opts || {};
     const now = o.now || Date.now();
@@ -348,6 +353,7 @@ async function ensureWebsiteFields(store, apiKey, opts) {
 
 // Writes the field values onto a brand-new lead. See the header for why only new.
 async function setWebsiteFields(leadId, fields, apiKey, opts) {
+  if (loftyViaHub()) return { attempted: false, viaHub: true, reason: VIA_HUB_FIELDS };
   try {
     if (!apiKey || !leadId || !Array.isArray(fields) || !fields.length) return { attempted: false };
     const res = await call("PUT", `/v1.0/leads/${String(leadId).replace(/\D/g, "")}`, apiKey,
@@ -428,6 +434,7 @@ function inquiryFromForm(data) {
 
 // POST /v1.0/leads/{leadId}/inquiry. Never throws; the caller records the result.
 async function placeInquiry(leadId, inquiry, apiKey, opts) {
+  if (loftyViaHub()) return { attempted: false, viaHub: true, reason: VIA_HUB_INQUIRY };
   try {
     if (!apiKey || !leadId || !inquiry) return { attempted: false };
     const res = await call("POST", `/v1.0/leads/${String(leadId).replace(/\D/g, "")}/inquiry`, apiKey,
