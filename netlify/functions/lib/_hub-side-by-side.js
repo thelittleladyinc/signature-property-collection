@@ -52,8 +52,6 @@ const MIN_POST_MS = 500;
 const RECORD_PATH = "/v1/parity/record";
 const MAX_ROWS_PER_POST = 200;
 const LOFTY_ORIGIN = "https://api.lofty.com/";
-// The hub takes at most 20 tags on a push (lib/_lofty-hub.js MAX_HUB_TAGS).
-const MAX_HUB_TAGS = 20;
 
 // The vendored toolkit (lib/suite-kit, CommonJS build; never edit it), loaded on first use so a site with the check
 // off never loads it.
@@ -700,46 +698,24 @@ function makeLeadSide(o) {
   };
 }
 
-// The hub's /v1/lofty/lead for this push, with dry_run: true (lib/_lofty-hub.js pushLeadViaHub's body, plus the
-// parity options sellerintelligence docs/hub-parity.md lists for the websites): the person, the source, the form's
-// tags (after the create, by read-merge-write), the same tags IN the create body except the trigger tag (create_tags:
-// the site puts its tags in the create body so they start no "Tag Added" plan, then re-fires the trigger tag alone),
-// the note, the plan's lead type (a create only), the home's address, the four website fields and the search wishes
-// (both written by the hub only on a contact it created, as the site writes them only on a contact proven new).
+// The hub's /v1/lofty/lead for this push, with dry_run: true: built by THE builder the real push uses
+// (lib/_lofty-hub.js leadAskFor; 2026-10-24), so what the dry run asked is exactly what the site asks for real with
+// LOFTY_VIA_HUB on. The person, the source, the form's tags (after the create, by read-merge-write), the same tags IN
+// the create body except the trigger tag (create_tags: the site puts its tags in the create body so they start no
+// "Tag Added" plan, then re-fires the trigger tag alone), the note, the plan's lead type (a create only), the home's
+// address, the four website fields and the search wishes (both written by the hub only on a contact it created, as
+// the site writes them only on a contact proven new).
 function buildLeadAsk(input, formTags) {
   const i = input || {};
   const b = i.body || {};
-  const clean = (t) => safe(() => kit().lofty.cleanTag(t), "");
-  const tags = Array.from(new Set(formTags.map(clean).filter(Boolean))).slice(0, MAX_HUB_TAGS);
-  const createTags = tags.filter((t) => t !== i.triggerTag);
-  const email = Array.isArray(b.emails) ? b.emails[0] : b.email;
-  const phone = Array.isArray(b.phones) ? b.phones[0] : b.phone;
   const plan = i.plan || {};
-  const leadTypes = Array.isArray(plan.leadTypes) ? plan.leadTypes.filter((n) => Number.isInteger(n) && n > 0 && n < 100) : [];
-  const out = {
-    ...(b.firstName ? { first_name: String(b.firstName) } : {}),
-    ...(b.lastName ? { last_name: String(b.lastName) } : {}),
-    ...(email ? { email: String(email) } : {}),
-    ...(phone ? { phone: String(phone) } : {}),
-    ...(b.source ? { source: String(b.source) } : {}),
-    tags,
-    ...(typeof b.notes === "string" && b.notes.trim() ? { note: b.notes } : {}),
-    ...(leadTypes.length ? { lead_types: leadTypes } : {}),
-    create: true,
-  };
-  if (createTags.length) out.create_tags = createTags;
-  const p = i.property;
-  if (p && p.streetAddress) {
-    out.address = { street: p.streetAddress, ...(p.city ? { city: p.city } : {}), ...(p.state ? { state: p.state } : {}), ...(p.zipCode ? { zip: p.zipCode } : {}) };
-  }
   const returning = safe(() => require("./_lofty-returning"), null);
-  if (returning && i.data) {
-    const values = safe(() => returning.websiteFieldValues(i.label, i.data), []) || [];
-    if (values.length) out.custom_fields = Object.fromEntries(values.map((f) => [f.attributeName, f.value]));
-    const inquiry = safe(() => returning.inquiryFromForm(i.data), null);
-    if (inquiry) out.inquiry = inquiry;
-  }
-  return out;
+  const websiteFields = returning && i.data ? (safe(() => returning.websiteFieldValues(i.label, i.data), []) || []) : [];
+  const inquiry = returning && i.data ? safe(() => returning.inquiryFromForm(i.data), null) : null;
+  return require("./_lofty-hub").leadAskFor({ ...b, tags: formTags, tagsAdd: undefined, property: i.property, leadTypes: undefined }, {
+    triggerTag: i.triggerTag, leadTypes: Array.isArray(plan.leadTypes) ? plan.leadTypes : [],
+    note: typeof b.notes === "string" && b.notes.trim() ? b.notes : null, websiteFields, inquiry,
+  });
 }
 
 // ---- MLS reads: the scheduled sync's side-by-side ---------------------------------------------------------------
