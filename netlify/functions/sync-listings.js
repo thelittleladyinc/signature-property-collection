@@ -994,6 +994,9 @@ function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env }) {
   const viaHub = mlsHub.mlsSource(env || process.env) === "hub";
   let gridMine = null;
   let verdicts = null;
+  // Hub mode only: her listings the hub run removed (lib/_mls-hub.js HUB_REMOVED_MINE_KEY). Unreadable = {}:
+  // the grace rule then decides, as it always has.
+  let removedMine = null;
   let lookups = 0;
   async function load() {
     if (gridMine === null) {
@@ -1003,6 +1006,9 @@ function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env }) {
     if (verdicts === null) {
       const v = await store.get(VERDICT_KEY, { type: "json" }).catch(() => null);
       verdicts = v && typeof v === "object" ? v : {};
+    }
+    if (viaHub && removedMine === null) {
+      removedMine = mlsHub.removedMemory(await store.get(mlsHub.HUB_REMOVED_MINE_KEY, { type: "json" }).catch(() => null));
     }
   }
   async function askMlsGrid(id) {
@@ -1048,6 +1054,10 @@ function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env }) {
         : await askMlsGrid(id);
     } catch (err) {
       verdict = { onMarket: null, why: `${viaHub ? "hub" : "MLS Grid"} check failed: ${err && err.message}` };
+    }
+    // Hub mode: "no record" for a listing the hub removed is MLS Grid's "off the market" (see removedMine).
+    if (viaHub && verdict.onMarket === false && verdict.status === "not in the feed") {
+      verdict = mlsHub.rememberedRemoval(removedMine, id) || verdict;
     }
     if (verdict.onMarket === false && verdict.status === "not in the feed") {
       const listed = listing.listDate ? Date.parse(listing.listDate) : NaN;
@@ -1302,10 +1312,36 @@ async function hubMarketDataRun(opts) {
     keyIndex.get(key).add(id);
   };
   for (const [id, l] of Object.entries(listingsById)) indexKey(l && l.listingKey, id);
-  const drop = (listingId, listingKey) => {
+
+  // 2026-10-24: her listings this run removes, remembered for the on-market check (lib/_mls-hub.js
+  // HUB_REMOVED_MINE_KEY: the hub deletes a listing MLS Grid hides, so its lookup says "no record" where MLS Grid
+  // said "Expired"). A memory that cannot be read is not rewritten this run (that would drop what it holds).
+  let removedMine = {};
+  let removedReadOk = true;
+  let removedDirty = false;
+  try {
+    removedMine = mlsHub.removedMemory(await store.get(mlsHub.HUB_REMOVED_MINE_KEY, { type: "json" }));
+    removedDirty = mlsHub.pruneRemoved(removedMine, Date.now());
+  } catch (err) {
+    removedReadOk = false;
+    say(`sync-listings (hub): could not read ${mlsHub.HUB_REMOVED_MINE_KEY} (${err && err.message}); not updating it this run.`);
+  }
+  const saveRemoved = async () => {
+    if (!removedReadOk || !removedDirty) return;
+    await store.setJSON(mlsHub.HUB_REMOVED_MINE_KEY, removedMine);
+    removedDirty = false;
+  };
+
+  // `why` is what the hub said about it (its MLS status, or why it is gone), kept for her listings only.
+  const drop = (listingId, listingKey, why) => {
     let n = 0;
     for (const id of new Set([listingId, listingKey, ...(keyIndex.get(listingKey) || [])])) {
-      if (id && listingsById[id]) { delete listingsById[id]; n += 1; }
+      const held = id ? listingsById[id] : null;
+      if (held) {
+        if (isHerListing(held) && mlsHub.noteRemoved(removedMine, held.listingId || id, why, Date.now())) removedDirty = true;
+        delete listingsById[id];
+        n += 1;
+      }
       if (id && seen) seen.delete(id);
     }
     if (n) dirty = true;
@@ -1342,6 +1378,7 @@ async function hubMarketDataRun(opts) {
   const saveProgress = async () => {
     if (dirty) await saveListingsCheckpoint(store, listingsById);
     dirty = false;
+    await saveRemoved();
     if (seen && pass && pass.kind === "snapshot") {
       await store.setJSON(HUB_SNAPSHOT_SEEN_KEY, { passStartedAt: pass.startedAt, ids: [...seen] });
     }
@@ -1404,7 +1441,8 @@ async function hubMarketDataRun(opts) {
           const heldAt = Date.parse((held && held.modificationTimestamp) || "");
           const goneAt = Date.parse(row.deleted_at || "");
           if (Number.isFinite(heldAt) && Number.isFinite(goneAt) && heldAt > goneAt) continue;
-          removedByHub += drop(null, row.ListingKey);
+          removedByHub += drop(null, row.ListingKey,
+            `removed from the MLS feed${typeof row.reason === "string" && row.reason ? ` (${row.reason.slice(0, 40)})` : ""}`);
         }
         pass.deletedAfter = page.next;
         if (!page.next) pass.deletedDone = true;
@@ -1437,7 +1475,8 @@ async function hubMarketDataRun(opts) {
           if (Number.isFinite(t) && !(Date.parse(pass.maxMod || "") >= t)) pass.maxMod = mapped.modificationTimestamp;
           // From here on, the same per-record rules as the MLS Grid crawl.
           if (mapped.mlgCanView === false || !REPLICATED_STATUSES.includes(mapped.status)) {
-            removedByHub += drop(mapped.listingId, mapped.listingKey);
+            removedByHub += drop(mapped.listingId, mapped.listingKey,
+              mapped.mlgCanView === false ? "not viewable" : (mapped.status || "no status"));
             continue;
           }
           if (OPERATING_COUNTIES.size > 0 && mapped.county && !OPERATING_COUNTIES.has(mapped.county) && !isHerListing(mapped)) {
@@ -1449,6 +1488,7 @@ async function hubMarketDataRun(opts) {
           mapped.photosRefreshedAt = new Date().toISOString();
           listingsById[mapped.listingId] = slimForStorage(mapped);
           indexKey(mapped.listingKey, mapped.listingId);
+          if (mlsHub.forgetRemoved(removedMine, mapped.listingId)) removedDirty = true;
           if (seen) seen.add(mapped.listingId);
           dirty = true;
         }
@@ -1467,7 +1507,7 @@ async function hubMarketDataRun(opts) {
               "the copy is not marked current"), { keepPass: false });
           }
           for (const id of Object.keys(listingsById)) {
-            if (!seen.has(id)) { delete listingsById[id]; removedByHub += 1; dirty = true; }
+            if (!seen.has(id)) removedByHub += drop(id, null, "not listed in the hub's copy");
           }
           const floor = Math.min(Date.parse(pass.startedAt),
             Date.parse(pass.copyLastSuccessAt || "") || Infinity) - HUB_SNAPSHOT_REWIND_MS;
@@ -1495,6 +1535,7 @@ async function hubMarketDataRun(opts) {
   }
 
   if (dirty) await saveListingsCheckpoint(store, listingsById);
+  await saveRemoved().catch((err) => say(`sync-listings (hub): could not save ${mlsHub.HUB_REMOVED_MINE_KEY}: ${err && err.message}`));
   if (snapshotFinished) {
     await store.delete(HUB_SNAPSHOT_SEEN_KEY).catch(() => {});
   } else if (seen && pass && pass.kind === "snapshot") {

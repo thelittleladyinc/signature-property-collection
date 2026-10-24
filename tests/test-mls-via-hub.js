@@ -301,6 +301,16 @@ async function bootstrapPair(hidden) {
   // ---------------------------------------------------------------------------
   print("\n1. The switch: only exactly \"hub\" (trimmed), read at call time");
   {
+    // 2026-10-24: one copy of lib/_mls-hub.js for both sites (the main site's on-market check uses it too).
+    const sib = path.join(ROOT, "..", "thelittleladysellshomes", "netlify", "functions", "lib", "_mls-hub.js");
+    if (fs.existsSync(sib)) {
+      check("lib/_mls-hub.js is byte-identical to thelittleladysellshomes's copy",
+        fs.readFileSync(sib, "utf8") === fs.readFileSync(`${FN_DIR}/lib/_mls-hub.js`, "utf8"));
+    } else {
+      print("  --   thelittleladysellshomes checkout not present; skipping the _mls-hub.js drift check");
+    }
+  }
+  {
     setEnv({});
     freshModules(makeStore({}), makeFetch(makeWorld()));
     const H = require(`${FN_DIR}/lib/_mls-hub.js`);
@@ -784,6 +794,93 @@ async function bootstrapPair(hidden) {
     // 2026-10-23: ?probe=1 also runs the hub key check (one GET /v1/health to the hub); that is the only call allowed.
     const notHubKeyCheck = f.calls.filter((c) => !/\/v1\/health$/.test(new URL(c.url).pathname));
     check("...and even ?probe=1 makes no MLS Grid photo request", /Not tested/.test(photos.detail) && notHubKeyCheck.length === 0, photos.detail + " " + notHubKeyCheck.map((c) => c.url).join(" "));
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2026-10-24 (nothing lost). MLS Grid keeps sending a listing it hides for about a week, so its lookup says
+  // "Expired"; the hub deletes it at once and says "no record". For a listing Lofty calls new (under 7 days) the
+  // grace rule turned "no record" into "unknown" -- kept on the site where MLS Grid would have hidden it. The hub
+  // run now remembers her listings it removes (lib/_mls-hub.js HUB_REMOVED_MINE_KEY) and the check uses that.
+  print("\n10. Her listing the MLS hides within a week of listing: off the market through both paths");
+  for (const hidden of ["deleted", "stub"]) {
+    const { world, gridStore, hubStore } = await bootstrapPair(hidden);
+    await runSync(hubStore, world, HUB_ENV);                         // the first hub run (the snapshot)
+    const newListing = { listingId: "IRE1000013", listDate: new Date(Date.now() - 2 * DAY).toISOString().slice(0, 10) };
+    const confirmWith = async (store, env) => {
+      setEnv(env);
+      const f = makeFetch(world);
+      freshModules(store, f);
+      const S = require(`${FN_DIR}/sync-listings.js`);
+      const c = S.makeOnMarketConfirmer({ store, token: process.env.MLSGRID_API_TOKEN, log: () => {}, sleepImpl: async () => {} });
+      return { v: await c(newListing), grid: f.grid() };
+    };
+    change(world, "K13", { StandardStatus: "Expired", MlgCanView: false });
+    await runSync(gridStore, world, GRID_ENV);
+    const h = await runSync(hubStore, world, HUB_ENV);
+    check(`${hidden}: both copies drop her listing`, !snapshot(gridStore).mine.includes("IRE1000013") &&
+      !snapshot(hubStore).mine.includes("IRE1000013") && h.fetch.grid() === 0);
+    const mem = hubStore.data.get("hub-removed-mine.json") || {};
+    check(`${hidden}: the hub run remembers it, with the reason`, !!mem.IRE1000013 &&
+      Date.now() - Date.parse(mem.IRE1000013.at) < 60e3 && (hidden === "deleted" ? /removed from the MLS feed/ : /not viewable/).test(mem.IRE1000013.status),
+      JSON.stringify(mem));
+    check(`${hidden}: only her listings are remembered (other brokerages' removals are not)`, Object.keys(mem).length === 1, Object.keys(mem).join(","));
+    check(`${hidden}: the MLS Grid path writes no such memory`, !gridStore.data.has("hub-removed-mine.json"));
+    const grid = await confirmWith(copyOf(gridStore), GRID_ENV);
+    const hub = await confirmWith(copyOf(hubStore), HUB_ENV);
+    check(`${hidden}: MLS Grid says off the market (its hidden record)`, grid.v.onMarket === false, JSON.stringify(grid.v));
+    check(`${hidden}: the hub path says off the market too, no MLS Grid request`, hub.v.onMarket === false && hub.grid === 0, JSON.stringify(hub.v));
+    if (hidden === "deleted") {
+      const forgetful = copyOf(hubStore);
+      forgetful.data.delete("hub-removed-mine.json");
+      const before = await confirmWith(forgetful, HUB_ENV);
+      check("deleted: without the memory the hub path would have KEPT it (the gap this closes)", before.v.onMarket === null, JSON.stringify(before.v));
+      check("deleted: ...and a brand-new listing the hub simply has not seen yet is still 'unknown' (grace unchanged)",
+        (await (async () => {
+          setEnv(HUB_ENV);
+          const f = makeFetch(world);
+          freshModules(copyOf(hubStore), f);
+          const c = require(`${FN_DIR}/sync-listings.js`).makeOnMarketConfirmer({ store: copyOf(hubStore), log: () => {}, sleepImpl: async () => {} });
+          return c({ listingId: "IRE1000077", listDate: newListing.listDate });
+        })()).onMarket === null);
+    }
+    // Back on the market: the memory forgets it and the copy holds it again.
+    change(world, "K13", { StandardStatus: "Active", MlgCanView: true });
+    await runSync(gridStore, world, GRID_ENV);
+    await runSync(hubStore, world, HUB_ENV);
+    const after = hubStore.data.get("hub-removed-mine.json") || {};
+    // (The hub's first snapshot also holds her Coming Soon listing, IRE1000014, which MLS Grid's bootstrap waits
+    // for; see section 2.)
+    check(`${hidden}: relisted: forgotten, back in mine-listings.json on both`, !after.IRE1000013 &&
+      snapshot(gridStore).mine.includes("IRE1000013") && same(snapshot(gridStore).mine, minus(snapshot(hubStore), ["IRE1000014"]).mine),
+      `${JSON.stringify(after)} grid ${snapshot(gridStore).mine} hub ${snapshot(hubStore).mine}`);
+    const back = await confirmWith(copyOf(hubStore), HUB_ENV);
+    check(`${hidden}: relisted: on the market`, back.v.onMarket === true, JSON.stringify(back.v));
+  }
+  {
+    // The memory: entries older than the keep window go; an unreadable memory is never rewritten.
+    setEnv(HUB_ENV);
+    freshModules(makeStore({}), makeFetch(makeWorld()));
+    const H = require(`${FN_DIR}/lib/_mls-hub.js`);
+    const now = Date.parse("2026-10-24T12:00:00Z");
+    const m = H.removedMemory({ IRE1: { at: "2026-10-23T00:00:00Z", status: "Expired" }, IRE2: { at: "2026-09-01T00:00:00Z", status: "x" },
+      bad: "nope", IRE3: { status: "no time" } });
+    check("a malformed entry is ignored", Object.keys(m).sort().join(",") === "IRE1,IRE2", Object.keys(m).join(","));
+    check("over 30 days old: pruned", H.pruneRemoved(m, now) === true && Object.keys(m).join(",") === "IRE1");
+    check("remembered with or without the IRE prefix", H.rememberedRemoval(m, "1").onMarket === false &&
+      /Expired/.test(H.rememberedRemoval(m, "IRE1").why) && H.rememberedRemoval(m, "IRE9") === null && H.rememberedRemoval(null, "IRE1") === null);
+    check("not a memory: {}", Object.keys(H.removedMemory(null)).length === 0 && Object.keys(H.removedMemory([1])).length === 0);
+
+    const { world, hubStore } = await bootstrapPair("deleted");
+    await runSync(hubStore, world, HUB_ENV);
+    hubStore.data.set("hub-removed-mine.json", { IRE1000999: { at: new Date().toISOString(), status: "Expired" } });
+    const realGet = hubStore.get;
+    hubStore.get = async (k) => { if (k === "hub-removed-mine.json") throw new Error("blobs unavailable"); return realGet(k); };
+    change(world, "K13", { StandardStatus: "Canceled", MlgCanView: false });
+    const r = await runSync(hubStore, world, HUB_ENV);
+    hubStore.get = realGet;
+    const kept = hubStore.data.get("hub-removed-mine.json");
+    check("an unreadable memory: the run still applies the change, and leaves the memory as it was", r.res.statusCode === 200 &&
+      !snapshot(hubStore).mine.includes("IRE1000013") && same(Object.keys(kept), ["IRE1000999"]), JSON.stringify(kept));
   }
 
   setEnv({});
