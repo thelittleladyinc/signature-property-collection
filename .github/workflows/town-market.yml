@@ -96,7 +96,7 @@ jobs:
         if: ${{ steps.creds.outputs.ready == 'true' && vars.TOWN_STATS_SOURCE == 'hub' }}
         env:
           HUB_API_URL: ${{ vars.HUB_API_URL }}
-          HUB_API_KEY: ${{ secrets.HUB_API_KEY }}
+          HUB_API_KEY: ${{ secrets.HUB_APP_KEY }}
         run: node build/tools/town-market-stats.js --source hub
 
       # OPTIONAL, off unless the repository variable HUB_SIDE_BY_SIDE lists mls_read (2026-10-23, the side-by-side
