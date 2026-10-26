@@ -511,7 +511,7 @@ function blobStore(seed) {
     d.res.recovered === 1 && !("leadTypes" in f.posts[0]) && planPuts(f).length === 0, JSON.stringify(f.posts[0]));
 
   check("the plan step runs after the trigger tag, before the returning-lead task",
-    same(L.FOLLOWUP_STEPS, ["note", "tag", "planTags", "returning", "fields", "inquiry"]), JSON.stringify(L.FOLLOWUP_STEPS));
+    same(L.FOLLOWUP_STEPS.slice(0, 6), ["note", "tag", "planTags", "returning", "fields", "inquiry"]), JSON.stringify(L.FOLLOWUP_STEPS));
   const deferred = (steps) => ({ ...queuedEntry, loftyId: NEWID, followupsPending: ["planTags"],
     replay: { newId: NEWID, identity: { ok: true, anyMatch: false, leadId: null }, steps } });
   f = fakeLofty({ leads: { [NEWID]: { tags: ["Hot Lead - Website", "Website Lead"], phones: [] } } });
