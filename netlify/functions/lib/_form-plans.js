@@ -193,6 +193,16 @@ const FORMS_WITHOUT_PLAN = Object.freeze([
   "market-conditions-inquiry",
 ]);
 
+// Forms with no plan whose leads still get a lead type (Christine, 2026-10-26:
+// "I will need to know the difference between expired vs rent to own"; a lead
+// with no type reads "Other" in Lofty). Rent-to-own is a buyer path, the same as
+// the hub router's intent rent_to_own; it still starts no plan (2026-10-23), and
+// its "Rent-to-Own" tag is what tells it apart from other buyers. Sent like every
+// lead type: on the create of a contact proven new only.
+const TYPE_ONLY_FORMS = Object.freeze({
+  "rent-to-own-options": LEAD_TYPE.BUYER,
+});
+
 function hasOwn(obj, key) {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
@@ -232,7 +242,10 @@ function planKeyFor(formName, data, opts) {
 function planForSubmission(formName, data, opts) {
   const key = planKeyFor(formName, data, opts);
   const p = key ? PLANS[key] : null;
-  if (!p) return { plan: null, planTags: [], leadTypes: [] };
+  if (!p) {
+    const name = String(formName || "");
+    return { plan: null, planTags: [], leadTypes: hasOwn(TYPE_ONLY_FORMS, name) ? [TYPE_ONLY_FORMS[name]] : [] };
+  }
   return { plan: key, planTags: p.tag ? [p.tag, ...(p.alsoTags || [])] : [], leadTypes: p.leadType ? [p.leadType] : [] };
 }
 
@@ -250,6 +263,7 @@ module.exports = {
   SIGNATURE_SITE_PLAN,
   HOME_LEAD_PLAN,
   FORMS_WITHOUT_PLAN,
+  TYPE_ONLY_FORMS,
   VALUE_REVIEW_SENT_TAG,
   VALUE_REVIEW_FORMS,
   SIGNATURE_VALUE_REVIEW_PLAN,

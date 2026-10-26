@@ -708,10 +708,10 @@ const deadline = () => Date.now() + 15000;
   reset(null, fakeLofty());
   await submit("rent-to-own-options", person({ message: "hi" }), "sub-6008");
   const rtoCreate = OWN.calls.find((c) => c.method === "POST" && c.path === "/leads");
-  check("a rent-to-own submission through the handler: one router copy with intent rent_to_own, the Lofty create as before",
+  check("a rent-to-own submission through the handler: one router copy with intent rent_to_own, the Lofty create typed Buyer (Oct 26)",
     HUB.routed.length === 1 && HUB.routed[0].intent === "rent_to_own" &&
     HUB.routed[0].idempotency_key === `${SITE}-form:rent-to-own-options:sub-6008` && !!rtoCreate &&
-    rtoCreate.body.cannotText === true && !("leadTypes" in rtoCreate.body) &&
+    rtoCreate.body.cannotText === true && JSON.stringify(rtoCreate.body.leadTypes) === "[2]" &&
     (SITE !== "tllsh" || (rtoCreate.body.tags.includes("Buyer Lead") && rtoCreate.body.tags.includes("Rent-to-Own"))),
     JSON.stringify({ routed: HUB.routed, create: rtoCreate && rtoCreate.body }));
   // A cash offer and an FSBO lead write exactly the same to Lofty with the router copy off and on: the new intents
