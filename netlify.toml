@@ -159,10 +159,14 @@
 # function -- so a slow Lofty could get the run killed before the queue was
 # written back (an accepted lead replayed next run: a duplicate note and a
 # re-fired tag) and before her listings were refreshed. Its own function now,
-# exactly as on the Little Lady site: a 20-second budget, at most 3 leads a run,
+# exactly as on the Little Lady site: a time budget, at most 3 leads a run,
 # a create-only lease so two schedules never replay the same lead at once.
 # Offset from this site's :00/:30 sync and from the Little Lady's :15/:45 drain,
 # so neither competes with the other for Lofty.
+# 2026-10-26: Netlify's scheduler stops waiting for a scheduled function after
+# about 15 seconds, not the documented 30 (HTTP 499 at 14.97 s, then the same run
+# sent again), so the drain's budget is 10 seconds and the 30-minute sync ends its
+# own work by 11 (sync-listings.js SCHEDULER_WAIT_MS).
 [functions."lofty-queue-drain"]
   schedule = "5,35 * * * *"
 

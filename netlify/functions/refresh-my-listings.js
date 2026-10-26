@@ -22,6 +22,12 @@ const { runMineSync } = require("./lib/_lofty-listings");
 // makeOnMarketConfirmer).
 const { makeOnMarketConfirmer, mlsGridMarketDataOn } = require("./sync-listings");
 
+// 2026-10-26: Netlify gives an ordinary function 10 seconds. A rate-limited Lofty
+// used to be waited out for 10 seconds inside that, so the refresh was cut off
+// with nothing said. Its own work now ends by here; what it has no time for is
+// named in the answer (cutShort) and done by the next run.
+const MANUAL_RUN_MS = 8000;
+
 function json(statusCode, body) {
   return {
     statusCode,
@@ -41,10 +47,11 @@ exports.handler = async (event) => {
   if (!apiKey) return json(503, { error: "LOFTY_API_KEY is not set in Netlify." });
   try {
     const store = getBlobStore(getStore);
+    const deadline = Date.now() + MANUAL_RUN_MS;
     const confirmOnMarket = mlsGridMarketDataOn()
-      ? makeOnMarketConfirmer({ store, token: process.env.MLSGRID_API_TOKEN })
+      ? makeOnMarketConfirmer({ store, token: process.env.MLSGRID_API_TOKEN, deadline })
       : undefined;
-    const result = await runMineSync({ store, apiKey, manual: true, confirmOnMarket });
+    const result = await runMineSync({ store, apiKey, manual: true, confirmOnMarket, deadline });
     return json(result.skipped ? 429 : 200, result);
   } catch (err) {
     console.error("refresh-my-listings:", err && err.message);

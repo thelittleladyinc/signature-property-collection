@@ -11,8 +11,9 @@
 // slow Lofty could get the run killed before the queue was written back (an
 // accepted lead replayed again: a duplicate note, a re-fired tag) and before her
 // listings were refreshed. The drain is its own scheduled function now
-// (netlify/functions/lofty-queue-drain.js), with a 20-second budget, exactly as
-// on the Little Lady site; section 5 pins that.
+// (netlify/functions/lofty-queue-drain.js), with its own budget, exactly as
+// on the Little Lady site; section 5 pins that. 2026-10-26: the budget is 10
+// seconds, since Netlify's scheduler stops waiting after about 15.
 "use strict";
 process.exitCode = 1;
 const ROOT = require("path").resolve(__dirname, "..");
@@ -103,8 +104,11 @@ const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, tex
   check("...offset from the listing sync's :00/:30 and the Little Lady's :15/:45",
     /\[functions\."lofty-queue-drain"\]\s*\n\s*schedule = "5,35 \* \* \* \*"/.test(toml));
   const drainSrc = fs.readFileSync(`${FN_DIR}/lofty-queue-drain.js`, "utf8");
-  check("a run's budget is 20 seconds inside Netlify's 30", /DRAIN_BUDGET_MS = 20000/.test(drainSrc) &&
-    /deadline: Date\.now\(\) \+ DRAIN_BUDGET_MS/.test(drainSrc));
+  // 2026-10-26: Netlify's scheduler stops waiting after about 15 s (HTTP 499 at 14.97 s, then the run is sent
+  // again), not the documented 30, so the budget leaves room for a cold start and the write-back inside 15.
+  const budget = Number((drainSrc.match(/const DRAIN_BUDGET_MS = (\d+);/) || [])[1]);
+  check("a run's budget fits inside the scheduler's ~15 s wait, with room for the write-back", budget > 0 && budget <= 10000, String(budget));
+  check("...measured from the start of the run", /deadline: startedAt \+ DRAIN_BUDGET_MS/.test(drainSrc) && /const startedAt = Date\.now\(\)/.test(drainSrc));
   // The word may survive in a comment; a call or the import may not.
   const syncSrc = fs.readFileSync(`${FN_DIR}/sync-listings.js`, "utf8");
   check("the listing sync no longer drains the queue itself",
@@ -115,6 +119,33 @@ const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, tex
   global.fetch = async (url, init) => { if (init && init.method === "POST") posted.push(1); return resp(200, {}); };
   let out = await drain();
   check("with no Lofty key it does nothing", out.statusCode === 200 && posted.length === 0 && store.data[L.FAILED_PUSH_KEY].length === 1);
+  // 2026-10-26: a paused queue says so (it answered "ok" before), with or without a key, and touches nothing.
+  for (const key of [undefined, "k"]) {
+    if (key) process.env.LOFTY_API_KEY = key; else delete process.env.LOFTY_API_KEY;
+    process.env.LOFTY_QUEUE_DRAIN = "off";
+    out = await drain();
+    delete process.env.LOFTY_QUEUE_DRAIN;
+    check(`LOFTY_QUEUE_DRAIN=off${key ? "" : " (no key)"}: answers "paused", nothing sent, the queue kept`,
+      out.statusCode === 200 && /^paused: LOFTY_QUEUE_DRAIN is off/.test(out.body) && posted.length === 0 &&
+      store.data[L.FAILED_PUSH_KEY].length === 1, out.body);
+  }
+  delete process.env.LOFTY_API_KEY;
+  // Its code is loaded inside the handler: a load failure is a clear 503, never Netlify's crash page.
+  check("nothing but the handler runs at load time (a load failure can be answered)",
+    !/^const .*require\(/m.test(drainSrc) && /could not load its code/.test(drainSrc) && /answer\(503,/.test(drainSrc));
+  {
+    const loftyPath = require.resolve(`${FN_DIR}/lib/_lofty.js`);
+    const real = require.cache[loftyPath];
+    const broken = {};
+    Object.defineProperty(broken, "drainFailedPushes", { get() { throw new Error("Cannot find module './_lofty-consent'"); } });
+    require.cache[loftyPath] = { id: loftyPath, filename: loftyPath, loaded: true, exports: broken };
+    const errLog = console.error;
+    console.error = () => {};
+    try { out = await drain(); } finally { console.error = errLog; require.cache[loftyPath] = real; }
+    check("its code failing to load: a 503 that says why, the queue untouched",
+      out.statusCode === 503 && /did not load \(Cannot find module/.test(out.body) && /queue is untouched/.test(out.body) &&
+      posted.length === 0 && store.data[L.FAILED_PUSH_KEY].length === 1, `${out.statusCode} ${out.body}`);
+  }
   process.env.LOFTY_API_KEY = "k";
   out = await drain();
   check("it replays the queued lead from the store submission-created writes to",

@@ -13,36 +13,68 @@
 // The Little Lady site already runs the drain as its own schedule; this is the
 // same function (lib/_lofty.js drainFailedPushes: at most 3 leads a run, a
 // create-only lease so two schedules never replay the same lead at once, the
-// queue written back merged with anything queued meanwhile), with a 20-second
-// budget so the write-back always happens, offset from this site's :00/:30 sync
+// queue written back merged with anything queued meanwhile), with a time budget
+// (DRAIN_BUDGET_MS below) so the write-back always happens, offset from this site's :00/:30 sync
 // and from the Little Lady's :15/:45 drain (netlify.toml). The sync now only
 // refreshes her listings and the town figures.
 "use strict";
-const { getStore } = require("@netlify/blobs");
-const { getBlobStore } = require("./lib/_mls-shared");
-const { drainFailedPushes } = require("./lib/_lofty");
+
+// 2026-10-26 (Netlify request log). One scheduled run (03:05 UTC) answered HTTP 500
+// in 0.7 s with no function invocation behind it -- Netlify's side, before this code
+// ran; the scheduler sent the run again a second later and it answered 200. Nothing
+// here can cause or prevent that. What this file does now so a run always says what
+// happened:
+//   - its code is loaded inside the handler, so a load failure answers a clear 503
+//     with the reason instead of Netlify's crash page;
+//   - a paused queue (LOFTY_QUEUE_DRAIN=off) answers "paused" and says so in the log,
+//     instead of "ok";
+//   - every run logs its outcome, including "nothing queued".
+//
+// DRAIN_BUDGET_MS. Netlify documents 30 seconds for a scheduled function, but its
+// scheduler stops waiting after about 15: in the same log every scheduled run that
+// went past it ended HTTP 499 at 14.97 s and was sent again at once (see
+// sync-listings.js SCHEDULER_WAIT_MS). A drain killed there never writes the queue
+// back, so a lead Lofty already accepted would be replayed again next run (a second
+// note, a re-fired tag). No replay starts, or runs, past this budget; the write-back
+// after it, and a cold start before it, fit in what is left of the 15 seconds. A
+// replay that needs longer finishes on the next run (lib/_lofty.js followupsPending).
+const DRAIN_BUDGET_MS = 10000;
 
 const DIAG_STORE = "mls-listings";  // where submission-created.js queues them
-// Netlify stops a scheduled function at 30 seconds. No replay starts, or runs,
-// past this, so the queue is always written back.
-const DRAIN_BUDGET_MS = 20000;
+
+function answer(statusCode, body) {
+  return { statusCode, headers: { "Content-Type": "text/plain; charset=utf-8" }, body };
+}
 
 exports.handler = async () => {
+  const startedAt = Date.now();
+  let getStore, getBlobStore, drainFailedPushes, queueDrainOff;
+  try {
+    ({ getStore } = require("@netlify/blobs"));
+    ({ getBlobStore } = require("./lib/_mls-shared"));
+    ({ drainFailedPushes, queueDrainOff } = require("./lib/_lofty"));
+  } catch (err) {
+    console.error("lofty-queue-drain: could not load its code (the queue is untouched):", err && err.message);
+    return answer(503, `not run: the drain's code did not load (${(err && err.message) || "unknown error"}); the queue is untouched`);
+  }
+  if (queueDrainOff()) {
+    console.log("lofty-queue-drain: paused (LOFTY_QUEUE_DRAIN is off); the queue is kept as it is.");
+    return answer(200, "paused: LOFTY_QUEUE_DRAIN is off; the queue is kept as it is");
+  }
   const apiKey = process.env.LOFTY_API_KEY;
   if (!apiKey) {
     console.log("lofty-queue-drain: LOFTY_API_KEY not set — nothing to retry with.");
-    return { statusCode: 200, body: "no Lofty key configured" };
+    return answer(200, "no Lofty key configured");
   }
   try {
     const store = getBlobStore(getStore, DIAG_STORE);
-    const result = await drainFailedPushes(store, apiKey, { deadline: Date.now() + DRAIN_BUDGET_MS });
-    if (result.attempted || result.locked) {
-      console.log(`lofty-queue-drain: ${JSON.stringify(result)}`);
-    }
-    return { statusCode: 200, body: "ok" };
+    const result = await drainFailedPushes(store, apiKey, { deadline: startedAt + DRAIN_BUDGET_MS });
+    console.log(`lofty-queue-drain: ${result.attempted || result.locked || result.deferred || result.finished
+      ? JSON.stringify(result) : "nothing to replay"} (${Date.now() - startedAt} ms)`);
+    return answer(200, result.locked ? "skipped: another drain holds the lease" : "ok");
   } catch (err) {
     // Nothing is lost: the queue stays as it was for the next run.
     console.error("lofty-queue-drain failed (queue kept for the next run):", err && err.message);
-    return { statusCode: 200, body: "error logged" };
+    return answer(200, "error logged");
   }
 };
