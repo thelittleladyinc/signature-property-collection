@@ -38,7 +38,7 @@ Not exactly today's behaviour:
 - A returning contact found by phone only used to have its trigger tag re-fired; through the hub it gets the Call task instead (the website profile takes no tag off, so a tag already on a lead cannot be re-fired). A returning contact found by email gets the Call task, as today.
 - The hub creates no Call task on a Do Not Contact, `#dnc` or `cannotCall` lead; today's own-key path did.
 - Texting is never switched on through the hub (10DLC campaign 12744 is not approved); today's own-key path switched it on for a yes on the only number.
-- The hub keeps Lofty's Source field to 100 characters: the one longer label (`signature-expired-inquiry` on the Little Lady site, 105 characters) loses its last five; the full label is still in the note and the "Website Form" field.
+- The hub keeps Lofty's Source field to 100 characters. Since 2026-10-26 the source is `Website` on both paths, so nothing is cut; the form's full label is in the note and the "Website Form" field.
 - A form's tags added to a returning contact go on by read-merge-write (a PUT), where today's create sent them as `tagsAdd`.
 - On an existing lead the address only fills a blank; a create Lofty folds into an existing lead could replace it today.
 - A replay of a lead whose first hub try created the contact but did not finish: the website fields and search wishes are not written (the hub writes them only in the push that creates the lead); they are in the note.

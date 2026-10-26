@@ -337,7 +337,8 @@ async function sendNoteRest(leadId, rest, o) {
 //   ok:true  -> the lead exists in Lofty; responseBody carries its id (and, only when the hub CREATED it and
 //               nothing merged, created_lead_id -- what makes a contact "proven new");
 //   ok:false -> manualReview:true for a hold (never replayed), otherwise queued for the next drain.
-// opts: { deadline, withoutNote, env, fetch, triggerTag, websiteFields, inquiry, smsYes }.
+// opts: { deadline, withoutNote, env, fetch, triggerTag, websiteFields, inquiry, smsYes, sourceLabel }. sourceLabel
+// (2026-10-26): the form's long label, kept for a returning contact's Call task (the lead's own source is "Website").
 async function pushLeadViaHub(body, opts) {
   const o = opts || {};
   const b = body || {};
@@ -405,7 +406,7 @@ async function pushLeadViaHub(body, opts) {
   hub.notePartsPending = notePending.length;
   if (leadId) {
     remember(leadId, { person: who, created, merged, noteAdded: hub.noteAdded, noteText: fullNote, notePending,
-      doNotContact: hub.doNotContact, emailBlocked: hub.emailBlocked, source: b.source || null, smsYes: hub.smsYes,
+      doNotContact: hub.doNotContact, emailBlocked: hub.emailBlocked, source: o.sourceLabel || b.source || null, smsYes: hub.smsYes,
       textingNotEnabled: hub.textingNotEnabled });
   }
   if ((j.status === "created" || j.status === "updated") && j.ok !== false && leadId) {

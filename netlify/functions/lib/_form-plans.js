@@ -44,6 +44,11 @@
 // each plan's FIRST email goes is set in Lofty, not here: the luxury plan's first
 // email must wait at least 2 days longer than HV's, so the two never land on the
 // same day (CLAUDE.md, "Website forms start their Lofty nurture plan").
+//
+// 2026-10-26 (Christine: every lead labeled, so her plans can tell a downsizer
+// from a rent-to-own buyer from an expired seller): this file also says how a
+// website lead is LABELED in Lofty -- its source (WEBSITE_SOURCE) and what the
+// person wants ("Interest – …" tags, interestFor below). Neither starts a plan.
 
 // The tag that starts each plan, exactly as the plan's start tag reads in Lofty.
 // Every "–" here is U+2013 EN DASH, copied from the plan names; S2's "-" is a
@@ -207,6 +212,137 @@ function hasOwn(obj, key) {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
+// ---- Labels (2026-10-26) ---------------------------------------------------------
+// The lead's Lofty source. Lofty files any source it does not already have as
+// "Other", and every long per-form label submission-created.js used to send read
+// "Other". "Website" is one her Lofty already keeps. The long label is not lost:
+// it is the note's first line, the "Website Form" field, the alert email and a
+// returning contact's Call task (and rides on a queued lead as sourceLabel).
+const WEBSITE_SOURCE = "Website";
+
+// What the person wants, as a tag her plans and lists can branch on. Exactly as
+// written here: "Interest – " with an EN DASH (U+2013) and a space either side;
+// "First Time" has no hyphen, matching her plan tag "TOF – First Time Buyer".
+// None of these starts a Smart Plan (her Lofty's only "Interest – …" tags today
+// are hobby tags). submission-created.js adds them to the form's other tags, so
+// they go the same way: in the create for a contact proven new, `tagsAdd` (which
+// only adds) for anyone else, and through the hub in its tags and create_tags.
+// Only the ones a website form uses are here.
+const INTEREST = Object.freeze({
+  BUYER: "Interest – Buyer",
+  FIRST_TIME_BUYER: "Interest – First Time Buyer",
+  VA_BUYER: "Interest – VA Buyer",
+  LUXURY_BUYER: "Interest – Luxury Buyer",
+  RELOCATION: "Interest – Relocation",
+  LAND: "Interest – Land",
+  MULTIGENERATIONAL: "Interest – Multigenerational",
+  RENT_TO_OWN: "Interest – Rent to Own",
+  INVESTOR: "Interest – Investor",
+  SELLER: "Interest – Seller",
+  HOME_VALUE: "Interest – Home Value",
+  CASH_OFFER: "Interest – Cash Offer",
+  LUXURY_SELLER: "Interest – Luxury Seller",
+  EXPIRED: "Interest – Expired",
+  DOWNSIZING: "Interest – Downsizing",
+  FSBO: "Interest – FSBO",
+  AGENT_RECRUIT: "Interest – Agent Recruit",
+  NEWSLETTER: "Interest – Newsletter",
+});
+
+const interests = (...keys) => Object.freeze(keys.map((k) => INTEREST[k]));
+
+// Form name -> its Interest tag(s), the same on both sites. Usually one; two only
+// when the form says both.
+const FORM_INTEREST = Object.freeze({
+  "listing-inquiry": interests("BUYER"),
+  "listing-alert-request": interests("BUYER"),
+  "neighborhood-quiz": interests("BUYER"),
+  "buyers-page-inquiry": interests("BUYER"),
+  "lifestyle-search": interests("BUYER"),
+  "buyers-guide": interests("BUYER"),
+  "dream-home-finder": interests("BUYER"),
+  "open-house-list": interests("BUYER"),
+  "loveland-buyers-guide": interests("BUYER"),
+  "west-greeley-inquiry": interests("BUYER"),
+  "ault-area-inquiry": interests("BUYER"),
+  "teacher-homebuying": interests("BUYER"),
+  "eaton-dining": interests("BUYER"),
+  "foreclosure-list-larimer": interests("BUYER"),
+  "foreclosure-list-weld": interests("BUYER"),
+  "relocation": interests("RELOCATION"),
+  "relocation-guide": interests("RELOCATION"),
+  "windsor-commute": interests("RELOCATION"),
+  "eaton-relocation": interests("RELOCATION"),
+  "multigenerational-search": interests("MULTIGENERATIONAL"),
+  "land-property-review": interests("LAND"),
+  "land-due-diligence-checklist": interests("LAND"),
+  "signature-buyers-inquiry": interests("LUXURY_BUYER"),
+  "signature-resort-buyer-inquiry": interests("LUXURY_BUYER"),
+  "signature-concierge-inquiry": interests("LUXURY_BUYER"),
+  "signature-luxury-market": interests("LUXURY_BUYER"),
+  "luxury-market": interests("LUXURY_BUYER"),
+  "concierge-page-inquiry": interests("LUXURY_BUYER"),
+  "first-time-homebuyer": interests("FIRST_TIME_BUYER"),
+  "veteran-home-purchase": interests("VA_BUYER"),
+  "sellers-guide": interests("SELLER"),
+  "seller-local-proof": interests("SELLER"),
+  "loveland-market-seller": interests("SELLER"),
+  "sellers-page-inquiry": interests("SELLER"),
+  "free-home-valuation": interests("HOME_VALUE"),
+  "cash-offer": interests("CASH_OFFER"),
+  "signature-sellers-inquiry": interests("LUXURY_SELLER"),
+  "signature-expired-inquiry": interests("LUXURY_SELLER", "EXPIRED"),
+  "noco-retirement": interests("DOWNSIZING"),
+  "fsbo-inquiry": interests("FSBO"),
+  "lpt-join": interests("AGENT_RECRUIT"),
+  "lpt-join-co": interests("AGENT_RECRUIT"),
+  "co-license-guide": interests("AGENT_RECRUIT"),
+  "agent-coaching": interests("AGENT_RECRUIT"),
+  "rent-to-own-options": interests("RENT_TO_OWN"),
+  "newsletter-signup": interests("NEWSLETTER"),
+});
+
+// On the Signature site (the luxury brand) its seller forms are luxury sellers,
+// as its seller plan is; its home-value form is both.
+const SIGNATURE_SITE_INTEREST = Object.freeze({
+  "sellers-guide": interests("LUXURY_SELLER"),
+  "seller-local-proof": interests("LUXURY_SELLER"),
+  "loveland-market-seller": interests("LUXURY_SELLER"),
+  "sellers-page-inquiry": interests("LUXURY_SELLER"),
+  "free-home-valuation": interests("HOME_VALUE", "LUXURY_SELLER"),
+});
+
+// The homepage form, by its `looking_to` answer. Blank or anything else: none.
+const HOME_LEAD_INTEREST = Object.freeze({
+  buy: interests("BUYER"),
+  sell: interests("SELLER"),
+  both: interests("SELLER", "BUYER"),
+  value: interests("HOME_VALUE"),
+  invest: interests("INVESTOR"),
+});
+
+// Forms that deliberately get no Interest tag: they say nothing about what the
+// person wants (any form not named in this file gets none either).
+const FORMS_WITHOUT_INTEREST = Object.freeze([
+  "contact",
+  "testimonials-page-inquiry",
+  "market-conditions-inquiry",
+]);
+
+// interestFor(formName, data, { site: "main" | "signature" }) -> string[]
+// The Interest tags for one submission ([] = none). `site` defaults to "main".
+// A fresh array every call, so a caller can't change the table.
+function interestFor(formName, data, opts) {
+  const name = String(formName || "");
+  const site = opts && opts.site === "signature" ? "signature" : "main";
+  if (name === "home-lead") {
+    const intent = String((data && data.looking_to) || "").trim().toLowerCase();
+    return hasOwn(HOME_LEAD_INTEREST, intent) ? HOME_LEAD_INTEREST[intent].slice() : [];
+  }
+  if (site === "signature" && hasOwn(SIGNATURE_SITE_INTEREST, name)) return SIGNATURE_SITE_INTEREST[name].slice();
+  return hasOwn(FORM_INTEREST, name) ? FORM_INTEREST[name].slice() : [];
+}
+
 // The plan key for a submission, or null.
 // With the value-review plan on, these wait for "Value Review Sent" instead ...
 const VALUE_REVIEW_FORMS = Object.freeze(["free-home-valuation"]);
@@ -270,4 +406,11 @@ module.exports = {
   LUXURY_TAG,
   planForSubmission,
   valueReviewPlanOn,
+  WEBSITE_SOURCE,
+  INTEREST,
+  FORM_INTEREST,
+  SIGNATURE_SITE_INTEREST,
+  HOME_LEAD_INTEREST,
+  FORMS_WITHOUT_INTEREST,
+  interestFor,
 };

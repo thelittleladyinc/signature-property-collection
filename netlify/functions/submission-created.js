@@ -65,7 +65,7 @@ const { getBlobStore } = require("./lib/_mls-shared");
 const { postLead, recordPush } = require("./lib/_lofty");
 const { applyTextingPreference } = require("./lib/_lofty-consent");
 const { addLoftyNote, refireLoftyTag, addPlanTags, sendLeadAlertEmail } = require("./lib/_notify");
-const { planForSubmission, valueReviewPlanOn, VALUE_REVIEW_SENT_TAG } = require("./lib/_form-plans");
+const { planForSubmission, valueReviewPlanOn, VALUE_REVIEW_SENT_TAG, interestFor, WEBSITE_SOURCE } = require("./lib/_form-plans");
 const { sendValueFormToHub } = require("./lib/_hub-intake");
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
@@ -87,8 +87,16 @@ const DIAG_STORE = "mls-listings";        // same store the rest of the site use
 // remove-then-re-add that makes a repeat enquiry trigger the plan again.
 const TRIGGER_TAG = "Hot Lead - Website";
 
+// 2026-10-26: every lead from this site carries "Signature Collection" (the tag
+// The Little Lady site's Collection forms already write), so the two sites' leads
+// stay apart in Lofty now that both arrive with the source "Website".
+const SITE_TAG = "Signature Collection";
+
 // Human-friendly source label per form-name, so leads are easy to tell apart
 // inside Lofty. Falls back to the raw form name for anything not listed.
+// 2026-10-26: no longer the lead's Lofty source (that is "Website", below); the
+// label is read in the note's first line, the "Website Form" field, the alert
+// email and a returning contact's Call task.
 const SOURCE_LABELS = {
   "contact": "Signature Property Collection - Contact Form",
   "buyers-guide": "Signature Property Collection - Buyer's Guide Download",
@@ -200,7 +208,14 @@ async function handleLead(event, side) {
     if (lastName) body.lastName = lastName;
     if (data.email) body.emails = [data.email];
     if (data.phone) body.phones = [data.phone];
-    body.source = SOURCE_LABELS[formName] || `Signature Property Collection - ${formName}`;
+    // 2026-10-26 (Christine: every lead labeled): the Lofty source is "Website"
+    // (lib/_form-plans.js WEBSITE_SOURCE), a source her Lofty already keeps. Lofty
+    // files any source it does not know as "Other", so each long label read "Other".
+    // The long label stays where it is read: the note's first line, the "Website
+    // Form" field, the alert email and a returning contact's Call task. A queued
+    // lead carries it as sourceLabel, so the replay uses it the same way.
+    const sourceLabel = SOURCE_LABELS[formName] || `Signature Property Collection - ${formName}`;
+    body.source = WEBSITE_SOURCE;
     // 2026-09-30 (consent fix): every lead is created with texting OFF, and on
     // this site it stays off. No Signature form posts a texting consent: each
     // form's consent box is required and has no name, so nothing about it
@@ -298,6 +313,12 @@ async function handleLead(event, side) {
     // instead of S2; this site's free-home-valuation keeps the luxury plan (lib/_form-plans.js).
     const plan = planForSubmission(formName, data, { site: "signature", valueReviewPlan: valueReviewPlanOn(process.env) });
     body.tags = body.tags.filter((t) => !plan.planTags.includes(t));
+    // 2026-10-26: this site's tag, then what the person wants as "Interest – …"
+    // tags (lib/_form-plans.js interestFor; this site's seller forms are luxury
+    // sellers). Added to the form's other tags, so they go the same way: in the
+    // create for a contact proven new, `tagsAdd` (which only adds) for anyone else.
+    // They start no Smart Plan and never replace a tag the form already writes.
+    for (const t of [SITE_TAG, ...interestFor(formName, data, { site: "signature" })]) if (!body.tags.includes(t)) body.tags.push(t);
 
     // A form with nothing but a name and email (the guide downloads) matches none
     // of the branches above, and a lead with no note at all is the easiest one to
@@ -346,7 +367,7 @@ async function handleLead(event, side) {
       // recordPush keeps a held lead under its own key (lib/_lofty.js
       // MANUAL_REVIEW_KEY) with the whole submission and the reason, where
       // nothing replays it and /status counts it by submission id.
-      if (store) await recordPush(store, { ...held, emailResult, submissionId, formData: data }, formName, body);
+      if (store) await recordPush(store, { ...held, emailResult, submissionId, formData: data, sourceLabel }, formName, body);
       return { statusCode: 200, body: "ok (captured; Lofty identity needs manual review)" };
     }
     // A known contact keeps its own tags. `tags` on the create call REPLACES the
@@ -369,10 +390,11 @@ async function handleLead(event, side) {
     // below always has time to go out (lib/_lofty.js MIN_RETRY_MS).
     // 2026-10-24: what the hub path needs to do everything this path does (lib/_lofty-hub.js; ignored on today's
     // path): the trigger tag (kept out of the create body so it goes on after the create and starts its plan), the
-    // four website fields and the search wishes (the hub writes them only on a contact it created).
+    // four website fields and the search wishes (the hub writes them only on a contact it created). 2026-10-26: and
+    // the long label, for a returning contact's Call task (the lead's own source is now just "Website").
     const websiteFields = websiteFieldValues(SOURCE_LABELS[formName] || formName, data);
     const hubPushExtras = {
-      triggerTag: TRIGGER_TAG, websiteFields, inquiry: inquiryFromForm(data),
+      triggerTag: TRIGGER_TAG, websiteFields, inquiry: inquiryFromForm(data), sourceLabel,
     };
     const result = await postLead(body, apiKey, { deadline: startedAt + CREATE_DEADLINE_MS, ...hubPushExtras });
     // The store is only needed for diagnostics, so a Blobs problem must not
@@ -428,7 +450,7 @@ async function handleLead(event, side) {
       // Lofty lead id only when the lookup found the contact; the hub matches by email otherwise.
       const hubIntake = await sendValueFormToHub({ formName, data, site: "signature", submissionId,
         createdAt: (payload && payload.payload && payload.payload.created_at) || null, loftyLeadId: existing.leadId || null });
-      if (store) await recordPush(store, { ...result, emailResult, submissionId, formData: data, plan, hubIntake }, formName, body);
+      if (store) await recordPush(store, { ...result, emailResult, submissionId, formData: data, plan, hubIntake, sourceLabel }, formName, body);
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
