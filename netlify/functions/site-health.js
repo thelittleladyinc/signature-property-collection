@@ -218,6 +218,8 @@ function hubMarketDataRow(gridState, now) {
       : "Has not read from the hub yet. ") + stored + copy +
       (gridState && gridState.lastSuccessAt ? `Last complete pass ${gridState.lastSuccessAt}. ` : "") +
       (gridState && gridState.lastRunError ? `Error: ${gridState.lastRunError}. ` : "") +
+      // 2026-10-26: a run that ran out of its time (sync-listings.js SCHEDULER_WAIT_MS) is not an error; it is named.
+      (gridState && gridState.lastRunCutShort ? `The last run was cut short: ${gridState.lastRunCutShort}. ` : "") +
       "Read through the Seller Intelligence hub (MLS_SOURCE=hub) — no MLS Grid request is made. " +
       "Used only for the town pages' market figures and the MLS check of your Lofty listings — never shown as listings.",
   };

@@ -256,7 +256,9 @@ const DAY = 24 * 3600e3;
   const sync = fs.readFileSync(`${FN_DIR}/sync-listings.js`, "utf8");
   const manual = fs.readFileSync(`${FN_DIR}/refresh-my-listings.js`, "utf8");
   const health = fs.readFileSync(`${FN_DIR}/site-health.js`, "utf8");
-  check("the scheduled run passes confirmOnMarket", /runMineSync\(\{ store, apiKey, confirmOnMarket \}\)/.test(sync));
+  // 2026-10-26: and the run's deadline (sync-listings.js SCHEDULER_WAIT_MS), which the confirmer gets too.
+  check("the scheduled run passes confirmOnMarket", /runMineSync\(\{ store, apiKey, confirmOnMarket, deadline \}\)/.test(sync) &&
+    /makeOnMarketConfirmer\(\{ store, token: process\.env\.MLSGRID_API_TOKEN, deadline \}\)/.test(sync));
   check("the manual refresh passes it too", /makeOnMarketConfirmer/.test(manual) && /manual: true, confirmOnMarket/.test(manual));
   check("neither runs the check without an MLS Grid token", /mlsGridMarketDataOn\(\)\s*\?\s*makeOnMarketConfirmer/.test(sync) && /mlsGridMarketDataOn\(\)\s*\?\s*makeOnMarketConfirmer/.test(manual));
   check("site-health has a row for hidden listings", /hiddenOffMarket/.test(health) && /Ask Lofty support/.test(health));

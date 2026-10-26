@@ -78,6 +78,15 @@ const DETAILS_BATCH = 50;
 // time with this gap stays far under it however fast Lofty answers.
 const REQUEST_GAP_MS = 150;
 const REQUEST_TIMEOUT_MS = 20000;
+// 2026-10-26: a caller with a hard time limit passes runMineSync a deadline
+// (opts.deadline, epoch ms). No Lofty request starts with less than this left
+// before it, every request's own time is capped at what is left, and a retry
+// that would not fit is not made: the run stops there, keeps the last good set
+// and says it was cut short (state.lastRunCutShort). Without a deadline nothing
+// changes. Why: Netlify's scheduler stops waiting for a scheduled function after
+// about 15 seconds (sync-listings.js SCHEDULER_WAIT_MS), and a 10-second wait
+// after a rate limit, on top of a 20-second read, ran the 30-minute sync past it.
+const MIN_REQUEST_MS = 1500;
 // How long Lofty must keep saying "no listings" before the site believes it.
 const EMPTY_TRUSTED_AFTER_MS = 2 * 60 * 60 * 1000;
 // The by-hand refresh (refresh-my-listings.js) is a public URL, so it refuses to
@@ -320,20 +329,39 @@ async function loftyRequest(method, path, { apiKey, body, fetchImpl, timeoutMs }
   return json;
 }
 
+// The error a request that runs out of the caller's time gets (code "deadline").
+// It is never retried.
+function outOfTime(message, httpStatus) {
+  const err = new LoftyError(message, httpStatus || 0, "deadline");
+  err.cutShort = true;
+  return err;
+}
+
 // One retry for the failures that are worth one: rate limits, Lofty's own
 // errors, and network trouble. A 4xx about the request itself is not.
-async function withRetry(fn, sleepImpl) {
+// fn(timeoutMs) is the request; timeoutMs is REQUEST_TIMEOUT_MS, or less when
+// opts.deadline (epoch ms) leaves less. With a deadline, a retry is made only
+// when its wait and a request still fit before it (2026-10-26).
+async function withRetry(fn, sleepImpl, opts) {
+  const o = opts || {};
+  const clock = o.now || Date.now;
+  const timeoutMs = () => (o.deadline ? Math.max(1, Math.min(REQUEST_TIMEOUT_MS, o.deadline - clock())) : REQUEST_TIMEOUT_MS);
   try {
-    return await fn();
+    return await fn(timeoutMs());
   } catch (err) {
+    if (err && err.code === "deadline") throw err;
     const status = err && err.httpStatus;
     if (status && status !== 429 && status < 500) throw err;
-    await (sleepImpl || sleep)(status === 429 ? 10000 : 2000);
-    return fn();
+    const wait = status === 429 ? 10000 : 2000;
+    if (o.deadline && o.deadline - clock() < wait + MIN_REQUEST_MS) {
+      throw outOfTime(`${err && err.message}; not tried again this run (out of time)`, status);
+    }
+    await (sleepImpl || sleep)(wait);
+    return fn(timeoutMs());
   }
 }
 
-async function searchPage({ apiKey, scope, county, filters, pageNum, pageSize, sortFields, fetchImpl }) {
+async function searchPage({ apiKey, scope, county, filters, pageNum, pageSize, sortFields, fetchImpl, timeoutMs }) {
   const body = {
     searchScope: scope || "all",
     pageNum: pageNum || 1,
@@ -343,7 +371,7 @@ async function searchPage({ apiKey, scope, county, filters, pageNum, pageSize, s
   const conditions = { ...(filters || {}) };
   if (county) conditions.location = { county: [`${titleCase(county)}, CO`] };
   if (Object.keys(conditions).length) body.filterConditions = conditions;
-  const json = await loftyRequest("POST", SEARCH_PATH, { apiKey, body, fetchImpl });
+  const json = await loftyRequest("POST", SEARCH_PATH, { apiKey, body, fetchImpl, timeoutMs });
   // Lofty can report an error inside an HTTP 200 envelope.
   if (!("listing" in json) && !json.metadata) {
     throw new LoftyError(`Lofty listing search returned no listings` +
@@ -358,11 +386,11 @@ async function searchPage({ apiKey, scope, county, filters, pageNum, pageSize, s
   };
 }
 
-async function detailsByMlsIds(ids, { apiKey, fetchImpl }) {
+async function detailsByMlsIds(ids, { apiKey, fetchImpl, timeoutMs }) {
   const list = (ids || []).filter(Boolean);
   if (!list.length) return new Map();
   const qs = new URLSearchParams({ mlsListingIds: list.join(","), limit: String(Math.min(1000, list.length)) });
-  const json = await loftyRequest("GET", `${DETAILS_PATH}?${qs.toString()}`, { apiKey, fetchImpl });
+  const json = await loftyRequest("GET", `${DETAILS_PATH}?${qs.toString()}`, { apiKey, fetchImpl, timeoutMs });
   const items = Array.isArray(json.listIng) ? json.listIng : (Array.isArray(json.listing) ? json.listing : []);
   const byId = new Map();
   for (const it of items) if (it && it.mlsListingId) byId.set(it.mlsListingId, it);
@@ -371,7 +399,7 @@ async function detailsByMlsIds(ids, { apiKey, fetchImpl }) {
 
 // ---- Reading her listings ------------------------------------------------------
 
-function pacer({ now, sleepImpl }) {
+function pacer({ now, sleepImpl, deadline }) {
   let last = 0;
   let count = 0;
   const clock = now || Date.now;
@@ -380,9 +408,10 @@ function pacer({ now, sleepImpl }) {
     async run(fn) {
       const wait = last + REQUEST_GAP_MS - clock();
       if (wait > 0) await (sleepImpl || sleep)(wait);
+      if (deadline && deadline - clock() < MIN_REQUEST_MS) throw outOfTime("not started (out of time this run)");
       last = clock();
       count += 1;
-      return withRetry(fn, sleepImpl);
+      return withRetry(fn, sleepImpl, { deadline, now: clock });
     },
   };
 }
@@ -396,7 +425,7 @@ async function readAllPages({ apiKey, scope, county, filters, pace, fetchImpl, m
   let totalCount = null;
   let endedEmpty = false;
   while (pageNum <= totalPage && pageNum <= (maxPages || MINE_MAX_PAGES)) {
-    const page = await pace.run(() => searchPage({ apiKey, scope, county, filters, pageNum, fetchImpl }));
+    const page = await pace.run((timeoutMs) => searchPage({ apiKey, scope, county, filters, pageNum, fetchImpl, timeoutMs }));
     totalPage = page.totalPage;
     totalCount = page.totalCount;
     items.push(...page.items);
@@ -417,12 +446,12 @@ async function readAllPages({ apiKey, scope, county, filters, pace, fetchImpl, m
 // Details for the given ids, 50 at a time, applied in place. A failure keeps
 // whatever the previous run learned (carryForward) and is reported, never fatal:
 // a listing with its cover and no description is still worth showing.
-async function enrich(ids, listingsById, { apiKey, pace, fetchImpl, errors }) {
+async function enrich(ids, listingsById, { apiKey, pace, fetchImpl, errors, cut }) {
   let fetched = 0;
   for (let i = 0; i < ids.length; i += DETAILS_BATCH) {
     const batch = ids.slice(i, i + DETAILS_BATCH);
     try {
-      const byId = await pace.run(() => detailsByMlsIds(batch, { apiKey, fetchImpl }));
+      const byId = await pace.run((timeoutMs) => detailsByMlsIds(batch, { apiKey, fetchImpl, timeoutMs }));
       for (const id of batch) {
         const l = listingsById[id];
         if (!l) continue;
@@ -434,6 +463,7 @@ async function enrich(ids, listingsById, { apiKey, pace, fetchImpl, errors }) {
       }
     } catch (err) {
       errors.push(`details: ${err.message}`);
+      if (cut && err && err.code === "deadline") cut.push("details");
     }
   }
   for (const id of ids) {
@@ -471,8 +501,12 @@ async function runMineSync(opts) {
   const previous = {};
   for (const [id, l] of Object.entries(previousRaw)) if (isHers(l)) previous[id] = l;
 
-  const pace = pacer({ now, sleepImpl });
+  // 2026-10-26: opts.deadline (epoch ms), see MIN_REQUEST_MS. What it cut short
+  // is named in `cut` and in the state's lastRunCutShort.
+  const deadline = Number.isFinite(opts.deadline) ? opts.deadline : null;
+  const pace = pacer({ now, sleepImpl, deadline });
   const errors = [];
+  const cut = [];
   const herNonMls = [];
   const fresh = {};
   let skippedNotHers = 0;
@@ -503,6 +537,7 @@ async function runMineSync(opts) {
     }
   } catch (err) {
     errors.push(`her listings: ${err.message}`);
+    if (err && err.code === "deadline") cut.push("her listings");
   }
 
   // 2026-09-30: Lofty's copy of the IRES feed showed IRE1043314 (212 N 54th,
@@ -559,7 +594,7 @@ async function runMineSync(opts) {
 
   let details = { fetched: 0 };
   if (accept) {
-    details = await enrich(Object.keys(fresh), fresh, { apiKey, pace, fetchImpl, errors });
+    details = await enrich(Object.keys(fresh), fresh, { apiKey, pace, fetchImpl, errors, cut });
   }
   const catalogue = accept ? fresh : previous;
   const mine = Object.values(catalogue).filter(isHers);
@@ -572,6 +607,9 @@ async function runMineSync(opts) {
     lastRunAt: finishedAt,
     lastRunAnswer: answer,
     lastRunError: errors.length ? errors.slice(0, 5).join(" | ").slice(0, 900) : null,
+    // 2026-10-26: what this run had no time left for (null when nothing): the
+    // next run does it.
+    lastRunCutShort: cut.length ? `out of time for ${cut.join(" and ")}; the next run tries again` : null,
     // What the IDX 12-hour freshness guard reads (lib/_idx-display.js): only an
     // answer the site accepted as her complete, current set counts.
     lastSuccessAt: accept ? finishedAt : (prevState.lastSuccessAt || null),
@@ -603,8 +641,10 @@ async function runMineSync(opts) {
   log(`lofty (her listings): ${answer}${accept ? "" : " — kept the last good set"} — ${mine.length} listing(s), ` +
     `${pace.requests} request(s), ${details.fetched} detail record(s)` +
     (hiddenOffMarket.length ? `; ${hiddenOffMarket.length} hidden as off-market per the MLS` : "") +
-    (errors.length ? `; ${errors.join("; ")}` : ""));
-  return { answer, accepted: accept, hers: mine.length, requests: pace.requests, errors, hiddenOffMarket };
+    (errors.length ? `; ${errors.join("; ")}` : "") +
+    (cut.length ? ` — CUT SHORT: out of time for ${cut.join(" and ")} (the next run tries again)` : ""));
+  return { answer, accepted: accept, hers: mine.length, requests: pace.requests, errors, hiddenOffMarket,
+    ...(cut.length ? { cutShort: cut.slice() } : {}) };
 }
 
 module.exports = {
@@ -617,6 +657,7 @@ module.exports = {
   LARGE_PHOTO_WIDTH,
   EMPTY_TRUSTED_AFTER_MS,
   MIN_MANUAL_GAP_MS,
+  MIN_REQUEST_MS,
   LoftyError,
   normalizeStatus,
   loftyTimestamp,

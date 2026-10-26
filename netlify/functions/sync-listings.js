@@ -987,7 +987,14 @@ const MAX_LOOKUPS_PER_RUN = 2;
 // with listing_ids, no status filter -- and nothing here calls MLS Grid. Same
 // copy-first order, same cap, pace, cache and grace; a hub that is not set up,
 // not ready or not answering is "unknown", exactly like an MLS Grid failure.
-function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env }) {
+// 2026-10-26: `deadline` (epoch ms, optional): a lookup starts only with
+// CONFIRM_MIN_LOOKUP_MS left before it (after the pause between lookups), and
+// waits no longer than what is left; past it a listing the copy and the cached
+// verdicts don't settle is "unknown" this run (kept, as any unknown), and is
+// checked on a later run. The scheduled run passes its Lofty part's end
+// (LOFTY_PART_MS, see SCHEDULER_WAIT_MS); the manual refresh passes one too.
+const CONFIRM_MIN_LOOKUP_MS = 2000;
+function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env, deadline }) {
   const say = log || console.log;
   const clock = now || Date.now;
   const pause = sleepImpl || sleep;
@@ -1011,13 +1018,13 @@ function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env }) {
       removedMine = mlsHub.removedMemory(await store.get(mlsHub.HUB_REMOVED_MINE_KEY, { type: "json" }).catch(() => null));
     }
   }
-  async function askMlsGrid(id) {
+  async function askMlsGrid(id, timeoutMs) {
     const qs = new URLSearchParams({
       "$filter": `${ORIGINATING_SYSTEM_CLAUSE} and ListingId eq '${id}'`,
       "$select": "ListingId,StandardStatus,MlgCanView",
       "$top": "1",
     });
-    const res = await mlsFetch(`${BASE_URL}?${qs.toString()}`, token, store);
+    const res = await mlsFetch(`${BASE_URL}?${qs.toString()}`, token, store, timeoutMs ? { timeoutMs } : undefined);
     if (res.status === 429) {
       await markSuspended(store, SUSPENSION_COOLDOWN_MS);
       return { onMarket: null, why: "MLS Grid answered 429" };
@@ -1045,13 +1052,22 @@ function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env }) {
       say(`sync-listings: could not confirm ${id} with the MLS (${why}); keeping it.`);
       return { onMarket: null, why };
     }
+    const outOfTime = () => {
+      const why = "out of time this run; it is checked on a later run";
+      say(`sync-listings: could not confirm ${id} with the MLS (${why}); keeping it.`);
+      return { onMarket: null, why };
+    };
+    const lookupMs = viaHub ? mlsHub.HUB_LOOKUP_TIMEOUT_MS : MLS_FETCH_TIMEOUT_MS;
+    if (deadline && deadline - clock() < (lookups > 0 ? REQUEST_DELAY_MS : 0) + CONFIRM_MIN_LOOKUP_MS) return outOfTime();
     if (lookups > 0) await pause(REQUEST_DELAY_MS);
+    const timeoutMs = deadline ? Math.min(lookupMs, deadline - clock()) : lookupMs;
+    if (timeoutMs < CONFIRM_MIN_LOOKUP_MS) return outOfTime();
     lookups += 1;
     let verdict;
     try {
       verdict = viaHub
-        ? await mlsHub.hubOnMarket(mlsHub.makeHubClient(env || process.env, mlsHub.HUB_LOOKUP_TIMEOUT_MS), id)
-        : await askMlsGrid(id);
+        ? await mlsHub.hubOnMarket(mlsHub.makeHubClient(env || process.env, timeoutMs), id)
+        : await askMlsGrid(id, deadline ? timeoutMs : undefined);
     } catch (err) {
       verdict = { onMarket: null, why: `${viaHub ? "hub" : "MLS Grid"} check failed: ${err && err.message}` };
     }
@@ -1080,6 +1096,35 @@ function makeOnMarketConfirmer({ store, token, now, log, sleepImpl, env }) {
 exports.makeOnMarketConfirmer = makeOnMarketConfirmer; // for tests
 exports.VERDICT_KEY = VERDICT_KEY;
 
+// ---- 2026-10-26: how long a scheduled run really has ---------------------------
+// Netlify documents 30 seconds for a scheduled function, but its scheduler stops
+// waiting after about 15. Measured in this site's request log (Oct 25-26, user
+// agent "Netlify Functions Scheduler"): every scheduled run that went past it ended
+// HTTP 499 at 14.97 s -- this function at 17:30 on Oct 25 and 12:00 on Oct 26,
+// mls-hub-sync at 15:15 on Oct 25 -- the scheduler sent the same run again within
+// a second, and no run that answered took longer than 14.94 s. A run past ~15 s
+// is cut off and run twice. Before this, the hub read below could START a page
+// at 11 s and wait 9 s for it (~20 s), and her Lofty listings could wait 10 s
+// after a rate limit on top of a 20-second read.
+//
+// So a scheduled run's own work now ends by SCHEDULED_RUN_MS after it started,
+// which leaves the rest of the 15 s for a cold start and its last Blobs writes.
+// Her Lofty listings and their MLS check get the first LOFTY_PART_MS of it (two
+// Lofty reads, usually quick; the time matters when Lofty or the hub rate-limits),
+// the hub read the rest (mls-hub-sync, which reads only the hub, gets it all). Whatever a run has no time for is named in its state
+// (lastRunCutShort) and its log, and the next run does it. The MLS Grid path
+// (mlsGridRun) keeps its own TIME_BUDGET_MS, unchanged: it does not run while
+// MLS_SOURCE=hub.
+const SCHEDULER_WAIT_MS = 15000;
+const SCHEDULED_RUN_MS = 11000;
+const LOFTY_PART_MS = 7000;
+// A hub page is not started with less than HUB_MIN_PAGE_MS left of the run, and
+// waits no longer than what is left minus HUB_SAVE_MS, kept for the writes after it.
+const HUB_MIN_PAGE_MS = 2500;
+const HUB_SAVE_MS = 1500;
+exports.SCHEDULER_WAIT_MS = SCHEDULER_WAIT_MS; // for tests
+exports.SCHEDULED_RUN_MS = SCHEDULED_RUN_MS;
+
 // ---- 2026-09-28: Lofty is the listing source now ---------------------------
 // When LISTINGS_SOURCE is "lofty" (the default -- see _mls-shared.js) this
 // schedule stops talking to MLS Grid entirely: no crawl, no photo caching, no
@@ -1095,8 +1140,10 @@ exports.VERDICT_KEY = VERDICT_KEY;
 // accepted lead replayed next run: a duplicate note, a re-fired tag) and before
 // her listings were refreshed at all. That is lofty-queue-drain.js's own
 // schedule now, as on the Little Lady site.
-async function loftyScheduledRun(side) {
+async function loftyScheduledRun(side, startedAt) {
   const store = getBlobStore(getStore);
+  // 2026-10-26: her listings and their MLS check end by here (see LOFTY_PART_MS).
+  const deadline = (startedAt || Date.now()) + LOFTY_PART_MS;
   const apiKey = process.env.LOFTY_API_KEY;
   if (!apiKey) {
     console.error("sync-listings: LOFTY_API_KEY not set, so her listings can't be refreshed.");
@@ -1105,13 +1152,13 @@ async function loftyScheduledRun(side) {
   // The MLS check needs an MLS Grid token; without one (or with the market-data
   // run switched off) her listings are shown as Lofty reports them, as before.
   const ownConfirmer = mlsGridMarketDataOn()
-    ? makeOnMarketConfirmer({ store, token: process.env.MLSGRID_API_TOKEN })
+    ? makeOnMarketConfirmer({ store, token: process.env.MLSGRID_API_TOKEN, deadline })
     : undefined;
   // The side-by-side check only notes each answer and hands it back unchanged (inert while it is off).
   const confirmOnMarket = side ? side.wrapConfirmer(ownConfirmer) : ownConfirmer;
-  const result = await runMineSync({ store, apiKey, confirmOnMarket });
+  const result = await runMineSync({ store, apiKey, confirmOnMarket, deadline });
   console.log("sync-listings (Lofty):", JSON.stringify(result).slice(0, 1500));
-  return { statusCode: 200, body: "ok" };
+  return { statusCode: 200, body: result && result.cutShort ? `ok (cut short: out of time for ${result.cutShort.join(" and ")})` : "ok" };
 }
 
 // The MLS Grid market-data run under Lofty: on whenever there is an MLS Grid
@@ -1135,7 +1182,8 @@ exports.mlsGridMarketDataOn = mlsGridMarketDataOn; // for tests
 exports.handler = async () => {
   // One clock for the whole invocation, so the MLS Grid path's time budget
   // (TIME_BUDGET_MS and the rest, all measured from startedAt) counts the time
-  // her Lofty listings took first. Netlify stops a scheduled run at 30 seconds.
+  // her Lofty listings took first. Netlify's scheduler stops waiting after about
+  // 15 seconds (SCHEDULER_WAIT_MS), so every part ends by SCHEDULED_RUN_MS.
   const startedAt = Date.now();
   const viaHub = mlsHub.mlsSource() === "hub";
   if (LISTINGS_SOURCE !== "lofty") {
@@ -1145,8 +1193,12 @@ exports.handler = async () => {
   }
   // Inert (no hub call, nothing wrapped, nothing read) unless HUB_SIDE_BY_SIDE lists mls_read and this run reads
   // MLS Grid itself.
+  // 2026-10-26: NOT moved to SCHEDULER_WAIT_MS. The check (off; inert while MLS_SOURCE=hub) still assumes the
+  // documented 30 s (lib/_hub-side-by-side.js SCHEDULED_LIMIT_MS) and needs 11-14 s of its own after the run, which
+  // a 15 s window can never give it; told the truth it would always skip. Before it is switched on with MLS Grid it
+  // needs its own scheduled slot -- see NEXT-SESSION.md 2.1.
   const side = mlsSideBySide({ startedAt, viaHub });
-  const result = await loftyScheduledRun(side);
+  const result = await loftyScheduledRun(side, startedAt);
   let gridRan = false;
   if (mlsGridMarketDataOn()) {
     try {
@@ -1161,7 +1213,7 @@ exports.handler = async () => {
     }
   }
   // After this run's own work: her listings' on-market verdicts and a sample of the MLS Grid copy against the hub's
-  // copy (one hub read), within what is left of Netlify's 30 seconds. Never throws.
+  // copy (one hub read), within what its own limit leaves (see above). Never throws.
   if (side.active) {
     let store = null;
     try { store = getBlobStore(getStore); } catch (err) { store = null; }
@@ -1296,6 +1348,8 @@ async function hubMarketDataRun(opts) {
   // against the hub's, so the next pass is a snapshot (see above).
   let reconciledAt = prev.hubReconciledAt || null;
   let lastRunError = null;
+  // 2026-10-26: what this run had no time for (SCHEDULED_RUN_MS), or null.
+  let cutShort = null;
   let passComplete = false;
   let snapshotFinished = false;
   let pagesFetched = 0;
@@ -1366,6 +1420,7 @@ async function hubMarketDataRun(opts) {
     backfillCursor: prev.backfillCursor || 0,
     totalBackfillCandidates: prev.totalBackfillCandidates || 0,
     lastRunError,
+    lastRunCutShort: cutShort,
     lastSuccessAt: nextLastSuccessAt(prev, { passComplete, lastRunError, httpErrorOccurred: false }, new Date().toISOString()),
     lastCloudinaryError: null,
     herOfficeMlsId: prev.herOfficeMlsId || null,
@@ -1389,8 +1444,26 @@ async function hubMarketDataRun(opts) {
   if (problem) {
     lastRunError = `hub: ${problem}`;
   } else {
-    const client = mlsHub.makeHubClient(env, mlsHub.HUB_PAGE_TIMEOUT_MS);
-    const outOfTime = () => Date.now() - startedAt > TIME_BUDGET_MS;
+    // 2026-10-26: the run ends its own work by SCHEDULED_RUN_MS (see SCHEDULER_WAIT_MS; o.runMs for tests). A page
+    // starts only with HUB_MIN_PAGE_MS left and waits no longer than what is left minus HUB_SAVE_MS (it was: start
+    // until 11 s, then wait up to 9 s). A page that did not finish in that time is this run being cut short, not a
+    // hub fault: nothing from it is applied, the pass keeps its place, and the next run reads the same page again.
+    const runEnd = startedAt + (o.runMs || SCHEDULED_RUN_MS);
+    const left = () => runEnd - Date.now();
+    const outOfTime = () => left() < HUB_MIN_PAGE_MS;
+    const client = {
+      async call(method, path, body, query) {
+        const ms = Math.max(1, Math.min(mlsHub.HUB_PAGE_TIMEOUT_MS, left() - HUB_SAVE_MS));
+        const askedAt = Date.now();
+        const ans = await mlsHub.makeHubClient(env, ms).call(method, path, body, query);
+        if (ms < mlsHub.HUB_PAGE_TIMEOUT_MS && ans && !ans.ok && (ans.reason === "unreachable" || ans.reason === "bad_answer") &&
+            Date.now() - askedAt >= ms - 250) {
+          throw Object.assign(new Error(`a hub page did not finish in the ${(ms / 1000).toFixed(1)} s this run had left`),
+            { cutShort: true, keepPass: true });
+        }
+        return ans;
+      },
+    };
     const startSnapshot = (rebuild) => ({
       kind: "snapshot", rebuild: !!rebuild, startedAt: new Date().toISOString(),
       storedBefore: Object.keys(listingsById).length, after: null, maxMod: null, copyLastSuccessAt: null,
@@ -1525,12 +1598,20 @@ async function hubMarketDataRun(opts) {
         passComplete = true;
       }
     } catch (err) {
-      lastRunError = `hub: ${err && err.message}`;
-      if (err && err.keepPass === false) {
-        if (pass && pass.kind === "snapshot") snapshotFinished = true; // its list of ids is no use now
-        pass = null;
+      if (err && err.cutShort) {
+        cutShort = `${err.message}; the pass resumes from the same page next run`;
+      } else {
+        lastRunError = `hub: ${err && err.message}`;
+        if (err && err.keepPass === false) {
+          if (pass && pass.kind === "snapshot") snapshotFinished = true; // its list of ids is no use now
+          pass = null;
+        }
+        console.error(`sync-listings (hub): ${lastRunError}`);
       }
-      console.error(`sync-listings (hub): ${lastRunError}`);
+    }
+    // Stopped by the run's time with the pass part-way: say so (a snapshot always takes several runs).
+    if (!cutShort && !lastRunError && !passComplete && pass) {
+      cutShort = `out of this run's time after ${pagesFetched} page(s); the pass resumes next run`;
     }
   }
 
@@ -1547,11 +1628,13 @@ async function hubMarketDataRun(opts) {
     `sync-listings (hub): ${pagesFetched} page(s), ${recordsSeen} record(s), ` +
     `pass ${passComplete ? "complete" : lastRunError ? "stopped" : "paused (resumes next run)"}, ` +
     `${Object.keys(listingsById).length} listing(s) now stored, ${removedByHub} removed` +
-    (lastRunError ? `; ${lastRunError}` : ".")
+    (lastRunError ? `; ${lastRunError}` : ".") +
+    (cutShort ? ` CUT SHORT: ${cutShort}.` : "")
   );
   return {
     statusCode: 200,
-    body: lastRunError ? `error: ${lastRunError}` : (passComplete ? "ok" : "paused (resumes next run)"),
+    body: lastRunError ? `error: ${lastRunError}`
+      : (passComplete ? "ok" : `paused (resumes next run)${cutShort ? `: cut short — ${cutShort}` : ""}`),
   };
 }
 exports.hubMarketDataRun = hubMarketDataRun;

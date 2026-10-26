@@ -340,6 +340,19 @@ a regression.)
 run, on an account shared with Listing-Engine and Expired-Luxury. A 429 appeared on
 the photo probe shortly after. See §2.6.
 
+**2026-10-26: the ~15 s was right after all, for the scheduler.** Netlify's request
+log (Oct 25-26) shows the "Netlify Functions Scheduler" closing every scheduled run
+that went past ~15 s (HTTP 499 at 14.97 s: `sync-listings` 17:30 Oct 25 and 12:00
+Oct 26, `mls-hub-sync` 15:15 Oct 25) and sending the same run again within a second;
+no run that answered took longer than 14.94 s. The hub read and her Lofty listings
+now end their work by `SCHEDULED_RUN_MS` (11 s) and say when they were cut short
+(`lastRunCutShort`); the queue drain's budget is 10 s. The MLS Grid path above keeps
+`TIME_BUDGET_MS` (it does not run while `MLS_SOURCE=hub`); its worst case (a 9 s
+page started at 11 s) is past the scheduler's wait, so align it before going back to
+MLS Grid. The side-by-side `mls_read` check (off; inert while `MLS_SOURCE=hub`) still
+assumes 30 s and needs 11-14 s after the sync, so it cannot fit inside 15: give it its
+own scheduled slot before switching it on. `tests/test-scheduler-window.js` pins the window.
+
 ### 2.2 Lofty tags cannot be read — settled, unfixable through the API
 `GET /leads/{id}` returns **no `tags` field** on this account. Proven live:
 `"Tags: response had no 'tags' field"`. Consequences:
