@@ -1035,6 +1035,36 @@ const deadline = () => Date.now() + 15000;
     JSON.stringify(sentTags.filter((t) => kit.isDncTag(t) || kit.isSmsConsentTag(t))));
 
   // ------------------------------------------------------------------------------------------------------------
+  console.log("\n9. With the switch on, this site's own Lofty key is not needed at all (2026-10-26)");
+  env({ LOFTY_VIA_HUB: "on" });
+  delete process.env.LOFTY_API_KEY;
+  reset();
+  await submit("buyers-guide", person(), "sub-9001");
+  check("no LOFTY_API_KEY: the form's lead still goes to the hub (the push, then its plan tag), nothing on api.lofty.com",
+    HUB.leadPushes().length >= 1 && HUB.leadPushes()[0].email === "pat@example.com" && HUB.leadPushes()[0].create === true &&
+    ownCalls.length === 0,
+    JSON.stringify({ hub: HUB.routes(), own: ownCalls }));
+  reset();
+  HUB.down = 503;
+  await submit("buyers-guide", person(), "sub-9002");
+  check("...a lead the hub could not take is queued as before", (mem["lofty-failed-pushes.json"] || []).length === 1);
+  HUB.down = null;
+  const dr9 = await quiet(() => L.drainFailedPushes(store, undefined, { deadline: Date.now() + 20000 }));
+  check("...and the queue replay runs without the key, through the hub", dr9.recovered === 1 &&
+    !(mem["lofty-failed-pushes.json"] || []).length && ownCalls.length === 0, JSON.stringify(dr9));
+  const LL9 = require(`${FN_DIR}/lib/_lofty-listings.js`);
+  const mine9 = await quiet(() => LL9.runMineSync({ store, apiKey: undefined, manual: false, deadline: Date.now() + 20000 }).catch((e) => ({ threw: String(e && e.message) })));
+  check("...her listings refresh is not skipped for the missing key", !(mine9 && mine9.skipped === "LOFTY_API_KEY is not set"), JSON.stringify(mine9));
+  env({ LOFTY_VIA_HUB: "off" });
+  delete process.env.LOFTY_API_KEY;
+  reset();
+  await submit("buyers-guide", person(), "sub-9003");
+  check("switch off and no key: nothing is pushed anywhere (today's rule, unchanged)", HUB.leadPushes().length === 0 && ownCalls.length === 0);
+  const dr9off = await quiet(() => L.drainFailedPushes(store, undefined, { deadline: Date.now() + 20000 }));
+  check("...and the queue waits", dr9off.attempted === 0);
+  env();
+
+  // ------------------------------------------------------------------------------------------------------------
   console.log("\n7. The vendored toolkit is untouched, and the shared files match the other site's");
   const run = spawnSync(process.execPath, [`${FN_DIR}/lib/suite-kit/check.mjs`], { encoding: "utf8" });
   check("node lib/suite-kit/check.mjs exits 0", run.status === 0 && /suite-kit \d+\.\d+\.\d+/.test(run.stdout), `${run.stdout}${run.stderr}`);
