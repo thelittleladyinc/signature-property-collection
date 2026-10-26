@@ -62,10 +62,10 @@ exports.BUYER_SIDE_INTERESTS = Object.freeze([
     exports.INTEREST_TAGS.buyer, exports.INTEREST_TAGS.firstTimeBuyer, exports.INTEREST_TAGS.rentToOwn, exports.INTEREST_TAGS.moveUpBuyer, exports.INTEREST_TAGS.vaBuyer,
     exports.INTEREST_TAGS.luxuryBuyer, exports.INTEREST_TAGS.relocation,
 ]);
-// Case, spacing and the kind of dash forgiven (a tag read back from Lofty may carry a hyphen); the words must match.
-const interestKey = (t) => String(t ?? '').trim().replace(/\s+/g, ' ').replace(/[-‐-―−]/g, '-').toLowerCase();
-const SELLER_KEYS = new Set(exports.SELLER_SIDE_INTERESTS.map(interestKey));
-const BUYER_KEYS = new Set(exports.BUYER_SIDE_INTERESTS.map(interestKey));
+// Exactly her tags, as isInterestTag reads them (spaces around the tag trimmed): "Interest - Buyer" with a hyphen is not
+// her tag, and a plan tag ("TOF – Seller") is not an Interest tag.
+const SELLER_KEYS = new Set(exports.SELLER_SIDE_INTERESTS);
+const BUYER_KEYS = new Set(exports.BUYER_SIDE_INTERESTS);
 /**
  * The Lofty lead types a lead's Interest tags say: [1] seller-side only, [2] buyer-side only, [1, 2] both, [] none (no
  * Interest tag, or only Investor / Land / Multigenerational / Agent Recruit / Newsletter). Other tags in the list are
@@ -74,7 +74,7 @@ const BUYER_KEYS = new Set(exports.BUYER_SIDE_INTERESTS.map(interestKey));
 function leadTypesForInterests(tags) {
     let seller = false, buyer = false;
     for (const t of tags ?? []) {
-        const k = interestKey(t);
+        const k = typeof t === 'string' ? t.trim() : '';
         if (SELLER_KEYS.has(k))
             seller = true;
         else if (BUYER_KEYS.has(k))
