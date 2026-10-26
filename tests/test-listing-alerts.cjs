@@ -25,3 +25,31 @@ test("hub activation uses header-only auth, no redirect or own Lofty key, and re
   result=await activatePropertyAlert({formName:"listing-alert-request",data,leadId:"123",submissionId:"s-1"},{env,fetch:async()=>({status:503,text:async()=>'{"error":"unavailable"}'})});
   assert.equal(result.status,"failed");assert.equal(result.retryable,true);
 });
+
+test("a transient alert failure retries only setup, preserving the accepted lead and avoiding repeated plans",async()=>{
+  const fs=require("node:fs"),vm=require("node:vm"),path=require("node:path");
+  const source=fs.readFileSync(path.join(__dirname,"../netlify/functions/lib/_lofty.js"),"utf8");
+  const fail=()=>{throw Error("contact, note, task or plan must not repeat");};let setupCalls=0;let transient=false;
+  const sandbox={module:{exports:{}},exports:{},process:{env:{LOFTY_VIA_HUB:"on"}},Date,AbortSignal,setTimeout,clearTimeout,
+    console:{log(){},warn(){},error(){}},require:name=>{
+      if(name==="crypto")return require("node:crypto");
+      if(name==="./_lofty-consent")return{applyTextingPreference:fail};
+      if(name==="./_lofty-returning")return{leadIdFromResponse:fail,findExistingLead:fail,alertReturningLead:fail,ensureWebsiteFields:fail,setWebsiteFields:fail,websiteFieldValues:fail,inquiryFromForm:()=>null,placeInquiry:fail};
+      if(name==="./_notify")return{addLoftyNote:fail,refireLoftyTag:fail,addPlanTags:fail,BRAND_SITE:"main"};
+      if(name==="./_lofty-hub")return{loftyViaHub:()=>true,pushLeadViaHub:fail,confirmCreated:fail,hubExtraResult:fail};
+      if(name==="./_form-plans")return{WEBSITE_SOURCE:"Website"};
+      if(name==="./_listing-alerts")return{activatePropertyAlert:async()=>{setupCalls++;return transient?{status:"failed",retryable:true}:{status:"active",copyToAgent:true};}};
+      throw Error("unexpected dependency "+name);
+    }};
+  vm.runInNewContext(source,sandbox);const L=sandbox.module.exports;
+  const rows={};const store={get:async k=>rows[k]??null,setJSON:async(k,v)=>{rows[k]=v;return{modified:true};},delete:async k=>{delete rows[k];}};
+  const result={ok:true,viaHub:true,site:"main",submissionId:"s-1",formData:data,propertyAlert:{status:"failed",retryable:true},propertyAlertLeadId:"123"};
+  await L.recordPush(store,result,"listing-alert-request",{emails:[data.email]});
+  assert.equal(rows[L.FAILED_PUSH_KEY].length,1);
+  let r=await L.drainFailedPushes(store,null,{deadline:Date.now()+30000});
+  assert.equal(r.finished,1);assert.equal(rows[L.FAILED_PUSH_KEY].length,0);assert.equal(setupCalls,1);
+  transient=true;await L.recordPush(store,result,"listing-alert-request",{emails:[data.email]});
+  r=await L.drainFailedPushes(store,null,{deadline:Date.now()+30000});
+  assert.equal(rows[L.FAILED_PUSH_KEY].length,1);assert.deepEqual(Array.from(rows[L.FAILED_PUSH_KEY][0].followupsPending),["propertyAlert"]);
+  assert.equal(Object.keys(rows[L.FAILED_PUSH_KEY][0].replay.steps).length,0);
+});

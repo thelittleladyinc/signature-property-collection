@@ -32,8 +32,8 @@ const fs = require("fs");
 const path = require("path");
 const ROOT = path.resolve(__dirname, "..");
 const FN_DIR = `${ROOT}/netlify/functions`;
-const SITE = "signature";
-const SIBLING = "thelittleladysellshomes";
+const SITE = "main";
+const SIBLING = "signature-property-collection";
 const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
@@ -511,7 +511,7 @@ function blobStore(seed) {
     d.res.recovered === 1 && !("leadTypes" in f.posts[0]) && planPuts(f).length === 0, JSON.stringify(f.posts[0]));
 
   check("the plan step runs after the trigger tag, before the returning-lead task",
-    same(L.FOLLOWUP_STEPS, ["note", "tag", "planTags", "returning", "fields", "inquiry"]), JSON.stringify(L.FOLLOWUP_STEPS));
+    same(L.FOLLOWUP_STEPS.slice(0, 6), ["note", "tag", "planTags", "returning", "fields", "inquiry"]), JSON.stringify(L.FOLLOWUP_STEPS));
   const deferred = (steps) => ({ ...queuedEntry, loftyId: NEWID, followupsPending: ["planTags"],
     replay: { newId: NEWID, identity: { ok: true, anyMatch: false, leadId: null }, steps } });
   f = fakeLofty({ leads: { [NEWID]: { tags: ["Hot Lead - Website", "Website Lead"], phones: [] } } });
