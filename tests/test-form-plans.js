@@ -229,16 +229,18 @@ function blobStore(seed) {
       if (!same(got(form, {}, site), want)) wrong.push(`${form}: ${JSON.stringify(got(form, {}, site))}`);
     }
     check(`${site}: all ${Object.keys(EXPECT).length} planned forms start the right plan with the right lead type`, wrong.length === 0, wrong.join("; "));
-    const leaked = NO_PLAN.filter((form) => !same(got(form, {}, site), expectPlan(null, null)));
-    check(`${site}: contact, testimonials, newsletter, rent-to-own, market conditions and unknown forms start nothing`, leaked.length === 0, leaked.join(", "));
+    const leaked = NO_PLAN.filter((form) => !same(got(form, {}, site), form === "rent-to-own-options" ? expectPlan(null, BUYER) : expectPlan(null, null)));
+    check(`${site}: contact, testimonials, newsletter, rent-to-own, market conditions and unknown forms start nothing (rent-to-own: Buyer type only)`, leaked.length === 0, leaked.join(", "));
   }
   check("no site given = The Little Lady (main) site", same(got("sellers-page-inquiry"), expectPlan(TAG.S1, SELLER)) &&
     same(got("free-home-valuation"), expectPlan(TAG.S2, SELLER)));
   check("Signature: its seller page, seller guide, local proof and home value start the luxury seller plan",
     Object.keys(SIGNATURE_ONLY).every((f) => same(got(f, {}, "signature"), expectPlan(TAG.SPC, SELLER))));
-  check("rent-to-own starts no plan on either site (none until Christine picks one; the lead is hers)",
-    same(got("rent-to-own-options", {}, "main"), expectPlan(null, null)) &&
-    same(got("rent-to-own-options", {}, "signature"), expectPlan(null, null)));
+  check("rent-to-own starts no plan on either site (none until Christine picks one; the lead is hers), but is typed Buyer (Oct 26)",
+    same(got("rent-to-own-options", {}, "main"), expectPlan(null, BUYER)) &&
+    same(got("rent-to-own-options", {}, "signature"), expectPlan(null, BUYER)));
+  check("the type-only list is rent-to-own as Buyer, and it is still a no-plan form",
+    same({ ...P.TYPE_ONLY_FORMS }, { "rent-to-own-options": BUYER }) && P.FORMS_WITHOUT_PLAN.includes("rent-to-own-options"));
   check("agent recruiting forms have a plan tag and NO lead type",
     ["lpt-join", "lpt-join-co", "co-license-guide", "agent-coaching"].every((f) => same(got(f), { planTags: [TAG.RECRUIT], leadTypes: [] })));
   const r1 = P.planForSubmission("listing-inquiry", {});
@@ -326,7 +328,7 @@ function blobStore(seed) {
     pp.length === 1 && pp[0].body.tags.includes(TAG.RECRUIT), JSON.stringify({ create: f.posts[0], pp }));
 
   console.log("\n7. Forms with no plan change nothing");
-  for (const form of ["contact", "rent-to-own-options", "newsletter-signup", "home-lead"]) {
+  for (const form of ["contact", "newsletter-signup", "home-lead"]) {
     f = fakeLofty();
     out = await submit(f, form, form === "home-lead" ? { looking_to: "invest" } : { message: "hi" });
     check(`${form}${form === "home-lead" ? " (invest)" : ""}: no lead type, no plan tag, everything else as before`,
@@ -336,8 +338,10 @@ function blobStore(seed) {
   if (SITE === "main") {
     f = fakeLofty();
     await submit(f, "rent-to-own-options", { message: "hi" });
-    check("rent-to-own-options keeps Buyer Lead + Rent-to-Own and nothing new", f.posts[0].tags.includes("Rent-to-Own") &&
-      f.posts[0].tags.includes("Buyer Lead") && !("leadTypes" in f.posts[0]) && planPuts(f).length === 0);
+    check("rent-to-own-options keeps Buyer Lead + Rent-to-Own, is created as Buyer (Oct 26), and starts no plan",
+      f.posts[0].tags.includes("Rent-to-Own") && f.posts[0].tags.includes("Buyer Lead") &&
+      JSON.stringify(f.posts[0].leadTypes) === JSON.stringify([BUYER]) && planPuts(f).length === 0 &&
+      last().planResult && last().planResult.attempted === false, JSON.stringify({ create: f.posts[0], plan: last().planResult }));
   }
 
   console.log("\n8. Returning contacts and contacts the lookup can't rule out: no lead type, no plan tag");
