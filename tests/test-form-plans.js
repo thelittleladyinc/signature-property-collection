@@ -17,7 +17,11 @@
 //   - tags that can't be read are never written;
 //   - a queued lead replayed later gets the same lead type and plan tag;
 //   - lib/_form-plans.js (and lib/_lofty.js) are byte-identical to the other
-//     site's copies.
+//     site's copies;
+//   - 2026-10-26: every lead's Lofty source is "Website" (the long label stays in
+//     the note, the "Website Form" field, the alert email and the Call task), each
+//     form adds its "Interest – …" tag(s) with its other tags, new contact or not,
+//     and the Signature site adds "Signature Property Collection" to every lead.
 //
 // The same file runs in both repos; only SITE and SIBLING below differ.
 //
@@ -54,6 +58,46 @@ const TAG = {
 const SELLER = 1;
 const BUYER = 2;
 const ALL_PLAN_TAGS = Object.values(TAG);
+
+// 2026-10-26: the Interest tags, spelled out the same way (EN DASH from its code
+// point, a space either side; no hyphen in "First Time").
+const I = (what) => `Interest ${EN_DASH} ${what}`;
+const INTEREST = {
+  BUYER: I("Buyer"), FIRST_TIME_BUYER: I("First Time Buyer"), VA_BUYER: I("VA Buyer"), LUXURY_BUYER: I("Luxury Buyer"),
+  RELOCATION: I("Relocation"), LAND: I("Land"), MULTIGENERATIONAL: I("Multigenerational"), RENT_TO_OWN: I("Rent to Own"),
+  INVESTOR: I("Investor"), SELLER: I("Seller"), HOME_VALUE: I("Home Value"), CASH_OFFER: I("Cash Offer"),
+  LUXURY_SELLER: I("Luxury Seller"), EXPIRED: I("Expired"), DOWNSIZING: I("Downsizing"), FSBO: I("FSBO"),
+  AGENT_RECRUIT: I("Agent Recruit"), NEWSLETTER: I("Newsletter"),
+};
+// form -> its Interest tags, the same on both sites ...
+const WANT_INTEREST = {};
+const wantI = (forms, ...tags) => forms.forEach((f) => { WANT_INTEREST[f] = tags; });
+wantI(["listing-inquiry", "listing-alert-request", "neighborhood-quiz", "buyers-page-inquiry", "lifestyle-search", "buyers-guide",
+  "dream-home-finder", "open-house-list", "loveland-buyers-guide", "west-greeley-inquiry", "ault-area-inquiry", "teacher-homebuying",
+  "eaton-dining", "foreclosure-list-larimer", "foreclosure-list-weld"], INTEREST.BUYER);
+wantI(["relocation", "relocation-guide", "windsor-commute", "eaton-relocation"], INTEREST.RELOCATION);
+wantI(["multigenerational-search"], INTEREST.MULTIGENERATIONAL);
+wantI(["land-property-review", "land-due-diligence-checklist"], INTEREST.LAND);
+wantI(["signature-buyers-inquiry", "signature-resort-buyer-inquiry", "signature-concierge-inquiry", "signature-luxury-market",
+  "luxury-market", "concierge-page-inquiry"], INTEREST.LUXURY_BUYER);
+wantI(["first-time-homebuyer"], INTEREST.FIRST_TIME_BUYER);
+wantI(["veteran-home-purchase"], INTEREST.VA_BUYER);
+wantI(["sellers-guide", "seller-local-proof", "loveland-market-seller", "sellers-page-inquiry"], INTEREST.SELLER);
+wantI(["free-home-valuation"], INTEREST.HOME_VALUE);
+wantI(["cash-offer"], INTEREST.CASH_OFFER);
+wantI(["signature-sellers-inquiry"], INTEREST.LUXURY_SELLER);
+wantI(["signature-expired-inquiry"], INTEREST.LUXURY_SELLER, INTEREST.EXPIRED);
+wantI(["noco-retirement"], INTEREST.DOWNSIZING);
+wantI(["fsbo-inquiry"], INTEREST.FSBO);
+wantI(["lpt-join", "lpt-join-co", "co-license-guide", "agent-coaching"], INTEREST.AGENT_RECRUIT);
+wantI(["rent-to-own-options"], INTEREST.RENT_TO_OWN);
+wantI(["newsletter-signup"], INTEREST.NEWSLETTER);
+const NO_INTEREST = ["contact", "testimonials-page-inquiry", "market-conditions-inquiry",
+  "some-form-nobody-has-built-yet", "", "__proto__", "constructor", "toString"];
+// ... except on the Signature site, where its seller forms are luxury sellers.
+const SIGNATURE_INTEREST = { "sellers-guide": [INTEREST.LUXURY_SELLER], "seller-local-proof": [INTEREST.LUXURY_SELLER],
+  "loveland-market-seller": [INTEREST.LUXURY_SELLER], "sellers-page-inquiry": [INTEREST.LUXURY_SELLER],
+  "free-home-valuation": [INTEREST.HOME_VALUE, INTEREST.LUXURY_SELLER] };
 
 // form -> [tag, leadType] (leadType null = none), the same on both sites ...
 const EXPECT = {};
@@ -533,6 +577,118 @@ function blobStore(seed) {
   await submit(f, "cash-offer", { address: "123 Main St" });
   check("end to end, switch on: cash-offer still starts S2", planPuts(f).length === 1 && planPuts(f)[0].body.tags.includes(TAG.S2));
   delete process.env.VALUE_REVIEW_PLAN;
+
+  console.log("\n12c. Labels (2026-10-26): the Lofty source \"Website\", the \"Interest \u2013 \u2026\" tags, and the Signature site's tag");
+  check("the Lofty source is \"Website\" (plain ASCII), one her Lofty already keeps", P.WEBSITE_SOURCE === "Website");
+  check("the Interest tags, character for character", same(P.INTEREST, INTEREST), JSON.stringify(P.INTEREST));
+  const dashBytes = Buffer.from(" \u2013 ", "utf8").toString("hex");
+  check("every one is \"Interest\" + space + EN DASH (bytes e2 80 93) + space, with no hyphen anywhere", dashBytes === "20e2809320" &&
+    Object.values(P.INTEREST).every((t) => Buffer.from(t, "utf8").toString("hex").startsWith(`496e746572657374${dashBytes}`) && !t.includes("-")));
+  check("no Interest tag is a plan tag, the HV start tag or \"Luxury\"", Object.values(P.INTEREST).every((t) =>
+    !Object.values(P.PLAN_TAGS).includes(t) && t !== P.VALUE_REVIEW_SENT_TAG && t !== P.LUXURY_TAG));
+  const gotI = (form, data, site) => P.interestFor(form, data || {}, site ? { site } : undefined);
+  for (const site of ["main", "signature"]) {
+    const wrong = Object.entries(WANT_INTEREST).filter(([form, tags]) =>
+      !same(gotI(form, {}, site), site === "signature" && SIGNATURE_INTEREST[form] ? SIGNATURE_INTEREST[form] : tags))
+      .map(([form]) => `${form}: ${JSON.stringify(gotI(form, {}, site))}`);
+    check(`${site}: all ${Object.keys(WANT_INTEREST).length} forms get their Interest tag(s)`, wrong.length === 0, wrong.join("; "));
+    const leaked = NO_INTEREST.filter((form) => gotI(form, {}, site).length !== 0);
+    check(`${site}: contact, testimonials, market conditions and unknown forms get none`, leaked.length === 0, leaked.join(", "));
+    check(`${site}: home-lead by looking_to -- buy, sell, both (Seller + Buyer), value, invest`,
+      same(gotI("home-lead", { looking_to: "buy" }, site), [INTEREST.BUYER]) && same(gotI("home-lead", { looking_to: "sell" }, site), [INTEREST.SELLER]) &&
+      same(gotI("home-lead", { looking_to: "both" }, site), [INTEREST.SELLER, INTEREST.BUYER]) &&
+      same(gotI("home-lead", { looking_to: "value" }, site), [INTEREST.HOME_VALUE]) &&
+      same(gotI("home-lead", { looking_to: "invest" }, site), [INTEREST.INVESTOR]));
+    check(`${site}: home-lead blank, missing or anything else -> none`,
+      [{ looking_to: "" }, {}, { looking_to: "rent" }, { looking_to: "__proto__" }].every((d) => gotI("home-lead", d, site).length === 0));
+  }
+  check("no site given = The Little Lady (main) site; stray case and spaces forgiven",
+    same(gotI("sellers-page-inquiry"), [INTEREST.SELLER]) && same(gotI("free-home-valuation"), [INTEREST.HOME_VALUE]) &&
+    same(gotI("home-lead", { looking_to: " Both " }), [INTEREST.SELLER, INTEREST.BUYER]));
+  check("Signature: its seller forms are Luxury Seller, its home-value form Home Value + Luxury Seller",
+    Object.entries(SIGNATURE_INTEREST).every(([form, tags]) => same(gotI(form, {}, "signature"), tags)));
+  const i1 = P.interestFor("listing-inquiry", {});
+  i1.push("mutated");
+  check("each call returns a fresh array (a caller can't change the table)", same(gotI("listing-inquiry"), [INTEREST.BUYER]));
+  const decidedI = new Set([...Object.keys(WANT_INTEREST), "home-lead", ...NO_INTEREST]);
+  check(`every source label (${labels.size}) has an Interest decision`, [...labels].every((l) => decidedI.has(l)),
+    [...labels].filter((l) => !decidedI.has(l)).join(", "));
+  check(`every form rendered on the site (${rendered.size}) has an Interest decision`, [...rendered].every((n) => decidedI.has(n)),
+    [...rendered].filter((n) => !decidedI.has(n)).join(", "));
+  check("the module's own no-Interest list is the one tested here", same([...P.FORMS_WITHOUT_INTEREST].sort(), NO_INTEREST.slice(0, 3).sort()));
+  check(`this site asks for its own Interest tags (site: "${SITE}") and sends the source "Website"`,
+    submission.includes(`interestFor(formName, data, { site: "${SITE}" })`) && submission.includes("body.source = WEBSITE_SOURCE;") &&
+    !/body\.source = SOURCE_LABELS/.test(submission));
+
+  const LONG = SITE === "signature" ? "Signature Property Collection - " : "The Little Lady Sells Homes - ";
+  const SELLER_LABEL = `${LONG}Free Home Valuation`;
+  const SELLER_INTERESTS = SITE === "signature" ? [INTEREST.HOME_VALUE, INTEREST.LUXURY_SELLER] : [INTEREST.HOME_VALUE];
+  const SITE_TAG = "Signature Property Collection";
+  f = fakeLofty();
+  await submit(f, SELLER_FORM, { address: "123 Main St, Loveland, CO 80538", attribution_first_page: "/sellers.html" });
+  create = f.posts[0] || {};
+  check("a new contact: the create's source is \"Website\"", create.source === "Website", JSON.stringify(create.source));
+  check("...its Interest tag(s) ride IN the create with the form's other tags (never a plan tag)",
+    Array.isArray(create.tags) && SELLER_INTERESTS.every((t) => create.tags.includes(t)) && create.tags[0] === "Hot Lead - Website" &&
+    create.tags.includes(SELLER_FORM) && !create.tags.some((t) => ALL_PLAN_TAGS.includes(t)), JSON.stringify(create.tags));
+  check(SITE === "signature" ? `...and "${SITE_TAG}" (every lead from this site)` : `...and no "${SITE_TAG}" (not a Collection form)`,
+    SITE === "signature" ? create.tags.includes(SITE_TAG) : !create.tags.includes(SITE_TAG), JSON.stringify(create.tags));
+  check("...the long label is the note's first line", new RegExp(`^NEW WEBSITE LEAD \\([^)]*\\) \u2014 ${SELLER_LABEL}\n`).test(create.notes || ""),
+    (create.notes || "").split("\n")[0]);
+  const fieldsPut = f.puts.find((x) => x.body && Array.isArray(x.body.customAttributeList));
+  check("...and the \"Website Form\" field (on the new contact)", fieldsPut && fieldsPut.id === NEWID &&
+    fieldsPut.body.customAttributeList.some((a) => a.attributeName === "Website Form" && a.value === SELLER_LABEL), JSON.stringify(fieldsPut && fieldsPut.body));
+  const alert = f.log.find((c) => c.p === "/v1/email/send");
+  check("...and the alert email (its subject and its body)", alert && /\u2014 Free Home Valuation$/.test(alert.body.subject || "") &&
+    String(alert.body.html || "").includes(SELLER_LABEL), JSON.stringify(alert && alert.body.subject));
+  check("...the plan tag still goes on after the create, untouched", planPuts(f).length === 1 && planPuts(f)[0].body.tags.includes(SELLER_TAG));
+  check("...and the Interest tags stay on the lead (the plan PUT keeps them)",
+    SELLER_INTERESTS.every((t) => f.leads[NEWID].tags.includes(t)), JSON.stringify(f.leads[NEWID].tags));
+
+  f = fakeLofty({ emailHits: [{ leadId: Number(EXISTING), emails: ["pat@example.com"] }], leads: { [EXISTING]: { tags: ["Past Client"], phones: [] } } });
+  await submit(f, SELLER_FORM, { address: "123 Main St" });
+  create = f.posts[0] || {};
+  check("a returning contact: the Interest tag(s) are ADDED (tagsAdd), nothing replaced, no lead type, source \"Website\"",
+    Array.isArray(create.tagsAdd) && !("tags" in create) && SELLER_INTERESTS.every((t) => create.tagsAdd.includes(t)) &&
+    (SITE !== "signature" || create.tagsAdd.includes(SITE_TAG)) && !("leadTypes" in create) && create.source === "Website", JSON.stringify(create));
+  const task = f.log.find((c) => c.m === "POST" && c.p === "/v2.0/tasks");
+  check("...its Call task names the form by its label, not \"Website\"",
+    task && /^Returning website lead \u2014 Free Home Valuation\./.test(task.body.content || ""), JSON.stringify(task && task.body));
+
+  f = fakeLofty();
+  await submit(f, "contact", { message: "hi" });
+  check(SITE === "signature" ? `the contact form: no Interest tag, but "${SITE_TAG}"` : "the contact form: no Interest tag, nothing new",
+    !f.posts[0].tags.some((t) => t.startsWith("Interest ")) && f.posts[0].source === "Website" &&
+    (SITE === "signature" ? f.posts[0].tags.includes(SITE_TAG) : !f.posts[0].tags.includes(SITE_TAG)), JSON.stringify(f.posts[0].tags));
+  f = fakeLofty();
+  await submit(f, "home-lead", { looking_to: "both" });
+  check("the homepage form, \"both\": Interest Seller + Buyer on the create",
+    [INTEREST.SELLER, INTEREST.BUYER].every((t) => f.posts[0].tags.includes(t)), JSON.stringify(f.posts[0].tags));
+
+  console.log("\n12d. A queued lead keeps its long label; the replay sends \"Website\"");
+  check("the queued entry carries the long label beside the lead, whose source is \"Website\"",
+    queuedEntry && queuedEntry.sourceLabel === SELLER_LABEL && queuedEntry.lead.source === "Website" &&
+    SELLER_INTERESTS.every((t) => tagsOnCreate(queuedEntry.lead).includes(t)), JSON.stringify(queuedEntry && { s: queuedEntry.sourceLabel, l: queuedEntry.lead.source }));
+  f = fakeLofty();
+  d = await drain(f, queuedEntry);
+  const replayFields = f.puts.find((x) => x.body && Array.isArray(x.body.customAttributeList));
+  check("replayed: source \"Website\", Interest tag(s) added, the \"Website Form\" field is the long label",
+    d.res.recovered === 1 && f.posts[0].source === "Website" && SELLER_INTERESTS.every((t) => f.posts[0].tagsAdd.includes(t)) &&
+    replayFields && replayFields.body.customAttributeList.some((a) => a.attributeName === "Website Form" && a.value === SELLER_LABEL),
+    JSON.stringify({ post: f.posts[0], fields: replayFields && replayFields.body }));
+  const before = { ...queuedEntry, lead: { ...queuedEntry.lead, source: SELLER_LABEL } };
+  delete before.sourceLabel;
+  f = fakeLofty();
+  d = await drain(f, before);
+  const beforeFields = f.puts.find((x) => x.body && Array.isArray(x.body.customAttributeList));
+  check("an entry queued before 2026-10-26 (long label as its source): sent as \"Website\", the field still the long label",
+    d.res.recovered === 1 && f.posts[0].source === "Website" && beforeFields &&
+    beforeFields.body.customAttributeList.some((a) => a.attributeName === "Website Form" && a.value === SELLER_LABEL),
+    JSON.stringify({ post: f.posts[0].source, fields: beforeFields && beforeFields.body }));
+  check("labelOf: sourceLabel first, then an older lead's own source, never \"Website\" (then the form name)",
+    L.labelOf({ sourceLabel: "A - B", lead: { source: "Website" }, formName: "f" }) === "A - B" &&
+    L.labelOf({ lead: { source: "Old - Label" }, formName: "f" }) === "Old - Label" &&
+    L.labelOf({ lead: { source: "Website" }, formName: "f" }) === "f" && L.labelOf({}) === "website");
 
   console.log(`\n13. Same modules as the other site (${SIBLING})`);
   // 2026-10-15: lib/_notify.js is shared too, apart from its four per-site

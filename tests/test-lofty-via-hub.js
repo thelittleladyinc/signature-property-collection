@@ -424,6 +424,12 @@ const deadline = () => Date.now() + 15000;
   check("...the form's tags ride IN the create body too, all but the trigger tag (create_tags)",
     Array.isArray(first.create_tags) && ["Website Lead", "buyers-guide"].every((t) => first.create_tags.includes(t)) &&
     !first.create_tags.includes("Hot Lead - Website"), JSON.stringify(first.create_tags));
+  // 2026-10-26: the Interest tag (and, on the Signature site, "Signature Property Collection") goes the same way; source "Website".
+  const INTEREST_BUYER = `Interest ${EN} Buyer`;
+  check(`...its Interest tag ("${INTEREST_BUYER}") rides in the create body (create_tags) and the tags; the source is "Website"`,
+    first.create_tags.includes(INTEREST_BUYER) && first.tags.includes(INTEREST_BUYER) && first.source === "Website" &&
+    (SITE !== "signature" || (first.create_tags.includes("Signature Property Collection") && first.tags.includes("Signature Property Collection"))),
+    JSON.stringify({ tags: first.tags, create_tags: first.create_tags, source: first.source }));
   check("...and the four website fields ride on the push (custom_fields), no address for a form without one",
     first.custom_fields && first.custom_fields["Website Form"] && !first.address && !("sms_yes" in first), JSON.stringify(first.custom_fields));
   const second = pushes[1] || {};
@@ -457,6 +463,8 @@ const deadline = () => Date.now() + 15000;
   check("a returning contact: one push, merged onto the existing lead (its tags kept, the form's added)",
     pushes.length === 1 && ["Buyer", "Hot Lead - Website", "buyers-guide"].every((t) => tagsOf(seven).includes(t)), JSON.stringify(seven.tags));
   check("...no plan tag and no change to its own lead type", !tagsOf(seven).includes(PLAN_B1) && JSON.stringify(seven.leadTypes) === "[1]");
+  check(`...its Interest tag is added too ("${INTEREST_BUYER}"), the lead's own tags kept`,
+    tagsOf(seven).includes(INTEREST_BUYER) && tagsOf(seven).includes("Buyer"), JSON.stringify(seven.tags));
   check("...the Call task + the push to her phone go through the hub's /v1/lofty/task, nothing on the own key",
     HUB.routes().includes("/v1/lofty/task") && HUB.lofty.calls.some((c) => c.method === "POST" && /\/v2\.0\/tasks$/.test(c.path)) &&
     HUB.lofty.calls.some((c) => /send-task-reminder$/.test(c.path)) && ownCalls.length === 0,
@@ -782,7 +790,10 @@ const deadline = () => Date.now() + 15000;
   check("...and the hub writes them on the contact it created (POST /leads/9000/inquiry)",
     HUB.lofty.inquiries.length === 1 && HUB.lofty.inquiries[0].leadId === "9000" &&
     JSON.stringify(HUB.lofty.inquiries[0].body) === JSON.stringify(wantInquiry), JSON.stringify(HUB.lofty.inquiries));
-  const wantFields = R.websiteFieldValues(p8.source, alertData);
+  // 2026-10-26: the lead's Lofty source is "Website"; the "Website Form" field keeps the form's long label.
+  check("...the push's Lofty source is \"Website\"", p8.source === "Website", JSON.stringify(p8.source));
+  const wantFields = R.websiteFieldValues(SITE === "signature" ? "Signature Property Collection - Listing Alert Request (saved search)"
+    : "The Little Lady Sells Homes - Listing Alert Request (saved search)", alertData);
   check("...the four website fields too: the same names and values today's code writes",
     JSON.stringify(Object.entries(p8.custom_fields || {})) === JSON.stringify(wantFields.map((f) => [f.attributeName, f.value])) &&
     JSON.stringify((made.customAttributeList || []).map((f) => [f.attributeName, f.value])) === JSON.stringify(wantFields.map((f) => [f.attributeName, f.value])),
@@ -888,6 +899,19 @@ const deadline = () => Date.now() + 15000;
   check("the queue replay of a returning contact: its Call task + push through the hub's /v1/lofty/task, nothing on the own key",
     dr.recovered === 1 && HUB.lofty.tasks.length === 1 && HUB.routes().includes("/v1/lofty/task") && ownCalls.length === 0,
     JSON.stringify({ dr, routes: HUB.routes() }));
+  check("...sent as \"Website\", its Call task named for the form's long label (2026-10-26)",
+    lastLeadPush().source === "Website" && HUB.lastTask && HUB.lastTask.content === R.taskContent({
+      label: `${SITE === "signature" ? "Signature Property Collection - " : ""}Buyer's Guide Download (queued retry)`,
+      name: "Pat Buyer", phone: "(970) 555-0123", email: "pat@example.com" }).slice(0, 500),
+    JSON.stringify({ source: lastLeadPush().source, task: HUB.lastTask }));
+  // A contact the hub matched that this site's own lookup did not name (a phone-only match, say): its Call task comes
+  // from what the push remembered, which is the long label, never "Website".
+  reset(fakeHub({ lofty: seedPat() }));
+  await quiet(() => L.postLead({ firstName: "Pat", emails: ["pat@example.com"], source: "Website", tags: ["Website Lead"], notes: "hi" },
+    "own-key-for-tests", { deadline: deadline(), sourceLabel: "The Little Lady Sells Homes - Buyer's Guide Download" }));
+  const ap = H.afterPush("7");
+  check("the hub path's returning-contact Call task reads the long label (sourceLabel), not the source \"Website\"",
+    ap.kind === "returning" && ap.details && ap.details.label === "Buyer's Guide Download", JSON.stringify(ap));
 
   // i. Her listings reads (lib/_lofty-listings.js) through POST /v1/lofty/read.
   const LL = require(`${FN_DIR}/lib/_lofty-listings.js`);

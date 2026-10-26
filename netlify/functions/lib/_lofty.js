@@ -88,6 +88,7 @@ const {
 } = require("./_lofty-returning");
 const { addLoftyNote, refireLoftyTag, addPlanTags, BRAND_SITE } = require("./_notify");
 const { loftyViaHub, pushLeadViaHub, confirmCreated, hubExtraResult } = require("./_lofty-hub");
+const { WEBSITE_SOURCE } = require("./_form-plans");
 const crypto = require("crypto");
 
 // Must match submission-created.js TRIGGER_TAG (pinned by tests/test-queue-replay-steps.js).
@@ -103,6 +104,18 @@ function planOf(entry) {
   const tags = p && Array.isArray(p.planTags) ? p.planTags.filter((t) => typeof t === "string" && t) : [];
   const typesFrom = p && Array.isArray(p.leadTypes) ? p.leadTypes : (Array.isArray(lead.leadTypes) ? lead.leadTypes : []);
   return { planTags: tags, leadTypes: typesFrom.filter((n) => Number.isInteger(n) && n > 0) };
+}
+
+// 2026-10-26: the long per-form label of a queued lead (the website fields, a
+// returning contact's Call task). A lead's Lofty source is "Website" now
+// (lib/_form-plans.js WEBSITE_SOURCE), so submission-created.js queues the label
+// beside the lead as sourceLabel; an entry queued before that has it as the
+// lead's own source. Never "Website" itself: then the form's name.
+function labelOf(entry) {
+  const e = entry || {};
+  if (typeof e.sourceLabel === "string" && e.sourceLabel) return e.sourceLabel;
+  const s = e.lead && e.lead.source;
+  return typeof s === "string" && s && s !== WEBSITE_SOURCE ? s : String(e.formName || "website");
 }
 
 // Strips the full payload down to the least a CRM could possibly need. Used only
@@ -416,6 +429,9 @@ async function drainWithLease(store, apiKey, opts) {
       // may exist -- a create that timed out on our side can still have landed in
       // Lofty -- and `tags` would wipe anything added since. `tagsAdd` only adds.
       const lead = { ...entry.lead };
+      // 2026-10-26: sent as "Website" like a live lead, also for one queued before
+      // that (its long label stays in the note and, through labelOf, the fields).
+      if (lead.source) lead.source = WEBSITE_SOURCE;
       const email = lead.email || (Array.isArray(lead.emails) && lead.emails[0]);
       const identity = await findExistingLead(email, consentPhoneOf(lead), apiKey,
         { budgetMs: Math.max(1, Math.min(2000, deadline - Date.now())) });
@@ -510,6 +526,7 @@ async function drainWithLease(store, apiKey, opts) {
 async function replayViaHub(entry, ctx) {
   const { apiKey, store, deadline } = ctx;
   const lead = { ...entry.lead };
+  if (lead.source) lead.source = WEBSITE_SOURCE;
   if (Array.isArray(lead.tags)) {
     lead.tagsAdd = [...new Set([...(lead.tagsAdd || []), ...lead.tags])];
     delete lead.tags;
@@ -530,11 +547,11 @@ async function replayViaHub(entry, ctx) {
   // website fields and the search wishes (the hub writes them only on a contact
   // this push created), and the yes to texts.
   const data = entry.formData || null;
-  const label = String(lead.source || entry.formName || "website").replace("The Little Lady Sells Homes - ", "");
-  const websiteFields = data ? websiteFieldValues(lead.source || label, data) : [];
+  const sourceLabel = labelOf(entry);
+  const websiteFields = data ? websiteFieldValues(sourceLabel, data) : [];
   const inquiry = data ? inquiryFromForm(data) : null;
   const result = await postLead(lead, apiKey, { deadline, withoutNote: !!(prior && prior.noteAdded),
-    triggerTag: REPLAY_TRIGGER_TAG, websiteFields, inquiry, smsYes: entry.smsConsent === true });
+    triggerTag: REPLAY_TRIGGER_TAG, websiteFields, inquiry, smsYes: entry.smsConsent === true, sourceLabel });
   if (!result.ok) {
     if (result.manualReview) {
       const flagged = { ...entry, ...result, manualReview: true, heldReason: result.reason, reason: result.reason };
@@ -587,7 +604,7 @@ async function finishReplay(entry, lead, ctx) {
   const steps = { ...(ctx.steps || {}) };
   const owed = Array.isArray(ctx.pending) ? ctx.pending : FOLLOWUP_STEPS;
   const data = entry.formData || null;
-  const label = String(lead.source || entry.formName || "website").replace("The Little Lady Sells Homes - ", "");
+  const label = labelOf(entry).replace("The Little Lady Sells Homes - ", "");
   const newContact = !!(identity.ok && !identity.anyMatch && newId);
   const provenNew = () => newContact && !!(steps.note && steps.note.ok);
   // `owed`: what the step needs at all. `skip`: decided when its turn comes,
@@ -620,7 +637,7 @@ async function finishReplay(entry, lead, ctx) {
       run: async () => {
         const ensured = await ensureWebsiteFields(store, apiKey, o);
         if (!ensured.ok) return { attempted: false, reason: "website fields not ensured", ...ensured };
-        return setWebsiteFields(newId, websiteFieldValues(lead.source || label, data), apiKey, o);
+        return setWebsiteFields(newId, websiteFieldValues(labelOf(entry), data), apiKey, o);
       } },
     inquiry: { owed: () => !!(newContact && data && store && inquiryFromForm(data)), skip: () => !provenNew(),
       run: () => placeInquiry(newId, inquiryFromForm(data), apiKey, o) },
@@ -664,6 +681,7 @@ module.exports = {
   MANUAL_REVIEW_KEY,
   MAX_HELD_FOR_REVIEW,
   minimalLead,
+  labelOf,
   postLead,
   recordPush,
   holdForManualReview,
