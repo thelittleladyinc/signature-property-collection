@@ -424,11 +424,11 @@ const deadline = () => Date.now() + 15000;
   check("...the form's tags ride IN the create body too, all but the trigger tag (create_tags)",
     Array.isArray(first.create_tags) && ["Website Lead", "buyers-guide"].every((t) => first.create_tags.includes(t)) &&
     !first.create_tags.includes("Hot Lead - Website"), JSON.stringify(first.create_tags));
-  // 2026-10-26: the Interest tag (and, on the Signature site, "Signature Collection") goes the same way; source "Website".
+  // 2026-10-26: the Interest tag (and, on the Signature site, "Signature Property Collection") goes the same way; source "Website".
   const INTEREST_BUYER = `Interest ${EN} Buyer`;
   check(`...its Interest tag ("${INTEREST_BUYER}") rides in the create body (create_tags) and the tags; the source is "Website"`,
     first.create_tags.includes(INTEREST_BUYER) && first.tags.includes(INTEREST_BUYER) && first.source === "Website" &&
-    (SITE !== "signature" || (first.create_tags.includes("Signature Collection") && first.tags.includes("Signature Collection"))),
+    (SITE !== "signature" || (first.create_tags.includes("Signature Property Collection") && first.tags.includes("Signature Property Collection"))),
     JSON.stringify({ tags: first.tags, create_tags: first.create_tags, source: first.source }));
   check("...and the four website fields ride on the push (custom_fields), no address for a form without one",
     first.custom_fields && first.custom_fields["Website Form"] && !first.address && !("sms_yes" in first), JSON.stringify(first.custom_fields));

@@ -21,7 +21,7 @@
 //   - 2026-10-26: every lead's Lofty source is "Website" (the long label stays in
 //     the note, the "Website Form" field, the alert email and the Call task), each
 //     form adds its "Interest – …" tag(s) with its other tags, new contact or not,
-//     and the Signature site adds "Signature Collection" to every lead.
+//     and the Signature site adds "Signature Property Collection" to every lead.
 //
 // The same file runs in both repos; only SITE and SIBLING below differ.
 //
@@ -623,7 +623,7 @@ function blobStore(seed) {
   const LONG = SITE === "signature" ? "Signature Property Collection - " : "The Little Lady Sells Homes - ";
   const SELLER_LABEL = `${LONG}Free Home Valuation`;
   const SELLER_INTERESTS = SITE === "signature" ? [INTEREST.HOME_VALUE, INTEREST.LUXURY_SELLER] : [INTEREST.HOME_VALUE];
-  const SITE_TAG = "Signature Collection";
+  const SITE_TAG = "Signature Property Collection";
   f = fakeLofty();
   await submit(f, SELLER_FORM, { address: "123 Main St, Loveland, CO 80538", attribution_first_page: "/sellers.html" });
   create = f.posts[0] || {};

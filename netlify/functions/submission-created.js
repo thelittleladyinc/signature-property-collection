@@ -87,10 +87,12 @@ const DIAG_STORE = "mls-listings";        // same store the rest of the site use
 // remove-then-re-add that makes a repeat enquiry trigger the plan again.
 const TRIGGER_TAG = "Hot Lead - Website";
 
-// 2026-10-26: every lead from this site carries "Signature Collection" (the tag
-// The Little Lady site's Collection forms already write), so the two sites' leads
-// stay apart in Lofty now that both arrive with the source "Website".
-const SITE_TAG = "Signature Collection";
+// 2026-10-26: every lead from this site carries "Signature Property Collection", so the
+// two sites' leads stay apart in Lofty now that both arrive with the source "Website"
+// (Command Center's lead-source report files that tag under the Signature site). Not
+// "Signature Collection": the main site's Collection forms write that one, and a code
+// note there calls it a Smart Plan trigger, so it is not added to every lead here.
+const SITE_TAG = "Signature Property Collection";
 
 // Human-friendly source label per form-name, so leads are easy to tell apart
 // inside Lofty. Falls back to the raw form name for anything not listed.
