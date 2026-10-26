@@ -48,11 +48,12 @@ function answer(statusCode, body) {
 
 exports.handler = async () => {
   const startedAt = Date.now();
-  let getStore, getBlobStore, drainFailedPushes, queueDrainOff;
+  let getStore, getBlobStore, drainFailedPushes, queueDrainOff, loftyViaHub;
   try {
     ({ getStore } = require("@netlify/blobs"));
     ({ getBlobStore } = require("./lib/_mls-shared"));
     ({ drainFailedPushes, queueDrainOff } = require("./lib/_lofty"));
+    ({ loftyViaHub } = require("./lib/_lofty-hub"));
   } catch (err) {
     console.error("lofty-queue-drain: could not load its code (the queue is untouched):", err && err.message);
     return answer(503, `not run: the drain's code did not load (${(err && err.message) || "unknown error"}); the queue is untouched`);
@@ -62,7 +63,8 @@ exports.handler = async () => {
     return answer(200, "paused: LOFTY_QUEUE_DRAIN is off; the queue is kept as it is");
   }
   const apiKey = process.env.LOFTY_API_KEY;
-  if (!apiKey) {
+  // 2026-10-26: with LOFTY_VIA_HUB=on the replay goes through the hub, not this key.
+  if (!apiKey && !loftyViaHub()) {
     console.log("lofty-queue-drain: LOFTY_API_KEY not set — nothing to retry with.");
     return answer(200, "no Lofty key configured");
   }

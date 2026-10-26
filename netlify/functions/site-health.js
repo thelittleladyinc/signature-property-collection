@@ -1004,6 +1004,9 @@ exports.handler = async (event) => {
     params.google === "1" || params.google === "true" ||
     params.lofty === "1" || params.lofty === "true";
   const loftyApiKey = process.env.LOFTY_API_KEY;
+  // 2026-10-26: with LOFTY_VIA_HUB=on both Lofty probes ask the hub and this site's
+  // own key is not needed (probeLoftyKey / probeLoftyLead route through the hub).
+  const loftyReachable = !!loftyApiKey || loftyViaHub();
 
   // All five probes at once, each refreshing itself if its cached verdict has
   // aged past the TTL, and the whole group bounded so the page always renders.
@@ -1030,12 +1033,12 @@ exports.handler = async (event) => {
       probe: () => probeCloudinaryUsage(),
     }),
     freshen(cachedLoftyKey, {
-      enabled: !!loftyApiKey, force: wantsProbe, store, key: LOFTY_CHECK_KEY,
+      enabled: loftyReachable, force: wantsProbe, store, key: LOFTY_CHECK_KEY,
       probe: () => probeLoftyKey(loftyApiKey),
     }),
     // Reads the last lead back out of Lofty. Only ever a GET.
     freshen(cachedLoftyLead, {
-      enabled: !!loftyApiKey, force: wantsProbe, store, key: LOFTY_LEAD_CHECK_KEY,
+      enabled: loftyReachable, force: wantsProbe, store, key: LOFTY_LEAD_CHECK_KEY,
       probe: () => probeLoftyLead(loftyApiKey, loftyLast && loftyLast.leadId, LOFTY_TRIGGER_TAG),
     }),
     // The hub key: one GET /v1/health, only when the hub settings are usable.
@@ -1454,10 +1457,13 @@ exports.handler = async (event) => {
   checks.push({
     name: "Lofty API key valid",
     ok: !process.env.LOFTY_API_KEY
-      ? false
+      ? loftyViaHub()
       : (!loftyKeyCheck || loftyKeyAge.stale ? true : loftyKeyCheck.ok),
     detail: !process.env.LOFTY_API_KEY
-      ? "LOFTY_API_KEY isn't set in Netlify."
+      ? (loftyViaHub()
+        ? "Not needed: LOFTY_VIA_HUB is on, so every Lofty call goes through the Seller Intelligence hub " +
+          "(its own check is the hub's Lofty doorway). LOFTY_API_KEY is not set and nothing on this site reads it."
+        : "LOFTY_API_KEY isn't set in Netlify.")
       : (!loftyKeyCheck
         ? "Not tested yet — add ?probe=1 to this page's URL to ask Lofty about the key directly."
         : loftyKeyAge.warning + loftyKeyAge.when + (loftyKeyCheck.viaHub
@@ -1506,7 +1512,8 @@ exports.handler = async (event) => {
   });
 
   // ---- Website leads reaching Lofty ----
-  const loftyKeySet = !!process.env.LOFTY_API_KEY;
+  // With LOFTY_VIA_HUB=on the leads go through the hub, so a missing key is not a gap.
+  const loftyKeySet = !!process.env.LOFTY_API_KEY || loftyViaHub();
   const failedCount = Array.isArray(loftyFailed) ? loftyFailed.length : 0;
   let loftyDetail;
   let loftyOk;
@@ -1664,7 +1671,7 @@ exports.handler = async (event) => {
     !!(r && r.httpStatus === 404 && mergeSignature(r.body != null ? r.body : r.response));
   let leadRowOk;
   let leadRowDetail;
-  if (!loftyApiKey) {
+  if (!loftyReachable) {
     leadRowOk = false;
     leadRowDetail = "LOFTY_API_KEY isn't set.";
   } else if (!loftyLeadCheck) {

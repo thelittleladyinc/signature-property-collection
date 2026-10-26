@@ -126,10 +126,16 @@ function toolkitTask(b) {
 }
 
 // "agree": the writes this site made with the check off, as the hub's plan (the new lead's id as the stand-in).
-function echoAnswer(route) {
+// Those writes were made at the start of the run, so their note's "(Oct 26, 2026, 11:44 AM MT)" is that minute's;
+// the real hub plans from the request it is sent, so the echo takes the time this request carries (a run that
+// crossed a minute failed in CI on Oct 26 with create.notes / note "different").
+function echoAnswer(route, req) {
   const e = HUB.echo;
+  const sent = (JSON.stringify(req || {}).match(MDT_RE) || [])[0];
+  const restamp = (v) => (sent && v != null ? JSON.parse(JSON.stringify(v).replace(MDT_RE, sent)) : v);
   const planned = e.writes.filter((w) => (route === "/v1/lofty/task" ? /tasks$|send-task-reminder$/.test(w.path) : !/tasks$|send-task-reminder$/.test(w.path)))
-    .map((w) => ({ method: w.method, path: e.newId ? w.path.replace(`/${e.newId}`, "/{new_lead_id}") : w.path, body: typeof w.raw === "string" && /tasks$|reminder$/.test(w.path) ? w.raw : w.body }));
+    .map((w) => ({ method: w.method, path: e.newId ? w.path.replace(`/${e.newId}`, "/{new_lead_id}") : w.path,
+      body: typeof w.raw === "string" && /tasks$|reminder$/.test(w.path) ? (sent ? w.raw.replace(MDT_RE, sent) : w.raw) : restamp(w.body) }));
   if (route === "/v1/lofty/task") return { status: "created", lead_id: e.leadId, dry_run: true, planned, needs_flags: [] };
   return { status: e.action === "created" ? "created" : "updated", ok: true, action: e.action, lead_id: e.action === "created" ? "{new_lead_id}" : e.leadId,
     matched_by: e.matchedBy || null, tags_added: [], tags_held: [], tags_dropped: [], dry_run: true, planned, needs_flags: [], code: null };
@@ -174,7 +180,7 @@ async function hubHandle(url, init) {
     if (m === "html") return { ok: true, status: 200, headers: { get: () => null }, text: async () => "<html>gateway</html>" };
     if (m === "not_dry") return res(200, { status: "created", ok: true, action: "created", lead_id: "1" });
     if (m === "rate_limited") return res(200, { status: "rate_limited", dry_run: true, planned: [], code: "rate_limited" });
-    let answer = m === "agree" ? echoAnswer(route) : route === "/v1/lofty/task" ? toolkitTask(b) : await toolkitLead(b);
+    let answer = m === "agree" ? echoAnswer(route, b) : route === "/v1/lofty/task" ? toolkitTask(b) : await toolkitLead(b);
     if (HUB.tweak) answer = HUB.tweak(route, answer, b) || answer;
     return res(200, answer);
   }

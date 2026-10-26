@@ -89,6 +89,7 @@ const {
   listPhotoDemand, clearPhotoDemand,
 } = require("./lib/_media");
 const { runMineSync } = require("./lib/_lofty-listings");
+const { loftyViaHub } = require("./lib/_lofty-hub");
 // 2026-10-17 (wave 2a): MLS_SOURCE=hub moves this file's two MLS readers -- the
 // market-data copy and the on-market check -- to the Seller Intelligence hub.
 // See lib/_mls-hub.js and docs/mls-via-hub.md. Unset keeps every MLS Grid path
@@ -1145,7 +1146,8 @@ async function loftyScheduledRun(side, startedAt) {
   // 2026-10-26: her listings and their MLS check end by here (see LOFTY_PART_MS).
   const deadline = (startedAt || Date.now()) + LOFTY_PART_MS;
   const apiKey = process.env.LOFTY_API_KEY;
-  if (!apiKey) {
+  // 2026-10-26: with LOFTY_VIA_HUB=on her listings are read through the hub, not this key.
+  if (!apiKey && !loftyViaHub()) {
     console.error("sync-listings: LOFTY_API_KEY not set, so her listings can't be refreshed.");
     return { statusCode: 200, body: "no Lofty key configured" };
   }

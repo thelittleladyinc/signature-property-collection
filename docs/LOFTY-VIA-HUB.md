@@ -32,7 +32,7 @@ Since 2026-10-24 (Christine: "Move each one, let's start with Lofty ... I need e
 - Held by the hub (Do Not Contact, several possible leads, no email or phone): the existing held-lead record on `/status`; never replayed.
 - Never stuck in the queue for an option: search values the hub would refuse are left out of the push, and a push the hub refuses as malformed (HTTP 400) for one of the options is asked once more without them, as today's own-key path retries Lofty in its minimal shape. What was left out is in the note.
 - The side-by-side check (`HUB_SIDE_BY_SIDE` `lofty_write`) asks nothing while this is on; its dry run was built by the same builder the real push now uses (`leadAskFor` in `netlify/functions/lib/_lofty-hub.js`).
-- `LOFTY_API_KEY` stays set: the existing "is Lofty set up here?" checks still read it, but with the switch on it is never sent anywhere.
+- `LOFTY_API_KEY` is not needed with the switch on (2026-10-26): the form's push, the retry queue, her listings refresh and the `/status` rows no longer stop when it is missing (before, a missing key skipped the push even with the switch on). With the switch on it is never sent anywhere, so it can be removed from Netlify. With the switch off, a missing key still means nothing is pushed, as before.
 
 Not exactly today's behaviour:
 - A returning contact found by phone only used to have its trigger tag re-fired; through the hub it gets the Call task instead (the website profile takes no tag off, so a tag already on a lead cannot be re-fired). A returning contact found by email gets the Call task, as today.

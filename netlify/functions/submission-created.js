@@ -78,7 +78,7 @@ const { leadSideBySide } = require("./lib/_hub-side-by-side");
 // 2026-10-24: with LOFTY_VIA_HUB=on the push carries every option today's own-key
 // path writes (lib/_lofty-hub.js), and the website fields / search wishes are read
 // from the hub's answer instead of being written here.
-const { hubExtraResult } = require("./lib/_lofty-hub");
+const { hubExtraResult, loftyViaHub } = require("./lib/_lofty-hub");
 
 const DIAG_STORE = "mls-listings";        // same store the rest of the site uses
 
@@ -191,7 +191,9 @@ async function handleLead(event, side) {
   const startedAt = Date.now();
   try {
     const apiKey = process.env.LOFTY_API_KEY;
-    if (!apiKey) {
+    // 2026-10-26: with LOFTY_VIA_HUB=on the push and every step after it go through the
+    // hub and never use this key, so the lead is pushed without it.
+    if (!apiKey && !loftyViaHub()) {
       console.log("LOFTY_API_KEY not set — skipping Lofty push (Netlify Forms submission still recorded normally).");
       return { statusCode: 200, body: "ok (lofty sync skipped, no api key)" };
     }

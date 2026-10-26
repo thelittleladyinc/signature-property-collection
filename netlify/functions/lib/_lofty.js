@@ -347,7 +347,9 @@ function queueDrainOff() {
 }
 
 async function drainFailedPushes(store, apiKey, opts) {
-  if (!apiKey) return { attempted: 0, recovered: 0 };
+  // 2026-10-26: with LOFTY_VIA_HUB=on the replay goes through the hub and never
+  // uses this site's key, so a missing LOFTY_API_KEY no longer stops it.
+  if (!apiKey && !loftyViaHub()) return { attempted: 0, recovered: 0 };
   if (queueDrainOff()) return { attempted: 0, recovered: 0, paused: true };
   const peek = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
   if (!peek.length) return { attempted: 0, recovered: 0 };

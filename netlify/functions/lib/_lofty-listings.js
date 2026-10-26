@@ -488,7 +488,9 @@ async function runMineSync(opts) {
   const { store, apiKey, fetchImpl, sleepImpl } = opts;
   const now = opts.now || Date.now;
   const log = opts.log || console.log;
-  if (!apiKey) return { skipped: "LOFTY_API_KEY is not set" };
+  // 2026-10-26: with LOFTY_VIA_HUB=on every read goes through the hub (loftyRequest),
+  // so this site's own key is not needed.
+  if (!apiKey && !loftyViaHub()) return { skipped: "LOFTY_API_KEY is not set" };
 
   const started = now();
   const prevState = (await store.get(LOFTY_KEYS.SYNC_STATE_KEY, { type: "json" }).catch(() => null)) || {};

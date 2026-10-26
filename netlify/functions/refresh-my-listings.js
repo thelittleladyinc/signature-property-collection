@@ -17,6 +17,7 @@
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore, LISTINGS_SOURCE } = require("./lib/_mls-shared");
 const { runMineSync } = require("./lib/_lofty-listings");
+const { loftyViaHub } = require("./lib/_lofty-hub");
 // 2026-09-30: the same MLS check the scheduled run applies, so a manual refresh
 // cannot bring back a listing the MLS says is off the market (see sync-listings.js
 // makeOnMarketConfirmer).
@@ -44,7 +45,8 @@ exports.handler = async (event) => {
     return json(409, { error: "Listings come from MLS Grid on this site (LISTINGS_SOURCE=mlsgrid)." });
   }
   const apiKey = process.env.LOFTY_API_KEY;
-  if (!apiKey) return json(503, { error: "LOFTY_API_KEY is not set in Netlify." });
+  // 2026-10-26: with LOFTY_VIA_HUB=on the reads go through the hub, not this key.
+  if (!apiKey && !loftyViaHub()) return json(503, { error: "LOFTY_API_KEY is not set in Netlify." });
   try {
     const store = getBlobStore(getStore);
     const deadline = Date.now() + MANUAL_RUN_MS;
