@@ -36,8 +36,8 @@ export declare const SELLER_SIDE_INTERESTS: readonly InterestTag[];
 export declare const BUYER_SIDE_INTERESTS: readonly InterestTag[];
 /**
  * The Lofty lead types a lead's Interest tags say: [1] seller-side only, [2] buyer-side only, [1, 2] both, [] none (no
- * Interest tag, or only Investor / Agent Recruit / Newsletter). Other tags in the list are ignored, so a lead's whole
- * tag list can be passed. Always in the order [1, 2].
+ * Interest tag, or only Investor / Land / Multigenerational / Agent Recruit / Newsletter). Other tags in the list are
+ * ignored, so a lead's whole tag list can be passed. Always in the order [1, 2].
  */
 export declare function leadTypesForInterests(tags: Iterable<unknown> | null | undefined): number[];
 /**

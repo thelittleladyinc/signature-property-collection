@@ -45,9 +45,11 @@ function isInterestTag(tag) {
 //
 // Lofty's `leadTypes` is a list: 1 = Seller, 2 = Buyer. A Smart Plan enrolls only the lead types in its scope, so a
 // person who said both must be both. The types come ONLY from what the person told us, as the Interest tags say it:
-// a seller-side tag gives Seller, a buyer-side tag gives Buyer, both kinds give [1, 2]. Nothing is inferred. Three
+// a seller-side tag gives Seller, a buyer-side tag gives Buyer, both kinds give [1, 2]. Nothing is inferred. These
 // readings wait for Christine and are NOT made here: Move Up Buyer as Seller too (they own now), Downsizing as Buyer
-// too (they buy the next home), Relocation as anything but Buyer. Investor, Agent Recruit and Newsletter say neither.
+// too (they buy the next home), Relocation as anything but Buyer. Investor, Land, Multigenerational, Agent Recruit and
+// Newsletter say neither (the same sides as Listing Engine's own copy of this rule; a form that files Land or
+// Multigenerational as Buyer today does it through its plan's type, which the apps keep).
 /** Lofty's numeric lead types (`leadTypes` on POST /v1.0/leads). */
 exports.LEAD_TYPES = { seller: 1, buyer: 2 };
 /** The Interest tags that say the person is selling (or weighing it): each gives the Seller lead type. */
@@ -58,7 +60,7 @@ exports.SELLER_SIDE_INTERESTS = Object.freeze([
 /** The Interest tags that say the person is buying: each gives the Buyer lead type. */
 exports.BUYER_SIDE_INTERESTS = Object.freeze([
     exports.INTEREST_TAGS.buyer, exports.INTEREST_TAGS.firstTimeBuyer, exports.INTEREST_TAGS.rentToOwn, exports.INTEREST_TAGS.moveUpBuyer, exports.INTEREST_TAGS.vaBuyer,
-    exports.INTEREST_TAGS.luxuryBuyer, exports.INTEREST_TAGS.relocation, exports.INTEREST_TAGS.land, exports.INTEREST_TAGS.multigenerational,
+    exports.INTEREST_TAGS.luxuryBuyer, exports.INTEREST_TAGS.relocation,
 ]);
 // Case, spacing and the kind of dash forgiven (a tag read back from Lofty may carry a hyphen); the words must match.
 const interestKey = (t) => String(t ?? '').trim().replace(/\s+/g, ' ').replace(/[-‐-―−]/g, '-').toLowerCase();
@@ -66,8 +68,8 @@ const SELLER_KEYS = new Set(exports.SELLER_SIDE_INTERESTS.map(interestKey));
 const BUYER_KEYS = new Set(exports.BUYER_SIDE_INTERESTS.map(interestKey));
 /**
  * The Lofty lead types a lead's Interest tags say: [1] seller-side only, [2] buyer-side only, [1, 2] both, [] none (no
- * Interest tag, or only Investor / Agent Recruit / Newsletter). Other tags in the list are ignored, so a lead's whole
- * tag list can be passed. Always in the order [1, 2].
+ * Interest tag, or only Investor / Land / Multigenerational / Agent Recruit / Newsletter). Other tags in the list are
+ * ignored, so a lead's whole tag list can be passed. Always in the order [1, 2].
  */
 function leadTypesForInterests(tags) {
     let seller = false, buyer = false;
