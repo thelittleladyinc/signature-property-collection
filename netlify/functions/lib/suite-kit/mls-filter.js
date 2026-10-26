@@ -28,6 +28,8 @@
 //     still be $select-ed; it is never filtered on. Every URL a builder here makes
 //     is checked against FILTER_FIELDS before it is returned.
 //   * A page size above 5,000 (1,000 when Media is expanded).
+//   * A $select name that is not letters, digits and underscores (an MLS's own fields carry one:
+//     IRE_GarageType; 0.5.3, 2026-10-24). A $filter field never has one (FILTER_FIELDS).
 //   * Following a link to another host: followNextLink() returns the
 //     @odata.nextLink UNCHANGED (verbatim), after checking it is an https
 //     api.mlsgrid.com /v2 URL for an allowed resource whose $filter passes the
@@ -43,6 +45,7 @@ exports.filterFields = filterFields;
 exports.buildFilter = buildFilter;
 exports.propertyIncrementalUrl = propertyIncrementalUrl;
 exports.propertyWindowUrl = propertyWindowUrl;
+exports.propertyStatusWindowUrl = propertyStatusWindowUrl;
 exports.propertyByListingIdsUrl = propertyByListingIdsUrl;
 exports.propertyKeysUrl = propertyKeysUrl;
 exports.resourceIncrementalUrl = resourceIncrementalUrl;
@@ -66,6 +69,8 @@ const ORIGIN_CLAUSE = `OriginatingSystemName eq '${exports.MLS_SYSTEM_NAME}'`;
 const FILTER_CHARS = /^[A-Za-z0-9 _.:\-',()]+$/;
 const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const FIELD_RE = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
+/** A $select name: FIELD_RE plus the underscore of an MLS's local fields (IRES: IRE_GarageType, IRE_HasWaterRights). */
+const SELECT_FIELD_RE = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 const ALLOWED_QUERY_KEYS = new Set(['$filter', '$select', '$expand', '$orderby', '$top', '$skip', '$skiptoken']);
 class MlsFilterError extends Error {
@@ -181,7 +186,7 @@ function buildUrl(p) {
     const q = [`$filter=${encodeURIComponent(p.filter)}`];
     if (p.select && p.select.length > 0) {
         for (const f of p.select)
-            if (!FIELD_RE.test(f))
+            if (!SELECT_FIELD_RE.test(f))
                 throw new MlsFilterError(`bad $select field: ${String(f)}`);
         q.push(`$select=${p.select.join(',')}`);
     }
@@ -205,6 +210,18 @@ function propertyWindowUrl(o) {
     return buildUrl({
         resource: 'Property',
         filter: buildFilter(canViewClause(true), statusInClause(o.statuses), modifiedClause('ge', o.from), modifiedClause('lt', o.until)),
+        select: o.select, expandMedia: o.media === true, top: o.top ?? (o.media ? exports.MAX_TOP_WITH_MEDIA : exports.MAX_TOP), ascending: true,
+    });
+}
+/**
+ * Records of the given statuses modified in [from, until), viewable or not: unlike propertyWindowUrl there is no
+ * MlgCanView clause, so a not-for-display record (MlgCanView=false) comes back too and the keep switch can hold it
+ * (the hub's off-market re-read, 0084; toolkit 0.5.5). Same filter fields MLS Grid allows, oldest first.
+ */
+function propertyStatusWindowUrl(o) {
+    return buildUrl({
+        resource: 'Property',
+        filter: buildFilter(statusInClause(o.statuses), modifiedClause('ge', o.from), modifiedClause('lt', o.until)),
         select: o.select, expandMedia: o.media === true, top: o.top ?? (o.media ? exports.MAX_TOP_WITH_MEDIA : exports.MAX_TOP), ascending: true,
     });
 }

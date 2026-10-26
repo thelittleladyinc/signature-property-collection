@@ -537,8 +537,9 @@ async function replayViaHub(entry, ctx) {
   if (Array.isArray(lead.tagsAdd) && planned.planTags.length) {
     lead.tagsAdd = lead.tagsAdd.filter((t) => !planned.planTags.includes(t));
   }
-  // The hub sends a lead type on a create only, so the plan's type rides on every
-  // replay: a contact the hub finds keeps its own.
+  // The plan's types ride on every replay: the hub puts them on a create, and on a
+  // contact it finds only once its lofty_lead_types_merge_enabled switch is on
+  // (adding the missing ones, never removing one); until then that contact keeps its own.
   delete lead.leadTypes;
   if (planned.leadTypes.length) lead.leadTypes = planned.leadTypes.slice();
   // An earlier hub attempt for this entry that got as far as making the contact.

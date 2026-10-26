@@ -66,8 +66,28 @@
 // counts them): the plan's lead is the lead as last read with the planned PUT bodies laid over it. A lead or task the
 // plan would have created carries a stand-in id, shown as `{new_lead_id}` / `{new_task_id}` by plannedRequests() and
 // withPlannedIds(). planningFetch() does the same for code that calls Lofty through a plain fetch.
+//
+// 0.5.4 (2026-10-24, Christine: "we don't lose anything at all"): an opt-out can carry the writing app's own source
+// LABEL (`applyOptOut` `labelTags`; the newsletter's `Newsletter Unsubscribed`). The label goes in the SAME
+// read-merge-write PUT as `Consent – Unsubscribed` + cannotEmail (or the Do Not Contact write), every other tag kept;
+// it is added on a Do Not Contact lead too (a label only ever records a stop, never starts anything), it is never taken
+// off, and after the write ONE re-read confirms it (a 200 is not proof). An unreadable tag list holds it with the rest
+// (the opt-out behaves exactly as without a label). `isOptOutLabelTag` says which tags may be a label: never a consent,
+// Do Not Contact, `#dnc`, SMS consent or other protected tag, except `Newsletter Unsubscribed` itself.
+//
+// 0.5.12 (2026-10-26, Christine: "we need it to be buyer and seller too not just one or the other"): lead types on an
+// EXISTING lead. Until now `lead.leadTypes` went on a create only and an existing lead kept its own. With
+// `pushLead({ mergeLeadTypes: true })` an existing lead (found, by lead id, or the lead Lofty folded a create into)
+// gains any Seller (1) or Buyer (2) type in `lead.leadTypes` it lacks, in the SAME read-merge-write PUT as the tags
+// (Lofty's PUT replaces the whole `leadTypes` list, so the list as read is kept and the missing types are appended);
+// a type is never removed. Held, nothing written to the types, wherever the requested tags are held (an unreadable tag
+// list, Do Not Contact, an email opt-out on the shared list), on an email opt-out on the lead itself (`Consent –
+// Unsubscribed`, cannotEmail, unsubscription) and when the lead's `leadTypes` list cannot be read. After
+// the write the types are read back (the PUT's answer, else one re-read, plus `readBackWaitsMs` more when the caller
+// can wait: Lofty shows a type change a few seconds after it answers). A type not shown yet does not fail the push; the
+// next push re-adds it. Which types a person wants comes from interest.ts `leadTypesForInterests`.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NO_LOOKUP_KEY = exports.CONSENT_NO_PHONE = exports.PLANNED_NEW_TASK_ID = exports.PLANNED_NEW_LEAD_ID = exports.LoftyError = exports.LOOKUP_LIMIT = exports.TEXTING_OFF_REASON = exports.NEW_NUMBER_NOTE = exports.EMAIL_OPTOUT_TAG = exports.DNC_WRITE_TAGS = exports.DNC_HASH_TAG = exports.DNC_TAG = exports.SMS_CONSENT_TAG = exports.LOFTY_API_PREFIX = exports.LOFTY_API_ORIGIN = void 0;
+exports.NO_LOOKUP_KEY = exports.CONSENT_NO_PHONE = exports.MERGEABLE_LEAD_TYPES = exports.PLANNED_NEW_TASK_ID = exports.PLANNED_NEW_LEAD_ID = exports.LoftyError = exports.LOOKUP_LIMIT = exports.TEXTING_OFF_REASON = exports.NEW_NUMBER_NOTE = exports.EMAIL_OPTOUT_TAG = exports.DNC_WRITE_TAGS = exports.DNC_HASH_TAG = exports.DNC_TAG = exports.SMS_CONSENT_TAG = exports.LOFTY_API_PREFIX = exports.LOFTY_API_ORIGIN = void 0;
 exports.isDoNotContactTag = isDoNotContactTag;
 exports.isPhoneOnlyDncTag = isPhoneOnlyDncTag;
 exports.isPhoneDncTag = isPhoneDncTag;
@@ -76,6 +96,7 @@ exports.isEmailOptOutTag = isEmailOptOutTag;
 exports.isSmsConsentTag = isSmsConsentTag;
 exports.isStopContactTag = isStopContactTag;
 exports.isProtectedTag = isProtectedTag;
+exports.isOptOutLabelTag = isOptOutLabelTag;
 exports.firstNamesDiffer = firstNamesDiffer;
 exports.loftyUnsubscribed = loftyUnsubscribed;
 exports.isLookupRefusal = isLookupRefusal;
@@ -96,6 +117,9 @@ exports.planningFetch = planningFetch;
 exports.cleanTag = cleanTag;
 exports.normalizeTags = normalizeTags;
 exports.existingTagsForWrite = existingTagsForWrite;
+exports.cleanLeadTypes = cleanLeadTypes;
+exports.leadTypesForWrite = leadTypesForWrite;
+exports.mergeLeadTypes = mergeLeadTypes;
 exports.mergeTags = mergeTags;
 exports.phoneKey = phoneKey;
 exports.leadPhonesForWrite = leadPhonesForWrite;
@@ -199,8 +223,9 @@ function isStopContactTag(name) {
     return isPhoneDncTag(name) || isEmailOptOutTag(name);
 }
 const ANY_CONSENT_RE = new RegExp(`^consent\\s*${DASH}`, 'i');
+const NEWSLETTER_UNSUBSCRIBED_RE = /^newsletter\s+unsubscribed$/i;
 const OTHER_PROTECTED_RE = [
-    /^newsletter\s+unsubscribed$/i,
+    NEWSLETTER_UNSUBSCRIBED_RE,
     new RegExp(`^system\\s*${DASH}\\s*kill\\s+all\\s+drips$`, 'i'),
 ];
 /**
@@ -211,6 +236,16 @@ const OTHER_PROTECTED_RE = [
 function isProtectedTag(name) {
     const t = tagText(name);
     return ANY_CONSENT_RE.test(t) || isStopContactTag(t) || isSmsConsentTag(t) || OTHER_PROTECTED_RE.some((re) => re.test(t));
+}
+/**
+ * May this tag go on a lead as an opt-out's source label (0.5.4, `applyOptOut` `labelTags`)? A label is only ever added
+ * with an opt-out and never taken off, so it is never a tag that decides consent: no `Consent – …` tag, no Do Not
+ * Contact or `#dnc` tag, no SMS consent, no `System – Kill All Drips`. Of the never-removed tags (isProtectedTag) only
+ * `Newsletter Unsubscribed` may be a label: it is the newsletter's own record of an unsubscribe. Any dash, any case.
+ */
+function isOptOutLabelTag(name) {
+    const t = cleanTag(name);
+    return !!t && (!isProtectedTag(t) || NEWSLETTER_UNSUBSCRIBED_RE.test(t));
 }
 /** A first name compared for identity: trimmed, inner spaces collapsed, lower case; the quiz placeholder ("Quiz") and a blank are no name. */
 function realFirstName(v) {
@@ -332,8 +367,10 @@ async function loftyRequest(method, path, body, deps) {
 /**
  * loftyRequest with Lofty's answer as text (0.5.0), for an id that may not fit a JavaScript number (Lofty ids are
  * 64-bit). A string `body` is sent exactly as given (raw JSON, e.g. an id written as digits). Throws like loftyRequest.
+ * `opts.accept` (0.5.10) asks for XML: Lofty's getPublishedListings answers only XML and refuses a JSON Accept with
+ * HTTP 406 (the hub's call log, Oct 26, 2026; Listing Engine's own key always sent `Accept: application/xml`).
  */
-async function loftyRequestText(method, path, body, deps) {
+async function loftyRequestText(method, path, body, deps, opts = {}) {
     const key = String(deps.apiKey ?? '').trim();
     if (!key)
         throw new LoftyError('LOFTY_API_KEY not configured', undefined, 'not_configured');
@@ -371,7 +408,7 @@ async function loftyRequestText(method, path, body, deps) {
     try {
         res = await fetchImpl(url, {
             method,
-            headers: { Authorization: `token ${key}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+            headers: { Authorization: `token ${key}`, 'Content-Type': 'application/json', Accept: opts.accept === 'application/xml' ? 'application/xml' : 'application/json' },
             ...(body !== undefined ? { body: typeof body === 'string' ? body : JSON.stringify(body) } : {}),
             redirect: 'error',
             signal: AbortSignal.timeout(deps.timeoutMs ?? DEFAULT_TIMEOUT_MS),
@@ -458,7 +495,14 @@ function planRequest(plan, method, path, body) {
     const obj = planBodyObject(body);
     if (method === 'POST' && full === '/v1.0/leads') {
         const id = Number(SENTINEL_LEAD);
-        plan.after.set(SENTINEL_LEAD, { ...(obj ?? {}), leadId: id, id, tags: Array.isArray(obj?.tags) ? obj.tags : [] });
+        // 0.5.6: a create with no tags in its body comes back from Lofty with NO tag list at all (measured Oct 25, 2026,
+        // four Expired Elite creates), so the planned lead has none either; [] here hid that from every dry run.
+        const planned = { ...(obj ?? {}), leadId: id, id };
+        if (Array.isArray(obj?.tags))
+            planned.tags = obj.tags;
+        else
+            delete planned.tags;
+        plan.after.set(SENTINEL_LEAD, planned);
         return okText(JSON.stringify({ leadId: id }));
     }
     if (method === 'POST' && (full === '/v2.0/tasks' || full === '/v1.0/tasks'))
@@ -600,6 +644,39 @@ function existingTagsForWrite(raw) {
         out.push(v.trim());
     }
     return out;
+}
+// ── lead types (0.5.12) ──────────────────────────────────────────────────────
+/** The lead types pushLead may ADD to an existing lead (mergeLeadTypes): Seller (1) and Buyer (2) only. */
+exports.MERGEABLE_LEAD_TYPES = Object.freeze([1, 2]);
+/** Lead types as a caller sends them: whole numbers 1-99, each once, in the order given. Anything else is dropped. */
+function cleanLeadTypes(list) {
+    if (!Array.isArray(list))
+        return [];
+    return [...new Set(list.filter((n) => Number.isInteger(n) && n > 0 && n < 100))];
+}
+/**
+ * The lead's existing types for a WRITE, or null when they cannot be trusted: `leadTypes` missing, null or not a list
+ * of whole numbers. Lofty's "none" (-1, 0) reads as no type. The PUT replaces the whole list, so a write from a read
+ * without it could drop a type the lead has: hold instead (Christine's rule: read, merge, then write).
+ */
+function leadTypesForWrite(lead) {
+    const raw = lead && typeof lead === 'object' ? lead.leadTypes : undefined;
+    if (!Array.isArray(raw))
+        return null;
+    const out = [];
+    for (const v of raw) {
+        const n = typeof v === 'string' && /^-?[0-9]{1,3}$/.test(v.trim()) ? Number(v) : v;
+        if (!Number.isInteger(n))
+            return null;
+        if (n > 0 && !out.includes(n))
+            out.push(n);
+    }
+    return out;
+}
+/** Existing + wanted (Seller / Buyer only): every existing type kept in its place, the missing ones appended. */
+function mergeLeadTypes(existing, wanted) {
+    const added = cleanLeadTypes(wanted).filter((n) => exports.MERGEABLE_LEAD_TYPES.includes(n) && !existing.includes(n));
+    return { merged: [...existing, ...added], added };
 }
 /**
  * Existing + requested. Every existing tag is kept exactly as it is; a requested tag is added unless the
@@ -744,7 +821,7 @@ function buildLeadBody(input, createTags = []) {
     }
     if (input.source)
         body.source = String(input.source).slice(0, 100);
-    const types = Array.isArray(input.leadTypes) ? [...new Set(input.leadTypes.filter((n) => Number.isInteger(n) && n > 0 && n < 100))] : [];
+    const types = cleanLeadTypes(input.leadTypes);
     if (types.length)
         body.leadTypes = types;
     const assignee = String(input.assignedUserId ?? '').trim();
@@ -867,7 +944,7 @@ async function createLeadResult(input, deps, createTags = []) {
     const res = await loftyRequest('POST', '/leads', buildLeadBody(input, createTags), deps);
     const made = createResponseMerge(res);
     if (!made)
-        throw new LoftyError('Lofty POST /leads succeeded but the response had no lead id');
+        throw new LoftyError('Lofty POST /leads succeeded but the response had no lead id', undefined, 'no_lead_id');
     return made;
 }
 async function getLead(leadId, deps) {
@@ -997,6 +1074,28 @@ function hasLookupKey(person) {
     return (0, contact_ts_1.normEmail)(person.email) !== null || phoneKey(person.phone) !== '';
 }
 /**
+ * 0.5.6: a second read of a lead whose own read had no tag list: ONE exact search by the lead's own email (else its
+ * phone), and only this same lead id with a readable list counts. Anything else (no email or phone, a failed search,
+ * the lead not in the answer, no list there either) is null, and the caller holds as before.
+ */
+async function tagsFromSearch(leadId, lead, deps) {
+    const email = leadEmails(lead)[0];
+    const phone = email ? '' : (leadPhoneKeys(lead)[0] ?? '');
+    if (!email && !phone)
+        return null;
+    let list;
+    try {
+        list = await searchRaw(email ? 'email' : 'phone', email || phone, deps);
+    }
+    catch {
+        return null;
+    }
+    const same = list.filter((l) => l && typeof l === 'object' && leadIdOf(l) === leadId);
+    if (same.length !== 1)
+        return null;
+    return existingTagsForWrite(same[0].tags);
+}
+/**
  * Read-merge-write ONE existing lead, in a single PUT (see the header for every rule). Throws LoftyError
  * when the read is not this lead; an unreadable tag list is reported in `tagsUnreadable` (a texting-off,
  * email-off or DNC flag write still goes through, since it touches no list).
@@ -1021,7 +1120,7 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     if (readId === undefined || readId === null || String(readId) !== String(leadId)) {
         const msg = `lead ${leadId}: the read returned another lead or none; nothing written`;
         logger(deps).warn(`${label(deps)} ${msg}`);
-        throw new LoftyError(msg);
+        throw new LoftyError(msg, undefined, 'read_mismatch');
     }
     if (change.expectFirstName !== undefined && firstNamesDiffer(lead.firstName, change.expectFirstName)) {
         const err = new LoftyError(`name_differs: lead ${leadId}'s first name is another real name; nothing written until identity is reviewed`, undefined, 'name_differs', [String(leadId)]);
@@ -1036,9 +1135,27 @@ async function mergeIntoLeadNow(leadId, change, deps) {
         else if (listed?.emailOptOut)
             change = { ...change, emailOptOut: true, holdTags: true };
     }
-    const existingRead = existingTagsForWrite(lead.tags);
+    let existingRead = existingTagsForWrite(lead.tags);
+    let tagsFrom;
+    if (existingRead === null && (lead.tags === undefined || lead.tags === null)) {
+        // A list that is THERE but unreadable (a tag with no name, another shape) always holds. A missing one is either a
+        // lead with no tags at all (Lofty answers a create without tags this way) or a read that dropped the field.
+        if (change.createdBlank === true) {
+            existingRead = [];
+            tagsFrom = 'new_lead';
+        }
+        else {
+            const listed = await tagsFromSearch(String(leadId), lead, deps);
+            if (listed) {
+                existingRead = listed;
+                tagsFrom = 'search';
+            }
+        }
+    }
     const out = { tagsAdded: [], emailTurnedOff: false, consentApplied: false, textingNotEnabled: null, wrote: false,
         textingTurnedOff: false, phoneAdded: false, dncHeld: false, phoneDnc: false, tagsHeld: [], before: lead };
+    if (tagsFrom)
+        out.tagsFrom = tagsFrom;
     if (existingRead === null) {
         out.tagsUnreadable = `lead ${leadId}: existing tags unreadable (missing or null); nothing written to tags and any yes held`;
         logger(deps).warn(`${label(deps)} ${out.tagsUnreadable}`);
@@ -1108,8 +1225,10 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     if (change.doNotContact)
         extra.push(...exports.DNC_WRITE_TAGS);
     let requested = [...(change.addTags || []), ...extra];
+    // 0.5.4: an opt-out's source labels go on below, after the holds (a label only ever records a stop).
+    const labels = (change.labelTags ?? []).map(cleanTag).filter(isOptOutLabelTag);
     // A tag the caller asks to add is never also taken off (even when a hold keeps it from going on).
-    const addWanted = new Set(requested.map((t) => cleanTag(t).toLowerCase()));
+    const addWanted = new Set([...requested, ...labels].map((t) => cleanTag(t).toLowerCase()));
     if (change.holdTags && !dnc) {
         out.tagsHeld = mergeTags(existing, requested.filter((t) => !isStopContactTag(cleanTag(t)))).added;
         requested = requested.filter((t) => isStopContactTag(cleanTag(t)));
@@ -1130,6 +1249,8 @@ async function mergeIntoLeadNow(leadId, change, deps) {
         if (dncBefore)
             logger(deps).warn(`${label(deps)} lead ${leadId} is Do Not Contact: texting and email off${out.tagsHeld.length ? `; tags held: ${out.tagsHeld.length}` : ''}`);
     }
+    if (labels.length)
+        requested = [...requested, ...labels];
     // 0.5.0: tags taken off in the same write (never a protected one, never one this write also adds).
     const removeWanted = new Set((change.removeTags ?? []).map(cleanTag).filter((t) => t && !isProtectedTag(t)).map((t) => t.toLowerCase()));
     const removed = out.tagsUnreadable || !removeWanted.size ? [] : existing.filter((t) => {
@@ -1137,9 +1258,44 @@ async function mergeIntoLeadNow(leadId, change, deps) {
         return removeWanted.has(k) && !addWanted.has(k) && !isProtectedTag(t);
     });
     const kept = removed.length ? existing.filter((t) => !removed.includes(t)) : existing;
-    const { merged, added } = out.tagsUnreadable ? { merged: [], added: [] } : mergeTags(kept, requested);
+    const first = out.tagsUnreadable ? { merged: [], added: [] } : mergeTags(kept, requested);
+    const merged = first.merged;
+    let added = first.added;
+    // 0.5.8 (Oct 26, 2026): Lofty did not take tags off in a PUT that also added one. 11 of 11 relisted Expired Elite
+    // sellers kept "Expired Elite" (their plans kept running) when "Expired Elite - OPTED OUT" went on in the same PUT;
+    // the ones that only lost tags were fine. So a write that does both takes the tags off first (with every other
+    // field), reads them back gone, and only then adds, from that read (read-merge-write again).
+    const removeFirst = removed.length > 0 && added.length > 0;
     if (added.length || removed.length)
-        body.tags = merged;
+        body.tags = removeFirst ? kept : merged;
+    // 0.5.12: the missing lead types go in this same PUT (the first one when tags come off first); none is ever removed.
+    let typesWanted = [];
+    if (change.addLeadTypes) {
+        const want = cleanLeadTypes(change.addLeadTypes).filter((n) => exports.MERGEABLE_LEAD_TYPES.includes(n));
+        if (want.length) {
+            const have = leadTypesForWrite(lead);
+            // An email opt-out holds them as it holds plan tags: the shared list's (holdTags), or the lead's own in Lofty
+            // (`Consent – Unsubscribed`, cannotEmail, Lofty's unsubscription), since a type can bring a lead into a plan's scope.
+            const emailOut = change.holdTags === true || change.emailOptOut === true || existing.some(isEmailOptOutTag)
+                || lead.cannotEmail === true || loftyUnsubscribed(lead) === true;
+            const held = out.tagsUnreadable ? 'tags_unreadable' : dnc ? 'do_not_contact'
+                : emailOut ? 'email_opt_out' : have === null ? 'types_unreadable' : null;
+            if (held || !have) {
+                out.leadTypes = { result: 'held', added: [], reason: held ?? 'types_unreadable' };
+                logger(deps).warn(`${label(deps)} lead ${leadId}: lead types held (${out.leadTypes.reason}); nothing written to them`);
+            }
+            else {
+                const m = mergeLeadTypes(have, want);
+                if (!m.added.length)
+                    out.leadTypes = { result: 'already', added: [] };
+                else {
+                    body.leadTypes = m.merged;
+                    typesWanted = want;
+                    out.leadTypes = { result: 'added', added: m.added };
+                }
+            }
+        }
+    }
     if (change.fillProperty) {
         const want = leadProperty(change.fillProperty);
         if (want && out.tagsUnreadable)
@@ -1151,8 +1307,31 @@ async function mergeIntoLeadNow(leadId, change, deps) {
                 body.property = plan.body;
         }
     }
-    if (Object.keys(body).length) {
+    let typesAnswer = null;
+    if (Object.keys(body).length && removeFirst) {
+        const path = `/leads/${encodeURIComponent(leadId)}`;
+        let written = await loftyRequest('PUT', path, body, deps);
+        typesAnswer = written;
+        out.wrote = true;
+        const back = await readBackRemoved(leadId, removed, deps);
+        out.removeCheck = back.check;
+        if (back.check === 'removed' && back.tags) {
+            const second = mergeTags(back.tags, requested);
+            added = second.added;
+            if (added.length)
+                written = await loftyRequest('PUT', path, { tags: second.merged }, deps);
+        }
+        else {
+            added = []; // nothing added: the caller fails on removeCheck and tries the whole change again later
+        }
+        if (dncBefore || (change.doNotContact && added.some(isDoNotContactTag)))
+            out.dncCheck = await confirmDncKept(leadId, written, deps, 'full');
+        else if (phoneDncBefore)
+            out.dncCheck = await confirmDncKept(leadId, written, deps, 'phone');
+    }
+    else if (Object.keys(body).length) {
         const written = await loftyRequest('PUT', `/leads/${encodeURIComponent(leadId)}`, body, deps);
+        typesAnswer = written;
         out.wrote = true;
         if (dncBefore || (change.doNotContact && added.some(isDoNotContactTag)))
             out.dncCheck = await confirmDncKept(leadId, written, deps, 'full');
@@ -1163,6 +1342,14 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     }
     if (removed.length)
         out.tagsRemoved = removed;
+    if (typesWanted.length && out.wrote && out.leadTypes)
+        out.leadTypes.check = await confirmLeadTypes(leadId, typesAnswer, typesWanted, deps);
+    if (change.labelTags) {
+        const wanted = new Set(labels.map((t) => t.toLowerCase()));
+        out.labelsAdded = added.filter((t) => wanted.has(t.toLowerCase()));
+        if (out.labelsAdded.length)
+            out.labelCheck = await confirmAdded(leadId, out.labelsAdded, deps);
+    }
     out.tagsAdded = added;
     if (out.textingTurnedOff && newNumber) {
         try {
@@ -1177,6 +1364,25 @@ async function mergeIntoLeadNow(leadId, change, deps) {
 }
 /** After a write that took tags off: ONE re-read (a 200 is not proof). Never throws. */
 async function confirmRemoved(leadId, removed, deps) {
+    return (await readBackRemoved(leadId, removed, deps)).check;
+}
+/** confirmRemoved, plus the tags that read saw (null when it could not read this lead's list). Never throws. */
+async function readBackRemoved(leadId, removed, deps) {
+    let tags = null;
+    try {
+        const again = await getLead(leadId, deps);
+        const id = again && typeof again === 'object' ? (again.leadId ?? again.id) : undefined;
+        if (id !== undefined && id !== null && String(id) === String(leadId))
+            tags = existingTagsForWrite(again.tags);
+    }
+    catch { /* unverified below */ }
+    if (tags === null)
+        return { check: 'unverified', tags: null };
+    const gone = new Set(removed.map((t) => cleanTag(t).toLowerCase()));
+    return { check: tags.some((t) => gone.has(cleanTag(t).toLowerCase())) ? 'not_removed' : 'removed', tags };
+}
+/** 0.5.4: after a write that added opt-out labels: ONE re-read (a 200 is not proof). Never throws. */
+async function confirmAdded(leadId, added, deps) {
     let tags = null;
     try {
         const again = await getLead(leadId, deps);
@@ -1187,8 +1393,40 @@ async function confirmRemoved(leadId, removed, deps) {
     catch { /* unverified below */ }
     if (tags === null)
         return 'unverified';
-    const gone = new Set(removed.map((t) => cleanTag(t).toLowerCase()));
-    return tags.some((t) => gone.has(cleanTag(t).toLowerCase())) ? 'not_removed' : 'removed';
+    const have = new Set(tags.map((t) => cleanTag(t).toLowerCase()));
+    return added.every((t) => have.has(cleanTag(t).toLowerCase())) ? 'added' : 'not_added';
+}
+/**
+ * 0.5.12: after a lead-type write: are the wanted types on the lead? The PUT's answer when it carries the list, else one
+ * re-read, then one more after each of deps.readBackWaitsMs. Never throws. `not_shown` = read, and not there yet.
+ */
+async function confirmLeadTypes(leadId, answer, want, deps) {
+    const shows = (o) => { const t = leadTypesForWrite(o); return t === null ? null : want.every((n) => t.includes(n)); };
+    const inAnswer = [answer?.lead, answer?.data, answer].find((o) => o && typeof o === 'object' && Array.isArray(o.leadTypes));
+    if (inAnswer && shows(inAnswer) === true)
+        return 'shown';
+    const waits = [0, ...(deps.readBackWaitsMs ?? []).filter((ms) => Number.isFinite(ms) && ms > 0)];
+    const sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    let read = false;
+    for (const ms of waits) {
+        if (ms > 0)
+            await sleep(ms);
+        try {
+            const again = await getLead(leadId, deps);
+            const id = again && typeof again === 'object' ? (again.leadId ?? again.id) : undefined;
+            if (id === undefined || id === null || String(id) !== String(leadId))
+                continue;
+            const s = shows(again);
+            if (s === true)
+                return 'shown';
+            if (s === false)
+                read = true;
+        }
+        catch { /* unverified below, unless another read answers */ }
+    }
+    if (read)
+        logger(deps).warn(`${label(deps)} lead ${leadId}: lead types written but not shown on the read-back yet (Lofty shows a type change a few seconds later)`);
+    return read ? 'not_shown' : 'unverified';
 }
 /** The address a lead read carries, nested (`property`) or flat. */
 function leadAddressOf(lead) {
@@ -1324,6 +1562,9 @@ async function addNoteFollowingMerge(leadId, content, email, deps) {
 }
 /** Why nothing was created when there is nothing to look the person up by. */
 exports.NO_LOOKUP_KEY = 'no email and no phone number with 10 digits to look the person up by: not created in Lofty; add them by hand';
+// 0.5.9 (Oct 26, 2026): the toolkit's own read-back checks carry a code too. Expired Elite's 11 un-enrolments held on
+// Oct 26 (a tag taken off was still on the lead) showed "held" with no code in the hub's log.
+const CHECK_CODES = new Set(['dnc_lost', 'not_removed', 'removal_unread', 'label_not_added', 'label_unread', 'no_lead_id']);
 const blank = () => ({ ok: false, leadId: null, action: null, tagsAdded: [], noteAdded: false });
 function fail(out, step, err, deps) {
     out.ok = false;
@@ -1339,6 +1580,17 @@ function fail(out, step, err, deps) {
     if (err?.code === 'busy') {
         out.code = 'busy';
         out.retryAfterSeconds = err.retryAfterSeconds ?? 5;
+    }
+    // 0.5.7: every other failed Lofty call gets a code too, so a hold is never "held, no reason" in the hub's log
+    // (Oct 25, 2026: a new lead held after its create showed only that). Letters and underscores only: the hub's
+    // log column takes nothing else; the HTTP status is in out.status.
+    if (!out.code) {
+        if (err?.code === 'timeout' || err?.code === 'network' || CHECK_CODES.has(err?.code))
+            out.code = err.code;
+        else if (typeof err?.status === 'number' && err.status >= 500)
+            out.code = 'lofty_error';
+        else if (typeof err?.status === 'number' && err.status >= 400)
+            out.code = 'lofty_refused';
     }
     logger(deps).warn(`${label(deps)} ${out.reason}${out.leadId ? ` (lead ${out.leadId})` : ''}`);
     return out;
@@ -1368,7 +1620,7 @@ async function applyChange(out, change, email, step, deps) {
             out.mergedFrom = id;
             out.leadId = survivor;
             out.merged = true;
-            m = await mergeIntoLead(survivor, { ...change, viaCreate: false }, deps);
+            m = await mergeIntoLead(survivor, { ...change, viaCreate: false, createdBlank: false }, deps);
         }
         out.lead = m.before;
         if (m.textingTurnedOff)
@@ -1385,30 +1637,42 @@ async function applyChange(out, change, email, step, deps) {
             out.tagsRemoved = m.tagsRemoved;
         if (m.property)
             out.property = m.property;
+        if (m.leadTypes)
+            out.leadTypes = m.leadTypes;
         if (m.dncCheck === 'lost') {
             out.dncLost = true;
-            fail(out, step, new LoftyError(dncLostReason(out.leadId, m.dncHeld ? 'full' : 'phone')), deps);
+            fail(out, step, new LoftyError(dncLostReason(out.leadId, m.dncHeld ? 'full' : 'phone'), undefined, 'dnc_lost'), deps);
             return m;
         }
         if (m.removeCheck && m.removeCheck !== 'removed') {
-            fail(out, step, new LoftyError(`lead ${out.leadId}: ${m.removeCheck === 'not_removed' ? 'a tag that was taken off is still on the lead when read back' : 'the tag removal could not be read back'}; treated as not removed`), deps);
+            fail(out, step, new LoftyError(`lead ${out.leadId}: ${m.removeCheck === 'not_removed' ? 'a tag that was taken off is still on the lead when read back' : 'the tag removal could not be read back'}; treated as not removed`, undefined, m.removeCheck === 'not_removed' ? 'not_removed' : 'removal_unread'), deps);
+            out.needsReview = true;
+            return m;
+        }
+        if (m.labelCheck && m.labelCheck !== 'added') {
+            fail(out, step, new LoftyError(`lead ${out.leadId}: ${m.labelCheck === 'not_added' ? 'an opt-out label is not on the lead when read back' : 'the opt-out label could not be read back'}; treated as not added`, undefined, m.labelCheck === 'not_added' ? 'label_not_added' : 'label_unread'), deps);
             out.needsReview = true;
             return m;
         }
         if (m.tagsUnreadable) {
             fail(out, step, new LoftyError(m.tagsUnreadable), deps);
+            out.code = 'tags_unreadable';
             out.needsReview = true;
             if (m.textingNotEnabled)
                 out.textingNotEnabled = m.textingNotEnabled;
             return m;
         }
         out.tagsAdded = m.tagsAdded;
+        if (m.labelsAdded)
+            out.labelsAdded = m.labelsAdded;
         out.consentApplied = m.consentApplied;
         if (m.textingNotEnabled)
             out.textingNotEnabled = m.textingNotEnabled;
     }
     catch (err) {
         fail(out, step, err, deps);
+        if (err?.code === 'read_mismatch')
+            out.code = 'read_mismatch';
         if (err?.code === 'name_differs') {
             out.code = 'name_differs';
             out.needsReview = true;
@@ -1475,6 +1739,8 @@ async function pushLead(args, deps) {
             extra.fillProperty = args.lead.property;
         if (args.expectFirstName !== undefined)
             extra.expectFirstName = args.expectFirstName;
+        if (args.mergeLeadTypes === true && cleanLeadTypes(args.lead.leadTypes).length)
+            extra.addLeadTypes = cleanLeadTypes(args.lead.leadTypes);
         await applyChange(out, { addTags: tags, smsConsent: consent, submittedPhone: args.lead.phone, emailOptOut: args.emailOptOut === true, ...extra }, args.lead.email, tags.length ? 'add tags' : 'update lead', deps);
     }
     else {
@@ -1513,9 +1779,18 @@ async function pushLead(args, deps) {
             catch { /* logged above */ }
         }
         // Always re-read after a create: the tags go on by read-merge-write, and a create Lofty folded into an
-        // existing lead must have that lead's Do Not Contact and numbers decide.
+        // existing lead must have that lead's Do Not Contact and numbers decide. 0.5.6: a lead this create made, for a
+        // person the exact searches proved new, with no tags in the create body, has no tag list in Lofty's answer
+        // (createdBlank: that means none, so its tags go on instead of holding every new lead).
+        const createdBlank = !made.merged && sent.tags === undefined;
+        // 0.5.12: a create Lofty folded into an existing lead may have replaced that lead's types with the create's (as it
+        // does tags); with mergeLeadTypes the types asked for go back on in the read-merge-write that follows.
+        const sentTypes = Array.isArray(sent.leadTypes) ? sent.leadTypes : [];
+        const foldTypes = made.merged && args.mergeLeadTypes === true && sentTypes.length ? { addLeadTypes: sentTypes } : {};
         await applyChange(out, { addTags: tags, smsConsent: consent, submittedPhone: args.lead.phone, viaCreate: !made.merged,
-            emailOptOut: args.emailOptOut === true }, args.lead.email, tags.length ? 'add tags' : 'read back new lead', deps);
+            ...(createdBlank ? { createdBlank: true } : {}), emailOptOut: args.emailOptOut === true, ...foldTypes }, args.lead.email, tags.length ? 'add tags' : 'read back new lead', deps);
+        if (!made.merged && sentTypes.length)
+            out.leadTypes = { result: 'in_create', added: sentTypes };
     }
     const note = noteWithConsent(args.note, out.textingNotEnabled);
     if (out.leadId && note && note.trim() && !out.dncLost && out.code !== 'name_differs') {
@@ -1576,9 +1851,14 @@ async function noteLead(leadId, content, deps) {
  * opt-out (`Consent – Unsubscribed` + cannotEmail); `do_not_contact` = both DNC tags + cannotText +
  * cannotEmail. Consent writes never wait on any Smart Plan switch. When the tags cannot be read only the
  * flags go on and the outcome is NOT ok (needsReview): half an opt-out is not an opt-out. Never throws.
+ * 0.5.4: `labelTags` = the writing app's own source label (isOptOutLabelTag), in the same PUT, also on a Do Not
+ * Contact lead, read back once after the write (`labelsAdded`; a label not read back is not ok, needsReview).
  */
 async function applyOptOut(args, deps) {
     const out = blank();
+    const labelTags = args.labelTags?.length ? args.labelTags : undefined;
+    if (labelTags)
+        out.labelsAdded = [];
     if (!isLoftyConfigured(deps)) {
         out.reason = 'LOFTY_API_KEY not configured; opt-out not written to Lofty';
         out.code = 'not_configured';
@@ -1611,7 +1891,7 @@ async function applyOptOut(args, deps) {
             return refuseLookup(out, err, deps);
         }
     }
-    const m = await applyChange(out, args.kind === 'email' ? { emailOptOut: true } : { doNotContact: true }, args.email, `${args.kind} opt-out`, deps);
+    const m = await applyChange(out, { ...(args.kind === 'email' ? { emailOptOut: true } : { doNotContact: true }), ...(labelTags ? { labelTags } : {}) }, args.email, `${args.kind} opt-out`, deps);
     if (m?.tagsUnreadable)
         out.reason = 'opt-out tag held: tags unreadable; the flags were written, add the tag in Lofty by hand';
     if (!out.reason)

@@ -294,7 +294,8 @@ function blobStore(seed) {
   console.log("\n3. The homepage form (home-lead) goes by `looking_to`");
   for (const site of ["main", "signature"]) {
     check(`${site}: sell -> S1 seller`, same(got("home-lead", { looking_to: "sell" }, site), expectPlan(TAG.S1, SELLER)));
-    check(`${site}: both -> S1 seller`, same(got("home-lead", { looking_to: "both" }, site), expectPlan(TAG.S1, SELLER)));
+    check(`${site}: both -> S1, Seller AND Buyer (Christine, Oct 26: "buyer and seller too")`,
+      same(got("home-lead", { looking_to: "both" }, site), { planTags: [TAG.S1], leadTypes: [SELLER, BUYER] }));
     check(`${site}: value -> S2 seller`, same(got("home-lead", { looking_to: "value" }, site), expectPlan(TAG.S2, SELLER)));
     check(`${site}: buy -> B1 website buyer`, same(got("home-lead", { looking_to: "buy" }, site), expectPlan(TAG.B1, BUYER)));
     check(`${site}: invest, blank, missing or anything else -> nothing`,
@@ -302,6 +303,35 @@ function blobStore(seed) {
         .every((d) => same(got("home-lead", d, site), expectPlan(null, null))));
   }
   check("tolerates stray case and spaces", same(got("home-lead", { looking_to: " Sell " }), expectPlan(TAG.S1, SELLER)));
+
+  console.log("\n3b. Lead types: the plan's AND the Interest tags' (the suite's one rule; Christine, Oct 26, 2026)");
+  {
+    const kit = require(`${FN_DIR}/lib/suite-kit/interest.js`);
+    check("the rule is the vendored toolkit's: seller-side = 1, buyer-side = 2, both = [1, 2], Investor = none",
+      same(kit.leadTypesForInterests([INTEREST.SELLER]), [SELLER]) && same(kit.leadTypesForInterests([INTEREST.BUYER]), [BUYER]) &&
+      same(kit.leadTypesForInterests([INTEREST.SELLER, INTEREST.BUYER]), [SELLER, BUYER]) && same(kit.leadTypesForInterests([INTEREST.INVESTOR]), []));
+    const forms = [...new Set([...Object.keys(EXPECT), ...NO_PLAN, ...Object.keys(P.FORM_INTEREST)])];
+    for (const site of ["main", "signature"]) {
+      for (const valueReviewPlan of [false, true]) {
+        const wrong = [];
+        const cases = [...forms.map((f) => [f, {}]), ...["buy", "sell", "both", "value", "invest", ""].map((v) => ["home-lead", { looking_to: v }])];
+        for (const [form, data] of cases) {
+          const r = P.planForSubmission(form, data, { site, valueReviewPlan });
+          const plan = r.plan ? P.PLANS[r.plan].leadType : (Object.prototype.hasOwnProperty.call(P.TYPE_ONLY_FORMS, form) ? P.TYPE_ONLY_FORMS[form] : null);
+          const want = [...new Set([...(plan ? [plan] : []), ...kit.leadTypesForInterests(P.interestFor(form, data, { site }))])].sort((a, b) => a - b);
+          if (!same(r.leadTypes, want)) wrong.push(`${form}${data.looking_to !== undefined ? `(${data.looking_to})` : ""}: ${JSON.stringify(r.leadTypes)}`);
+          const extra = r.leadTypes.filter((n) => n !== plan);
+          if (extra.length && !(form === "home-lead" && data.looking_to === "both")) wrong.push(`${form}: a type beyond its plan's ${JSON.stringify(extra)}`);
+        }
+        check(`${site}${valueReviewPlan ? " (value-review plan on)" : ""}: every form gets its plan's type plus its Interest tags'; only home-lead "both" gains one`,
+          wrong.length === 0, wrong.join("; "));
+      }
+    }
+    check("leadTypesFor: the plan's type is never dropped, each type once, lowest first",
+      same(P.leadTypesFor("home-lead", { looking_to: "both" }, { site: "main" }, [SELLER]), [SELLER, BUYER]) &&
+      same(P.leadTypesFor("contact", {}, { site: "main" }, [BUYER]), [BUYER]) &&
+      same(P.leadTypesFor("lpt-join", {}, { site: "main" }, []), []));
+  }
 
   console.log("\n4. Every form has a decision");
   const submission = fs.readFileSync(`${FN_DIR}/submission-created.js`, "utf8");
@@ -363,6 +393,12 @@ function blobStore(seed) {
       same(f.posts[0].leadTypes, [type]) && !tagsOnCreate(f.posts[0]).includes(tag) && pp.length === 1 && pp[0].body.tags.includes(tag),
       JSON.stringify({ create: f.posts[0], pp }));
   }
+  f = fakeLofty();
+  await submit(f, "home-lead", { looking_to: "both" });
+  pp = planPuts(f);
+  check("home-lead (both): Seller AND Buyer on the create (Oct 26), \"TOF – Seller Ready to List\" added after",
+    same(f.posts[0].leadTypes, [SELLER, BUYER]) && f.posts[0].cannotText === true && pp.length === 1 && pp[0].body.tags.includes(TAG.S1),
+    JSON.stringify({ create: f.posts[0], pp }));
   f = fakeLofty();
   await submit(f, "lpt-join", { message: "split?" });
   pp = planPuts(f);

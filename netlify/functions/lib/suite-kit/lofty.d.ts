@@ -44,6 +44,13 @@ export declare function isStopContactTag(name: unknown): boolean;
  */
 export declare function isProtectedTag(name: unknown): boolean;
 /**
+ * May this tag go on a lead as an opt-out's source label (0.5.4, `applyOptOut` `labelTags`)? A label is only ever added
+ * with an opt-out and never taken off, so it is never a tag that decides consent: no `Consent – …` tag, no Do Not
+ * Contact or `#dnc` tag, no SMS consent, no `System – Kill All Drips`. Of the never-removed tags (isProtectedTag) only
+ * `Newsletter Unsubscribed` may be a label: it is the newsletter's own record of an unsubscribe. Any dash, any case.
+ */
+export declare function isOptOutLabelTag(name: unknown): boolean;
+/**
  * Two real, different first names (Command Center's rule, 0.5.0): a missing or placeholder name on either side is
  * never a difference.
  */
@@ -129,6 +136,14 @@ export interface LoftyDeps {
      * Lofty would. Reads still go to Lofty, except a read of a lead the plan wrote to or would have created.
      */
     plan?: LoftyPlan;
+    /**
+     * 0.5.12: more re-reads after a lead-type write, waiting these many milliseconds before each (default none: the PUT's
+     * answer and one re-read). Lofty shows a type change a few seconds after it answers, so a caller with time to spare
+     * (a nightly script) passes e.g. [2000, 5000]; a caller inside a visitor's form submission does not.
+     */
+    readBackWaitsMs?: number[];
+    /** Waits for readBackWaitsMs; injected in tests. Defaults to setTimeout. */
+    sleep?: (ms: number) => Promise<void>;
 }
 export declare class LoftyError extends Error {
     status?: number;
@@ -150,8 +165,9 @@ export interface LoftyLeadInput {
     phone?: string;
     source?: string;
     /**
-     * Lofty's numeric lead types (1 seller, 2 buyer, …), sent on a CREATE only (an existing lead keeps its own):
-     * a Smart Plan enrols only the lead types in its scope.
+     * Lofty's numeric lead types (1 seller, 2 buyer, …; interest.ts leadTypesForInterests), sent on a CREATE; an existing
+     * lead keeps its own unless the push asks mergeLeadTypes (0.5.12: Seller / Buyer added, never removed). A Smart Plan
+     * enrols only the lead types in its scope.
      */
     leadTypes?: number[];
     /** The Lofty user a NEW lead is assigned to (Christine's user id); sent on a create only. */
@@ -191,8 +207,12 @@ export declare function loftyRequest(method: LoftyMethod, path: string, body: un
 /**
  * loftyRequest with Lofty's answer as text (0.5.0), for an id that may not fit a JavaScript number (Lofty ids are
  * 64-bit). A string `body` is sent exactly as given (raw JSON, e.g. an id written as digits). Throws like loftyRequest.
+ * `opts.accept` (0.5.10) asks for XML: Lofty's getPublishedListings answers only XML and refuses a JSON Accept with
+ * HTTP 406 (the hub's call log, Oct 26, 2026; Listing Engine's own key always sent `Accept: application/xml`).
  */
-export declare function loftyRequestText(method: LoftyMethod, path: string, body: unknown, deps: LoftyDeps): Promise<{
+export declare function loftyRequestText(method: LoftyMethod, path: string, body: unknown, deps: LoftyDeps, opts?: {
+    accept?: 'application/xml';
+}): Promise<{
     status: number;
     text: string;
 }>;
@@ -255,6 +275,21 @@ export declare function normalizeTags(raw: unknown): string[];
  * list, so writing from such a read could drop `Consent – DNC`. Names are kept exactly as Lofty sent them.
  */
 export declare function existingTagsForWrite(raw: unknown): string[] | null;
+/** The lead types pushLead may ADD to an existing lead (mergeLeadTypes): Seller (1) and Buyer (2) only. */
+export declare const MERGEABLE_LEAD_TYPES: readonly number[];
+/** Lead types as a caller sends them: whole numbers 1-99, each once, in the order given. Anything else is dropped. */
+export declare function cleanLeadTypes(list: unknown): number[];
+/**
+ * The lead's existing types for a WRITE, or null when they cannot be trusted: `leadTypes` missing, null or not a list
+ * of whole numbers. Lofty's "none" (-1, 0) reads as no type. The PUT replaces the whole list, so a write from a read
+ * without it could drop a type the lead has: hold instead (Christine's rule: read, merge, then write).
+ */
+export declare function leadTypesForWrite(lead: any): number[] | null;
+/** Existing + wanted (Seller / Buyer only): every existing type kept in its place, the missing ones appended. */
+export declare function mergeLeadTypes(existing: number[], wanted: number[]): {
+    merged: number[];
+    added: number[];
+};
 /**
  * Existing + requested. Every existing tag is kept exactly as it is; a requested tag is added unless the
  * lead already has it (ignoring case).
@@ -399,6 +434,13 @@ export interface LeadChange {
     submittedPhone?: string;
     /** The submitted phone went to Lofty in the create body that produced this lead id. */
     viaCreate?: boolean;
+    /**
+     * 0.5.6: this push created the lead a moment ago and nobody else can have tagged it: the exact searches found nobody
+     * with this email or phone, Lofty did not fold the create into another lead, and the create body carried no tags.
+     * Lofty answers such a lead with NO tag list at all (missing or null), which then means none, not unreadable.
+     * Only pushLead sets it; any other missing list still holds.
+     */
+    createdBlank?: boolean;
     /** Email opt-out: `Consent – Unsubscribed` + cannotEmail:true in the same PUT. */
     emailOptOut?: boolean;
     /** Do Not Contact: both DNC tags + cannotText:true + cannotEmail:true in the same PUT. */
@@ -411,6 +453,28 @@ export interface LeadChange {
     fillProperty?: LeadProperty;
     /** 0.5.0: the first name the person gave; another real first name on the lead refuses (name_differs), nothing written. */
     expectFirstName?: string;
+    /**
+     * 0.5.4: an opt-out's source labels (isOptOutLabelTag; any other tag is dropped): added in the same PUT whatever
+     * holds the other tags (Do Not Contact, a shared-list opt-out), never taken off, read back after the write.
+     */
+    labelTags?: string[];
+    /**
+     * 0.5.12: lead types to ADD (Seller 1 / Buyer 2 only; see mergeLeadTypes), in the same PUT as the tags; never one
+     * removed. Held where the requested tags are held, on any email opt-out (the shared list's or the lead's own), and when
+     * the lead's own type list cannot be read.
+     */
+    addLeadTypes?: number[];
+}
+/** 0.5.12: what a push did with the lead types it was given. */
+export interface LeadTypesResult {
+    /** in_create: sent in the create body; added: written to an existing lead; already: it had them; held: nothing written. */
+    result: 'in_create' | 'added' | 'already' | 'held';
+    /** The types this push gave the lead (in_create: the create's; added: the missing ones). */
+    added: number[];
+    /** held: tags_unreadable, do_not_contact, email_opt_out or types_unreadable. */
+    reason?: 'tags_unreadable' | 'do_not_contact' | 'email_opt_out' | 'types_unreadable';
+    /** added: what the read-back showed (Lofty shows a type change a few seconds after it answers). */
+    check?: 'shown' | 'not_shown' | 'unverified';
 }
 export interface LeadChangeResult {
     tagsAdded: string[];
@@ -423,6 +487,11 @@ export interface LeadChangeResult {
     noteError?: string;
     /** Set when the lead's tags were missing or null: nothing written to tags, any yes held. */
     tagsUnreadable?: string;
+    /**
+     * 0.5.6: where the existing tags came from when the lead's own read had no tag list: `new_lead` (createdBlank: none)
+     * or `search` (an exact email or phone search returned this same lead with a readable list). Unset = the lead's read.
+     */
+    tagsFrom?: 'new_lead' | 'search';
     /** The lead is Do Not Contact (before or by this write): only stop-contact tags, texting and email off. */
     dncHeld: boolean;
     /** The lead is `#dnc` or Do Not Contact: texting off and no calls (`#dnc` alone leaves email and tags alone). */
@@ -436,6 +505,12 @@ export interface LeadChangeResult {
     removeCheck?: 'removed' | 'not_removed' | 'unverified';
     /** 0.5.0: the address (fillProperty): filled (none before), completed (same street, blanks filled), same, kept (another street), held (tags unreadable). */
     property?: 'filled' | 'completed' | 'same' | 'kept' | 'held';
+    /** 0.5.4: the labels (labelTags) this write added; [] when they were on the lead already or the tags were unreadable. */
+    labelsAdded?: string[];
+    /** 0.5.4: after a write that added labels, one re-read: on the lead, missing, or not readable. */
+    labelCheck?: 'added' | 'not_added' | 'unverified';
+    /** 0.5.12: the lead types asked with addLeadTypes (unset when none were asked). */
+    leadTypes?: LeadTypesResult;
     /** The lead as read before the write (for a caller that mirrors it). */
     before: any;
 }
@@ -479,7 +554,7 @@ export interface LoftyOutcome {
     reason?: string;
     status?: number;
     /** Why nothing was written: a refused lookup, no lookup key, not configured, or rate limited. */
-    code?: LookupRefusalCode | 'no_lookup_key' | 'not_configured' | 'rate_limited' | 'busy' | 'name_differs';
+    code?: LookupRefusalCode | 'no_lookup_key' | 'not_configured' | 'rate_limited' | 'busy' | 'name_differs' | 'tags_unreadable' | 'read_mismatch' | 'timeout' | 'network' | 'lofty_error' | 'lofty_refused';
     needsReview?: boolean;
     matchLeadIds?: string[];
     matchedBy?: 'email' | 'phone' | 'lead_id';
@@ -505,6 +580,10 @@ export interface LoftyOutcome {
     nameOnLead?: string;
     /** 0.5.0: a create carrying tags, an address or custom fields was folded into an existing lead: check that lead. */
     createBodyMerged?: boolean;
+    /** 0.5.4: the opt-out labels (applyOptOut labelTags) this write added and read back; [] when none went on. */
+    labelsAdded?: string[];
+    /** 0.5.12: what this push did with lead.leadTypes (on a create, or with mergeLeadTypes on an existing lead). */
+    leadTypes?: LeadTypesResult;
 }
 /** Why nothing was created when there is nothing to look the person up by. */
 export declare const NO_LOOKUP_KEY = "no email and no phone number with 10 digits to look the person up by: not created in Lofty; add them by hand";
@@ -532,6 +611,12 @@ export interface PushLeadArgs {
     removeTags?: string[];
     /** 0.5.0: tags sent IN the create body (a create only, never an existing lead; see buildLeadBody). */
     createTags?: string[];
+    /**
+     * 0.5.12: an EXISTING lead (found, `leadId`, or the lead Lofty folded this create into) gains any Seller / Buyer type
+     * in lead.leadTypes it lacks, in the same read-merge-write as the tags; none is ever removed (see LeadChange.addLeadTypes).
+     * Default false: an existing lead keeps its own types, as before.
+     */
+    mergeLeadTypes?: boolean;
 }
 /**
  * Look up (email, then phone), then add to the one existing lead, or create (cannotText:true) and tag the
@@ -549,12 +634,15 @@ export type OptOutKind = 'email' | 'do_not_contact';
  * opt-out (`Consent – Unsubscribed` + cannotEmail); `do_not_contact` = both DNC tags + cannotText +
  * cannotEmail. Consent writes never wait on any Smart Plan switch. When the tags cannot be read only the
  * flags go on and the outcome is NOT ok (needsReview): half an opt-out is not an opt-out. Never throws.
+ * 0.5.4: `labelTags` = the writing app's own source label (isOptOutLabelTag), in the same PUT, also on a Do Not
+ * Contact lead, read back once after the write (`labelsAdded`; a label not read back is not ok, needsReview).
  */
 export declare function applyOptOut(args: {
     kind: OptOutKind;
     leadId?: string;
     email?: unknown;
     phone?: unknown;
+    labelTags?: string[];
 }, deps: LoftyDeps): Promise<LoftyOutcome>;
 /** Read one lead and say what may be done with it (consentStatus). Never throws. */
 export declare function lookupConsent(args: {

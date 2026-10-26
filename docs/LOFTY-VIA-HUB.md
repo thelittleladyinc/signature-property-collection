@@ -27,6 +27,7 @@ Since 2026-10-24 (Christine: "Move each one, let's start with Lofty ... I need e
 | The retry queue replays all of the above | The same hub calls, every option included |
 
 - "Proven new" is unchanged: lead type, plan tag, website fields and search wishes only for a contact the push created (not found, not folded into another lead) whose note landed.
+- Lead types (2026-10-26, Christine: "buyer and seller too"): the plan's type and the Interest tags' (`lib/_form-plans.js` `leadTypesFor`; the homepage "both" = `[1, 2]`) ride on every push. The hub puts them on a create; on a contact it finds it adds the missing ones only once its switch `lofty_lead_types_merge_enabled` is on (sellerintelligence 0095, seeded off; never one removed), and its answer says `lead_types.result` (`in_create`, `added`, `already`, `held`, `off`).
 - A note longer than the hub keeps (5,000 characters) goes in parts: the first with the push, the rest right after it as `/v1/lofty/note`, so a long message never cuts off the consent record at the end.
 - The hub can't take it (not configured, unreachable, switched off, an option's switch off, rate limited, busy): the lead goes to the existing retry queue with the reason. Nothing is sent with this site's own key instead.
 - Held by the hub (Do Not Contact, several possible leads, no email or phone): the existing held-lead record on `/status`; never replayed.
