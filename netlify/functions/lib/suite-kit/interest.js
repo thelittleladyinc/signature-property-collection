@@ -40,7 +40,7 @@ const ALL_INTEREST_TAGS = new Set(Object.values(exports.INTEREST_TAGS));
 function isInterestTag(tag) {
     return ALL_INTEREST_TAGS.has(tag);
 }
-// ── Lofty lead types from the Interest tags (0.5.12; Christine, Oct 26, 2026: "we need it to be buyer and seller too not
+// ── Lofty lead types from the Interest tags (0.5.13; Christine, Oct 26, 2026: "we need it to be buyer and seller too not
 // just one or the other") ──
 //
 // Lofty's `leadTypes` is a list: 1 = Seller, 2 = Buyer. A Smart Plan enrolls only the lead types in its scope, so a

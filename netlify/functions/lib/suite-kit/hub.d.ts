@@ -45,8 +45,8 @@ export interface HubClient {
         phone?: string;
     }): Promise<HubAnswer>;
     /**
-     * 0.5.12: `lead_types` (e.g. [1, 2], interest.ts leadTypesForInterests) go on a create; onto an EXISTING lead too (Seller /
-     * Buyer added, none removed) once hub flag lofty_lead_types_merge_enabled is on (0095), unless the body says
+     * 0.5.13: `lead_types` (e.g. [1, 2], interest.ts leadTypesForInterests) go on a create; onto an EXISTING lead too (Seller /
+     * Buyer added, none removed) once hub flag lofty_lead_types_merge_enabled is on (0100), unless the body says
      * `lead_types_create_only: true` (a public form's push). The answer's `lead_types` says in_create / added / already /
      * held / off / create_only.
      */

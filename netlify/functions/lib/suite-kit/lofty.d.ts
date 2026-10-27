@@ -110,6 +110,11 @@ export interface LoftyDeps {
     /** Milliseconds now; injected in tests. */
     now?: () => number;
     /**
+     * Waits `ms` milliseconds (default setTimeout); injected in tests so the waits cost nothing: the removal read-back's
+     * 2 s / 5 s (0.5.12) and readBackWaitsMs after a lead-type write (0.5.13).
+     */
+    sleep?: (ms: number) => Promise<unknown>;
+    /**
      * One writer per lead. Called before the read of every read-merge-write and released after the PUT (and
      * the Do Not Contact re-check). Return the release function; throw (a LoftyError with code 'busy') to
      * refuse, and nothing is read or written. Without it, two writers that read the same lead before either
@@ -137,13 +142,11 @@ export interface LoftyDeps {
      */
     plan?: LoftyPlan;
     /**
-     * 0.5.12: more re-reads after a lead-type write, waiting these many milliseconds before each (default none: the PUT's
+     * 0.5.13: more re-reads after a lead-type write, waiting these many milliseconds before each (default none: the PUT's
      * answer and one re-read). Lofty shows a type change a few seconds after it answers, so a caller with time to spare
      * (a nightly script) passes e.g. [2000, 5000]; a caller inside a visitor's form submission does not.
      */
     readBackWaitsMs?: number[];
-    /** Waits for readBackWaitsMs; injected in tests. Defaults to setTimeout. */
-    sleep?: (ms: number) => Promise<void>;
 }
 export declare class LoftyError extends Error {
     status?: number;
@@ -166,7 +169,7 @@ export interface LoftyLeadInput {
     source?: string;
     /**
      * Lofty's numeric lead types (1 seller, 2 buyer, …; interest.ts leadTypesForInterests), sent on a CREATE; an existing
-     * lead keeps its own unless the push asks mergeLeadTypes (0.5.12: Seller / Buyer added, never removed). A Smart Plan
+     * lead keeps its own unless the push asks mergeLeadTypes (0.5.13: Seller / Buyer added, never removed). A Smart Plan
      * enrols only the lead types in its scope.
      */
     leadTypes?: number[];
@@ -459,13 +462,13 @@ export interface LeadChange {
      */
     labelTags?: string[];
     /**
-     * 0.5.12: lead types to ADD (Seller 1 / Buyer 2 only; see mergeLeadTypes), in the same PUT as the tags; never one
+     * 0.5.13: lead types to ADD (Seller 1 / Buyer 2 only; see mergeLeadTypes), in the same PUT as the tags; never one
      * removed. Held where the requested tags are held, on any email opt-out (the shared list's or the lead's own), and when
      * the lead's own type list cannot be read.
      */
     addLeadTypes?: number[];
 }
-/** 0.5.12: what a push did with the lead types it was given. */
+/** 0.5.13: what a push did with the lead types it was given. */
 export interface LeadTypesResult {
     /** in_create: sent in the create body; added: written to an existing lead; already: it had them; held: nothing written. */
     result: 'in_create' | 'added' | 'already' | 'held';
@@ -509,7 +512,7 @@ export interface LeadChangeResult {
     labelsAdded?: string[];
     /** 0.5.4: after a write that added labels, one re-read: on the lead, missing, or not readable. */
     labelCheck?: 'added' | 'not_added' | 'unverified';
-    /** 0.5.12: the lead types asked with addLeadTypes (unset when none were asked). */
+    /** 0.5.13: the lead types asked with addLeadTypes (unset when none were asked). */
     leadTypes?: LeadTypesResult;
     /** The lead as read before the write (for a caller that mirrors it). */
     before: any;
@@ -520,6 +523,13 @@ export interface LeadChangeResult {
  * email-off or DNC flag write still goes through, since it touches no list).
  */
 export declare function mergeIntoLead(leadId: string, change: LeadChange, deps: LoftyDeps): Promise<LeadChangeResult>;
+/**
+ * 0.5.12 (Oct 27, 2026): Lofty shows a change a few seconds late, so a removal that does not read back gone is read
+ * again 2 s and then 5 s after the first read (waits of 2 s, then 3 s more) before it counts as "not removed".
+ * Only a read that SAW the tag still on the lead is read again; an unreadable list is `unverified`, never retried
+ * here. Every read is a plain GET, on the caller's read budget (`beforeCall`).
+ */
+export declare const REMOVAL_READ_BACK_WAITS_MS: readonly number[];
 /**
  * Fill a lead's address without ever overwriting it (0.5.0): no street on the lead = the whole address goes on
  * (`filled`); the same street (suite-kit street key) with a blank city, state or ZIP = those blanks are filled, the
@@ -582,7 +592,7 @@ export interface LoftyOutcome {
     createBodyMerged?: boolean;
     /** 0.5.4: the opt-out labels (applyOptOut labelTags) this write added and read back; [] when none went on. */
     labelsAdded?: string[];
-    /** 0.5.12: what this push did with lead.leadTypes (on a create, or with mergeLeadTypes on an existing lead). */
+    /** 0.5.13: what this push did with lead.leadTypes (on a create, or with mergeLeadTypes on an existing lead). */
     leadTypes?: LeadTypesResult;
 }
 /** Why nothing was created when there is nothing to look the person up by. */
@@ -612,7 +622,7 @@ export interface PushLeadArgs {
     /** 0.5.0: tags sent IN the create body (a create only, never an existing lead; see buildLeadBody). */
     createTags?: string[];
     /**
-     * 0.5.12: an EXISTING lead (found, `leadId`, or the lead Lofty folded this create into) gains any Seller / Buyer type
+     * 0.5.13: an EXISTING lead (found, `leadId`, or the lead Lofty folded this create into) gains any Seller / Buyer type
      * in lead.leadTypes it lacks, in the same read-merge-write as the tags; none is ever removed (see LeadChange.addLeadTypes).
      * Default false: an existing lead keeps its own types, as before.
      */

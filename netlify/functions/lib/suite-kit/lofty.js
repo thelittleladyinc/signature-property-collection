@@ -75,7 +75,7 @@
 // (the opt-out behaves exactly as without a label). `isOptOutLabelTag` says which tags may be a label: never a consent,
 // Do Not Contact, `#dnc`, SMS consent or other protected tag, except `Newsletter Unsubscribed` itself.
 //
-// 0.5.12 (2026-10-26, Christine: "we need it to be buyer and seller too not just one or the other"): lead types on an
+// 0.5.13 (2026-10-26, Christine: "we need it to be buyer and seller too not just one or the other"): lead types on an
 // EXISTING lead. Until now `lead.leadTypes` went on a create only and an existing lead kept its own. With
 // `pushLead({ mergeLeadTypes: true })` an existing lead (found, by lead id, or the lead Lofty folded a create into)
 // gains any Seller (1) or Buyer (2) type in `lead.leadTypes` it lacks, in the SAME read-merge-write PUT as the tags
@@ -87,7 +87,7 @@
 // can wait: Lofty shows a type change a few seconds after it answers). A type not shown yet does not fail the push; the
 // next push re-adds it. Which types a person wants comes from interest.ts `leadTypesForInterests`.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NO_LOOKUP_KEY = exports.CONSENT_NO_PHONE = exports.MERGEABLE_LEAD_TYPES = exports.PLANNED_NEW_TASK_ID = exports.PLANNED_NEW_LEAD_ID = exports.LoftyError = exports.LOOKUP_LIMIT = exports.TEXTING_OFF_REASON = exports.NEW_NUMBER_NOTE = exports.EMAIL_OPTOUT_TAG = exports.DNC_WRITE_TAGS = exports.DNC_HASH_TAG = exports.DNC_TAG = exports.SMS_CONSENT_TAG = exports.LOFTY_API_PREFIX = exports.LOFTY_API_ORIGIN = void 0;
+exports.NO_LOOKUP_KEY = exports.REMOVAL_READ_BACK_WAITS_MS = exports.CONSENT_NO_PHONE = exports.MERGEABLE_LEAD_TYPES = exports.PLANNED_NEW_TASK_ID = exports.PLANNED_NEW_LEAD_ID = exports.LoftyError = exports.LOOKUP_LIMIT = exports.TEXTING_OFF_REASON = exports.NEW_NUMBER_NOTE = exports.EMAIL_OPTOUT_TAG = exports.DNC_WRITE_TAGS = exports.DNC_HASH_TAG = exports.DNC_TAG = exports.SMS_CONSENT_TAG = exports.LOFTY_API_PREFIX = exports.LOFTY_API_ORIGIN = void 0;
 exports.isDoNotContactTag = isDoNotContactTag;
 exports.isPhoneOnlyDncTag = isPhoneOnlyDncTag;
 exports.isPhoneDncTag = isPhoneDncTag;
@@ -645,7 +645,7 @@ function existingTagsForWrite(raw) {
     }
     return out;
 }
-// ── lead types (0.5.12) ──────────────────────────────────────────────────────
+// ── lead types (0.5.13) ──────────────────────────────────────────────────────
 /** The lead types pushLead may ADD to an existing lead (mergeLeadTypes): Seller (1) and Buyer (2) only. */
 exports.MERGEABLE_LEAD_TYPES = Object.freeze([1, 2]);
 /** Lead types as a caller sends them: whole numbers 1-99, each once, in the order given. Anything else is dropped. */
@@ -1268,7 +1268,7 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     const removeFirst = removed.length > 0 && added.length > 0;
     if (added.length || removed.length)
         body.tags = removeFirst ? kept : merged;
-    // 0.5.12: the missing lead types go in this same PUT (the first one when tags come off first); none is ever removed.
+    // 0.5.13: the missing lead types go in this same PUT (the first one when tags come off first); none is ever removed.
     let typesWanted = [];
     if (change.addLeadTypes) {
         const want = cleanLeadTypes(change.addLeadTypes).filter((n) => exports.MERGEABLE_LEAD_TYPES.includes(n));
@@ -1362,12 +1362,38 @@ async function mergeIntoLeadNow(leadId, change, deps) {
     }
     return out;
 }
-/** After a write that took tags off: ONE re-read (a 200 is not proof). Never throws. */
+/** After a write that took tags off: re-read it (a 200 is not proof; see readBackRemoved). Never throws. */
 async function confirmRemoved(leadId, removed, deps) {
     return (await readBackRemoved(leadId, removed, deps)).check;
 }
+/**
+ * 0.5.12 (Oct 27, 2026): Lofty shows a change a few seconds late, so a removal that does not read back gone is read
+ * again 2 s and then 5 s after the first read (waits of 2 s, then 3 s more) before it counts as "not removed".
+ * Only a read that SAW the tag still on the lead is read again; an unreadable list is `unverified`, never retried
+ * here. Every read is a plain GET, on the caller's read budget (`beforeCall`).
+ */
+exports.REMOVAL_READ_BACK_WAITS_MS = [2000, 3000];
+const realSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** confirmRemoved, plus the tags that read saw (null when it could not read this lead's list). Never throws. */
 async function readBackRemoved(leadId, removed, deps) {
+    let seen = await readRemovedOnce(leadId, removed, deps);
+    let waited = 0;
+    for (const wait of exports.REMOVAL_READ_BACK_WAITS_MS) {
+        if (seen.check !== 'not_removed')
+            break;
+        try {
+            await (deps.sleep ?? realSleep)(wait);
+        }
+        catch { /* read again anyway */ }
+        waited += wait;
+        seen = await readRemovedOnce(leadId, removed, deps);
+        if (seen.check === 'removed')
+            logger(deps).info(`${label(deps)} lead ${leadId}: the tag removal showed ${waited / 1000} s after the write`);
+    }
+    return seen;
+}
+/** ONE re-read of the lead's tags against the tags just taken off. Never throws. */
+async function readRemovedOnce(leadId, removed, deps) {
     let tags = null;
     try {
         const again = await getLead(leadId, deps);
@@ -1397,7 +1423,7 @@ async function confirmAdded(leadId, added, deps) {
     return added.every((t) => have.has(cleanTag(t).toLowerCase())) ? 'added' : 'not_added';
 }
 /**
- * 0.5.12: after a lead-type write: are the wanted types on the lead? The PUT's answer when it carries the list, else one
+ * 0.5.13: after a lead-type write: are the wanted types on the lead? The PUT's answer when it carries the list, else one
  * re-read, then one more after each of deps.readBackWaitsMs. Never throws. `not_shown` = read, and not there yet.
  */
 async function confirmLeadTypes(leadId, answer, want, deps) {
@@ -1783,7 +1809,7 @@ async function pushLead(args, deps) {
         // person the exact searches proved new, with no tags in the create body, has no tag list in Lofty's answer
         // (createdBlank: that means none, so its tags go on instead of holding every new lead).
         const createdBlank = !made.merged && sent.tags === undefined;
-        // 0.5.12: a create Lofty folded into an existing lead may have replaced that lead's types with the create's (as it
+        // 0.5.13: a create Lofty folded into an existing lead may have replaced that lead's types with the create's (as it
         // does tags); with mergeLeadTypes the types asked for go back on in the read-merge-write that follows.
         const sentTypes = Array.isArray(sent.leadTypes) ? sent.leadTypes : [];
         const foldTypes = made.merged && args.mergeLeadTypes === true && sentTypes.length ? { addLeadTypes: sentTypes } : {};

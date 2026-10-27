@@ -57,7 +57,7 @@
 // homepage "both" choice is now [1, 2] (Seller AND Buyer); every other form gets
 // exactly the type it had. On a create as before; through the hub they ride on
 // every push, and the hub adds the missing ones to a returning contact only once
-// its switch lofty_lead_types_merge_enabled is on (sellerintelligence 0095). On
+// its switch lofty_lead_types_merge_enabled is on (sellerintelligence 0100). On
 // this site's own key a returning contact keeps its own types, as before.
 
 // The tag that starts each plan, exactly as the plan's start tag reads in Lofty.
