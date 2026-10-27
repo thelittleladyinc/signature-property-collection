@@ -477,6 +477,23 @@ const deadline = () => Date.now() + 15000;
     !HUB.lofty.calls.some((c) => c.method === "PUT" && c.body && c.body.customAttributeList) && !HUB.lofty.inquiries.length);
   check("...and nothing the hub covers went out on the own key", coveredOwn().length === 0);
 
+  // 2026-10-26 (Christine: "buyer and seller too"): the homepage "both" choice is Seller AND Buyer. The push carries both
+  // types on a new contact and on a returning one; the hub puts them on a create, and adds the missing ones to a lead it
+  // finds only once its lofty_lead_types_merge_enabled switch is on (this fake hub is the switch off: today's answer).
+  reset();
+  await submit("home-lead", person({ looking_to: "both" }), "sub-2010");
+  pushes = HUB.leadPushes();
+  check("home-lead \"both\", a new contact: the push asks lead_types [1, 2]; the hub creates it Seller AND Buyer, texting off",
+    pushes.length >= 1 && JSON.stringify(pushes[0].lead_types) === "[1,2]" && pushes[0].create === true &&
+    JSON.stringify((HUB.lofty.leads.get(9000) || {}).leadTypes) === "[1,2]" && (HUB.lofty.leads.get(9000) || {}).cannotText === true,
+    JSON.stringify({ push: pushes[0], lead: HUB.lofty.leads.get(9000) }));
+  reset(fakeHub({ lofty: fakeLofty([{ leadId: 7, emails: ["pat@example.com"], phones: ["+19705550123"], tags: ["Buyer"], cannotText: true, leadTypes: [2] }]) }));
+  await submit("home-lead", person({ looking_to: "both" }), "sub-2011");
+  pushes = HUB.leadPushes();
+  check("home-lead \"both\", a returning contact: the push still asks lead_types [1, 2] (the hub decides); with its switch off the lead keeps [2]",
+    pushes.length === 1 && JSON.stringify(pushes[0].lead_types) === "[1,2]" && JSON.stringify(HUB.lofty.leads.get(7).leadTypes) === "[2]" &&
+    ownCalls.length === 0, JSON.stringify({ push: pushes[0], lead: HUB.lofty.leads.get(7) }));
+
   reset(fakeHub({ lofty: fakeLofty([{ leadId: 8, emails: ["pat@example.com"], phones: ["+19705550123"], tags: [`Consent ${EN} DNC`], cannotText: true }]) }));
   await submit("buyers-guide", person(), "sub-2003");
   const eight = HUB.lofty.leads.get(8);

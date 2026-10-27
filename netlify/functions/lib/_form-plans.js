@@ -49,6 +49,16 @@
 // from a rent-to-own buyer from an expired seller): this file also says how a
 // website lead is LABELED in Lofty -- its source (WEBSITE_SOURCE) and what the
 // person wants ("Interest – …" tags, interestFor below). Neither starts a plan.
+//
+// 2026-10-26 (Christine: "we need it to be buyer and seller too not just one or
+// the other"): a lead's types are its plan's type AND the ones its Interest tags
+// say, by the suite's ONE rule (the vendored toolkit's leadTypesForInterests:
+// seller-side Interest = 1, buyer-side = 2, both = [1, 2]; nothing inferred). The
+// homepage "both" choice is now [1, 2] (Seller AND Buyer); every other form gets
+// exactly the type it had. On a create as before; through the hub they ride on
+// every push, and the hub adds the missing ones to a returning contact only once
+// its switch lofty_lead_types_merge_enabled is on (sellerintelligence 0100). On
+// this site's own key a returning contact keeps its own types, as before.
 
 // The tag that starts each plan, exactly as the plan's start tag reads in Lofty.
 // Every "–" here is U+2013 EN DASH, copied from the plan names; S2's "-" is a
@@ -86,6 +96,14 @@ const LUXURY_TAG = "Luxury";
 
 // Lofty's numeric lead types (`leadTypes` on POST /v1.0/leads).
 const LEAD_TYPE = Object.freeze({ SELLER: 1, BUYER: 2 });
+
+// The suite's one rule for which types the Interest tags say (vendored toolkit,
+// lib/suite-kit; never edit it there). Loaded on first use.
+let interestKit = null;
+function leadTypesForInterests(tags) {
+  if (!interestKit) interestKit = require("./suite-kit/interest");
+  return interestKit.leadTypesForInterests(tags);
+}
 
 // Each plan: its start tag and the lead type a new contact is created with.
 // RECRUIT has no lead type: an agent asking about LPT is neither a buyer nor a
@@ -373,16 +391,29 @@ function planKeyFor(formName, data, opts) {
 // to "main"; `valueReviewPlan` to false. HV_VALUE_REVIEW has a lead type and no
 // plan tag (its plan starts later, in Lofty). planTags is the plan's tag first,
 // then any tag added with it (SPC_LUXURY_VALUE_REVIEW: "Luxury"), all in the one
-// PUT after the create. Fresh arrays every call, so a caller can't change the
-// table.
+// PUT after the create. leadTypes (2026-10-26) is the plan's type (or the form's
+// TYPE_ONLY_FORMS type) together with the ones the submission's Interest tags say
+// (leadTypesFor), lowest first: home-lead "both" = [1, 2]. Fresh arrays every
+// call, so a caller can't change the table.
 function planForSubmission(formName, data, opts) {
   const key = planKeyFor(formName, data, opts);
   const p = key ? PLANS[key] : null;
-  if (!p) {
-    const name = String(formName || "");
-    return { plan: null, planTags: [], leadTypes: hasOwn(TYPE_ONLY_FORMS, name) ? [TYPE_ONLY_FORMS[name]] : [] };
-  }
-  return { plan: key, planTags: p.tag ? [p.tag, ...(p.alsoTags || [])] : [], leadTypes: p.leadType ? [p.leadType] : [] };
+  const name = String(formName || "");
+  const own = p ? (p.leadType ? [p.leadType] : []) : (hasOwn(TYPE_ONLY_FORMS, name) ? [TYPE_ONLY_FORMS[name]] : []);
+  const leadTypes = leadTypesFor(formName, data, opts, own);
+  if (!p) return { plan: null, planTags: [], leadTypes };
+  return { plan: key, planTags: p.tag ? [p.tag, ...(p.alsoTags || [])] : [], leadTypes };
+}
+
+// leadTypesFor(formName, data, { site }, base = []) -> number[]
+// The lead types one submission gets: `base` (its plan's) and the ones its
+// Interest tags say (interestFor + the toolkit's leadTypesForInterests), each
+// once, lowest first. Never fewer than the plan's: a form keeps the type its plan
+// enrolls on. A fresh array every call.
+function leadTypesFor(formName, data, opts, base) {
+  const types = new Set((Array.isArray(base) ? base : []).filter((n) => Number.isInteger(n) && n > 0));
+  for (const n of leadTypesForInterests(interestFor(formName, data, opts))) types.add(n);
+  return [...types].sort((a, b) => a - b);
 }
 
 // The switch, read once per submission by submission-created.js: exactly "on"
@@ -405,6 +436,7 @@ module.exports = {
   SIGNATURE_VALUE_REVIEW_PLAN,
   LUXURY_TAG,
   planForSubmission,
+  leadTypesFor,
   valueReviewPlanOn,
   WEBSITE_SOURCE,
   INTEREST,

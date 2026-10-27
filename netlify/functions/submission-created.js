@@ -387,7 +387,12 @@ async function handleLead(event, side) {
     }
     // 2026-10-06: the plan's lead type, on the same rule -- sent only for a contact
     // PROVEN new, so a returning client (or one the lookup couldn't rule out)
-    // keeps the lead type they already have.
+    // keeps the lead type they already have. 2026-10-26 (Christine: "buyer and seller
+    // too"): the types are the plan's and the Interest tags' (lib/_form-plans.js; the
+    // homepage "both" = Seller AND Buyer). Through the hub (LOFTY_VIA_HUB=on) this site
+    // looks nobody up, so they ride on every push and the hub decides: a create carries
+    // them; a contact it finds gains the missing ones only once its switch
+    // lofty_lead_types_merge_enabled is on (never one removed).
     if (plan.leadTypes.length && existing.ok && !existing.anyMatch) body.leadTypes = plan.leadTypes.slice();
 
     // Both attempts at the create finish by this deadline, so the backup email

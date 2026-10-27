@@ -12,7 +12,8 @@
 // apps writing the same lead take turns and never lose a tag.
 //
 // THE SWITCH. LOFTY_VIA_HUB -- exactly "on" (trimmed, any case) -- moves this site's form -> Lofty work to the hub:
-//   - the lookup, the create (with the plan's lead type, which the hub sends on a create only), the form's tags
+//   - the lookup, the create (with the lead types, lib/_form-plans.js; 2026-10-26: the hub also adds the missing ones
+//     to a returning contact once its switch lofty_lead_types_merge_enabled is on, never removing one), the form's tags
 //     and the note: ONE POST /v1/lofty/lead (lib/_lofty.js postLead; lib/_lofty-returning.js findExistingLead
 //     makes no call of its own -- the hub looks the person up);
 //   - the nurture-plan tag, still only on a contact proven new (the hub answered action "created" and merged

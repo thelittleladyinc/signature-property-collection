@@ -550,7 +550,7 @@ const ON = { HUB_SIDE_BY_SIDE: "lofty_write", HUB_SIDE_BY_SIDE_MAX: "200" };
     (src.match(/\.lofty(Lead|Task|Note|OptOut|Flags|Stage|EmailAdd|FillName)\(/g) || []).length === (src.match(/\.lofty(Lead|Task)\([^)]*\{ dryRun: true \}\)/g) || []).length &&
     (src.match(/\.lofty(Lead|Task)\(/g) || []).length === 2 && !/call\(\s*["']POST["']\s*,\s*["']\/v1\/lofty\//.test(src));
   check("it never logs a key or a hub address", !/console\.[a-z]+\([^)]*(HUB_API_KEY|HUB_API_URL|LOFTY_API_KEY)/.test(src));
-  check("lib/suite-kit is toolkit 0.5.2 with the parity rules", require(`${FN_DIR}/lib/suite-kit/version.js`).VERSION === "0.5.2" &&
+  check("lib/suite-kit is toolkit 0.5.13 with the parity rules", require(`${FN_DIR}/lib/suite-kit/version.js`).VERSION === "0.5.13" &&
     typeof kit.compareRecords === "function" && typeof kit.parityRow === "function");
   const other = path.join(ROOT, "..", SIBLING);
   if (fs.existsSync(other)) {

@@ -193,7 +193,8 @@ async function findExistingLead(email, phone, apiKey, opts) {
   // Through the hub: no lookup here. The hub's push looks the person up (email,
   // then phone), refuses several or loose matches (held for review), and says
   // whether it created the contact; nothing new is decided from this answer
-  // (the tags are always merged and a lead type is only ever sent on a create).
+  // (the tags are always merged; the lead types go on a create, and on a contact the
+  // hub finds only once its lofty_lead_types_merge_enabled switch is on).
   if (loftyViaHub()) return { attempted: false, ok: true, leadId: null, anyMatch: false, via: "hub" };
   try {
     const o = opts || {};

@@ -47,6 +47,16 @@ export declare function propertyWindowUrl(o: PropertyUrlOptions & {
     from: string;
     until: string;
 }): string;
+/**
+ * Records of the given statuses modified in [from, until), viewable or not: unlike propertyWindowUrl there is no
+ * MlgCanView clause, so a not-for-display record (MlgCanView=false) comes back too and the keep switch can hold it
+ * (the hub's off-market re-read, 0084; toolkit 0.5.5). Same filter fields MLS Grid allows, oldest first.
+ */
+export declare function propertyStatusWindowUrl(o: PropertyUrlOptions & {
+    statuses: readonly string[];
+    from: string;
+    until: string;
+}): string;
 /** At most 20 listings by MLS number (ListingId), optionally with their photos ($expand=Media). */
 export declare function propertyByListingIdsUrl(o: {
     ids: readonly string[];

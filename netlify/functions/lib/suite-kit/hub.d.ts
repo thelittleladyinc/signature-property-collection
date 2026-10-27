@@ -44,12 +44,19 @@ export interface HubClient {
         email?: string;
         phone?: string;
     }): Promise<HubAnswer>;
+    /**
+     * 0.5.13: `lead_types` (e.g. [1, 2], interest.ts leadTypesForInterests) go on a create; onto an EXISTING lead too (Seller /
+     * Buyer added, none removed) once hub flag lofty_lead_types_merge_enabled is on (0100), unless the body says
+     * `lead_types_create_only: true` (a public form's push). The answer's `lead_types` says in_create / added / already /
+     * held / off / create_only.
+     */
     loftyLead(lead: Record<string, unknown>, opts?: HubDryRun): Promise<HubAnswer>;
     loftyNote(note: {
         lead_id: string;
         content: string;
         idempotency_key?: string;
     }, opts?: HubDryRun): Promise<HubAnswer>;
+    /** 0.5.4: `label_tags` = the app's own source label in the opt-out's PUT (the newsletter's `Newsletter Unsubscribed`; hub flag lofty_optout_labels_enabled + the app's profile). */
     loftyOptOut(o: {
         kind: 'email' | 'do_not_contact';
         lead_id?: string;
@@ -57,6 +64,7 @@ export interface HubClient {
         phone?: string;
         reason?: string;
         note?: string;
+        label_tags?: string[];
     }, opts?: HubDryRun): Promise<HubAnswer>;
     loftyTask(t: {
         lead_id: string;
