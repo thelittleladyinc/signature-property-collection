@@ -236,6 +236,13 @@ async function recordPush(store, result, formName, lead) {
       const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
       queue.unshift({ at: new Date().toISOString(), formName, lead, ...result });
       await store.setJSON(FAILED_PUSH_KEY, queue.slice(0, MAX_QUEUED_FAILURES));
+    } else if (result.ok && result.propertyAlert && result.propertyAlert.retryable && result.propertyAlertLeadId) {
+      // Retry only the alert setup. Never create the lead, add its note or start its plan again.
+      const queue = (await store.get(FAILED_PUSH_KEY, {type:"json"}).catch(()=>null)) || [];
+      const entry = {at:new Date().toISOString(),formName,lead,...result,loftyId:String(result.propertyAlertLeadId),
+        followupsPending:["propertyAlert"],replay:{identity:{},newId:null,steps:{}}};
+      const kept = queue.filter(e => !(e.submissionId && e.submissionId === entry.submissionId && e.followupsPending && e.followupsPending.includes("propertyAlert")));
+      await store.setJSON(FAILED_PUSH_KEY,[entry,...kept].slice(0,MAX_QUEUED_FAILURES));
     }
   } catch (err) {
     // Diagnostics must never be the reason a lead push fails.
@@ -599,7 +606,7 @@ async function replayViaHub(entry, ctx) {
 // with the accepted contact (loftyId) and what this run learned (replay), and
 // the next run calls this again for those alone -- never a second create,
 // lookup or note. Returns that entry, or null when nothing is owed.
-const FOLLOWUP_STEPS = ["note", "tag", "planTags", "returning", "fields", "inquiry"];
+const FOLLOWUP_STEPS = ["note", "tag", "planTags", "returning", "fields", "inquiry", "propertyAlert"];
 
 async function finishReplay(entry, lead, ctx) {
   const { identity, newId, target, apiKey, store, deadline } = ctx;
@@ -645,6 +652,8 @@ async function finishReplay(entry, lead, ctx) {
     inquiry: { owed: () => !!(newContact && data && store && inquiryFromForm(data)), skip: () => !provenNew(),
       run: () => placeInquiry(newId, inquiryFromForm(data), apiKey, o) },
   };
+  plan.propertyAlert = { owed: () => !!(target && data && entry.formName === "listing-alert-request" && data.listing_alert_consent === "yes"),
+    run: () => require("./_listing-alerts").activatePropertyAlert({formName:entry.formName,data,leadId:target,submissionId:entry.submissionId},o) };
   const pending = [];
   try {
     for (const name of FOLLOWUP_STEPS) {
@@ -652,6 +661,7 @@ async function finishReplay(entry, lead, ctx) {
       if (pending.length || deadline - Date.now() < FOLLOWUP_MIN_MS) { pending.push(name); continue; }
       if (plan[name].skip && plan[name].skip()) continue;
       steps[name] = await plan[name].run();
+      if (name === "propertyAlert" && steps[name].retryable) { delete steps[name]; pending.push(name); }
     }
   } catch (err) {
     console.error(`Queued Lofty lead from "${entry.formName}": a follow-up step failed:`, err && err.message);
