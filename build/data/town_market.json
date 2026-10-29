@@ -17,14 +17,14 @@
     "Aggregates only, and towns under 5 active listings are omitted —",
     "see the compliance note at the top of the generating script."
   ],
-  "generated_at": "2026-10-26",
+  "generated_at": "2026-10-29",
   "source": "hub-mls",
   "min_sample": 5,
   "towns": {
     "Rye": {
       "active": 24,
-      "new_30d": 4,
-      "median_dom": 121,
+      "new_30d": 2,
+      "median_dom": 124,
       "median_list": 457500,
       "pct_reduced": 38,
       "median_price_per_sqft": 238
@@ -32,55 +32,55 @@
     "Alma": {
       "active": 39,
       "new_30d": 1,
-      "median_dom": 144,
+      "median_dom": 147,
       "median_list": 439000,
       "pct_reduced": 46,
       "median_price_per_sqft": 442
     },
     "Ault": {
-      "active": 34,
+      "active": 29,
       "new_30d": 5,
-      "median_dom": 56,
-      "median_list": 429500,
+      "median_dom": 57,
+      "median_list": 410000,
       "pct_reduced": 62,
-      "median_price_per_sqft": 284
+      "median_price_per_sqft": 275
     },
     "Avon": {
       "active": 5,
       "new_30d": 1,
-      "median_dom": 42,
+      "median_dom": 45,
       "median_list": 540000,
-      "pct_reduced": 40,
+      "pct_reduced": 60,
       "median_price_per_sqft": 703
     },
     "Carr": {
-      "active": 26,
+      "active": 25,
       "new_30d": 4,
-      "median_dom": 126,
-      "median_list": 219500,
-      "pct_reduced": 15,
-      "median_price_per_sqft": 358
+      "median_dom": 129,
+      "median_list": 219000,
+      "pct_reduced": 16,
+      "median_price_per_sqft": 373
     },
     "Como": {
-      "active": 109,
-      "new_30d": 15,
+      "active": 110,
+      "new_30d": 14,
       "median_dom": 143,
-      "median_list": 78000,
+      "median_list": 73950,
       "pct_reduced": 46,
       "median_price_per_sqft": 323
     },
     "Erie": {
-      "active": 245,
-      "new_30d": 39,
-      "median_dom": 62,
-      "median_list": 699000,
-      "pct_reduced": 61,
+      "active": 244,
+      "new_30d": 42,
+      "median_dom": 65,
+      "median_list": 699450,
+      "pct_reduced": 60,
       "median_price_per_sqft": 297
     },
     "Gill": {
       "active": 7,
       "new_30d": 2,
-      "median_dom": 97,
+      "median_dom": 100,
       "median_list": 615000,
       "pct_reduced": 71,
       "median_price_per_sqft": 245
@@ -88,23 +88,23 @@
     "Hugo": {
       "active": 10,
       "new_30d": 1,
-      "median_dom": 142,
+      "median_dom": 145,
       "median_list": 135000,
       "pct_reduced": 50,
       "median_price_per_sqft": 131
     },
     "Mead": {
-      "active": 86,
-      "new_30d": 20,
+      "active": 84,
+      "new_30d": 19,
       "median_dom": 94,
-      "median_list": 575000,
-      "pct_reduced": 44,
+      "median_list": 577000,
+      "pct_reduced": 43,
       "median_price_per_sqft": 275
     },
     "Nunn": {
       "active": 38,
-      "new_30d": 7,
-      "median_dom": 74,
+      "new_30d": 6,
+      "median_dom": 77,
       "median_list": 422500,
       "pct_reduced": 37,
       "median_price_per_sqft": 275
@@ -112,135 +112,135 @@
     "Otis": {
       "active": 5,
       "new_30d": 2,
-      "median_dom": 42,
+      "median_dom": 45,
       "median_list": 224000,
       "pct_reduced": 40,
       "median_price_per_sqft": null
     },
     "Pine": {
-      "active": 72,
-      "new_30d": 14,
-      "median_dom": 101,
-      "median_list": 637450,
-      "pct_reduced": 49,
+      "active": 71,
+      "new_30d": 15,
+      "median_dom": 104,
+      "median_list": 625000,
+      "pct_reduced": 48,
       "median_price_per_sqft": 359
     },
     "Rush": {
       "active": 10,
       "new_30d": 2,
-      "median_dom": 137,
+      "median_dom": 140,
       "median_list": 132000,
       "pct_reduced": 40,
       "median_price_per_sqft": null
     },
     "Vail": {
-      "active": 8,
-      "new_30d": 1,
-      "median_dom": 159,
+      "active": 9,
+      "new_30d": 2,
+      "median_dom": 160,
       "median_list": 349000,
-      "pct_reduced": 13,
-      "median_price_per_sqft": 446
+      "pct_reduced": 11,
+      "median_price_per_sqft": 499
     },
     "Ward": {
-      "active": 21,
+      "active": 20,
       "new_30d": 2,
-      "median_dom": 79,
-      "median_list": 499000,
-      "pct_reduced": 33,
+      "median_dom": 88,
+      "median_list": 512000,
+      "pct_reduced": 35,
       "median_price_per_sqft": 396
     },
     "Agate": {
       "active": 11,
       "new_30d": 5,
-      "median_dom": 31,
+      "median_dom": 34,
       "median_list": 145000,
       "pct_reduced": 18,
       "median_price_per_sqft": null
     },
     "Akron": {
-      "active": 19,
-      "new_30d": 2,
-      "median_dom": 166,
-      "median_list": 160000,
-      "pct_reduced": 42,
-      "median_price_per_sqft": 145
+      "active": 18,
+      "new_30d": 1,
+      "median_dom": 181,
+      "median_list": 155000,
+      "pct_reduced": 50,
+      "median_price_per_sqft": 147
     },
     "Brush": {
       "active": 50,
-      "new_30d": 6,
-      "median_dom": 101,
-      "median_list": 299500,
-      "pct_reduced": 42,
+      "new_30d": 7,
+      "median_dom": 104,
+      "median_list": 274950,
+      "pct_reduced": 44,
       "median_price_per_sqft": 215
     },
     "Byers": {
       "active": 40,
       "new_30d": 10,
-      "median_dom": 154,
+      "median_dom": 157,
       "median_list": 380000,
-      "pct_reduced": 43,
-      "median_price_per_sqft": 280
+      "pct_reduced": 45,
+      "median_price_per_sqft": 272
     },
     "Craig": {
       "active": 5,
       "new_30d": 0,
-      "median_dom": 83,
+      "median_dom": 86,
       "median_list": 285000,
       "pct_reduced": 40,
       "median_price_per_sqft": null
     },
     "Drake": {
-      "active": 37,
-      "new_30d": 4,
-      "median_dom": 137,
-      "median_list": 450000,
-      "pct_reduced": 54,
+      "active": 38,
+      "new_30d": 5,
+      "median_dom": 139,
+      "median_list": 437500,
+      "pct_reduced": 53,
       "median_price_per_sqft": 390
     },
     "Eaton": {
-      "active": 51,
+      "active": 49,
       "new_30d": 11,
-      "median_dom": 74,
+      "median_dom": 81,
       "median_list": 610000,
-      "pct_reduced": 49,
+      "pct_reduced": 51,
       "median_price_per_sqft": 257
     },
     "Evans": {
-      "active": 95,
+      "active": 94,
       "new_30d": 26,
-      "median_dom": 53,
-      "median_list": 394900,
-      "pct_reduced": 46,
-      "median_price_per_sqft": 248
+      "median_dom": 56,
+      "median_list": 392450,
+      "pct_reduced": 48,
+      "median_price_per_sqft": 246
     },
     "Kiowa": {
       "active": 45,
-      "new_30d": 5,
-      "median_dom": 168,
+      "new_30d": 4,
+      "median_dom": 171,
       "median_list": 424999,
       "pct_reduced": 40,
       "median_price_per_sqft": 375
     },
     "Limon": {
-      "active": 16,
-      "new_30d": 1,
-      "median_dom": 110,
-      "median_list": 280000,
-      "pct_reduced": 38,
+      "active": 18,
+      "new_30d": 3,
+      "median_dom": 99,
+      "median_list": 286000,
+      "pct_reduced": 39,
       "median_price_per_sqft": 178
     },
     "Lyons": {
-      "active": 102,
+      "active": 101,
       "new_30d": 11,
-      "median_dom": 117,
-      "median_list": 724000,
-      "pct_reduced": 41,
-      "median_price_per_sqft": 408
+      "median_dom": 118,
+      "median_list": 720000,
+      "pct_reduced": 43,
+      "median_price_per_sqft": 402
     },
     "Model": {
       "active": 6,
       "new_30d": 1,
-      "median_dom": 294,
+      "median_dom": 297,
       "median_list": 27500,
       "pct_reduced": 50,
       "median_price_per_sqft": null
@@ -248,103 +248,103 @@
     "Mosca": {
       "active": 48,
       "new_30d": 4,
-      "median_dom": 225,
+      "median_dom": 228,
       "median_list": 23700,
       "pct_reduced": 25,
       "median_price_per_sqft": 218
     },
     "Niwot": {
-      "active": 35,
-      "new_30d": 4,
-      "median_dom": 130,
-      "median_list": 1475000,
-      "pct_reduced": 43,
-      "median_price_per_sqft": 400
+      "active": 36,
+      "new_30d": 6,
+      "median_dom": 120,
+      "median_list": 1487500,
+      "pct_reduced": 42,
+      "median_price_per_sqft": 406
     },
     "Ramah": {
       "active": 23,
-      "new_30d": 3,
-      "median_dom": 114,
+      "new_30d": 2,
+      "median_dom": 117,
       "median_list": 429900,
       "pct_reduced": 43,
       "median_price_per_sqft": 248
     },
     "Simla": {
       "active": 11,
-      "new_30d": 2,
-      "median_dom": 116,
+      "new_30d": 1,
+      "median_dom": 119,
       "median_list": 324000,
       "pct_reduced": 27,
       "median_price_per_sqft": 228
     },
     "Yoder": {
-      "active": 13,
+      "active": 12,
       "new_30d": 2,
-      "median_dom": 164,
-      "median_list": 469999,
-      "pct_reduced": 62,
-      "median_price_per_sqft": 307
+      "median_dom": 169,
+      "median_list": 409900,
+      "pct_reduced": 58,
+      "median_price_per_sqft": 292
     },
     "Arriba": {
       "active": 6,
       "new_30d": 0,
-      "median_dom": 129,
+      "median_dom": 132,
       "median_list": 127500,
       "pct_reduced": 33,
       "median_price_per_sqft": 50
     },
     "Arvada": {
-      "active": 582,
-      "new_30d": 151,
-      "median_dom": 53,
-      "median_list": 622250,
-      "pct_reduced": 54,
+      "active": 584,
+      "new_30d": 161,
+      "median_dom": 55,
+      "median_list": 624995,
+      "pct_reduced": 53,
       "median_price_per_sqft": 301
     },
     "Aurora": {
-      "active": 1966,
-      "new_30d": 468,
-      "median_dom": 67,
+      "active": 1934,
+      "new_30d": 460,
+      "median_dom": 69,
       "median_list": 450000,
-      "pct_reduced": 60,
-      "median_price_per_sqft": 250
+      "pct_reduced": 61,
+      "median_price_per_sqft": 249
     },
     "Bailey": {
-      "active": 112,
-      "new_30d": 14,
-      "median_dom": 95,
-      "median_list": 484000,
-      "pct_reduced": 56,
-      "median_price_per_sqft": 328
+      "active": 110,
+      "new_30d": 15,
+      "median_dom": 102,
+      "median_list": 465000,
+      "pct_reduced": 57,
+      "median_price_per_sqft": 324
     },
     "Beulah": {
       "active": 8,
       "new_30d": 0,
-      "median_dom": 135,
-      "median_list": 399450,
+      "median_dom": 138,
+      "median_list": 391500,
       "pct_reduced": 63,
       "median_price_per_sqft": 215
     },
     "Blanca": {
-      "active": 138,
+      "active": 136,
       "new_30d": 10,
-      "median_dom": 178,
+      "median_dom": 181,
       "median_list": 6300,
-      "pct_reduced": 11,
+      "pct_reduced": 10,
       "median_price_per_sqft": 190
     },
     "Calhan": {
-      "active": 82,
-      "new_30d": 11,
-      "median_dom": 154,
-      "median_list": 292000,
+      "active": 84,
+      "new_30d": 12,
+      "median_dom": 157,
+      "median_list": 322500,
       "pct_reduced": 52,
-      "median_price_per_sqft": 279
+      "median_price_per_sqft": 278
     },
     "Center": {
       "active": 13,
       "new_30d": 3,
-      "median_dom": 188,
+      "median_dom": 191,
       "median_list": 210000,
       "pct_reduced": 38,
       "median_price_per_sqft": 147
@@ -352,63 +352,63 @@
     "Creede": {
       "active": 24,
       "new_30d": 1,
-      "median_dom": 140,
+      "median_dom": 143,
       "median_list": 327000,
       "pct_reduced": 25,
       "median_price_per_sqft": 358
     },
     "Dacono": {
-      "active": 33,
-      "new_30d": 11,
-      "median_dom": 59,
-      "median_list": 489990,
-      "pct_reduced": 42,
+      "active": 32,
+      "new_30d": 10,
+      "median_dom": 66,
+      "median_list": 482495,
+      "pct_reduced": 41,
       "median_price_per_sqft": 278
     },
     "Denver": {
-      "active": 4109,
-      "new_30d": 878,
-      "median_dom": 67,
+      "active": 4044,
+      "new_30d": 900,
+      "median_dom": 70,
       "median_list": 525000,
-      "pct_reduced": 58,
-      "median_price_per_sqft": 355
+      "pct_reduced": 59,
+      "median_price_per_sqft": 354
     },
     "Dillon": {
       "active": 81,
-      "new_30d": 9,
-      "median_dom": 123,
-      "median_list": 750000,
+      "new_30d": 7,
+      "median_dom": 126,
+      "median_list": 770000,
       "pct_reduced": 63,
-      "median_price_per_sqft": 727
+      "median_price_per_sqft": 716
     },
     "Divide": {
-      "active": 66,
-      "new_30d": 12,
-      "median_dom": 130,
-      "median_list": 401500,
-      "pct_reduced": 48,
+      "active": 67,
+      "new_30d": 13,
+      "median_dom": 128,
+      "median_list": 400000,
+      "pct_reduced": 46,
       "median_price_per_sqft": 285
     },
     "Dumont": {
       "active": 9,
       "new_30d": 0,
-      "median_dom": 201,
+      "median_dom": 204,
       "median_list": 55000,
       "pct_reduced": 67,
       "median_price_per_sqft": null
     },
     "Elbert": {
-      "active": 35,
-      "new_30d": 9,
-      "median_dom": 74,
-      "median_list": 675000,
-      "pct_reduced": 51,
-      "median_price_per_sqft": 315
+      "active": 34,
+      "new_30d": 8,
+      "median_dom": 81,
+      "median_list": 655000,
+      "pct_reduced": 56,
+      "median_price_per_sqft": 337
     },
     "Empire": {
       "active": 9,
       "new_30d": 2,
-      "median_dom": 173,
+      "median_dom": 176,
       "median_list": 695000,
       "pct_reduced": 44,
       "median_price_per_sqft": 334
@@ -416,63 +416,63 @@
     "Fowler": {
       "active": 5,
       "new_30d": 2,
-      "median_dom": 46,
+      "median_dom": 49,
       "median_list": 220000,
       "pct_reduced": 40,
       "median_price_per_sqft": 132
     },
     "Fraser": {
       "active": 58,
-      "new_30d": 14,
-      "median_dom": 104,
+      "new_30d": 15,
+      "median_dom": 102,
       "median_list": 899000,
-      "pct_reduced": 40,
+      "pct_reduced": 38,
       "median_price_per_sqft": 587
     },
     "Frisco": {
-      "active": 34,
-      "new_30d": 4,
-      "median_dom": 116,
-      "median_list": 1035000,
-      "pct_reduced": 62,
-      "median_price_per_sqft": 838
+      "active": 35,
+      "new_30d": 5,
+      "median_dom": 118,
+      "median_list": 975000,
+      "pct_reduced": 60,
+      "median_price_per_sqft": 829
     },
     "Golden": {
-      "active": 298,
-      "new_30d": 65,
-      "median_dom": 80,
-      "median_list": 799999,
-      "pct_reduced": 51,
-      "median_price_per_sqft": 374
+      "active": 290,
+      "new_30d": 70,
+      "median_dom": 77,
+      "median_list": 800000,
+      "pct_reduced": 50,
+      "median_price_per_sqft": 379
     },
     "Granby": {
-      "active": 118,
-      "new_30d": 7,
-      "median_dom": 157,
+      "active": 117,
+      "new_30d": 8,
+      "median_dom": 159,
       "median_list": 449000,
       "pct_reduced": 57,
-      "median_price_per_sqft": 455
+      "median_price_per_sqft": 449
     },
     "Grover": {
       "active": 7,
       "new_30d": 1,
-      "median_dom": 115,
+      "median_dom": 118,
       "median_list": 155900,
       "pct_reduced": 71,
       "median_price_per_sqft": null
     },
     "Guffey": {
-      "active": 40,
-      "new_30d": 2,
+      "active": 41,
+      "new_30d": 3,
       "median_dom": 143,
-      "median_list": 374400,
-      "pct_reduced": 48,
+      "median_list": 349900,
+      "pct_reduced": 46,
       "median_price_per_sqft": 427
     },
     "Haxtun": {
       "active": 9,
       "new_30d": 0,
-      "median_dom": 258,
+      "median_dom": 261,
       "median_list": 235000,
       "pct_reduced": 67,
       "median_price_per_sqft": 159
@@ -480,7 +480,7 @@
     "Hooper": {
       "active": 9,
       "new_30d": 2,
-      "median_dom": 856,
+      "median_dom": 859,
       "median_list": 69000,
       "pct_reduced": 67,
       "median_price_per_sqft": null
@@ -488,7 +488,7 @@
     "Howard": {
       "active": 15,
       "new_30d": 1,
-      "median_dom": 200,
+      "median_dom": 203,
       "median_list": 750000,
       "pct_reduced": 73,
       "median_price_per_sqft": 355
@@ -496,23 +496,23 @@
     "Hudson": {
       "active": 47,
       "new_30d": 3,
-      "median_dom": 129,
+      "median_dom": 132,
       "median_list": 735170,
-      "pct_reduced": 43,
+      "pct_reduced": 45,
       "median_price_per_sqft": 387
     },
     "Jaroso": {
-      "active": 12,
+      "active": 11,
       "new_30d": 0,
-      "median_dom": 230,
+      "median_dom": 233,
       "median_list": 6500,
-      "pct_reduced": 58,
+      "pct_reduced": 55,
       "median_price_per_sqft": null
     },
     "Kersey": {
       "active": 17,
-      "new_30d": 5,
-      "median_dom": 95,
+      "new_30d": 4,
+      "median_dom": 98,
       "median_list": 699000,
       "pct_reduced": 29,
       "median_price_per_sqft": 312
@@ -520,95 +520,95 @@
     "Mesita": {
       "active": 14,
       "new_30d": 8,
-      "median_dom": 9,
+      "median_dom": 12,
       "median_list": 6500,
       "pct_reduced": 14,
       "median_price_per_sqft": null
     },
     "Moffat": {
-      "active": 56,
-      "new_30d": 7,
-      "median_dom": 200,
-      "median_list": 54500,
-      "pct_reduced": 32,
+      "active": 55,
+      "new_30d": 5,
+      "median_dom": 203,
+      "median_list": 59000,
+      "pct_reduced": 31,
       "median_price_per_sqft": 186
     },
     "Molina": {
       "active": 7,
       "new_30d": 0,
-      "median_dom": 357,
-      "median_list": 937000,
+      "median_dom": 360,
+      "median_list": 897000,
       "pct_reduced": 100,
       "median_price_per_sqft": null
     },
     "Parker": {
-      "active": 637,
-      "new_30d": 146,
-      "median_dom": 63,
+      "active": 639,
+      "new_30d": 147,
+      "median_dom": 66,
       "median_list": 685000,
-      "pct_reduced": 59,
-      "median_price_per_sqft": 273
+      "pct_reduced": 62,
+      "median_price_per_sqft": 274
     },
     "Peyton": {
-      "active": 100,
-      "new_30d": 21,
-      "median_dom": 91,
-      "median_list": 617500,
-      "pct_reduced": 58,
-      "median_price_per_sqft": 214
+      "active": 101,
+      "new_30d": 24,
+      "median_dom": 90,
+      "median_list": 620000,
+      "pct_reduced": 57,
+      "median_price_per_sqft": 213
     },
     "Pierce": {
       "active": 19,
-      "new_30d": 3,
-      "median_dom": 102,
+      "new_30d": 4,
+      "median_dom": 105,
       "median_list": 339999,
-      "pct_reduced": 58,
+      "pct_reduced": 53,
       "median_price_per_sqft": 233
     },
     "Pueblo": {
-      "active": 204,
-      "new_30d": 36,
-      "median_dom": 101,
-      "median_list": 294950,
-      "pct_reduced": 42,
-      "median_price_per_sqft": 190
+      "active": 199,
+      "new_30d": 33,
+      "median_dom": 104,
+      "median_list": 295000,
+      "pct_reduced": 43,
+      "median_price_per_sqft": 192
     },
     "Roggen": {
       "active": 7,
       "new_30d": 0,
-      "median_dom": 108,
+      "median_dom": 111,
       "median_list": 495000,
       "pct_reduced": 43,
       "median_price_per_sqft": null
     },
     "Salida": {
-      "active": 251,
+      "active": 248,
       "new_30d": 35,
-      "median_dom": 122,
-      "median_list": 645000,
+      "median_dom": 123,
+      "median_list": 642000,
       "pct_reduced": 35,
       "median_price_per_sqft": 487
     },
     "Victor": {
       "active": 7,
       "new_30d": 1,
-      "median_dom": 59,
+      "median_dom": 62,
       "median_list": 260000,
       "pct_reduced": 29,
       "median_price_per_sqft": 226
     },
     "Walden": {
-      "active": 23,
-      "new_30d": 1,
-      "median_dom": 185,
-      "median_list": 349900,
-      "pct_reduced": 52,
-      "median_price_per_sqft": 156
+      "active": 22,
+      "new_30d": 0,
+      "median_dom": 193,
+      "median_list": 359450,
+      "pct_reduced": 50,
+      "median_price_per_sqft": 158
     },
     "Weston": {
       "active": 15,
       "new_30d": 1,
-      "median_dom": 196,
+      "median_dom": 199,
       "median_list": 249000,
       "pct_reduced": 33,
       "median_price_per_sqft": 243
@@ -616,127 +616,127 @@
     "Aguilar": {
       "active": 10,
       "new_30d": 0,
-      "median_dom": 134,
-      "median_list": 457500,
-      "pct_reduced": 50,
-      "median_price_per_sqft": 324
+      "median_dom": 137,
+      "median_list": 440000,
+      "pct_reduced": 60,
+      "median_price_per_sqft": 314
     },
     "Alamosa": {
       "active": 88,
-      "new_30d": 7,
-      "median_dom": 258,
+      "new_30d": 6,
+      "median_dom": 261,
       "median_list": 16949,
-      "pct_reduced": 31,
-      "median_price_per_sqft": 200
+      "pct_reduced": 32,
+      "median_price_per_sqft": 207
     },
     "Bellvue": {
-      "active": 72,
-      "new_30d": 6,
-      "median_dom": 162,
-      "median_list": 384500,
-      "pct_reduced": 57,
-      "median_price_per_sqft": 347
+      "active": 73,
+      "new_30d": 7,
+      "median_dom": 161,
+      "median_list": 370000,
+      "pct_reduced": 58,
+      "median_price_per_sqft": 346
     },
     "Bennett": {
-      "active": 136,
-      "new_30d": 33,
+      "active": 134,
+      "new_30d": 34,
       "median_dom": 68,
-      "median_list": 430000,
+      "median_list": 429950,
       "pct_reduced": 37,
-      "median_price_per_sqft": 250
+      "median_price_per_sqft": 253
     },
     "Boulder": {
-      "active": 853,
-      "new_30d": 160,
+      "active": 841,
+      "new_30d": 159,
       "median_dom": 81,
       "median_list": 950000,
       "pct_reduced": 46,
-      "median_price_per_sqft": 523
+      "median_price_per_sqft": 524
     },
     "Cascade": {
       "active": 12,
       "new_30d": 0,
-      "median_dom": 144,
+      "median_dom": 147,
       "median_list": 637500,
       "pct_reduced": 33,
       "median_price_per_sqft": 310
     },
     "Conifer": {
-      "active": 114,
-      "new_30d": 24,
-      "median_dom": 81,
-      "median_list": 749750,
-      "pct_reduced": 51,
+      "active": 116,
+      "new_30d": 25,
+      "median_dom": 84,
+      "median_list": 750000,
+      "pct_reduced": 53,
       "median_price_per_sqft": 385
     },
     "Cuchara": {
       "active": 7,
       "new_30d": 0,
-      "median_dom": 179,
+      "median_dom": 182,
       "median_list": 295000,
       "pct_reduced": 43,
       "median_price_per_sqft": 243
     },
     "Durango": {
-      "active": 5,
-      "new_30d": 3,
-      "median_dom": 11,
-      "median_list": 539000,
-      "pct_reduced": 20,
+      "active": 6,
+      "new_30d": 4,
+      "median_dom": 12,
+      "median_list": 487000,
+      "pct_reduced": 17,
       "median_price_per_sqft": null
     },
     "Fleming": {
-      "active": 7,
+      "active": 6,
       "new_30d": 0,
-      "median_dom": 134,
-      "median_list": 285000,
+      "median_dom": 162,
+      "median_list": 299750,
       "pct_reduced": 100,
-      "median_price_per_sqft": 142
+      "median_price_per_sqft": 152
     },
     "Galeton": {
       "active": 7,
       "new_30d": 2,
-      "median_dom": 47,
+      "median_dom": 50,
       "median_list": 445000,
       "pct_reduced": 29,
       "median_price_per_sqft": null
     },
     "Gardner": {
-      "active": 19,
+      "active": 18,
       "new_30d": 5,
-      "median_dom": 154,
-      "median_list": 325000,
-      "pct_reduced": 47,
+      "median_dom": 150,
+      "median_list": 252500,
+      "pct_reduced": 44,
       "median_price_per_sqft": 231
     },
     "Granite": {
       "active": 7,
       "new_30d": 1,
-      "median_dom": 115,
+      "median_dom": 118,
       "median_list": 299000,
       "pct_reduced": 29,
       "median_price_per_sqft": 320
     },
     "Greeley": {
-      "active": 574,
-      "new_30d": 143,
-      "median_dom": 67,
+      "active": 566,
+      "new_30d": 138,
+      "median_dom": 66,
       "median_list": 425000,
-      "pct_reduced": 47,
-      "median_price_per_sqft": 217
+      "pct_reduced": 48,
+      "median_price_per_sqft": 216
     },
     "Hartsel": {
-      "active": 393,
-      "new_30d": 27,
-      "median_dom": 181,
-      "median_list": 49500,
+      "active": 388,
+      "new_30d": 24,
+      "median_dom": 183,
+      "median_list": 48950,
       "pct_reduced": 45,
-      "median_price_per_sqft": 325
+      "median_price_per_sqft": 323
     },
     "Holyoke": {
       "active": 12,
       "new_30d": 0,
-      "median_dom": 167,
+      "median_dom": 170,
       "median_list": 372500,
       "pct_reduced": 58,
       "median_price_per_sqft": 174
@@ -744,55 +744,55 @@
     "La Jara": {
       "active": 11,
       "new_30d": 1,
-      "median_dom": 213,
+      "median_dom": 216,
       "median_list": 64000,
       "pct_reduced": 45,
       "median_price_per_sqft": null
     },
     "La Veta": {
       "active": 33,
-      "new_30d": 0,
-      "median_dom": 172,
+      "new_30d": 1,
+      "median_dom": 161,
       "median_list": 149900,
-      "pct_reduced": 36,
+      "pct_reduced": 33,
       "median_price_per_sqft": 250
     },
     "Laporte": {
-      "active": 17,
-      "new_30d": 3,
-      "median_dom": 139,
+      "active": 16,
+      "new_30d": 2,
+      "median_dom": 138,
       "median_list": 550000,
-      "pct_reduced": 71,
-      "median_price_per_sqft": 336
+      "pct_reduced": 69,
+      "median_price_per_sqft": 382
     },
     "Nathrop": {
-      "active": 44,
-      "new_30d": 8,
-      "median_dom": 131,
-      "median_list": 705000,
-      "pct_reduced": 68,
-      "median_price_per_sqft": 458
+      "active": 43,
+      "new_30d": 7,
+      "median_dom": 134,
+      "median_list": 725000,
+      "pct_reduced": 70,
+      "median_price_per_sqft": 456
     },
     "Orchard": {
       "active": 12,
       "new_30d": 1,
-      "median_dom": 157,
+      "median_dom": 160,
       "median_list": 287500,
       "pct_reduced": 50,
       "median_price_per_sqft": 262
     },
     "Penrose": {
-      "active": 21,
-      "new_30d": 3,
-      "median_dom": 120,
-      "median_list": 279000,
-      "pct_reduced": 43,
-      "median_price_per_sqft": 260
+      "active": 20,
+      "new_30d": 2,
+      "median_dom": 121,
+      "median_list": 337500,
+      "pct_reduced": 45,
+      "median_price_per_sqft": 266
     },
     "Rangely": {
       "active": 5,
       "new_30d": 0,
-      "median_dom": 128,
+      "median_dom": 131,
       "median_list": 174000,
       "pct_reduced": 40,
       "median_price_per_sqft": null
@@ -800,47 +800,47 @@
     "Sanford": {
       "active": 7,
       "new_30d": 1,
-      "median_dom": 168,
+      "median_dom": 171,
       "median_list": 13300,
       "pct_reduced": 29,
       "median_price_per_sqft": null
     },
     "Sedalia": {
-      "active": 65,
-      "new_30d": 6,
-      "median_dom": 157,
-      "median_list": 939000,
-      "pct_reduced": 51,
-      "median_price_per_sqft": 466
+      "active": 66,
+      "new_30d": 7,
+      "median_dom": 160,
+      "median_list": 919000,
+      "pct_reduced": 50,
+      "median_price_per_sqft": 461
     },
     "Shawnee": {
       "active": 7,
       "new_30d": 0,
-      "median_dom": 106,
+      "median_dom": 109,
       "median_list": 545000,
       "pct_reduced": 86,
       "median_price_per_sqft": 274
     },
     "Timnath": {
-      "active": 106,
-      "new_30d": 25,
+      "active": 107,
+      "new_30d": 27,
       "median_dom": 93,
-      "median_list": 694535,
-      "pct_reduced": 43,
-      "median_price_per_sqft": 275
+      "median_list": 689900,
+      "pct_reduced": 44,
+      "median_price_per_sqft": 279
     },
     "Watkins": {
-      "active": 62,
-      "new_30d": 9,
-      "median_dom": 104,
-      "median_list": 457500,
-      "pct_reduced": 65,
+      "active": 59,
+      "new_30d": 11,
+      "median_dom": 92,
+      "median_list": 455000,
+      "pct_reduced": 64,
       "median_price_per_sqft": 254
     },
     "Weldona": {
       "active": 18,
-      "new_30d": 2,
-      "median_dom": 90,
+      "new_30d": 1,
+      "median_dom": 93,
       "median_list": 217000,
       "pct_reduced": 50,
       "median_price_per_sqft": 303
@@ -848,31 +848,31 @@
     "Wetmore": {
       "active": 5,
       "new_30d": 1,
-      "median_dom": 97,
+      "median_dom": 100,
       "median_list": 870000,
       "pct_reduced": 40,
       "median_price_per_sqft": 277
     },
     "Wiggins": {
-      "active": 97,
-      "new_30d": 6,
-      "median_dom": 229,
-      "median_list": 250000,
-      "pct_reduced": 44,
-      "median_price_per_sqft": 258
+      "active": 94,
+      "new_30d": 5,
+      "median_dom": 232,
+      "median_list": 235735,
+      "pct_reduced": 43,
+      "median_price_per_sqft": 257
     },
     "Windsor": {
-      "active": 365,
-      "new_30d": 90,
-      "median_dom": 62,
+      "active": 353,
+      "new_30d": 88,
+      "median_dom": 64,
       "median_list": 595000,
-      "pct_reduced": 49,
-      "median_price_per_sqft": 259
+      "pct_reduced": 50,
+      "median_price_per_sqft": 257
     },
     "Antonito": {
       "active": 30,
       "new_30d": 5,
-      "median_dom": 118,
+      "median_dom": 121,
       "median_list": 342500,
       "pct_reduced": 40,
       "median_price_per_sqft": 220
@@ -880,31 +880,31 @@
     "Avondale": {
       "active": 8,
       "new_30d": 1,
-      "median_dom": 52,
+      "median_dom": 55,
       "median_list": 250000,
       "pct_reduced": 13,
       "median_price_per_sqft": null
     },
     "Berthoud": {
-      "active": 266,
-      "new_30d": 75,
-      "median_dom": 72,
-      "median_list": 632450,
+      "active": 257,
+      "new_30d": 77,
+      "median_dom": 74,
+      "median_list": 649990,
       "pct_reduced": 42,
-      "median_price_per_sqft": 306
+      "median_price_per_sqft": 309
     },
     "Brighton": {
-      "active": 360,
-      "new_30d": 83,
-      "median_dom": 74,
-      "median_list": 538000,
+      "active": 353,
+      "new_30d": 77,
+      "median_dom": 76,
+      "median_list": 535000,
       "pct_reduced": 59,
       "median_price_per_sqft": 258
     },
     "Coaldale": {
       "active": 8,
-      "new_30d": 1,
-      "median_dom": 61,
+      "new_30d": 0,
+      "median_dom": 64,
       "median_list": 524500,
       "pct_reduced": 38,
       "median_price_per_sqft": null
@@ -912,767 +912,751 @@
     "Collbran": {
       "active": 15,
       "new_30d": 1,
-      "median_dom": 175,
+      "median_dom": 178,
       "median_list": 370000,
       "pct_reduced": 53,
       "median_price_per_sqft": 330
     },
     "Cotopaxi": {
       "active": 113,
-      "new_30d": 13,
-      "median_dom": 153,
+      "new_30d": 11,
+      "median_dom": 156,
       "median_list": 124900,
-      "pct_reduced": 36,
-      "median_price_per_sqft": 313
+      "pct_reduced": 37,
+      "median_price_per_sqft": 304
     },
     "Crestone": {
-      "active": 171,
+      "active": 172,
       "new_30d": 18,
-      "median_dom": 154,
-      "median_list": 42000,
+      "median_dom": 157,
+      "median_list": 42250,
       "pct_reduced": 40,
       "median_price_per_sqft": 249
     },
     "Fairplay": {
-      "active": 210,
-      "new_30d": 21,
-      "median_dom": 152,
+      "active": 208,
+      "new_30d": 19,
+      "median_dom": 155,
       "median_list": 399000,
-      "pct_reduced": 55,
-      "median_price_per_sqft": 375
+      "pct_reduced": 56,
+      "median_price_per_sqft": 377
     },
     "Florence": {
       "active": 25,
       "new_30d": 4,
-      "median_dom": 89,
+      "median_dom": 92,
       "median_list": 335000,
-      "pct_reduced": 32,
+      "pct_reduced": 36,
       "median_price_per_sqft": 240
     },
     "Fountain": {
-      "active": 64,
+      "active": 63,
       "new_30d": 20,
-      "median_dom": 81,
-      "median_list": 392450,
-      "pct_reduced": 53,
+      "median_dom": 83,
+      "median_list": 395000,
+      "pct_reduced": 56,
       "median_price_per_sqft": 208
     },
     "Gilcrest": {
-      "active": 7,
-      "new_30d": 1,
-      "median_dom": 47,
-      "median_list": 290000,
-      "pct_reduced": 43,
+      "active": 6,
+      "new_30d": 0,
+      "median_dom": 68,
+      "median_list": 252000,
+      "pct_reduced": 50,
       "median_price_per_sqft": null
     },
     "Gunnison": {
       "active": 5,
       "new_30d": 1,
-      "median_dom": 75,
+      "median_dom": 78,
       "median_list": 279000,
       "pct_reduced": 0,
       "median_price_per_sqft": null
     },
     "Keystone": {
-      "active": 46,
-      "new_30d": 7,
-      "median_dom": 86,
+      "active": 44,
+      "new_30d": 6,
+      "median_dom": 89,
       "median_list": 825000,
-      "pct_reduced": 43,
+      "pct_reduced": 45,
       "median_price_per_sqft": 809
     },
     "La Junta": {
       "active": 11,
       "new_30d": 0,
-      "median_dom": 153,
+      "median_dom": 156,
       "median_list": 131000,
-      "pct_reduced": 73,
-      "median_price_per_sqft": 117
+      "pct_reduced": 91,
+      "median_price_per_sqft": 114
     },
     "La Salle": {
       "active": 14,
       "new_30d": 2,
-      "median_dom": 93,
-      "median_list": 362400,
-      "pct_reduced": 50,
+      "median_dom": 96,
+      "median_list": 357450,
+      "pct_reduced": 57,
       "median_price_per_sqft": 234
     },
     "Lakewood": {
-      "active": 478,
-      "new_30d": 142,
-      "median_dom": 53,
-      "median_list": 532500,
-      "pct_reduced": 64,
+      "active": 472,
+      "new_30d": 141,
+      "median_dom": 55,
+      "median_list": 530000,
+      "pct_reduced": 65,
       "median_price_per_sqft": 296
     },
     "Larkspur": {
-      "active": 119,
-      "new_30d": 10,
-      "median_dom": 107,
-      "median_list": 625000,
+      "active": 120,
+      "new_30d": 12,
+      "median_dom": 109,
+      "median_list": 580000,
       "pct_reduced": 44,
-      "median_price_per_sqft": 315
+      "median_price_per_sqft": 322
     },
     "Lochbuie": {
-      "active": 29,
-      "new_30d": 8,
-      "median_dom": 60,
+      "active": 30,
+      "new_30d": 11,
+      "median_dom": 51,
       "median_list": 490000,
-      "pct_reduced": 62,
-      "median_price_per_sqft": 238
+      "pct_reduced": 53,
+      "median_price_per_sqft": 247
     },
     "Longmont": {
-      "active": 534,
-      "new_30d": 142,
-      "median_dom": 70,
+      "active": 538,
+      "new_30d": 147,
+      "median_dom": 71,
       "median_list": 550000,
       "pct_reduced": 50,
-      "median_price_per_sqft": 306
+      "median_price_per_sqft": 308
     },
     "Loveland": {
-      "active": 716,
-      "new_30d": 148,
-      "median_dom": 75,
-      "median_list": 509000,
-      "pct_reduced": 45,
-      "median_price_per_sqft": 282
+      "active": 704,
+      "new_30d": 146,
+      "median_dom": 77,
+      "median_list": 509899,
+      "pct_reduced": 46,
+      "median_price_per_sqft": 285
     },
     "Matheson": {
       "active": 6,
-      "new_30d": 2,
-      "median_dom": 65,
+      "new_30d": 1,
+      "median_dom": 68,
       "median_list": 234450,
       "pct_reduced": 67,
       "median_price_per_sqft": 287
     },
     "Milliken": {
       "active": 47,
-      "new_30d": 11,
-      "median_dom": 68,
+      "new_30d": 12,
+      "median_dom": 71,
       "median_list": 475000,
-      "pct_reduced": 55,
-      "median_price_per_sqft": 239
+      "pct_reduced": 53,
+      "median_price_per_sqft": 249
     },
     "Monument": {
-      "active": 131,
-      "new_30d": 23,
-      "median_dom": 82,
-      "median_list": 799715,
-      "pct_reduced": 63,
+      "active": 125,
+      "new_30d": 19,
+      "median_dom": 91,
+      "median_list": 799900,
+      "pct_reduced": 65,
       "median_price_per_sqft": 239
     },
     "Morrison": {
-      "active": 127,
-      "new_30d": 31,
-      "median_dom": 73,
-      "median_list": 769926,
+      "active": 124,
+      "new_30d": 29,
+      "median_dom": 72,
+      "median_list": 784463,
       "pct_reduced": 48,
       "median_price_per_sqft": 349
     },
     "Saguache": {
-      "active": 20,
-      "new_30d": 2,
-      "median_dom": 269,
-      "median_list": 192000,
-      "pct_reduced": 70,
+      "active": 21,
+      "new_30d": 3,
+      "median_dom": 248,
+      "median_list": 200000,
+      "pct_reduced": 67,
       "median_price_per_sqft": 276
     },
     "San Luis": {
       "active": 234,
       "new_30d": 16,
-      "median_dom": 143,
+      "median_dom": 146,
       "median_list": 15500,
       "pct_reduced": 23,
-      "median_price_per_sqft": 158
+      "median_price_per_sqft": 137
     },
     "Sterling": {
-      "active": 83,
-      "new_30d": 7,
-      "median_dom": 107,
+      "active": 81,
+      "new_30d": 5,
+      "median_dom": 112,
       "median_list": 249500,
       "pct_reduced": 54,
       "median_price_per_sqft": 184
     },
     "Superior": {
-      "active": 76,
-      "new_30d": 21,
-      "median_dom": 80,
+      "active": 73,
+      "new_30d": 20,
+      "median_dom": 83,
       "median_list": 750000,
-      "pct_reduced": 46,
-      "median_price_per_sqft": 368
+      "pct_reduced": 44,
+      "median_price_per_sqft": 367
     },
     "Thornton": {
-      "active": 413,
-      "new_30d": 121,
-      "median_dom": 51,
-      "median_list": 505870,
+      "active": 405,
+      "new_30d": 126,
+      "median_dom": 50,
+      "median_list": 505000,
       "pct_reduced": 57,
       "median_price_per_sqft": 273
     },
     "Trinidad": {
       "active": 80,
       "new_30d": 7,
-      "median_dom": 166,
+      "median_dom": 169,
       "median_list": 225000,
-      "pct_reduced": 43,
+      "pct_reduced": 44,
       "median_price_per_sqft": 152
     },
     "Del Norte": {
       "active": 9,
       "new_30d": 2,
-      "median_dom": 196,
+      "median_dom": 199,
       "median_list": 409000,
       "pct_reduced": 67,
       "median_price_per_sqft": 321
     },
     "Edgewater": {
       "active": 15,
-      "new_30d": 4,
-      "median_dom": 48,
+      "new_30d": 3,
+      "median_dom": 51,
       "median_list": 660000,
-      "pct_reduced": 53,
+      "pct_reduced": 60,
       "median_price_per_sqft": 428
     },
     "Elizabeth": {
-      "active": 234,
-      "new_30d": 49,
+      "active": 236,
+      "new_30d": 52,
       "median_dom": 96,
       "median_list": 576950,
       "pct_reduced": 44,
-      "median_price_per_sqft": 286
+      "median_price_per_sqft": 290
     },
     "Englewood": {
-      "active": 312,
-      "new_30d": 72,
-      "median_dom": 60,
-      "median_list": 558065,
-      "pct_reduced": 57,
-      "median_price_per_sqft": 321
+      "active": 305,
+      "new_30d": 70,
+      "median_dom": 63,
+      "median_list": 550000,
+      "pct_reduced": 60,
+      "median_price_per_sqft": 327
     },
     "Evergreen": {
-      "active": 300,
-      "new_30d": 52,
-      "median_dom": 88,
+      "active": 298,
+      "new_30d": 54,
+      "median_dom": 87,
       "median_list": 842000,
       "pct_reduced": 53,
-      "median_price_per_sqft": 388
+      "median_price_per_sqft": 389
     },
     "Firestone": {
-      "active": 106,
-      "new_30d": 20,
-      "median_dom": 62,
-      "median_list": 552997,
-      "pct_reduced": 60,
-      "median_price_per_sqft": 240
+      "active": 102,
+      "new_30d": 22,
+      "median_dom": 58,
+      "median_list": 557570,
+      "pct_reduced": 61,
+      "median_price_per_sqft": 230
     },
     "Franktown": {
-      "active": 78,
-      "new_30d": 11,
-      "median_dom": 102,
-      "median_list": 959750,
-      "pct_reduced": 44,
-      "median_price_per_sqft": 391
+      "active": 79,
+      "new_30d": 12,
+      "median_dom": 90,
+      "median_list": 995000,
+      "pct_reduced": 43,
+      "median_price_per_sqft": 386
     },
     "Frederick": {
       "active": 123,
-      "new_30d": 34,
-      "median_dom": 47,
+      "new_30d": 36,
+      "median_dom": 49,
       "median_list": 505000,
-      "pct_reduced": 53,
+      "pct_reduced": 51,
       "median_price_per_sqft": 253
     },
     "Henderson": {
       "active": 14,
       "new_30d": 5,
-      "median_dom": 61,
+      "median_dom": 64,
       "median_list": 497000,
-      "pct_reduced": 64,
+      "pct_reduced": 71,
       "median_price_per_sqft": 281
     },
     "Jamestown": {
       "active": 9,
       "new_30d": 1,
-      "median_dom": 97,
+      "median_dom": 100,
       "median_list": 469999,
       "pct_reduced": 56,
       "median_price_per_sqft": null
     },
     "Jefferson": {
       "active": 102,
-      "new_30d": 6,
-      "median_dom": 166,
-      "median_list": 150000,
-      "pct_reduced": 49,
-      "median_price_per_sqft": 323
+      "new_30d": 7,
+      "median_dom": 169,
+      "median_list": 152500,
+      "pct_reduced": 50,
+      "median_price_per_sqft": 324
     },
     "Johnstown": {
-      "active": 250,
-      "new_30d": 43,
-      "median_dom": 77,
-      "median_list": 494296,
+      "active": 253,
+      "new_30d": 46,
+      "median_dom": 78,
+      "median_list": 494900,
       "pct_reduced": 59,
-      "median_price_per_sqft": 244
+      "median_price_per_sqft": 240
     },
     "Julesburg": {
-      "active": 19,
-      "new_30d": 0,
-      "median_dom": 214,
-      "median_list": 199500,
-      "pct_reduced": 37,
-      "median_price_per_sqft": 118
+      "active": 20,
+      "new_30d": 1,
+      "median_dom": 182,
+      "median_list": 194500,
+      "pct_reduced": 35,
+      "median_price_per_sqft": 114
     },
     "Kremmling": {
-      "active": 53,
-      "new_30d": 4,
-      "median_dom": 161,
+      "active": 55,
+      "new_30d": 5,
+      "median_dom": 155,
       "median_list": 395000,
       "pct_reduced": 42,
-      "median_price_per_sqft": 304
+      "median_price_per_sqft": 312
     },
     "Lafayette": {
       "active": 123,
-      "new_30d": 28,
-      "median_dom": 60,
-      "median_list": 587000,
+      "new_30d": 29,
+      "median_dom": 62,
+      "median_list": 595000,
       "pct_reduced": 41,
       "median_price_per_sqft": 375
     },
     "Lake City": {
       "active": 7,
       "new_30d": 0,
-      "median_dom": 91,
+      "median_dom": 94,
       "median_list": 477000,
       "pct_reduced": 0,
       "median_price_per_sqft": 652
     },
     "Leadville": {
-      "active": 132,
-      "new_30d": 9,
-      "median_dom": 129,
-      "median_list": 398500,
+      "active": 129,
+      "new_30d": 8,
+      "median_dom": 132,
+      "median_list": 399000,
       "pct_reduced": 39,
-      "median_price_per_sqft": 401
+      "median_price_per_sqft": 399
     },
     "Littleton": {
-      "active": 904,
-      "new_30d": 219,
-      "median_dom": 67,
+      "active": 886,
+      "new_30d": 218,
+      "median_dom": 69,
       "median_list": 599000,
-      "pct_reduced": 59,
-      "median_price_per_sqft": 307
+      "pct_reduced": 60,
+      "median_price_per_sqft": 306
     },
     "Livermore": {
-      "active": 96,
+      "active": 99,
       "new_30d": 13,
-      "median_dom": 131,
+      "median_dom": 133,
       "median_list": 375000,
-      "pct_reduced": 41,
-      "median_price_per_sqft": 310
+      "pct_reduced": 40,
+      "median_price_per_sqft": 323
     },
     "Lone Tree": {
-      "active": 71,
-      "new_30d": 11,
-      "median_dom": 60,
+      "active": 69,
+      "new_30d": 12,
+      "median_dom": 61,
       "median_list": 842900,
-      "pct_reduced": 58,
-      "median_price_per_sqft": 308
+      "pct_reduced": 57,
+      "median_price_per_sqft": 309
     },
     "Nederland": {
-      "active": 71,
-      "new_30d": 11,
-      "median_dom": 112,
-      "median_list": 700000,
-      "pct_reduced": 38,
-      "median_price_per_sqft": 387
+      "active": 73,
+      "new_30d": 10,
+      "median_dom": 115,
+      "median_list": 695000,
+      "pct_reduced": 41,
+      "median_price_per_sqft": 405
     },
     "Oak Creek": {
-      "active": 8,
-      "new_30d": 1,
-      "median_dom": 39,
-      "median_list": 81500,
-      "pct_reduced": 13,
+      "active": 9,
+      "new_30d": 2,
+      "median_dom": 42,
+      "median_list": 78000,
+      "pct_reduced": 11,
       "median_price_per_sqft": null
     },
     "Parachute": {
       "active": 9,
       "new_30d": 0,
-      "median_dom": 1007,
+      "median_dom": 1010,
       "median_list": 350000,
       "pct_reduced": 33,
       "median_price_per_sqft": null
     },
     "Severance": {
-      "active": 93,
-      "new_30d": 17,
-      "median_dom": 70,
-      "median_list": 489900,
-      "pct_reduced": 57,
-      "median_price_per_sqft": 223
+      "active": 90,
+      "new_30d": 16,
+      "median_dom": 71,
+      "median_list": 488250,
+      "pct_reduced": 60,
+      "median_price_per_sqft": 226
     },
     "Strasburg": {
-      "active": 75,
-      "new_30d": 23,
-      "median_dom": 63,
-      "median_list": 459990,
-      "pct_reduced": 47,
-      "median_price_per_sqft": 247
+      "active": 74,
+      "new_30d": 22,
+      "median_dom": 64,
+      "median_list": 452495,
+      "pct_reduced": 51,
+      "median_price_per_sqft": 243
     },
     "Tabernash": {
-      "active": 14,
+      "active": 13,
       "new_30d": 1,
-      "median_dom": 168,
-      "median_list": 862000,
-      "pct_reduced": 64,
+      "median_dom": 164,
+      "median_list": 929000,
+      "pct_reduced": 62,
       "median_price_per_sqft": 508
     },
     "Allenspark": {
       "active": 21,
       "new_30d": 2,
-      "median_dom": 136,
+      "median_dom": 139,
       "median_list": 614000,
       "pct_reduced": 43,
       "median_price_per_sqft": 466
     },
     "Black Hawk": {
-      "active": 102,
+      "active": 100,
       "new_30d": 11,
-      "median_dom": 102,
+      "median_dom": 103,
       "median_list": 472000,
       "pct_reduced": 45,
       "median_price_per_sqft": 324
     },
-    "Blue River": {
-      "active": 5,
-      "new_30d": 2,
-      "median_dom": 32,
-      "median_list": 1670000,
-      "pct_reduced": 0,
-      "median_price_per_sqft": null
-    },
     "Briggsdale": {
       "active": 17,
       "new_30d": 1,
-      "median_dom": 70,
+      "median_dom": 73,
       "median_list": 488000,
       "pct_reduced": 47,
       "median_price_per_sqft": 272
     },
     "Broomfield": {
-      "active": 343,
-      "new_30d": 84,
-      "median_dom": 66,
+      "active": 335,
+      "new_30d": 76,
+      "median_dom": 70,
       "median_list": 585000,
-      "pct_reduced": 59,
-      "median_price_per_sqft": 299
+      "pct_reduced": 60,
+      "median_price_per_sqft": 300
     },
     "Burlington": {
       "active": 25,
       "new_30d": 2,
-      "median_dom": 131,
+      "median_dom": 146,
       "median_list": 325000,
-      "pct_reduced": 60,
+      "pct_reduced": 64,
       "median_price_per_sqft": 135
     },
     "Canon City": {
       "active": 69,
       "new_30d": 13,
-      "median_dom": 109,
+      "median_dom": 112,
       "median_list": 359000,
-      "pct_reduced": 45,
-      "median_price_per_sqft": 245
-    },
-    "Carbondale": {
-      "active": 5,
-      "new_30d": 1,
-      "median_dom": 39,
-      "median_list": 525000,
-      "pct_reduced": 20,
-      "median_price_per_sqft": null
+      "pct_reduced": 46,
+      "median_price_per_sqft": 247
     },
     "Centennial": {
-      "active": 287,
-      "new_30d": 91,
-      "median_dom": 46,
-      "median_list": 625000,
-      "pct_reduced": 59,
-      "median_price_per_sqft": 281
+      "active": 282,
+      "new_30d": 94,
+      "median_dom": 48,
+      "median_list": 619500,
+      "pct_reduced": 60,
+      "median_price_per_sqft": 280
     },
     "Deer Trail": {
-      "active": 35,
+      "active": 34,
       "new_30d": 7,
       "median_dom": 117,
-      "median_list": 395000,
-      "pct_reduced": 40,
-      "median_price_per_sqft": 260
+      "median_list": 385000,
+      "pct_reduced": 38,
+      "median_price_per_sqft": 259
     },
     "Estes Park": {
-      "active": 190,
-      "new_30d": 23,
-      "median_dom": 96,
+      "active": 191,
+      "new_30d": 24,
+      "median_dom": 99,
       "median_list": 675000,
       "pct_reduced": 36,
-      "median_price_per_sqft": 389
+      "median_price_per_sqft": 388
     },
     "Florissant": {
-      "active": 147,
-      "new_30d": 14,
-      "median_dom": 136,
-      "median_list": 124750,
+      "active": 149,
+      "new_30d": 17,
+      "median_dom": 132,
+      "median_list": 129000,
       "pct_reduced": 43,
       "median_price_per_sqft": 310
     },
     "Georgetown": {
-      "active": 28,
+      "active": 25,
       "new_30d": 3,
-      "median_dom": 165,
-      "median_list": 382450,
-      "pct_reduced": 50,
-      "median_price_per_sqft": 427
+      "median_dom": 142,
+      "median_list": 375000,
+      "pct_reduced": 56,
+      "median_price_per_sqft": 412
     },
     "Glen Haven": {
-      "active": 20,
-      "new_30d": 4,
-      "median_dom": 130,
-      "median_list": 437000,
-      "pct_reduced": 55,
+      "active": 21,
+      "new_30d": 2,
+      "median_dom": 119,
+      "median_list": 475000,
+      "pct_reduced": 57,
       "median_price_per_sqft": 394
     },
     "Grand Lake": {
-      "active": 87,
-      "new_30d": 11,
-      "median_dom": 129,
-      "median_list": 529000,
-      "pct_reduced": 51,
+      "active": 84,
+      "new_30d": 9,
+      "median_dom": 132,
+      "median_list": 539500,
+      "pct_reduced": 54,
       "median_price_per_sqft": 435
     },
     "Keenesburg": {
       "active": 64,
-      "new_30d": 7,
-      "median_dom": 104,
+      "new_30d": 9,
+      "median_dom": 107,
       "median_list": 452000,
-      "pct_reduced": 45,
+      "pct_reduced": 47,
       "median_price_per_sqft": 283
     },
     "Louisville": {
-      "active": 88,
-      "new_30d": 17,
-      "median_dom": 96,
-      "median_list": 769000,
+      "active": 86,
+      "new_30d": 18,
+      "median_dom": 100,
+      "median_list": 767000,
       "pct_reduced": 58,
-      "median_price_per_sqft": 407
+      "median_price_per_sqft": 404
     },
     "New Castle": {
       "active": 9,
       "new_30d": 0,
-      "median_dom": 139,
-      "median_list": 854000,
+      "median_dom": 142,
+      "median_list": 849000,
       "pct_reduced": 67,
-      "median_price_per_sqft": 392
+      "median_price_per_sqft": 391
     },
     "Northglenn": {
-      "active": 55,
-      "new_30d": 21,
-      "median_dom": 36,
-      "median_list": 474995,
-      "pct_reduced": 55,
+      "active": 54,
+      "new_30d": 20,
+      "median_dom": 38,
+      "median_list": 472495,
+      "pct_reduced": 54,
       "median_price_per_sqft": 272
     },
     "San Acacio": {
       "active": 11,
       "new_30d": 0,
-      "median_dom": 143,
+      "median_dom": 146,
       "median_list": 7500,
       "pct_reduced": 18,
       "median_price_per_sqft": null
     },
     "South Fork": {
       "active": 27,
-      "new_30d": 6,
-      "median_dom": 173,
+      "new_30d": 4,
+      "median_dom": 176,
       "median_list": 175000,
       "pct_reduced": 30,
       "median_price_per_sqft": 339
     },
     "Twin Lakes": {
-      "active": 67,
-      "new_30d": 5,
-      "median_dom": 173,
-      "median_list": 189000,
+      "active": 68,
+      "new_30d": 6,
+      "median_dom": 175,
+      "median_list": 172000,
       "pct_reduced": 51,
       "median_price_per_sqft": 480
     },
     "Walsenburg": {
-      "active": 99,
-      "new_30d": 10,
-      "median_dom": 186,
-      "median_list": 60000,
-      "pct_reduced": 30,
-      "median_price_per_sqft": 224
+      "active": 94,
+      "new_30d": 9,
+      "median_dom": 177,
+      "median_list": 61000,
+      "pct_reduced": 31,
+      "median_price_per_sqft": 215
     },
     "Wellington": {
-      "active": 101,
-      "new_30d": 25,
-      "median_dom": 77,
-      "median_list": 499900,
-      "pct_reduced": 40,
-      "median_price_per_sqft": 269
+      "active": 98,
+      "new_30d": 28,
+      "median_dom": 72,
+      "median_list": 499950,
+      "pct_reduced": 38,
+      "median_price_per_sqft": 273
     },
     "Westcliffe": {
-      "active": 129,
+      "active": 127,
       "new_30d": 6,
-      "median_dom": 177,
+      "median_dom": 176,
       "median_list": 449900,
-      "pct_reduced": 56,
+      "pct_reduced": 54,
       "median_price_per_sqft": 278
     },
     "Buena Vista": {
-      "active": 224,
-      "new_30d": 20,
-      "median_dom": 171,
-      "median_list": 504750,
+      "active": 227,
+      "new_30d": 23,
+      "median_dom": 174,
+      "median_list": 515000,
       "pct_reduced": 41,
-      "median_price_per_sqft": 437
+      "median_price_per_sqft": 438
     },
     "Castle Rock": {
-      "active": 563,
-      "new_30d": 119,
+      "active": 560,
+      "new_30d": 126,
       "median_dom": 80,
-      "median_list": 745000,
-      "pct_reduced": 62,
-      "median_price_per_sqft": 275
+      "median_list": 749925,
+      "pct_reduced": 61,
+      "median_price_per_sqft": 273
     },
     "Fort Lupton": {
-      "active": 152,
+      "active": 149,
       "new_30d": 28,
-      "median_dom": 88,
-      "median_list": 477490,
-      "pct_reduced": 49,
-      "median_price_per_sqft": 272
+      "median_dom": 90,
+      "median_list": 470000,
+      "pct_reduced": 52,
+      "median_price_per_sqft": 275
     },
     "Fort Morgan": {
-      "active": 135,
-      "new_30d": 29,
+      "active": 133,
+      "new_30d": 27,
       "median_dom": 123,
-      "median_list": 339900,
-      "pct_reduced": 37,
-      "median_price_per_sqft": 180
+      "median_list": 335000,
+      "pct_reduced": 38,
+      "median_price_per_sqft": 182
     },
     "Lake George": {
       "active": 31,
       "new_30d": 2,
-      "median_dom": 153,
+      "median_dom": 156,
       "median_list": 475000,
       "pct_reduced": 58,
       "median_price_per_sqft": 355
     },
     "Monte Vista": {
-      "active": 11,
+      "active": 10,
       "new_30d": 2,
-      "median_dom": 110,
-      "median_list": 335000,
-      "pct_reduced": 64,
-      "median_price_per_sqft": 158
+      "median_dom": 100,
+      "median_list": 329950,
+      "pct_reduced": 60,
+      "median_price_per_sqft": 169
     },
     "Palmer Lake": {
-      "active": 17,
-      "new_30d": 4,
-      "median_dom": 123,
-      "median_list": 405000,
-      "pct_reduced": 29,
-      "median_price_per_sqft": 353
+      "active": 16,
+      "new_30d": 3,
+      "median_dom": 126,
+      "median_list": 390000,
+      "pct_reduced": 31,
+      "median_price_per_sqft": 312
     },
     "Platteville": {
-      "active": 34,
+      "active": 35,
       "new_30d": 5,
-      "median_dom": 96,
+      "median_dom": 101,
       "median_list": 385000,
-      "pct_reduced": 56,
-      "median_price_per_sqft": 311
+      "pct_reduced": 57,
+      "median_price_per_sqft": 308
     },
     "Pueblo West": {
-      "active": 38,
-      "new_30d": 12,
-      "median_dom": 50,
+      "active": 39,
+      "new_30d": 11,
+      "median_dom": 54,
       "median_list": 399000,
-      "pct_reduced": 34,
+      "pct_reduced": 36,
       "median_price_per_sqft": 217
     },
     "Villa Grove": {
       "active": 7,
       "new_30d": 1,
-      "median_dom": 80,
+      "median_dom": 83,
       "median_list": 395000,
       "pct_reduced": 43,
       "median_price_per_sqft": 330
     },
     "Westminster": {
-      "active": 339,
-      "new_30d": 107,
-      "median_dom": 53,
+      "active": 332,
+      "new_30d": 104,
+      "median_dom": 56,
       "median_list": 520000,
-      "pct_reduced": 54,
+      "pct_reduced": 56,
       "median_price_per_sqft": 283
     },
     "Wheat Ridge": {
-      "active": 117,
-      "new_30d": 30,
-      "median_dom": 49,
-      "median_list": 554500,
-      "pct_reduced": 56,
-      "median_price_per_sqft": 328
+      "active": 109,
+      "new_30d": 25,
+      "median_dom": 58,
+      "median_list": 550000,
+      "pct_reduced": 59,
+      "median_price_per_sqft": 335
     },
     "Winter Park": {
       "active": 47,
-      "new_30d": 7,
-      "median_dom": 104,
-      "median_list": 1299000,
+      "new_30d": 8,
+      "median_dom": 107,
+      "median_list": 1250000,
       "pct_reduced": 40,
       "median_price_per_sqft": 808
     },
     "Breckenridge": {
-      "active": 144,
-      "new_30d": 9,
-      "median_dom": 143,
-      "median_list": 1099998,
-      "pct_reduced": 53,
-      "median_price_per_sqft": 907
+      "active": 142,
+      "new_30d": 10,
+      "median_dom": 144,
+      "median_list": 1122500,
+      "pct_reduced": 51,
+      "median_price_per_sqft": 916
     },
     "Castle Pines": {
-      "active": 84,
+      "active": 79,
       "new_30d": 24,
       "median_dom": 63,
-      "median_list": 888500,
-      "pct_reduced": 63,
+      "median_list": 898000,
+      "pct_reduced": 62,
       "median_price_per_sqft": 297
     },
     "Central City": {
-      "active": 38,
+      "active": 37,
       "new_30d": 1,
-      "median_dom": 135,
-      "median_list": 277500,
-      "pct_reduced": 39,
-      "median_price_per_sqft": 308
+      "median_dom": 139,
+      "median_list": 280000,
+      "pct_reduced": 49,
+      "median_price_per_sqft": 305
     },
     "Fort Collins": {
-      "active": 1052,
-      "new_30d": 207,
-      "median_dom": 80,
-      "median_list": 500000,
+      "active": 1040,
+      "new_30d": 210,
+      "median_dom": 83,
+      "median_list": 499995,
       "pct_reduced": 47,
-      "median_price_per_sqft": 292
+      "median_price_per_sqft": 294
     },
     "Fort Garland": {
-      "active": 419,
-      "new_30d": 25,
-      "median_dom": 166,
+      "active": 414,
+      "new_30d": 16,
+      "median_dom": 168,
       "median_list": 16000,
-      "pct_reduced": 30,
+      "pct_reduced": 29,
       "median_price_per_sqft": 234
     },
     "Indian Hills": {
       "active": 16,
       "new_30d": 2,
-      "median_dom": 129,
+      "median_dom": 132,
       "median_list": 1375000,
       "pct_reduced": 44,
       "median_price_per_sqft": 508
@@ -1680,47 +1664,47 @@
     "Rollinsville": {
       "active": 7,
       "new_30d": 0,
-      "median_dom": 91,
+      "median_dom": 94,
       "median_list": 849000,
       "pct_reduced": 29,
       "median_price_per_sqft": null
     },
     "Silver Cliff": {
-      "active": 8,
+      "active": 7,
       "new_30d": 1,
-      "median_dom": 244,
-      "median_list": 410000,
-      "pct_reduced": 63,
-      "median_price_per_sqft": 287
+      "median_dom": 237,
+      "median_list": 374999,
+      "pct_reduced": 57,
+      "median_price_per_sqft": 276
     },
     "Silverthorne": {
-      "active": 94,
+      "active": 93,
       "new_30d": 16,
-      "median_dom": 118,
+      "median_dom": 122,
       "median_list": 899000,
-      "pct_reduced": 65,
-      "median_price_per_sqft": 579
+      "pct_reduced": 66,
+      "median_price_per_sqft": 577
     },
     "Colorado City": {
       "active": 25,
       "new_30d": 3,
-      "median_dom": 175,
+      "median_dom": 178,
       "median_list": 12000,
       "pct_reduced": 52,
       "median_price_per_sqft": null
     },
     "Commerce City": {
-      "active": 351,
+      "active": 349,
       "new_30d": 90,
-      "median_dom": 59,
-      "median_list": 506000,
-      "pct_reduced": 52,
-      "median_price_per_sqft": 246
+      "median_dom": 61,
+      "median_list": 500000,
+      "pct_reduced": 55,
+      "median_price_per_sqft": 245
     },
     "Crested Butte": {
       "active": 5,
       "new_30d": 0,
-      "median_dom": 142,
+      "median_dom": 145,
       "median_list": 825000,
       "pct_reduced": 40,
       "median_price_per_sqft": null
@@ -1728,39 +1712,39 @@
     "Cripple Creek": {
       "active": 90,
       "new_30d": 8,
-      "median_dom": 117,
+      "median_dom": 120,
       "median_list": 33750,
       "pct_reduced": 43,
-      "median_price_per_sqft": 271
+      "median_price_per_sqft": 272
     },
     "Idaho Springs": {
       "active": 109,
-      "new_30d": 8,
-      "median_dom": 135,
+      "new_30d": 9,
+      "median_dom": 134,
       "median_list": 80000,
-      "pct_reduced": 42,
-      "median_price_per_sqft": 340
+      "pct_reduced": 41,
+      "median_price_per_sqft": 337
     },
     "Woodland Park": {
       "active": 84,
-      "new_30d": 13,
-      "median_dom": 104,
-      "median_list": 554950,
+      "new_30d": 16,
+      "median_dom": 99,
+      "median_list": 569900,
       "pct_reduced": 50,
       "median_price_per_sqft": 287
     },
     "Grand Junction": {
       "active": 17,
-      "new_30d": 5,
-      "median_dom": 61,
+      "new_30d": 6,
+      "median_dom": 62,
       "median_list": 410000,
-      "pct_reduced": 53,
+      "pct_reduced": 47,
       "median_price_per_sqft": 273
     },
     "Pagosa Springs": {
       "active": 10,
       "new_30d": 0,
-      "median_dom": 123,
+      "median_dom": 126,
       "median_list": 1184900,
       "pct_reduced": 30,
       "median_price_per_sqft": 534
@@ -1768,79 +1752,71 @@
     "Poncha Springs": {
       "active": 90,
       "new_30d": 5,
-      "median_dom": 285,
+      "median_dom": 288,
       "median_list": 157000,
       "pct_reduced": 68,
       "median_price_per_sqft": 364
     },
     "Federal Heights": {
-      "active": 5,
-      "new_30d": 3,
-      "median_dom": 25,
-      "median_list": 385000,
-      "pct_reduced": 20,
+      "active": 7,
+      "new_30d": 5,
+      "median_dom": 20,
+      "median_list": 270000,
+      "pct_reduced": 14,
       "median_price_per_sqft": 268
     },
     "Highlands Ranch": {
       "active": 225,
-      "new_30d": 75,
+      "new_30d": 81,
       "median_dom": 46,
       "median_list": 679900,
-      "pct_reduced": 55,
-      "median_price_per_sqft": 297
+      "pct_reduced": 54,
+      "median_price_per_sqft": 299
     },
     "Manitou Springs": {
-      "active": 35,
+      "active": 34,
       "new_30d": 1,
-      "median_dom": 124,
-      "median_list": 200000,
-      "pct_reduced": 37,
-      "median_price_per_sqft": 407
+      "median_dom": 130,
+      "median_list": 175000,
+      "pct_reduced": 35,
+      "median_price_per_sqft": 411
     },
     "Colorado Springs": {
-      "active": 1093,
-      "new_30d": 217,
-      "median_dom": 74,
-      "median_list": 493000,
-      "pct_reduced": 57,
+      "active": 1085,
+      "new_30d": 221,
+      "median_dom": 75,
+      "median_list": 494000,
+      "pct_reduced": 56,
       "median_price_per_sqft": 236
     },
     "Glenwood Springs": {
       "active": 6,
       "new_30d": 1,
-      "median_dom": 146,
+      "median_dom": 149,
       "median_list": 979500,
       "pct_reduced": 50,
       "median_price_per_sqft": 424
     },
-    "Log Lane Village": {
-      "active": 5,
-      "new_30d": 2,
-      "median_dom": 112,
-      "median_list": 209900,
-      "pct_reduced": 60,
-      "median_price_per_sqft": 173
-    },
     "Greenwood Village": {
-      "active": 55,
+      "active": 54,
       "new_30d": 13,
-      "median_dom": 67,
-      "median_list": 1149000,
+      "median_dom": 70,
+      "median_list": 1087000,
       "pct_reduced": 44,
-      "median_price_per_sqft": 417
+      "median_price_per_sqft": 416
     },
     "Red Feather Lakes": {
-      "active": 117,
+      "active": 114,
       "new_30d": 13,
-      "median_dom": 122,
-      "median_list": 209900,
+      "median_dom": 125,
+      "median_list": 192450,
       "pct_reduced": 55,
-      "median_price_per_sqft": 314
+      "median_price_per_sqft": 316
     },
     "Steamboat Springs": {
       "active": 7,
       "new_30d": 4,
-      "median_dom": 18,
+      "median_dom": 21,
       "median_list": 1925000,
       "pct_reduced": 14,
       "median_price_per_sqft": 985
@@ -1848,7 +1824,7 @@
     "Hot Sulphur Springs": {
       "active": 19,
       "new_30d": 1,
-      "median_dom": 175,
+      "median_dom": 178,
       "median_list": 149000,
       "pct_reduced": 53,
       "median_price_per_sqft": 393
@@ -1856,7 +1832,7 @@
     "Mount Crested Butte": {
       "active": 17,
       "new_30d": 0,
-      "median_dom": 270,
+      "median_dom": 273,
       "median_list": 1946436,
       "pct_reduced": 47,
       "median_price_per_sqft": 1453
@@ -1864,18 +1840,18 @@
     "Sand Creek Township": {
       "active": 5,
       "new_30d": 0,
-      "median_dom": 140,
+      "median_dom": 143,
       "median_list": 107500,
       "pct_reduced": 60,
       "median_price_per_sqft": null
     },
     "Cherry Hills Village": {
-      "active": 37,
-      "new_30d": 9,
+      "active": 38,
+      "new_30d": 10,
       "median_dom": 45,
-      "median_list": 4569000,
-      "pct_reduced": 38,
-      "median_price_per_sqft": 649
+      "median_list": 4659500,
+      "pct_reduced": 37,
+      "median_price_per_sqft": 636
     }
   },
   "via": "hub",
