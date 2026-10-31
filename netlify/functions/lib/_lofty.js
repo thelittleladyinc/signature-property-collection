@@ -255,6 +255,13 @@ async function recordPush(store, result, formName, lead) {
 // submission (a lead held again replaces its earlier entry rather than adding
 // one). Nothing in this file ever posts one of these to Lofty: the drain reads
 // FAILED_PUSH_KEY only. Returns true when the record was written.
+// 2026-10-31: one queued lead's stable name, for lib/_lead-stuck.js (the alert
+// when a lead stays in this queue) and the drain's recoveredKeys: Netlify's own
+// submission id, else when it was queued and from which form. Never who.
+function queuedLeadKey(e) {
+  return e && e.submissionId ? `id:${e.submissionId}` : `${e && e.at}|${e && e.formName}`;
+}
+
 function heldKey(e) {
   return e && e.submissionId ? `id:${e.submissionId}` : `${e && e.at}|${e && e.formName}`;
 }
@@ -384,6 +391,9 @@ async function drainWithLease(store, apiKey, opts) {
   let consentHeld = 0;
   let heldForReview = 0;
   let leftForHub = 0;
+  // 2026-10-31: which queued leads Lofty accepted on this run, by queuedLeadKey,
+  // so lib/_lead-stuck.js can say "now delivered" with certainty.
+  const recoveredKeys = [];
   let i = 0;
   try {
     for (; i < queue.length; i++) {
@@ -428,6 +438,7 @@ async function drainWithLease(store, apiKey, opts) {
       if (viaHub) {
         const r = await replayViaHub(entry, { apiKey, store, deadline });
         recovered += r.recovered || 0;
+        if (r.recovered) recoveredKeys.push(queuedLeadKey(entry));
         deferred += r.deferred || 0;
         consentHeld += r.consentHeld || 0;
         heldForReview += r.heldForReview || 0;
@@ -470,6 +481,7 @@ async function drainWithLease(store, apiKey, opts) {
       const result = await postLead(lead, apiKey, { deadline });
       if (result.ok) {
         recovered += 1;
+        recoveredKeys.push(queuedLeadKey(entry));
         console.log(`Recovered a queued Lofty lead from "${entry.formName}" (${result.payloadShape} shape).`);
         const newId = leadIdFromResponse(result.responseBody);
         // The surviving contact: the one the lookup found, else the create's id.
@@ -490,7 +502,8 @@ async function drainWithLease(store, apiKey, opts) {
         const kept = await finishReplay(entry, lead, { identity, newId, target, apiKey, store, deadline, accepted: result });
         if (kept) { deferred += 1; remaining.push(kept); }
       } else {
-        remaining.push({ ...entry, lastRetryAt: new Date().toISOString(), ...result });
+        // retries (2026-10-31): replays that failed, for the stuck-lead alert.
+        remaining.push({ ...entry, lastRetryAt: new Date().toISOString(), ...result, retries: (Number(entry.retries) || 0) + 1 });
       }
     }
   } finally {
@@ -524,6 +537,7 @@ async function drainWithLease(store, apiKey, opts) {
     ...(deferred ? { deferred } : {}), ...(finished ? { finished } : {}),
     ...(heldForReview ? { heldForReview } : {}), ...(consentHeld ? { consentHeld } : {}),
     ...(leftForHub ? { leftForHub } : {}), ...(viaHub ? { viaHub: true } : {}),
+    ...(recoveredKeys.length ? { recoveredKeys } : {}),
   };
 }
 
@@ -571,7 +585,8 @@ async function replayViaHub(entry, ctx) {
       }
       return { keep: flagged };
     }
-    return { keep: { ...entry, lastRetryAt: new Date().toISOString(), ...result, hub: result.hub || entry.hub } };
+    return { keep: { ...entry, lastRetryAt: new Date().toISOString(), ...result, hub: result.hub || entry.hub,
+      retries: (Number(entry.retries) || 0) + 1 } };
   }
   const h = result.hub;
   console.log(`Recovered a queued Lofty lead from "${entry.formName}" through the hub (${h.status}).`);
@@ -698,6 +713,7 @@ module.exports = {
   postLead,
   recordPush,
   holdForManualReview,
+  queuedLeadKey,
   drainFailedPushes,
   queueDrainOff,
   REPLAY_TRIGGER_TAG,

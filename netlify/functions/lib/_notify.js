@@ -505,13 +505,16 @@ function alertIdempotencyKey(details) {
   return `lead-alert:${BRAND_SITE}:${form}:h${h}`;
 }
 
-async function postToHub(endpoint, body) {
+// timeoutMs (optional, 2026-10-31): a caller with a hard time limit (the queue
+// drain's stuck-lead alert, lib/_lead-stuck.js) asks for less than TIMEOUT_MS.
+async function postToHub(endpoint, body, timeoutMs) {
+  const limit = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.min(TIMEOUT_MS, timeoutMs) : TIMEOUT_MS;
   const res = await fetch(endpoint.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-hub-key": endpoint.key },
     body: JSON.stringify(body),
     redirect: "manual", // a redirect is refused: the key goes nowhere else
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(limit),
   });
   const text = await res.text().catch(() => "");
   let json = null;
@@ -537,6 +540,42 @@ function readHubAnswer(r) {
     hubStatus: r.httpStatus >= 300 && r.httpStatus < 400 ? "redirect_refused" : "http_error",
     ...(why ? { error: why } : {}),
   };
+}
+
+// Who the alerts go to: LEAD_ALERT_TO (comma list), else Christine's own inbox.
+function alertRecipients() {
+  const listed = (process.env.LEAD_ALERT_TO || DEFAULT_TO).split(",").map((s) => s.trim()).filter(Boolean);
+  return Array.from(new Set(listed.map(bareAddress).filter(Boolean))).slice(0, 10);
+}
+
+// 2026-10-31 (Christine: "do them all"): a short notice to her about the site
+// itself -- not a lead alert -- through the same hub path and to the same people
+// as the lead alert (kind "alert", LEAD_ALERT_TO, LEAD_ALERT_FROM with the same
+// fallback). Used by lib/_lead-stuck.js for a lead stuck in the Lofty retry queue.
+// The caller builds the subject and body; nothing here adds anything to them.
+// Never throws. opts.timeoutMs caps the one call (see postToHub).
+async function sendInternalAlert({ subject, html, idempotencyKey }, opts = {}) {
+  const endpoint = hubEndpoint(process.env);
+  if (!endpoint.url) return { attempted: false, ok: false, via: "hub", reason: endpoint.reason };
+  const to = alertRecipients();
+  if (!to.length) return { attempted: false, ok: false, via: "hub", reason: "LEAD_ALERT_TO has no valid address" };
+  const customFrom = String(process.env.LEAD_ALERT_FROM || "").trim();
+  const message = {
+    kind: "alert", to,
+    subject: String(subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 200),
+    html: String(html || ""),
+    idempotency_key: String(idempotencyKey || "").replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 200),
+  };
+  try {
+    let result = readHubAnswer(await postToHub(endpoint, customFrom ? { ...message, from: customFrom } : message, opts.timeoutMs));
+    if (customFrom && result.httpStatus === 400 && /^from /.test(result.error || "")) {
+      result = { ...readHubAnswer(await postToHub(endpoint, message, opts.timeoutMs)), fromFallback: true };
+    }
+    return { attempted: true, via: "hub", ...result };
+  } catch (err) {
+    return { attempted: true, via: "hub", ok: false, hubStatus: "no_answer",
+      error: err && err.name === "TimeoutError" ? "timed out" : String(err && err.message) };
+  }
 }
 
 // Emails Christine directly. Independent of Lofty entirely: this is the path
@@ -571,8 +610,7 @@ async function sendAlertEmailNow(details) {
     return { attempted: false, via: "hub", reason: endpoint.reason };
   }
 
-  const listed = (process.env.LEAD_ALERT_TO || DEFAULT_TO).split(",").map((s) => s.trim()).filter(Boolean);
-  const to = Array.from(new Set(listed.map(bareAddress).filter(Boolean))).slice(0, 10);
+  const to = alertRecipients();
   if (!to.length) {
     console.error("Lead alert email skipped: LEAD_ALERT_TO has no valid address.");
     return { attempted: false, via: "hub", reason: "LEAD_ALERT_TO has no valid address" };
@@ -618,6 +656,7 @@ async function sendAlertEmailNow(details) {
 
 module.exports = {
   BRAND_SITE,
+  BRAND_DOMAIN,
   LOFTY_BASE_URL,
   DEFAULT_TO,
   HUB_EMAIL_PATH,
@@ -633,4 +672,6 @@ module.exports = {
   describeTagShape,
   alertEmailHtml,
   sendLeadAlertEmail,
+  sendInternalAlert,
+  alertRecipients,
 };

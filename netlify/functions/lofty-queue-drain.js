@@ -42,6 +42,30 @@ const DRAIN_BUDGET_MS = 10000;
 
 const DIAG_STORE = "mls-listings";  // where submission-created.js queues them
 
+// 2026-10-31 (Christine: "do them all"): after the drain, with LEAD_STUCK_ALERT
+// exactly "on", lib/_lead-stuck.js emails her once about any queued lead Lofty
+// still has not accepted after LEAD_STUCK_ALERT_MINUTES (60), and once more when
+// it goes through. Off, it reads and sends nothing. It runs on every run -- also
+// when the drain is paused or has no Lofty key, which is exactly when a lead
+// waits -- and only inside STUCK_BUDGET_MS of the run, so the run still ends
+// inside the scheduler's 15 seconds. Its result never changes the drain's answer.
+const STUCK_BUDGET_MS = 13000;
+
+async function stuckCheck(getStore, getBlobStore, startedAt, drained) {
+  try {
+    const { checkStuckLeads, leadStuckAlertOn } = require("./lib/_lead-stuck");
+    if (!leadStuckAlertOn()) return;
+    const store = getBlobStore(getStore, DIAG_STORE);
+    const r = await checkStuckLeads(store, {
+      deadline: startedAt + STUCK_BUDGET_MS,
+      recoveredKeys: (drained && drained.recoveredKeys) || [],
+    });
+    console.log(`lofty-queue-drain: stuck-lead check ${JSON.stringify(r)}`);
+  } catch (err) {
+    console.error("lofty-queue-drain: stuck-lead check failed (the queue is untouched):", err && err.message);
+  }
+}
+
 function answer(statusCode, body) {
   return { statusCode, headers: { "Content-Type": "text/plain; charset=utf-8" }, body };
 }
@@ -60,12 +84,14 @@ exports.handler = async () => {
   }
   if (queueDrainOff()) {
     console.log("lofty-queue-drain: paused (LOFTY_QUEUE_DRAIN is off); the queue is kept as it is.");
+    await stuckCheck(getStore, getBlobStore, startedAt, null);
     return answer(200, "paused: LOFTY_QUEUE_DRAIN is off; the queue is kept as it is");
   }
   const apiKey = process.env.LOFTY_API_KEY;
   // 2026-10-26: with LOFTY_VIA_HUB=on the replay goes through the hub, not this key.
   if (!apiKey && !loftyViaHub()) {
     console.log("lofty-queue-drain: LOFTY_API_KEY not set — nothing to retry with.");
+    await stuckCheck(getStore, getBlobStore, startedAt, null);
     return answer(200, "no Lofty key configured");
   }
   try {
@@ -73,10 +99,12 @@ exports.handler = async () => {
     const result = await drainFailedPushes(store, apiKey, { deadline: startedAt + DRAIN_BUDGET_MS });
     console.log(`lofty-queue-drain: ${result.attempted || result.locked || result.deferred || result.finished
       ? JSON.stringify(result) : "nothing to replay"} (${Date.now() - startedAt} ms)`);
+    await stuckCheck(getStore, getBlobStore, startedAt, result);
     return answer(200, result.locked ? "skipped: another drain holds the lease" : "ok");
   } catch (err) {
     // Nothing is lost: the queue stays as it was for the next run.
     console.error("lofty-queue-drain failed (queue kept for the next run):", err && err.message);
+    await stuckCheck(getStore, getBlobStore, startedAt, null);
     return answer(200, "error logged");
   }
 };
