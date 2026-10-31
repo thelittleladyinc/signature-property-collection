@@ -55,6 +55,10 @@ const { checkMlsQuota } = require("./lib/_mls-usage");
 const { mlsSource, hubProblem, makeHubClient, gridListingsRefused, GRID_VIA_HUB_REFUSAL } = require("./lib/_mls-hub");
 const { cloudinaryDiagnostics } = require("./lib/_cloudinary");
 const { tagsFromLead, describeTagShape } = require("./lib/_notify");
+// 2026-10-31: the "Lofty retry queue" row (only with LEAD_STUCK_ALERT=on). It reads
+// the queue already loaded below and the stuck-lead record, both from Blobs: this
+// row makes no outbound call of any kind, on a plain load or with ?probe=1.
+const { leadStuckAlertOn, stuckMinutes, queueSummary, STUCK_ALERT_KEY } = require("./lib/_lead-stuck");
 // 2026-10-24: with LOFTY_VIA_HUB=on the two Lofty probes below go through the
 // Seller Intelligence hub (POST /v1/lofty/read: me, lead) -- this site's own key is
 // never sent (lib/_lofty-hub.js).
@@ -1557,6 +1561,33 @@ exports.handler = async (event) => {
   // the lead is captured three times over (the email, Netlify Forms, this
   // record); what it needs is Christine, in Lofty, by hand.
   const heldPublic = publicHeldLeads(loftyHeld);
+
+  // ---- Lofty retry queue (2026-10-31, only with LEAD_STUCK_ALERT=on) -------
+  // How many website leads wait in the retry queue and how long the oldest has
+  // waited; red once one has waited past LEAD_STUCK_ALERT_MINUTES (60). Counts,
+  // form names and times only -- never who: this page is public. Blobs reads only.
+  if (leadStuckAlertOn()) {
+    const minutes = stuckMinutes();
+    const q = queueSummary(loftyFailed, Date.now(), minutes);
+    const stuckRecord = await store.get(STUCK_ALERT_KEY, { type: "json" }).catch(() => null);
+    const alertedOpen = Object.values((stuckRecord && stuckRecord.alerted) || {})
+      .filter((r) => r && !r.resolvedAt).length;
+    checks.push({
+      name: "Lofty retry queue",
+      ok: q.stuck.length === 0,
+      detail: q.waiting === 0
+        ? `Empty: no website lead is waiting for Lofty.${q.acceptedStepsLeft ? ` ${q.acceptedStepsLeft} accepted by Lofty with follow-up steps left for the next run.` : ""}`
+        : `${q.waiting} website lead(s) waiting for Lofty; the oldest came in ${q.oldestMinutes} minute(s) ago (${q.oldestAt}).` +
+          (q.stuck.length
+            ? ` ${q.stuck.length} waited longer than ${minutes} minutes (form(s): ${[...new Set(q.stuck.map((e) => e.formName || "unknown"))].join(", ")}). ` +
+              "Check LOFTY_API_KEY in Netlify (or the Seller Intelligence hub's Lofty key when LOFTY_VIA_HUB is on). " +
+              "Each lead is kept and retried every 30 minutes, and is also in the Netlify Forms inbox."
+            : ` None has waited longer than ${minutes} minutes yet.`) +
+          (alertedOpen ? ` You were emailed about ${alertedOpen} of them.` : "") +
+          (stuckRecord && stuckRecord.lastProblem
+            ? ` The stuck-lead email could not be sent (${stuckRecord.lastProblem.reason}, ${stuckRecord.lastProblem.at}).` : ""),
+    });
+  }
   checks.push({
     name: "Leads held for identity review",
     ok: heldPublic.count === 0,
