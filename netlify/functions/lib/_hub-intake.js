@@ -11,6 +11,11 @@
 // the hub matches the person (the Lofty lead id first, then email, then phone)
 // and opens at most one review per person per 30 days.
 //
+// Which of them (Christine, 2026-10-31: start with ONE form so she sees a first
+// draft): WEBSITE_TO_HUB_INTAKE_FORMS, a comma list of free-home-valuation,
+// sellers-page-inquiry and home-lead (the homepage "value" choice). Unset or
+// blank = all three, as before. A list naming none of them sends nothing.
+//
 // What is sent: POST {HUB_API_URL}/v1/intake/website with header x-hub-key =
 // HUB_INTAKE_KEY -- a hub key that can only write intake, separate from
 // HUB_API_KEY (which sends the alert email). The visitor's name, email, phone and
@@ -27,6 +32,15 @@ const { propertyFromAddress } = require("./_lead-address");
 const INTAKE_PATH = "/v1/intake/website";
 const TIMEOUT_MS = 4000;
 const VALUE_FORMS = Object.freeze(["free-home-valuation", "sellers-page-inquiry"]);
+
+// The forms WEBSITE_TO_HUB_INTAKE_FORMS lets through: null = all (unset or blank),
+// else the Set of known names it lists (spaces and case forgiven; unknown names ignored).
+const FORM_KEYS = Object.freeze([...VALUE_FORMS, "home-lead"]);
+function allowedValueForms(env) {
+  const raw = String((env && env.WEBSITE_TO_HUB_INTAKE_FORMS) || "").trim();
+  if (!raw) return null;
+  return new Set(raw.split(",").map((x) => x.trim().toLowerCase()).filter((x) => FORM_KEYS.includes(x)));
+}
 
 // The switch: exactly "on" (spaces and case forgiven), anything else is off.
 function hubIntakeOn(env) {
@@ -102,6 +116,8 @@ async function sendValueFormToHub(args, deps) {
     if (!hubIntakeOn(env)) return { attempted: false, reason: "WEBSITE_TO_HUB_INTAKE is off" };
     const form = valueForm(a.formName, a.data);
     if (!form) return { attempted: false, reason: "not a value form" };
+    const allowed = allowedValueForms(env);
+    if (allowed && !allowed.has(form.form_name)) return { attempted: false, reason: "not on WEBSITE_TO_HUB_INTAKE_FORMS" };
     const endpoint = intakeEndpoint(env);
     if (!endpoint.url) return { attempted: false, reason: endpoint.reason };
     const body = intakeBody(form, a.data, a);
@@ -127,4 +143,4 @@ async function sendValueFormToHub(args, deps) {
   }
 }
 
-module.exports = { INTAKE_PATH, VALUE_FORMS, hubIntakeOn, valueForm, intakeEndpoint, hubEndpoint, intakeBody, sendValueFormToHub };
+module.exports = { INTAKE_PATH, VALUE_FORMS, FORM_KEYS, allowedValueForms, hubIntakeOn, valueForm, intakeEndpoint, hubEndpoint, intakeBody, sendValueFormToHub };
