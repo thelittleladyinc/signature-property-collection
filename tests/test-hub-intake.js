@@ -200,6 +200,27 @@ const on = () => { process.env.WEBSITE_TO_HUB_INTAKE = "on"; process.env.HUB_INT
   check("a redirect is a failure, not followed", last().hubIntake.ok === false && last().hubIntake.httpStatus === 302 && w.intake.length === 1);
   check("the email alert still goes out through the hub's email route", w.other.some((u) => /\/v1\/email\/send$/.test(u)));
 
+  console.log("\n4b. One form first (WEBSITE_TO_HUB_INTAKE_FORMS, 2026-10-31)");
+  check("unset or blank = all three, as before", H.allowedValueForms({}) === null && H.allowedValueForms({ WEBSITE_TO_HUB_INTAKE_FORMS: "  " }) === null);
+  check("a list: the known names only (spaces and case forgiven)",
+    JSON.stringify([...H.allowedValueForms({ WEBSITE_TO_HUB_INTAKE_FORMS: " Free-Home-Valuation , cash-offer,home-lead" })]) === '["free-home-valuation","home-lead"]');
+  process.env.WEBSITE_TO_HUB_INTAKE_FORMS = "free-home-valuation";
+  try {
+    w = fakeWorld();
+    await submit(w, "free-home-valuation", { address: "123 Main St, Loveland, CO 80538" });
+    check("listed: free-home-valuation goes to the hub", w.intake.length === 1 && last().hubIntake.ok === true, JSON.stringify(last().hubIntake));
+    for (const [form, data] of [["sellers-page-inquiry", { address: "123 Main St" }], ["home-lead", { looking_to: "value", address: "123 Main St" }]]) {
+      w = fakeWorld();
+      await submit(w, form, data);
+      check(`not listed: ${form} makes no hub call, Lofty as before`, w.intake.length === 0 && Object.keys(w.leads).length === 1 &&
+        last().hubIntake.attempted === false && last().hubIntake.reason === "not on WEBSITE_TO_HUB_INTAKE_FORMS", JSON.stringify(last().hubIntake));
+    }
+    process.env.WEBSITE_TO_HUB_INTAKE_FORMS = "nonsense";
+    w = fakeWorld();
+    await submit(w, "free-home-valuation", { address: "123 Main St" });
+    check("a list naming none of the three sends nothing", w.intake.length === 0);
+  } finally { delete process.env.WEBSITE_TO_HUB_INTAKE_FORMS; }
+
   console.log(`\n5. Same module as the other site (${SIBLING})`);
   const other = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib", "_hub-intake.js");
   if (fs.existsSync(other)) {
