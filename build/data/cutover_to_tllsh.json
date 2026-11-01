@@ -6,7 +6,7 @@
     "extra_rules are pattern rules that are not pages (Netlify placeholders allowed). Each becomes a forced 301 like a page.",
     "Run docs/CUTOVER-RUNBOOK.md before activating a group. Group order is proposed by page type and should be re-ordered with Search Console data once the domain is verified."
   ],
-  "active_groups": [],
+  "active_groups": [4],
   "groups": {
     "1": {
       "name": "The moved blog posts and the blog index",
