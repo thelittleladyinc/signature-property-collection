@@ -22,3 +22,13 @@ This site shares `netlify/functions/lib/_lofty.js`, `_lofty-consent.js`, `_notif
 
 
 **Two /status rows that are not the site failing (2026-11-03; `tests/test-status-stale-rows.js`).** "Every listing Lofty reports is still on the MLS" is noted (ℹ️, optional), never a failure, when the sync hides a Lofty record the MLS says is off the market: the site is right to hide it and only Lofty support can correct the record (Nov 2: IRE1062804, Expired since Oct 25, still Active in Lofty, read both sites red on the hub's daily Connections check). "Your Lofty notification will fire" reports the LAST push only and is rewritten only by the next lead, so a push that went wrong (or was cut short) is red for 48 hours and then history: still shown, dated ("From the last lead, N day(s) ago"), optional. A fresh failure is red exactly as before; a good push never ages.
+
+## Fair housing / neighborhood copy
+
+Do not write housing marketing that expresses a preference for protected classes or family status.
+
+Avoid promotional phrases such as “family-friendly,” “great place to raise a family,” “safe and nurturing,” or describing who “typically moves here” by age, family composition, religion, race, ethnicity, disability, or other protected traits.
+
+Objective information may be presented neutrally when it is accurate and relevant. For schools, name the district or objective program information and encourage buyers with specific needs to confirm current offerings directly. Do not characterize schools as “excellent,” “best,” or otherwise steer buyers based on school reputation.
+
+The multigenerational funnel must ask about **property features** (entrance, bedroom/bath placement, kitchen, ADU/guest house, walkout, land, etc.), not protected-class characteristics or who will live there.
