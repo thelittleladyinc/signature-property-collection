@@ -10598,7 +10598,7 @@ QUIZ_CITIES = [
      "priorities": ["new-build", "schools"],
      "lifestyle": ["golf-lake", "small-town"],
      "blurb": "Windsor centers on its own lake and a fast-growing downtown, with "
-              "new-build communities that suit families well."},
+              "a lot of new-build inventory."},
     {"name": "Timnath", "url": "/communities/larimer/timnath.html",
      "views": ["farmland", "lake"], "commute": "moderate",
      "priorities": ["new-build", "schools"],
@@ -10635,9 +10635,8 @@ QUIZ_CITIES = [
      "views": ["farmland"], "commute": "far",
      "priorities": ["schools", "acreage"],
      "lifestyle": ["small-town"],
-     "blurb": "Eaton is a welcoming agricultural town just north of Greeley, known "
-              "for strong schools and a genuine small-town, family-first pace of "
-              "life."},
+     "blurb": "Eaton is an agricultural town just north of Greeley with its own "
+              "school district and a small-town pace."},
     {"name": "Johnstown", "url": "/communities/weld/johnstown.html", "photo": "johnstown",
      "views": ["farmland"], "commute": "moderate",
      "priorities": ["new-build", "schools"],
@@ -10656,8 +10655,8 @@ QUIZ_CITIES = [
      "views": ["mountain", "farmland"], "commute": "moderate",
      "priorities": ["new-build", "schools"],
      "lifestyle": ["small-town", "hiking-mountain"],
-     "blurb": "Firestone pairs real mountain views with family-friendly new-build "
-              "communities, parks, and trails — closer to Longmont and Denver than "
+     "blurb": "Firestone pairs mountain views with new-build communities, parks, "
+              "and trails — closer to Longmont and Denver than "
               "most of Weld County."},
     {"name": "Frederick", "url": "/communities/weld/frederick.html",
      "views": ["farmland"], "commute": "moderate",
@@ -10713,7 +10712,7 @@ QUIZ_QUESTIONS = [
     {
         "key": "q3", "prompt": "What matters most in your next neighborhood?",
         "options": [
-            {"label": "Top-rated schools & family amenities", "priorities": ["schools"]},
+            {"label": "A specific school district (I'll confirm the address boundary)", "priorities": ["schools"]},
             {"label": "Privacy, acreage, and room to spread out", "priorities": ["acreage"]},
             {"label": "Walkability — restaurants and shops nearby", "priorities": ["walkable"]},
             {"label": "A newer build with modern HOA amenities", "priorities": ["new-build"]},
@@ -12060,7 +12059,7 @@ def build_nav_pages():
     # ---- Lifestyle Search ----
     lifestyles = [
         ("Luxury Homes", "Estate properties, custom finishes, and premier locations across the Front Range.", "/guides/best-places-to-retire-in-northern-colorado.html"),
-        ("Family-Friendly", "Top school districts, parks, and neighborhoods built for growing families.", "/communities/index.html"),
+        ("Parks & Room To Grow", "Bigger yards, parks and trails nearby, and newer subdivisions with space.", "/communities/index.html"),
         ("Urban Convenience", "Walkable Old Town living in Fort Collins, Loveland, and Boulder.", "/communities/larimer.html"),
         ("Acreage Homes", "Land, privacy, and mountain views in Masonville, Berthoud, and beyond.", "/guides/cost-to-develop-raw-land-colorado.html"),
         ("Small-Town Charm", "Quiet, close-knit communities from Wellington to Milliken.", "/communities/weld.html"),
@@ -12094,7 +12093,7 @@ def build_nav_pages():
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Lifestyle Search", None)])
     page(
         "Northern Colorado Lifestyle Home Search | Signature Property Collection",
-        "Explore Northern Colorado homes by lifestyle — luxury, family-friendly, urban, "
+        "Explore Northern Colorado homes by lifestyle — luxury, bigger yards, urban, "
         "acreage, small-town, and farm & ranch properties.",
         "/lifestyle-search.html", None, body, schema_extra=[breadcrumbs],
     )
