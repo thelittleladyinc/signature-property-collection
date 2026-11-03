@@ -312,7 +312,12 @@ function loftyListingRows(state, mineListings, now, alertCount, gridState) {
   // sync (lib/_lofty-listings.js confirmOnMarket) and named here, because the
   // fix for it lives with Lofty support, not on this site.
   const hidden = state && Array.isArray(state.hiddenOffMarket) ? state.hiddenOffMarket : [];
+  // 2026-11-03: a hidden listing is this site doing the right thing (the Lofty
+  // record is wrong, and only Lofty support can correct it), so it is noted
+  // (ℹ️), not counted as the site failing: the hub's daily Connections check
+  // read both sites red for one expired listing Lofty still reported as Active.
   rows.push({
+    optional: hidden.length > 0,
     name: "Every listing Lofty reports is still on the MLS",
     ok: hidden.length === 0,
     detail: hidden.length
@@ -1998,19 +2003,34 @@ exports.handler = async (event) => {
       ? `Their home search (${(inquiryStep.fields || []).join(", ")}) set on the new contact in Lofty ✓.`
       : `Their home search was NOT set on the contact (${inquiryStep.httpStatus || inquiryStep.error || "unknown"}) — it is in the note.`);
   }
+  const notifyOk = (stoppedEarly || returningUnconfirmed) ? false
+    : returningHandled ? (!!(note && note.ok) && !!returning.ok)
+    : leadMerged ? false
+    : (!note || !note.attempted) ? true
+    : (!!note.ok && (!tag || !tag.attempted || (tag.ok && tag.tagRestored !== false)));
+  // 2026-11-03: this row reports the LAST push only, and nothing rewrites the
+  // record until the next lead, so one push that went wrong (or was cut short)
+  // kept the row red for days after Christine had checked the contact, and the
+  // hub's daily Connections check counted the site as failing. After
+  // STALE_PUSH_MS a failed record is history: still shown, dated, no longer a
+  // failure. A fresh failure is red exactly as before.
+  const STALE_PUSH_MS = 48 * 60 * 60 * 1000;
+  const pushAt = loftyLast && loftyLast.at ? Date.parse(String(loftyLast.at)) : NaN;
+  const pushAgeMs = Number.isFinite(pushAt) ? Date.now() - pushAt : NaN;
+  const stalePush = !notifyOk && Number.isFinite(pushAgeMs) && pushAgeMs > STALE_PUSH_MS;
+  const staleNote = stalePush
+    ? `From the last lead, ${Math.floor(pushAgeMs / 86400e3)} day(s) ago (${String(loftyLast.at).slice(0, 10)}); ` +
+      "no lead has come in since, so this is history, not a live fault. The next lead rewrites this row. "
+    : "";
   checks.push({
     // Named for what she cares about, not for the mechanism: this row is the
     // primary notification path now that the tag genuinely changes.
-    optional: leadMerged && !returningHandled,
+    optional: (leadMerged && !returningHandled) || stalePush,
     name: leadMerged && !returningHandled
       ? "Lofty note on your last lead (it merged — expected)"
       : "Your Lofty notification will fire",
-    ok: (stoppedEarly || returningUnconfirmed) ? false
-      : returningHandled ? (!!(note && note.ok) && !!returning.ok)
-      : leadMerged ? false
-      : (!note || !note.attempted) ? true
-      : (!!note.ok && (!tag || !tag.attempted || (tag.ok && tag.tagRestored !== false))),
-    detail: parts.join(" ") + (leadMerged || returningHandled ? "" :
+    ok: notifyOk,
+    detail: staleNote + parts.join(" ") + (leadMerged || returningHandled ? "" :
       " These are what make a lead that MERGED into an existing contact still show up — " +
       "the case that hid your own test submissions, because they used your account-owner email."),
   });
