@@ -27,6 +27,8 @@ const { makeOnMarketConfirmer, mlsGridMarketDataOn } = require("./sync-listings"
 // used to be waited out for 10 seconds inside that, so the refresh was cut off
 // with nothing said. Its own work now ends by here; what it has no time for is
 // named in the answer (cutShort) and done by the next run.
+const { statusAccess } = require("./lib/_status-key");
+
 const MANUAL_RUN_MS = 8000;
 
 function json(statusCode, body) {
@@ -41,6 +43,9 @@ exports.handler = async (event) => {
   if (!event || event.httpMethod !== "POST") {
     return json(405, { error: "POST to refresh Christine's listings from Lofty now." });
   }
+  // 2026-11-03: with STATUS_KEY set, only the key may start a refresh (lib/_status-key.js).
+  const access = statusAccess(event);
+  if (!access.ok) return json(401, { error: `Not refreshed: ${access.why}.` });
   if (LISTINGS_SOURCE !== "lofty") {
     return json(409, { error: "Listings come from MLS Grid on this site (LISTINGS_SOURCE=mlsgrid)." });
   }

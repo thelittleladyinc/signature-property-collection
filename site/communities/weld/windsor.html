@@ -1894,10 +1894,12 @@ window.__ytPlay = function (b) {
       <input type="hidden" name="inquiry_type" id="li-kind">
       <textarea name="message" placeholder="Your message (optional)" rows="3"></textarea>
       <label class="consent">
-        <input type="checkbox" required>
-        I agree to receive marketing communication via call, text, or similar automated
-        means from Signature Property Collection. Consent is not a condition of purchase. Msg/data rates
-        may apply. Reply STOP to unsubscribe.
+        <input type="checkbox" name="terms_agree" value="yes" required>
+        By checking this box, I agree to the <a href="/terms-of-service.html">Terms of Service</a> and <a href="/privacy-policy.html">Privacy Policy</a> of this website.
+      </label>
+      <label class="consent">
+        <input type="checkbox" name="sms_consent" value="yes">
+        By checking this box, I agree to receive transactional and informational SMS communications, including appointment reminders, property updates, and account notifications from Little Lady. Message frequency varies. Message and data rates may apply. Reply HELP for help or STOP to opt out.
       </label>
       <button class="btn btn-dark" type="submit">Send My Message</button>
     </form>
@@ -1920,10 +1922,12 @@ window.__ytPlay = function (b) {
       <input type="hidden" name="alert_query" id="al-query">
       <textarea name="message" placeholder="Anything else you're looking for? (optional)" rows="3"></textarea>
       <label class="consent">
-        <input type="checkbox" required>
-        I agree to receive marketing communication via call, text, or similar automated
-        means from Signature Property Collection. Consent is not a condition of purchase. Msg/data rates
-        may apply. Reply STOP to unsubscribe.
+        <input type="checkbox" name="terms_agree" value="yes" required>
+        By checking this box, I agree to the <a href="/terms-of-service.html">Terms of Service</a> and <a href="/privacy-policy.html">Privacy Policy</a> of this website.
+      </label>
+      <label class="consent">
+        <input type="checkbox" name="sms_consent" value="yes">
+        By checking this box, I agree to receive transactional and informational SMS communications, including appointment reminders, property updates, and account notifications from Little Lady. Message frequency varies. Message and data rates may apply. Reply HELP for help or STOP to opt out.
       </label>
       <button class="btn btn-dark" type="submit">Set Up My Alerts</button>
     </form>
@@ -3098,10 +3102,12 @@ window.__ytPlay = function (b) {
       <input type="hidden" name="quiz_match" id="quiz-match-field">
       <input type="hidden" name="quiz_answers" id="quiz-answers-field">
       <label class="consent">
-        <input type="checkbox" required>
-        I agree to receive marketing communication via call, text, or similar automated
-        means from Signature Property Collection. Consent is not a condition of purchase. Msg/data rates
-        may apply. Reply STOP to unsubscribe.
+        <input type="checkbox" name="terms_agree" value="yes" required>
+        By checking this box, I agree to the <a href="/terms-of-service.html">Terms of Service</a> and <a href="/privacy-policy.html">Privacy Policy</a> of this website.
+      </label>
+      <label class="consent">
+        <input type="checkbox" name="sms_consent" value="yes">
+        By checking this box, I agree to receive transactional and informational SMS communications, including appointment reminders, property updates, and account notifications from Little Lady. Message frequency varies. Message and data rates may apply. Reply HELP for help or STOP to opt out.
       </label>
       <button class="btn btn-dark" type="submit">Get My Full Match Report</button>
     </form>
@@ -3186,6 +3192,7 @@ window.__ytPlay = function (b) {
     <div class="footer-bottom">
       <span>&copy; 2026 Signature Property Collection &middot; Christine Gwinnup, LPT Realty &middot; CO License #100090441. All information deemed reliable but not guaranteed.
       &middot; <a href="/privacy-policy.html" style="text-decoration:underline">Privacy Policy</a>
+      &middot; <a href="/terms-of-service.html" style="text-decoration:underline">Terms of Service</a>
       &middot; <a href="/accessibility.html" style="text-decoration:underline">Accessibility</a>
       &middot; <button type="button" class="qr-share-btn" onclick="var i=document.getElementById('qr-img');if(!i.src)i.src=i.dataset.src;document.getElementById('qr-overlay').classList.add('open');document.getElementById('qr-close-btn').focus()">Share This Page (QR Code)</button></span>
     </div>

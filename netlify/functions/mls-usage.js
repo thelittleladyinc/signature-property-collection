@@ -21,6 +21,7 @@
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
 const { checkMlsQuota, RETENTION_HOURS } = require("./lib/_mls-usage");
+const { statusAccess } = require("./lib/_status-key");
 
 const BLOB_STORE_NAME = "mls-listings";
 
@@ -32,6 +33,15 @@ function pct(used, budget) {
 
 exports.handler = async (event) => {
   const params = (event && event.queryStringParameters) || {};
+  // 2026-11-03: with STATUS_KEY set, this page needs the key (lib/_status-key.js).
+  const access = statusAccess(event);
+  if (!access.ok) {
+    return {
+      statusCode: 401,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      body: JSON.stringify({ error: `Not shown: ${access.why}.` }, null, 2),
+    };
+  }
   try {
     const store = getBlobStore(getStore, BLOB_STORE_NAME);
     const q = await checkMlsQuota(store, { full: true });

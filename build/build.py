@@ -56,6 +56,49 @@ def _load_json(name):
 CITY_CONTENT = _load_json("city_content.json")
 GUIDES = _load_json("guides.json")
 LEGAL = _load_json("legal.json")
+
+# 2026-11-03 (10DLC). Lofty's compliance team wrote that carriers review the real
+# sign-up form, which must carry exactly two checkboxes in exactly this wording:
+# a REQUIRED Terms of Service / Privacy Policy box, then an OPTIONAL, unticked SMS
+# box. Until today every form on this site had one unnamed, required "marketing
+# communication" box, which reached nobody (an unnamed input is never submitted)
+# and could not be a free yes to texts (it was required). These are the same two
+# strings as The Little Lady site's build/build.py and this site's
+# netlify/functions/submission-created.js (SMS_CONSENT_TEXT); the note on the
+# Lofty lead records the SMS sentence. tests/test-consent-boxes.js checks every
+# form, the generator and the committed pages agree, character for character.
+CONSENT_TERMS_TEXT = ("By checking this box, I agree to the Terms of Service and "
+                      "Privacy Policy of this website.")
+CONSENT_SMS_TEXT = ("By checking this box, I agree to receive transactional and "
+                    "informational SMS communications, including appointment "
+                    "reminders, property updates, and account notifications from "
+                    "Little Lady. Message frequency varies. Message and data rates "
+                    "may apply. Reply HELP for help or STOP to opt out.")
+
+
+def consent_boxes_html():
+    """The required Terms/Privacy box, then the optional SMS box.
+
+    Same <label class="consent"> pattern for both, so they style as a pair. The
+    caller's own indentation (six spaces inside a form) is baked in because the
+    committed pages are diffed against this output. The SMS box is deliberately
+    NOT `required` and NOT `checked`; the Terms box is `required`. Each sentence
+    sits on one source line so a plain-text search finds it whole.
+    """
+    terms = CONSENT_TERMS_TEXT.replace(
+        "Terms of Service", '<a href="/terms-of-service.html">Terms of Service</a>'
+    ).replace(
+        "Privacy Policy", '<a href="/privacy-policy.html">Privacy Policy</a>')
+    return (
+        '<label class="consent">\n'
+        '        <input type="checkbox" name="terms_agree" value="yes" required>\n'
+        f'        {terms}\n'
+        '      </label>\n'
+        '      <label class="consent">\n'
+        '        <input type="checkbox" name="sms_consent" value="yes">\n'
+        f'        {CONSENT_SMS_TEXT}\n'
+        '      </label>'
+    )
 BLOG = _load_json("blog.json")  # 60 posts migrated from the live site's blog
 
 # Christine's past sales, plotted on /sold-homes-map.html. A video is
@@ -3869,6 +3912,7 @@ CROSS_BRAND_CANONICAL_TO_TLLSH = frozenset([
     # 99% and 95% textually identical on 2026-08-23 audit. Cross-canonicalize
     # so ranking signals consolidate onto one URL.
     "/privacy-policy.html",
+    "/terms-of-service.html",
     "/accessibility.html",
 ])
 
@@ -4233,6 +4277,7 @@ def footer_html():
     <div class="footer-bottom">
       <span>&copy; 2026 {SITE['name']} &middot; {SITE['agent']}, {SITE['brokerage']} &middot; {SITE['license']}. All information deemed reliable but not guaranteed.
       &middot; <a href="/privacy-policy.html" style="text-decoration:underline">Privacy Policy</a>
+      &middot; <a href="/terms-of-service.html" style="text-decoration:underline">Terms of Service</a>
       &middot; <a href="/accessibility.html" style="text-decoration:underline">Accessibility</a>
       &middot; {_qr_share_button()}</span>
     </div>
@@ -4978,12 +5023,7 @@ def build_seller_local_proof():
       <input type="tel" name="phone" placeholder="Phone">
       <input type="text" name="address" placeholder="Your home's address" required>
       <input type="hidden" name="local_proof_town" id="spt-town-field" value="">
-      <label class="consent">
-        <input type="checkbox" required>
-        I agree to receive marketing communication via call, text, or similar automated
-        means from {SITE['name']}. Consent is not a condition of purchase. Msg/data rates
-        may apply. Reply STOP to unsubscribe.
-      </label>
+      {consent_boxes_html()}
       <button class="btn btn-dark" type="submit">Send Me My Local Proof</button>
     </form>
   </div>
@@ -7716,12 +7756,7 @@ def build_contact():
       <input type="email" name="email" placeholder="Email" required>
       <input type="tel" name="phone" placeholder="Phone" required>
       <textarea name="message" rows="5" placeholder="Comments, Questions?" required></textarea>
-      <label class="consent">
-        <input type="checkbox" required>
-        I agree to receive marketing communication via call, text, or similar automated
-        means from {SITE['name']}. Consent is not a condition of purchase. Msg/data rates
-        may apply. Reply STOP to unsubscribe.
-      </label>
+      {consent_boxes_html()}
       <button class="btn btn-dark" type="submit">Submit</button>
     </form>
     <div class="card">
@@ -7906,12 +7941,7 @@ def build_guides():
       <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email" required>
-      <label class="consent">
-        <input type="checkbox" required>
-        I agree to receive marketing communication via call, text, or similar automated
-        means from {SITE['name']}. Consent is not a condition of purchase. Msg/data rates
-        may apply. Reply STOP to unsubscribe.
-      </label>
+      {consent_boxes_html()}
       <button class="btn btn-dark" type="submit">Get Access To This Free Guide</button>
     </form>
   </div>
@@ -10541,12 +10571,7 @@ def _tool_lead_form(form_name, button_label, extra_fields=""):
       <input type="email" name="email" placeholder="Email" required>
       <input type="tel" name="phone" placeholder="Phone">
       {extra_fields}
-      <label class="consent">
-        <input type="checkbox" required>
-        I agree to receive marketing communication via call, text, or similar automated
-        means from {SITE['name']}. Consent is not a condition of purchase. Msg/data rates
-        may apply. Reply STOP to unsubscribe.
-      </label>
+      {consent_boxes_html()}
       <button class="btn btn-dark" type="submit">{esc(button_label)}</button>
     </form>"""
 
@@ -13540,6 +13565,18 @@ def build_legal():
              "How Signature Property Collection collects, uses, and protects your information.",
              "/privacy-policy.html", None, body)
 
+    # 2026-11-03: the required consent box links to it (consent_boxes_html).
+    if LEGAL.get("terms-of-service"):
+        body = f"""
+<section class="hero" style="padding:80px 0 50px"><div class="wrap"><h1>Terms of Service</h1></div></section>
+<section><div class="wrap" style="max-width:780px">
+    {_legal_body_html(LEGAL['terms-of-service'])}
+</div></section>
+"""
+        page("Terms of Service | Signature Property Collection",
+             "The terms that govern your use of signaturepropertycollection.com and the communications you opt in to.",
+             "/terms-of-service.html", None, body)
+
     if LEGAL.get("accessibility"):
         body = f"""
 <section class="hero" style="padding:80px 0 50px"><div class="wrap"><h1>Accessibility Statement</h1></div></section>
@@ -13919,7 +13956,7 @@ def build_redirects_and_meta():
     # sitemap
     paths = ["/index.html", "/communities/index.html", "/about.html", "/buyers.html",
              "/sellers.html", "/seller-local-proof.html", "/testimonials.html", "/contact.html",
-             "/privacy-policy.html", "/accessibility.html", "/thank-you.html",
+             "/privacy-policy.html", "/terms-of-service.html", "/accessibility.html", "/thank-you.html",
              "/guides/buyers-guide.html", "/guides/sellers-guide.html",
              RELOCATION_GUIDE_PATH]
     paths += [f"/communities/{c['slug']}.html" for c in COUNTIES]

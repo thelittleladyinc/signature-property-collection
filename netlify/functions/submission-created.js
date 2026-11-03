@@ -63,7 +63,7 @@
 const { getStore } = require("@netlify/blobs");
 const { getBlobStore } = require("./lib/_mls-shared");
 const { postLead, recordPush } = require("./lib/_lofty");
-const { applyTextingPreference } = require("./lib/_lofty-consent");
+const { smsConsentFromForm, applyTextingPreference } = require("./lib/_lofty-consent");
 const { addLoftyNote, refireLoftyTag, addPlanTags, sendLeadAlertEmail } = require("./lib/_notify");
 const { planForSubmission, valueReviewPlanOn, VALUE_REVIEW_SENT_TAG, interestFor, WEBSITE_SOURCE } = require("./lib/_form-plans");
 const { sendValueFormToHub } = require("./lib/_hub-intake");
@@ -143,6 +143,28 @@ const SOURCE_LABELS = {
 // email always goes out inside the function's time limit.
 const CREATE_DEADLINE_MS = 7000;
 
+// 2026-11-03 (10DLC, this site): the two checkbox sentences every lead form on this
+// site now carries, character for character (Lofty's compliance wording, the same
+// two boxes as The Little Lady site; build/build.py CONSENT_SMS_TEXT /
+// CONSENT_TERMS_TEXT hold the same strings, and tests/test-consent-boxes.js checks
+// all three agree). The lead note records the SMS sentence the visitor actually
+// saw, so a later reader can see what was agreed to. Do not paraphrase it; change
+// it here and in build.py together.
+const SMS_CONSENT_TEXT = "By checking this box, I agree to receive transactional and informational SMS " +
+  "communications, including appointment reminders, property updates, and account notifications from " +
+  "Little Lady. Message frequency varies. Message and data rates may apply. Reply HELP for help or STOP " +
+  "to opt out.";
+
+// Was the REQUIRED "Terms of Service and Privacy Policy" box ticked? The browser
+// enforces it, but this is a record, never a gate: a bot, a direct POST or a page
+// cached from before the box existed arrives without it, and that lead is still
+// captured, pushed and emailed exactly like any other. Only the note says so.
+function termsAgreedFromForm(data) {
+  const v = data && typeof data === "object" ? data.terms_agree : undefined;
+  const vals = (Array.isArray(v) ? v : [v]).map((x) => String(x == null ? "" : x).trim().toLowerCase()).filter(Boolean);
+  return vals.length > 0 && vals.every((x) => /^(yes|y|true|on|1|checked|agree|agreed)$/.test(x));
+}
+
 function splitName(fullName) {
   const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { firstName: undefined, lastName: undefined };
@@ -220,14 +242,18 @@ async function handleLead(event, side) {
     // lead carries it as sourceLabel, so the replay uses it the same way.
     const sourceLabel = SOURCE_LABELS[formName] || `Signature Property Collection - ${formName}`;
     body.source = WEBSITE_SOURCE;
-    // 2026-09-30 (consent fix): every lead is created with texting OFF, and on
-    // this site it stays off. No Signature form posts a texting consent: each
-    // form's consent box is required and has no name, so nothing about it
-    // reaches this function, and a required box would not be a free yes anyway.
-    // A lead here is only made textable by hand in Lofty, once consent is
-    // confirmed. lib/_lofty.js enforces cannotText:true on every
-    // create, the queue replay included; lib/_lofty-consent.js has the rule.
+    // 2026-09-30 (consent fix): every lead is created with texting OFF. Texting
+    // goes on only after the create, and only on an explicit yes whose number is
+    // every phone on the lead (lib/_lofty-consent.js; lib/_lofty.js enforces
+    // this on every create, the queue replay included).
+    //
+    // 2026-11-03: until today no Signature form posted a texting consent (each
+    // form's one consent box was required and had no name, so nothing about it
+    // reached this function). Every form now carries the same two boxes as The
+    // Little Lady site (build/build.py consent_boxes_html): the required
+    // Terms/Privacy box and the OPTIONAL, unticked SMS box, `sms_consent`.
     body.cannotText = true;
+    const consent = smsConsentFromForm(data);
     // 2026-08-15 (Christine: "make sure that when the new lead comes in or if it
     // merges that i am still notified some how in lofty with a hot lead or
     // something of hte sort"). Her 16:48 test DID reach Lofty -- lead
@@ -329,6 +355,47 @@ async function handleLead(event, side) {
     // miss. The banner alone is still worth having.
     if (!body.notes) body.notes = banner;
 
+    // ---- TCPA consent record (2026-11-03, as on The Little Lady site) ---------
+    // The yes is written into the lead note with the disclosure TEXT the visitor
+    // saw, not just the fact of it, so the record shows WHAT was agreed to even
+    // after the wording on the page changes. An unchecked box submits nothing, so
+    // a MISSING field is not "no": it means the form reached this function without
+    // the browser's own form (a direct POST, a bot, a page cached from before the
+    // box existed), and the safe reading of "no record" is DO NOT TEXT. Every
+    // branch adds one more line saying whether the required Terms/Privacy box
+    // (`terms_agree`) was ticked. That line is a record only: nothing holds or
+    // drops a lead because it is missing, and it has no part in the texting
+    // decision (that is `sms_consent` alone).
+    const termsLine = termsAgreedFromForm(data)
+      ? "\nTerms/Privacy box: ticked"
+      : "\nTerms/Privacy box: NOT ticked on this submission";
+    if (consent.given) {
+      body.notes += "\n\nCONSENT (TCPA)" +
+        "\nSMS consent: YES \u2014 box ticked at submit (texts only; this wording does not cover calls)" +
+        `\nAgreed to: "${SMS_CONSENT_TEXT}"` +
+        termsLine;
+    } else if (consent.answered) {
+      body.notes += "\n\nCONSENT (TCPA)" +
+        "\n!! SMS consent NOT given on this submission (the sms_consent field was not a yes). " +
+        "Texting is off for this lead in Lofty. Do NOT text or auto-dial this lead until consent " +
+        "is obtained and logged." +
+        termsLine;
+    } else if (data.consent) {
+      body.notes += "\n\nCONSENT (TCPA)" +
+        "\n!! No texting consent on this submission. This form's consent box is REQUIRED to " +
+        "submit, so ticking it is not a free choice and is not counted as agreeing to texts. " +
+        "Texting is off for this lead in Lofty. Do NOT text or auto-dial this lead until consent " +
+        "is obtained and logged." +
+        termsLine;
+    } else {
+      body.notes += "\n\nCONSENT (TCPA)" +
+        "\n!! NO CONSENT RECORD on this submission \u2014 the sms_consent field was " +
+        "absent, which means this did not arrive through the site's own form with the " +
+        "box ticked. Do NOT text or auto-dial this lead until consent is obtained and " +
+        "logged." +
+        termsLine;
+    }
+
     // 2026-09-24: a home-value lead carries its address as a real Lofty field
     // (the nested `property` object), not only in the note, so Seller
     // Intelligence's Lofty sync -- which reads streetAddress/city/state/zipCode
@@ -371,7 +438,7 @@ async function handleLead(event, side) {
       // recordPush keeps a held lead under its own key (lib/_lofty.js
       // MANUAL_REVIEW_KEY) with the whole submission and the reason, where
       // nothing replays it and /status counts it by submission id.
-      if (store) await recordPush(store, { ...held, emailResult, submissionId, formData: data, sourceLabel }, formName, body);
+      if (store) await recordPush(store, { ...held, emailResult, submissionId, smsConsent: consent.given, formData: data, sourceLabel }, formName, body);
       return { statusCode: 200, body: "ok (captured; Lofty identity needs manual review)" };
     }
     // A known contact keeps its own tags. `tags` on the create call REPLACES the
@@ -404,6 +471,9 @@ async function handleLead(event, side) {
     const websiteFields = websiteFieldValues(SOURCE_LABELS[formName] || formName, data);
     const hubPushExtras = {
       triggerTag: TRIGGER_TAG, websiteFields, inquiry: inquiryFromForm(data), sourceLabel,
+      // 2026-11-03: the yes to texts rides to the hub too (sms_yes). The hub decides
+      // and keeps texting off until it has a confirmed yes; the website never turns it on itself.
+      smsYes: consent.given === true,
     };
     const result = await postLead(body, apiKey, { deadline: startedAt + CREATE_DEADLINE_MS, ...hubPushExtras });
     // The store is only needed for diagnostics, so a Blobs problem must not
@@ -459,7 +529,7 @@ async function handleLead(event, side) {
       // Lofty lead id only when the lookup found the contact; the hub matches by email otherwise.
       const hubIntake = await sendValueFormToHub({ formName, data, site: "signature", submissionId,
         createdAt: (payload && payload.payload && payload.payload.created_at) || null, loftyLeadId: existing.leadId || null });
-      if (store) await recordPush(store, { ...result, emailResult, submissionId, formData: data, plan, hubIntake, sourceLabel }, formName, body);
+      if (store) await recordPush(store, { ...result, emailResult, submissionId, smsConsent: consent.given, formData: data, plan, hubIntake, sourceLabel }, formName, body);
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
@@ -494,9 +564,17 @@ async function handleLead(event, side) {
       createdAt: (payload && payload.payload && payload.payload.created_at) || null,
       loftyLeadId: noteResult.leadMissing ? existing.leadId || null : noteTarget || null });
     const consentTarget = existing.leadId || leadIdFromResponse(result.responseBody) || leadId;
-    const consentResult = consentTarget ? await applyTextingPreference(consentTarget, data.phone, false, apiKey)
-      : { attempted: false, textingEnabled: false, reason: "no lead id for texting safety check" };
-    if (consentResult.textingNotEnabled) console.warn(`Signature texting safety: ${consentResult.textingNotEnabled}`);
+    // 2026-11-03: texting on, only for an explicit yes, and only if every phone on
+    // the lead is the number the yes came with -- the lead is read first and its
+    // tags merged, never replaced (lib/_lofty-consent.js). Before the tag re-add
+    // below, so the Smart Plan it starts sees the right switch. Without a yes
+    // nothing runs: texting stays off and no tag is touched.
+    const consentResult = consentTarget ? await applyTextingPreference(consentTarget, data.phone, consent.given, apiKey)
+      : { attempted: false, textingEnabled: false, textingNotEnabled: "no lead id to apply the consent to; texting left off" };
+    if (consentResult.textingNotEnabled) {
+      console.warn(`Lofty lead from "${formName}": said yes to texts, but texting not turned on -- ` +
+        `${consentResult.textingNotEnabled || consentResult.reason || consentResult.error || "not applied"}.`);
+    }
     // And make the trigger tag a real CHANGE, so the Smart Plan fires on a
     // returning buyer's second enquiry and not only their first.
     //
@@ -538,7 +616,7 @@ async function handleLead(event, side) {
     if (store) {
       await recordPush(store, {
         ...result, leadId, emailResult, noteResult, consentResult, tagResult, planResult, existing: existingSummary,
-        inProgress: !!existing.leadId,
+        smsConsent: consent.given, inProgress: !!existing.leadId,
       }, formName, body);
     }
 
@@ -584,7 +662,7 @@ async function handleLead(event, side) {
     if (store) {
       await recordPush(store, {
         ...result, leadId, emailResult, noteResult, consentResult, tagResult, planResult, existing: existingSummary,
-        returningResult, fieldsResult, inquiryResult, hubIntake: hubIntakeResult,
+        smsConsent: consent.given, returningResult, fieldsResult, inquiryResult, hubIntake: hubIntakeResult,
       }, formName, body);
     }
     return { statusCode: 200, body: "ok" };
