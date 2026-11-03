@@ -453,7 +453,7 @@ function alertEmailHtml({ name, email, phone, source, noteText, leadId, stamp })
 <table style="border-collapse:collapse;margin:8px 0 16px">${rows}</table>
 <p style="margin:0 0 4px;color:#666">What they said</p>
 <pre style="white-space:pre-wrap;font:inherit;background:#f6f6f6;padding:12px;border-radius:6px;margin:0">${escapeHtml(noteText)}</pre>
-${leadId ? `<p style="margin:16px 0 0"><a href="https://app.lofty.com/crm/leads/${escapeHtml(leadId)}">Open this lead in Lofty</a></p>` : ""}
+${leadId ? `<p style="margin:16px 0 0"><a href="https://crm.lofty.com/admin/home/detail?leadId=${encodeURIComponent(leadId)}">Open this lead in Lofty</a></p>` : ""}
 <p style="margin:20px 0 0;font-size:12px;color:#888">Sent by ${BRAND_DOMAIN} the moment the form was submitted. This does not depend on a Lofty Smart Plan — if this arrives, the lead was captured.</p>
 </div>`;
 }
