@@ -1,0 +1,31 @@
+# TEMPORARY (2026-11-03, PR #116): builds site/ the way tests.yml does, with the
+# qrcode package installed, and prints the two files the session building this PR
+# could not generate (it has no PyPI access): the Terms page's QR image and the
+# page itself. Removed in the next commit on this branch.
+name: tmp qr print
+on:
+  push:
+    branches: ["claude/magical-brahmagupta-fplfnb"]
+jobs:
+  print:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -m pip install --quiet -r requirements.txt
+      - run: npm install --no-audit --no-fund
+      - run: bash scripts/netlify-build.sh > /dev/null
+      - name: Print the generated files
+        run: |
+          git status --short site/ | head -20
+          echo "=====SVG-BASE64-BEGIN====="
+          base64 -w 0 site/assets/qr/terms-of-service.svg; echo
+          echo "=====SVG-BASE64-END====="
+          echo "=====HTML-DIFF-BEGIN====="
+          git diff site/terms-of-service.html
+          echo "=====HTML-DIFF-END====="
