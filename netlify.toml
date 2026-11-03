@@ -170,6 +170,13 @@
 [functions."lofty-queue-drain"]
   schedule = "5,35 * * * *"
 
+# 2026-11-03: counts the form submissions Netlify marked as spam (counts only) for the
+# /status row, every 6 hours. Netlify never hands a spam submission to the site, so a
+# real person whose browser filled the hidden spam field was lost without a trace.
+[functions."form-spam-count"]
+  schedule = "25 */6 * * *"
+
+
 # Clean, shareable, indexable URL for one listing:
 #   /listing/IRE1234567  ->  netlify/functions/listing-page.js
 #

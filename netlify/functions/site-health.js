@@ -43,6 +43,8 @@ const {
   SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS, LISTINGS_SOURCE, MLSGRID_KEYS,
 } = require("./lib/_mls-shared");
 const { statusAccess } = require("./lib/_status-key");
+const { spamRow, spamKey } = require("./lib/_form-spam");
+const { THIS_SITE_ID: FORM_SPAM_SITE_ID, FORMS_URL } = require("./form-spam-count");
 const { isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH } = require("./lib/_lofty-listings");
 const { homeSearchUrl } = require("./lib/_home-search");
 const recentActivity = require("./recent-activity")._internals;
@@ -1612,6 +1614,17 @@ exports.handler = async (event) => {
         "Each is in the alert email and the Netlify Forms inbox; nothing in Lofty was created or " +
         "changed for it, and nothing replays it.",
   });
+
+  // ---- Form submissions Netlify kept as spam (2026-11-03) -------------------
+  // Netlify never hands a spam submission to submission-created.js, so a real
+  // person whose browser filled the hidden spam field was lost without a trace.
+  // form-spam-count.js counts them every 6 hours (counts only, never who);
+  // optional: a spam count is never the site failing.
+  {
+    const spamSite = String(process.env.SITE_ID || "").trim() || FORM_SPAM_SITE_ID;
+    const spamRecord = await store.get(spamKey(spamSite), { type: "json" }).catch(() => null);
+    checks.push(spamRow(spamRecord, { formsUrl: FORMS_URL }));
+  }
 
   // ---- Is Christine actually being TOLD about the lead? --------------------
   // 2026-08-15: added because the answer turned out to be no, twice, while the
