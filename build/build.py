@@ -8408,33 +8408,32 @@ MARKET_TOPIC_PAGES = [
                   "one specialty market most retirement guides skip entirely.",
         "paragraphs": [
             "Loveland: Arts, Affordability, and the Sweetheart City",
-            "Loveland punches above its size for retirees who care about culture — "
+            "Loveland punches above its size for culture — "
             "the Benson Sculpture Garden, the Loveland Museum, the restored Rialto "
             "Theater downtown, and Lake Loveland's kayaking and walking paths. "
             "Healthcare access is a genuine differentiator: UCHealth Medical Center "
             "of the Rockies is a Level II Trauma Center with advanced cardiac and "
             "cancer care. New active-adult development is arriving too, with a "
             "55+ community planned within Centerra's Kinston neighborhood. Entry-level "
-            "retirement housing generally runs from the high $300,000s. Best fit: "
-            "arts-oriented, active retirees who want walkable culture without Denver "
-            "prices.",
+            "retirement housing generally runs from the high $300,000s. Best for: "
+            "walkable culture, a Level II trauma center nearby, and prices below "
+            "Denver.",
             "Windsor: Resort Living Without The Denver Price Tag",
             "Windsor offers a resort lifestyle at a price point that doesn't require "
             "liquidating a portfolio — anchored by a major golf-and-resort master-planned "
             "community and the private-lake Water Valley neighborhood. Windsor also "
             "sits in Weld County, which carries a meaningfully lower median property "
-            "tax bill than neighboring Larimer County — a real difference for "
-            "retirees on a fixed income compounded over ten or fifteen years of "
-            "ownership. Best fit: active retirees who want upscale amenities and the "
-            "Weld County tax advantage without an age-restricted requirement.",
+            "tax bill than neighboring Larimer County — a real difference on a "
+            "fixed income compounded over ten or fifteen years of ownership. "
+            "Best for: resort amenities and the Weld County tax advantage, in "
+            "both 55+ and all-ages communities.",
             "Fort Collins: The University Town Option",
-            "Fort Collins is Northern Colorado's most expensive market, and for a "
-            "specific kind of retiree it's worth it — a walkable Old Town with "
+            "Fort Collins is Northern Colorado's most expensive market, and for some "
+            "buyers it's worth it — a walkable Old Town with "
             "restaurants, live music, and craft breweries, plus Colorado State "
             "University's lifelong-learning programs, library access, and campus "
-            "cultural events. The trade-off is price and traffic; the acreage and "
-            "quiet many retirees want is a different zip code. Best fit: "
-            "intellectually active retirees who value walkable urban amenities and "
+            "cultural events. The trade-off is price and traffic; acreage and quiet "
+            "are a different zip code. Best for: walkable urban amenities and "
             "CSU's lifelong-learning ecosystem.",
             "Masonville and West Loveland: The Quiet Acreage Option",
             "This is Christine's specialty area, and it's the retirement option most "
@@ -8445,27 +8444,24 @@ MARKET_TOPIC_PAGES = [
             "the backyard and Rocky Mountain National Park under an hour up the "
             "canyon. This market rewards buyers who know what they're looking at: "
             "well quality, irrigation rights, outbuilding condition, and road access "
-            "all matter here in ways they don't in a subdivision. Best fit: "
-            "outdoor-focused retirees, horse owners, and buyers who want land and "
-            "mountain proximity over community amenities.",
+            "all matter here in ways they don't in a subdivision. Best for: land, "
+            "horses, and mountain proximity over community amenities.",
             "Greeley: The Honest, Affordable Option",
             "Greeley is the most genuinely affordable retirement market in Northern "
             "Colorado, anchored by the University of Northern Colorado's "
             "lifelong-learning programs and a downtown that's seen real investment. "
             "The honest trade-off: Greeley sits in an agricultural and "
             "oil-and-gas region, and it doesn't have the mountain-view drama of "
-            "Loveland or Fort Collins. For retirees with ties to Weld County, or "
-            "whose priority is financial flexibility over scenery, it offers real "
-            "value. Best fit: budget-focused retirees who want low cost of ownership "
-            "and don't need mountain views.",
+            "Loveland or Fort Collins. If you have ties to Weld County, or your "
+            "priority is financial flexibility over scenery, it offers real "
+            "value. Best for: low cost of ownership without needing mountain "
+            "views.",
             "Wellington: Small Town, Real Value",
-            "Wellington sits in Larimer County — Poudre School District territory, "
-            "which matters for grandparents with grandkids in the system — about "
-            "twenty minutes south of Fort Collins via I-25. New construction here "
+            "Wellington sits in Larimer County, in Poudre School District, about "
+            "twenty minutes north of Fort Collins via I-25. New construction here "
             "represents real value for Larimer County, without Windsor's resort "
-            "amenities or Loveland's arts infrastructure. Best fit: retirees who want "
-            "small-town feel and proximity to Fort Collins without Fort Collins "
-            "prices.",
+            "amenities or Loveland's arts infrastructure. Best for: small-town feel "
+            "and proximity to Fort Collins without Fort Collins prices.",
             "Things To Know Before Retiring To NoCo",
             "Property taxes run lower in Weld County than in Larimer County — worth "
             "factoring in if you're comparing, say, Windsor to Loveland, alongside "
@@ -8483,14 +8479,13 @@ MARKET_TOPIC_PAGES = [
         ],
         "faq": [
             ("What's the best place to retire in Northern Colorado?",
-             "It depends on what you're optimizing for. Loveland fits retirees who "
-             "want walkable arts and culture; Windsor fits those who want resort "
-             "amenities and a Weld County tax advantage; Masonville and West "
-             "Loveland fit retirees who want quiet acreage and mountain proximity; "
-             "and Greeley fits retirees prioritizing affordability. There's no single "
+             "It depends on what you're optimizing for. Loveland has walkable arts "
+             "and culture; Windsor has resort amenities and a Weld County tax "
+             "advantage; Masonville and West Loveland have quiet acreage and "
+             "mountain proximity; and Greeley is the most affordable. There's no single "
              "right answer — it's a conversation about lifestyle and budget."),
             ("Is Loveland, Colorado a good place to retire?",
-             "Yes, for retirees who value arts and culture, healthcare access, and a "
+             "Yes, if you value arts and culture, healthcare access, and a "
              "walkable small-city feel — Loveland has the Benson Sculpture Garden, "
              "the Loveland Museum, and a Level II Trauma Center hospital, all at a "
              "price point well below Denver or Boulder."),
@@ -10623,13 +10618,13 @@ QUIZ_CITIES = [
      "priorities": ["new-build", "schools"],
      "lifestyle": ["golf-lake", "small-town"],
      "blurb": "Windsor centers on its own lake and a fast-growing downtown, with "
-              "new-build communities that suit families well."},
+              "a lot of new-build inventory."},
     {"name": "Timnath", "url": "/communities/larimer/timnath.html",
      "views": ["farmland", "lake"], "commute": "moderate",
      "priorities": ["new-build", "schools"],
      "lifestyle": ["small-town", "golf-lake"],
      "blurb": "Timnath is one of the fastest-growing master-planned communities in "
-              "Northern Colorado — new construction, top schools, and easy access to "
+              "Northern Colorado — new construction and easy access to "
               "Fort Collins."},
     {"name": "Wellington", "url": "/communities/larimer/wellington.html",
      "views": ["farmland"], "commute": "far",
@@ -10660,16 +10655,15 @@ QUIZ_CITIES = [
      "views": ["farmland"], "commute": "far",
      "priorities": ["schools", "acreage"],
      "lifestyle": ["small-town"],
-     "blurb": "Eaton is a welcoming agricultural town just north of Greeley, known "
-              "for strong schools and a genuine small-town, family-first pace of "
-              "life."},
+     "blurb": "Eaton is an agricultural town just north of Greeley with its own "
+              "school district and a small-town pace."},
     {"name": "Johnstown", "url": "/communities/weld/johnstown.html", "photo": "johnstown",
      "views": ["farmland"], "commute": "moderate",
      "priorities": ["new-build", "schools"],
      "lifestyle": ["small-town"],
      "blurb": "Johnstown is one of the fastest-growing towns between Loveland and "
-              "Greeley — small-town warmth with real new-build inventory and good "
-              "schools."},
+              "Greeley — small-town warmth with real new-build inventory and fast "
+              "I-25 access."},
     {"name": "Milliken", "url": "/communities/weld/milliken.html",
      "views": ["farmland"], "commute": "far",
      "priorities": ["acreage", "schools"],
@@ -10681,8 +10675,8 @@ QUIZ_CITIES = [
      "views": ["mountain", "farmland"], "commute": "moderate",
      "priorities": ["new-build", "schools"],
      "lifestyle": ["small-town", "hiking-mountain"],
-     "blurb": "Firestone pairs real mountain views with family-friendly new-build "
-              "communities, parks, and trails — closer to Longmont and Denver than "
+     "blurb": "Firestone pairs mountain views with new-build communities, parks, "
+              "and trails — closer to Longmont and Denver than "
               "most of Weld County."},
     {"name": "Frederick", "url": "/communities/weld/frederick.html",
      "views": ["farmland"], "commute": "moderate",
@@ -10701,14 +10695,14 @@ QUIZ_CITIES = [
      "views": ["downtown", "farmland"], "commute": "close",
      "priorities": ["schools", "walkable"],
      "lifestyle": ["culture-dining"],
-     "blurb": "Lafayette gives you Boulder-adjacent schools and a walkable downtown "
-              "at a more attainable price than Boulder itself."},
+     "blurb": "Lafayette is in Boulder Valley School District, with a walkable "
+              "downtown at a more attainable price than Boulder itself."},
     {"name": "Louisville", "url": "/communities/boulder/louisville.html",
      "views": ["downtown"], "commute": "close",
      "priorities": ["schools", "walkable"],
      "lifestyle": ["culture-dining"],
      "blurb": "Louisville consistently ranks among the best small towns in America — "
-              "top schools, a genuine Main Street, and quick access to Boulder."},
+              "a genuine Main Street, Boulder Valley schools, and quick access to Boulder."},
     {"name": "Nederland", "url": "/communities/boulder/nederland.html",
      "views": ["mountain"], "commute": "far",
      "priorities": ["acreage"],
@@ -10738,7 +10732,7 @@ QUIZ_QUESTIONS = [
     {
         "key": "q3", "prompt": "What matters most in your next neighborhood?",
         "options": [
-            {"label": "Top-rated schools & family amenities", "priorities": ["schools"]},
+            {"label": "A specific school district (I'll confirm the address boundary)", "priorities": ["schools"]},
             {"label": "Privacy, acreage, and room to spread out", "priorities": ["acreage"]},
             {"label": "Walkability — restaurants and shops nearby", "priorities": ["walkable"]},
             {"label": "A newer build with modern HOA amenities", "priorities": ["new-build"]},
@@ -10811,7 +10805,7 @@ def build_luxury_market():
          "as few people in the transaction as it can be run with."),
     ]
     sellers = [
-        ("Empty nesters right-sizing and releasing equity",
+        ("Long-time owners right-sizing and releasing equity",
          "The biggest seller group at this level, and the one where timing "
          "genuinely matters. The house did its job for twenty years, the "
          "equity in it is now a retirement asset, and the decision is "
@@ -10900,7 +10894,7 @@ def build_luxury_market():
          "golf-course, lakefront, or master-planned community. Privacy is a "
          "recurring theme across all of them."),
         ("Who is selling homes at this price point?",
-         "Most often empty nesters right-sizing and turning home equity into a "
+         "Most often long-time owners right-sizing and turning home equity into a "
          "retirement asset, owners of large acreage who no longer want the "
          "upkeep, relocating professionals on a set timeline, families settling "
          "an estate, and sellers whose luxury listing already expired once with "
@@ -12085,7 +12079,7 @@ def build_nav_pages():
     # ---- Lifestyle Search ----
     lifestyles = [
         ("Luxury Homes", "Estate properties, custom finishes, and premier locations across the Front Range.", "/guides/best-places-to-retire-in-northern-colorado.html"),
-        ("Family-Friendly", "Top school districts, parks, and neighborhoods built for growing families.", "/communities/index.html"),
+        ("Parks & Room To Grow", "Bigger yards, parks and trails nearby, and newer subdivisions with space.", "/communities/index.html"),
         ("Urban Convenience", "Walkable Old Town living in Fort Collins, Loveland, and Boulder.", "/communities/larimer.html"),
         ("Acreage Homes", "Land, privacy, and mountain views in Masonville, Berthoud, and beyond.", "/guides/cost-to-develop-raw-land-colorado.html"),
         ("Small-Town Charm", "Quiet, close-knit communities from Wellington to Milliken.", "/communities/weld.html"),
@@ -12119,7 +12113,7 @@ def build_nav_pages():
     breadcrumbs = _breadcrumb_schema([("Home", "/index.html"), ("Lifestyle Search", None)])
     page(
         "Northern Colorado Lifestyle Home Search | Signature Property Collection",
-        "Explore Northern Colorado homes by lifestyle — luxury, family-friendly, urban, "
+        "Explore Northern Colorado homes by lifestyle — luxury, bigger yards, urban, "
         "acreage, small-town, and farm & ranch properties.",
         "/lifestyle-search.html", None, body, schema_extra=[breadcrumbs],
     )
