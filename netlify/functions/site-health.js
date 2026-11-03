@@ -42,6 +42,7 @@ const { getStore } = require("@netlify/blobs");
 const {
   SYNC_STATE_KEY, MINE_LISTINGS_KEY, getBlobStore, BASE_URL, SELECT_FIELDS, LISTINGS_SOURCE, MLSGRID_KEYS,
 } = require("./lib/_mls-shared");
+const { statusAccess } = require("./lib/_status-key");
 const { isLoftyPhoto, sizedPhoto, CARD_PHOTO_WIDTH } = require("./lib/_lofty-listings");
 const { homeSearchUrl } = require("./lib/_home-search");
 const recentActivity = require("./recent-activity")._internals;
@@ -988,6 +989,10 @@ exports.handler = async (event) => {
   const store = getBlobStore(getStore);
   const params = (event && event.queryStringParameters) || {};
   const wantsJson = params.format === "json";
+  // 2026-11-03: with STATUS_KEY set, the detail text, the raw data and the live
+  // probes need the key (lib/_status-key.js); the row names and lights stay public.
+  const access = statusAccess(event);
+  const detailsOpen = access.ok;
 
   const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, loftyHeld, cachedLoftyKey,
     cachedLoftyLead, cachedPhotoCheck, cachedCloudCheck, cachedHubKey] = await Promise.all([
@@ -1009,9 +1014,9 @@ exports.handler = async (event) => {
   const googleKey = process.env.GOOGLE_MAPS_API_KEY;
   // ?probe=1 runs every live check; ?google=1 is kept working since that URL
   // has already been handed to Christine.
-  const wantsProbe = params.probe === "1" || params.probe === "true" ||
+  const wantsProbe = detailsOpen && (params.probe === "1" || params.probe === "true" ||
     params.google === "1" || params.google === "true" ||
-    params.lofty === "1" || params.lofty === "true";
+    params.lofty === "1" || params.lofty === "true");
   const loftyApiKey = process.env.LOFTY_API_KEY;
   // 2026-10-26: with LOFTY_VIA_HUB=on both Lofty probes ask the hub and this site's
   // own key is not needed (probeLoftyKey / probeLoftyLead route through the hub).
@@ -2126,6 +2131,18 @@ exports.handler = async (event) => {
   const allOk = checks.every((c) => c.ok || c.optional);
   const optionalIssues = checks.filter((c) => !c.ok && c.optional).length;
 
+  if (wantsJson && !detailsOpen) {
+    // What the hub's Connections check reads, and nothing more: allOk and each
+    // check's name, light and whether it is optional. No detail, no raw records.
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      body: JSON.stringify({
+        allOk, checks: checks.map((c) => ({ name: c.name, ok: !!c.ok, optional: !!c.optional })),
+        details: "hidden", why: access.why,
+      }, null, 2),
+    };
+  }
   if (wantsJson) {
     return {
       statusCode: 200,
@@ -2153,7 +2170,7 @@ exports.handler = async (event) => {
     <tr>
       <td style="padding:12px 16px;font-size:20px;text-align:center">${c.ok ? "✅" : (c.optional ? "ℹ️" : "❌")}</td>
       <td style="padding:12px 16px;font-weight:600;white-space:nowrap">${esc(c.name)}</td>
-      <td style="padding:12px 16px;color:#555">${esc(c.detail)}</td>
+      <td style="padding:12px 16px;color:#555">${detailsOpen ? esc(c.detail) : ""}</td>
     </tr>`).join("");
 
   const html = `<!doctype html>
@@ -2179,7 +2196,9 @@ exports.handler = async (event) => {
     : "✅ Everything looks clean.")
   : "⚠️ Something needs attention — see below."}</p>
 <table>${rows}</table>
-<p class="refresh">Checked live just now — reload anytime. This page only reads stored status; it never calls MLS Grid or Cloudinary itself, so checking it is always free. Add <code>?probe=1</code> to live-test the Google APIs and the Lofty key (cached 10 minutes), or <code>?format=json</code> for raw data.</p>
+<p class="refresh">${detailsOpen
+  ? "Checked live just now — reload anytime. This page only reads stored status; it never calls MLS Grid or Cloudinary itself, so checking it is always free. Add <code>?probe=1</code> to live-test the Google APIs and the Lofty key (cached 10 minutes), or <code>?format=json</code> for raw data."
+  : "Row names and lights only. The details, the live checks (<code>?probe=1</code>) and the raw data (<code>?format=json</code>) need the status key: open this page as <code>/status?key=&hellip;</code> with the value of <code>STATUS_KEY</code> in Netlify."}</p>
 </div></body></html>`;
 
   return {
