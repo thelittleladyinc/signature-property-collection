@@ -8428,7 +8428,7 @@ MARKET_TOPIC_PAGES = [
             "views.",
             "Wellington: Small Town, Real Value",
             "Wellington sits in Larimer County, in Poudre School District, about "
-            "twenty minutes from Fort Collins via I-25. New construction here "
+            "twenty minutes north of Fort Collins via I-25. New construction here "
             "represents real value for Larimer County, without Windsor's resort "
             "amenities or Loveland's arts infrastructure. Best for: small-town feel "
             "and proximity to Fort Collins without Fort Collins prices.",
