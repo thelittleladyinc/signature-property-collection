@@ -94,6 +94,6 @@ const sub = (id, d) => ({ id, created_at: day(d), email: PII, name: "Jane", data
   check("the function knows this site's id", /^[0-9a-f-]{36}$/.test(fn.THIS_SITE_ID));
 
   if (failures) { console.log(`\n${failures} failure(s)`); return; }
-  console.log("\nall ok");
+  console.log("\nAll checks passed.");
   process.exitCode = 0;
 })();
