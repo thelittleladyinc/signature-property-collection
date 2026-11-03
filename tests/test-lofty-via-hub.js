@@ -845,13 +845,11 @@ const deadline = () => Date.now() + 15000;
   await submit("buyers-guide", person({ sms_consent: "yes" }), "sub-8007");
   p8 = lastLeadPush();
   made = HUB.lofty.leads.get(9000) || {};
-  if (SITE === "tllsh") {
-    check("a yes to texts rides on the push (sms_yes): the hub decides and records it in the same note -- ONE note, no second call",
-      p8.sms_yes === true && HUB.lofty.notes.length === 1 && /10DLC campaign 12744/.test(HUB.lofty.notes[0].content) &&
-      /SMS consent: YES/.test(HUB.lofty.notes[0].content) && !HUB.routes().includes("/v1/lofty/note"), JSON.stringify(HUB.lofty.notes));
-  } else {
-    check("this site reads no texting yes (its boxes are required): no sms_yes on the push", !("sms_yes" in p8), JSON.stringify(p8));
-  }
+  // 2026-11-03: both sites now carry the same OPTIONAL sms_consent box (the Signature
+  // forms had one unnamed, required box until then), so both send the yes the same way.
+  check("a yes to texts rides on the push (sms_yes): the hub decides and records it in the same note -- ONE note, no second call",
+    p8.sms_yes === true && HUB.lofty.notes.length === 1 && /10DLC campaign 12744/.test(HUB.lofty.notes[0].content) &&
+    /SMS consent: YES/.test(HUB.lofty.notes[0].content) && !HUB.routes().includes("/v1/lofty/note"), JSON.stringify(HUB.lofty.notes));
   check("...texting stays off and the SMS consent tag is never added", made.cannotText === true &&
     !tagsOf(made).some((t) => kit.isSmsConsentTag(t)) && ownCalls.length === 0, JSON.stringify(made));
 
