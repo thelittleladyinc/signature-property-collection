@@ -973,6 +973,37 @@
     var mapEl = document.getElementById('county-map');
     if (!mapEl || typeof L === 'undefined') return;
 
+  // 2026-11-04: CARTO's free dark tiles now answer "API KEY REQUIRED" on this site (Cowork saw it on
+  // the sold-homes map). The site already has a public Mapbox token (MAPBOX_PUBLIC_TOKEN, served by
+  // /.netlify/functions/mapbox-token and restricted to this domain in Mapbox), so the base map is
+  // Mapbox's dark style when the token is there, and the old CARTO tiles only when it is not.
+  function addBaseTiles(map, maxZoom) {
+    var done = false;
+    function carto() {
+      if (done) return; done = true;
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        maxZoom: maxZoom,
+      }).addTo(map);
+    }
+    try {
+      fetch('/.netlify/functions/mapbox-token', { credentials: 'omit' })
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .then(function (j) {
+          var token = j && typeof j.token === 'string' ? j.token : '';
+          if (!/^pk\./.test(token) || done) return carto();
+          done = true;
+          L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}{r}?access_token=' + encodeURIComponent(token), {
+            tileSize: 512,
+            zoomOffset: -1,
+            attribution: '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: maxZoom,
+          }).addTo(map);
+        })
+        .catch(carto);
+    } catch (e) { carto(); }
+  }
+
     var map = L.map('county-map', {
       zoomControl: true,
       scrollWheelZoom: true,
@@ -989,10 +1020,7 @@
       preferCanvas: true,
     }).setView([40.35, -104.85], 8);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      maxZoom: 18,
-    }).addTo(map);
+    addBaseTiles(map, 18);
 
     // 2026-08-17: reveal the play badge on video-backed pins once you are zoomed in
     // far enough that pins are not on top of each other. See poiIcon().
