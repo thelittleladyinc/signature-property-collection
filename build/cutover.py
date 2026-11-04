@@ -336,6 +336,15 @@ def verify_targets(tllsh, groups=None):
                     problems.append(f"the main site canonicals {key} to Signature's {sig}, which is in no cutover group")
                 elif mapped[sig] != key:
                     problems.append(f"{sig} forwards to {mapped[sig]} but the main site's Collection page is {key}")
+            # 2026-11-04 (group 4): a Collection page the main site still canonicals to
+            # Signature must not be forwarded by a group in play, or its canonical would
+            # name a URL that 301s straight back to it. Runbook step 1: main site first.
+            in_play = active_pages(data, groups)
+            for sig, key in sorted(pairs.items()):
+                if sig in in_play:
+                    problems.append(
+                        f"{sig} is forwarded by a group in play, but the main site still canonicals {key} "
+                        f"to it (COLLECTION_CANONICAL_TO_SIGNATURE); flip that canonical on the main site first")
         # Same idea for the 11 Loveland neighbourhood pages: they canonical to Signature at the
         # SAME address, so a group that forwards them needs that canonical flipped too.
         problems += cross_brand_problems(text, data, groups)

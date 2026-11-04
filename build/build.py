@@ -3857,6 +3857,62 @@ _cutover = _ilu.module_from_spec(_cutover_spec)
 _cutover_spec.loader.exec_module(_cutover)
 _CUTOVER = _cutover.load()
 CUTOVER_ACTIVE_PAGES = frozenset(_cutover.active_pages(_CUTOVER))
+# Final address of each page in an active group, for links (repoint_forwarded_links).
+CUTOVER_LINK_TARGETS = {
+    _p: _cutover._destination(_t) for _p, _t in _cutover.active_pages(_CUTOVER).items()
+}
+
+
+def _cutover_link_target(path):
+    """The final address for a link to `path` when its group forwards it, else None.
+    Matches the three forms the cutover forwards: /page.html, /page/ and /page."""
+    if path in CUTOVER_LINK_TARGETS:
+        return CUTOVER_LINK_TARGETS[path]
+    for _p, _dst in CUTOVER_LINK_TARGETS.items():
+        if _p.endswith(".html") and path in (_p[:-5], _p[:-5] + "/"):
+            return _dst
+    return None
+
+
+_CUTOVER_A_HREF = re.compile(
+    r'(<a\b[^>]*?\shref=")(?:https://signaturepropertycollection\.com)?(/[^"?#]*)([?#][^"]*)?(")')
+_CUTOVER_MD_LINK = re.compile(r'(\]\()(?:https://signaturepropertycollection\.com)?(/[^)?#\s]*)([?#][^)\s]*)?(\))')
+
+
+def repoint_forwarded_text(text, pattern=_CUTOVER_A_HREF):
+    """Point every link to a forwarding page straight at its final address."""
+    def _sub(m):
+        dst = _cutover_link_target(m.group(2))
+        return m.group(0) if dst is None else m.group(1) + dst + (m.group(3) or "") + m.group(4)
+    return pattern.sub(_sub, text)
+
+
+def repoint_forwarded_links():
+    """2026-11-04 (cutover group 4): links on this site to a page an active cutover
+    group forwards would each take a 301 first (docs/CUTOVER-RUNBOOK.md, "What this
+    change does NOT do"). Rewrite every <a href> in the built pages, and in the
+    listing-page shell the function serves, to the final address on the main site.
+    Only <a> links: canonicals, og:url and the redirect rules are left alone. With no
+    group active this changes nothing."""
+    if not CUTOVER_LINK_TARGETS:
+        return
+    import glob as _glob
+    files = sorted(_glob.glob(os.path.join(OUT, "**", "*.html"), recursive=True))
+    files.append(os.path.abspath(os.path.join(HERE, "..", "netlify", "functions", "lib",
+                                              "_listing-page-shell.html")))
+    changed = links = 0
+    for fp in files:
+        if not os.path.exists(fp):
+            continue
+        with open(fp, encoding="utf-8") as f:
+            html = f.read()
+        new = repoint_forwarded_text(html)
+        if new != html:
+            links += sum(1 for m in _CUTOVER_A_HREF.finditer(html) if _cutover_link_target(m.group(2)))
+            changed += 1
+            with open(fp, "w", encoding="utf-8") as f:
+                f.write(new)
+    print(f"  cutover: {links} link(s) on {changed} file(s) re-pointed at the main site")
 
 # 2026-08-23. Second wave of two-brand consolidation. The prune above moved
 # 46 general-market TOWN pages off Signature entirely. But a deeper duplicate
@@ -14556,6 +14612,8 @@ transaction history and service
 areas is provided by the business itself and should be treated as a
 primary-source claim, not an independently verified figure.
 """
+    # 2026-11-04: a page a cutover group forwards is listed at its final address.
+    content = repoint_forwarded_text(content, _CUTOVER_MD_LINK)
     with open(os.path.join(OUT, "llms.txt"), "w") as f:
         f.write(content)
 
@@ -14896,6 +14954,7 @@ if __name__ == "__main__":
     build_explore()
     build_legal()
     build_404()
+    repoint_forwarded_links()   # after every page, before the sitemaps read them
     # Wave 5 P0.3: emit /sitemap-videos.xml BEFORE build_redirects_and_meta
     # so the sitemap-existence guard in that function sees it on disk.
     build_video_sitemap()

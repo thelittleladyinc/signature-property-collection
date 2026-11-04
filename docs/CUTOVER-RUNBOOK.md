@@ -96,6 +96,31 @@ data once the domain is verified (Cowork J22).
 4. **Search Console**: check three addresses per group, then weekly. A two-to-six week
    wobble per group is normal.
 
+## Group 4 (2026-11-04, Christine: "start with group 4")
+
+* Main site first: thelittleladysellshomes PR #110 moves buyers, sellers and
+  expired-listings from `COLLECTION_CANONICAL_TO_SIGNATURE` to
+  `COLLECTION_CANONICAL_FLIPPED` (self-canonical, in its sitemap).
+* Then here: `"active_groups": [4]`. A build changes only `_redirects` (9 forced 301s for
+  the three pages, the printed-book `/expiredlisting/` and `/expiredlisting` re-pointed in
+  one hop, 6 older local rules dropped), `sitemap.xml` (buyers and sellers out; the
+  expired page was never in it) and the links below.
+* **Links re-pointed in code, for this and every later group**: `repoint_forwarded_links()`
+  in `build/build.py` rewrites every `<a href>` on the built pages, and in the listing-page
+  shell, that names a page an active group forwards (`/page.html`, `/page/`, `/page`, also
+  on the Signature domain) to its final address. `llms.txt` gets the same rule
+  (`repoint_forwarded_text`). Canonicals, `og:url` and redirect rules are never touched.
+  Group 4: 360 links on 115 files (nav Buy / Sell, the footer's Expired Listings, four
+  buttons). `feed.xml` and `sitemap-videos.xml` name none of the three pages.
+* `verify-targets` now also fails when a group in play forwards a page the main site still
+  canonicals to Signature through `COLLECTION_CANONICAL_TO_SIGNATURE` (it only checked
+  the 11 neighbourhood pages before). Against unchanged main with group 4 on: 3 problems.
+* **The query string (step 6 above) is still not proven on Netlify.** The rules carry no
+  query conditions, which is the case Netlify documents as passing the query string on,
+  but the PR #112 preview's `curl` was never recorded and this environment cannot reach
+  Netlify. Check on the group 4 deploy preview before merging, and scan one printed
+  book's QR after it is live.
+
 ## Rollback
 
 Remove the group from `active_groups` and deploy (or publish the previous deploy in
