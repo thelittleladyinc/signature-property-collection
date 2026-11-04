@@ -102,9 +102,17 @@ check(`towns link their county siblings (${crossLinked.length}/${sample.length} 
 const sitemap = fs.readFileSync(path.join(SITE, "sitemap.xml"), "utf8");
 const noindex = (u) => /name="robots"[^>]*noindex/.test(html.get(u) || "");
 const orphans = [...inbound].filter(([, n]) => n === 0).map(([u]) => u);
-const badOrphans = orphans.filter((u) => u !== "/404.html" && !noindex(u));
-check(`every orphan page is one we don't want indexed (${orphans.join(", ")})`,
+// 2026-11-04: a page an active cutover group forwards to the main site
+// (build/data/cutover_to_tllsh.json, build.py repoint_forwarded_links) is SUPPOSED to
+// be an orphan: every link to it now names its final address, so no visitor takes the 301.
+const cutover = JSON.parse(fs.readFileSync(path.join(SITE, "..", "build", "data", "cutover_to_tllsh.json"), "utf8"));
+const forwarded = new Set((cutover.active_groups || []).flatMap((g) => Object.keys(cutover.groups[String(g)].pages)));
+const badOrphans = orphans.filter((u) => u !== "/404.html" && !noindex(u) && !forwarded.has(u));
+check(`every orphan page is one we don't want indexed, or one a live cutover group forwards (${orphans.join(", ")})`,
   badOrphans.length === 0, badOrphans.join(", "));
+const stillLinked = [...forwarded].filter((u) => (inbound.get(u) || 0) > 0);
+check(`no page links to a page a live cutover group forwards (${forwarded.size} forwarded)`,
+  stillLinked.length === 0, stillLinked.join(", "));
 
 // The contradiction that orphan check exposed, now pinned. A noindex page listed in
 // the sitemap is submitting a URL that tells Google not to index it, which Search

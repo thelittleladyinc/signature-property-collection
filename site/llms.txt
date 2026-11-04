@@ -9,8 +9,8 @@
 ## Core pages
 - [Home](https://signaturepropertycollection.com/index.html)
 - [About Christine Gwinnup](/about.html)
-- [Buy A Home](/buyers.html)
-- [Sell A Home](/sellers.html)
+- [Buy A Home](https://www.thelittleladysellshomes.com/signature-property-collection/buyers.html)
+- [Sell A Home](https://www.thelittleladysellshomes.com/signature-property-collection/sellers.html)
 
 ## Counties served
 

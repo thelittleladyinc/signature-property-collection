@@ -73,6 +73,26 @@ console.log("\n3b. A canonical to Signature that a live group forwards is caught
   check("an unreadable main-site build is reported, not ignored", got && got[3] === 1);
 }
 
+console.log("\n3c. A Collection page the main site still canonicals to Signature is never forwarded first");
+{
+  // A stand-in main-site checkout: only build/build.py, with group 4's buyers page still
+  // in COLLECTION_CANONICAL_TO_SIGNATURE (as it was before the main site's group 4 change).
+  const os = require("os");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cutover-fake-tllsh-"));
+  fs.mkdirSync(path.join(tmp, "build"));
+  fs.writeFileSync(path.join(tmp, "build", "build.py"),
+    'CROSS_BRAND_CANONICAL_TO_SIGNATURE = frozenset([\n])\n' +
+    'COLLECTION_CANONICAL_TO_SIGNATURE = {\n    COLLECTION_HUB: "/index.html",\n' +
+    '    f"{COLLECTION_DIR}/buyers.html": "/buyers.html",\n}\n');
+  const flips = (groups) => {
+    const out = spawnSync("python3", ["build/cutover.py", "verify-targets", "--tllsh", tmp, "--groups", groups], { cwd: ROOT, encoding: "utf8" });
+    return out.stdout.split("\n").filter((l) => l.includes("flip that canonical on the main site first"));
+  };
+  check("group 4 on while buyers still canonicals to Signature: one problem", flips("4").length === 1, flips("4").join(" | "));
+  check("groups 1-3 on: that page is not forwarded, no problem", flips("1,2,3").length === 0, flips("1,2,3").join(" | "));
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
 console.log("\n4. The targets on the main site");
 if (process.env.TLLSH_CHECKOUT) {
   r = py(["verify-targets", "--tllsh", process.env.TLLSH_CHECKOUT]);
