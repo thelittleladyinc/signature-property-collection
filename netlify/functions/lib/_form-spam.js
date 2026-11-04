@@ -147,6 +147,74 @@ async function countSpam({ token, siteId, fetchImpl = fetch, now = Date.now(), b
   };
 }
 
+// One scheduled run: count, then save the record where /status reads it (2026-11-04).
+//
+// The thelittleladysellshomes copy answered HTTP 500 on every scheduled run from Nov 3
+// (00:25, 06:25, 12:25 UTC, three tries each, 0.1-0.7 s, no Netlify API call behind
+// it), while Signature's answered 200. The Blobs store could not be opened: getStore()
+// threw "The environment has not been configured to use Netlify Blobs" because that
+// site's functions do not get BLOBS_SITE_ID + BLOBS_TOKEN, and a Lambda-style
+// scheduled function gets no Blobs context unless it calls connectLambda(event). The
+// throw happened after the count, so the count (incomplete for want of a token, or
+// complete) was lost and the run said only "failed".
+//
+// Now: the store is the one getBlobStore() opens (BLOBS_SITE_ID + BLOBS_TOKEN, exactly
+// what /status reads), else this site's own store through the Blobs context Netlify
+// sends with the run (connectLambda); the count and the save each fail on their own;
+// every run answers JSON with what happened (complete, saved, the problem), 200 only
+// when the count is complete AND saved, else 503. Never a bare 500. The problem text is
+// this file's own words and an error's NAME only (no Netlify text, no token).
+function openSpamStore(event, { getStore, getBlobStore, connectLambda } = {}) {
+  const tries = [];
+  try {
+    return { store: getBlobStore(getStore), via: "settings", why: null };
+  } catch (err) {
+    tries.push(`BLOBS_SITE_ID + BLOBS_TOKEN: ${(err && err.name) || "error"}`);
+  }
+  if (event && event.blobs && typeof connectLambda === "function") {
+    try {
+      connectLambda(event);
+      return { store: getBlobStore(getStore), via: "netlify", why: null };
+    } catch (err) {
+      tries.push(`Netlify's run context: ${(err && err.name) || "error"}`);
+    }
+  } else {
+    tries.push("Netlify sent no Blobs context with the run");
+  }
+  return { store: null, via: null, why: `the Blobs store could not be opened (${tries.join("; ")})` };
+}
+
+async function runSpamCount({ event, siteId, token, deps = {}, now = Date.now(), log = console } = {}) {
+  let record;
+  try {
+    record = await countSpam({ token, siteId, now, ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}) });
+  } catch (err) {
+    record = { at: new Date(now).toISOString(), days: SPAM_DAYS, siteId: siteId || null, complete: false,
+      problem: `the count stopped (${(err && err.name) || "error"})` };
+  }
+  const opened = openSpamStore(event, deps);
+  let saved = false;
+  let saveProblem = opened.why;
+  if (opened.store) {
+    try {
+      await opened.store.setJSON(spamKey(siteId), record);
+      saved = true;
+    } catch (err) {
+      saveProblem = `the count could not be saved (${(err && err.name) || "error"})`;
+    }
+  }
+  const problem = [record.complete ? null : record.problem, saved ? null : saveProblem].filter(Boolean).join("; ") || null;
+  const line = `form-spam-count: ${record.complete
+    ? `${record.total} in ${record.days} days, ${record.formsRead} form(s) read`
+    : `could not count: ${record.problem}`}; ${saved ? `saved (${opened.via})` : `NOT saved: ${saveProblem}`}`;
+  (record.complete && saved ? log.log : log.error).call(log, line);
+  return {
+    statusCode: record.complete && saved ? 200 : 503,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ complete: !!record.complete, total: record.complete ? record.total : null, saved, problem }),
+  };
+}
+
 // The /status row. Optional: a spam count is never the site failing.
 function spamRow(record, { now = Date.now(), formsUrl } = {}) {
   const where = formsUrl ? ` Netlify's form pages: ${formsUrl} (each form's Spam tab).` : "";
@@ -181,4 +249,4 @@ function spamRow(record, { now = Date.now(), formsUrl } = {}) {
   };
 }
 
-module.exports = { countSpam, spamRow, spamKey, formsToken, SPAM_DAYS };
+module.exports = { countSpam, spamRow, spamKey, formsToken, openSpamStore, runSpamCount, SPAM_DAYS };
