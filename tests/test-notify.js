@@ -342,7 +342,7 @@ delete process.env.LEAD_ALERT_TO;
   await runWith(SENT("email_10"), lead, null);
   const k = of("POST", HUB)[0].body.idempotency_key;
   check("without a submission id the key is a hash, never the lead's details",
-    /^lead-alert:[a-z]+:contact:h[0-9a-f]{32}$/.test(k) && !/robin|example|970/i.test(k), k);
+    /^lead-alert:[a-z]+:contact:h[0-9a-f]{32}$/.test(k) && !/robin|example|970/i.test(k.replace(/:h[0-9a-f]{32}$/, "")), k);
   await runWith(SENT("email_11"), { ...lead, email: "robin at example dot com" }, "sub-bad-email-01");
   const e = of("POST", HUB);
   check("a malformed lead email is left off reply_to rather than costing the alert", e.length === 1 && !("reply_to" in e[0].body),
