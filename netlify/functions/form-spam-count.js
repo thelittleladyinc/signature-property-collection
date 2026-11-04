@@ -8,20 +8,26 @@
 // This site's Netlify project id (not secret: Project configuration > General).
 const THIS_SITE_ID = "97baf0fc-c899-4fb1-8163-06c401ae020e";
 
-exports.handler = async () => {
+// 2026-11-04: the run's work is lib/_form-spam.js runSpamCount (shared): a store that
+// cannot be opened, a save that fails or a count that stops is an answer that says so
+// (503 + JSON), never Netlify's bare 500. The event is passed on so the Blobs context
+// Netlify sends with a scheduled run can open this site's own store (connectLambda)
+// when BLOBS_SITE_ID / BLOBS_TOKEN are not available to functions here.
+exports.handler = async (event) => {
+  let deps;
+  let lib;
   try {
-    const { getStore } = require("@netlify/blobs");
+    const { getStore, connectLambda } = require("@netlify/blobs");
     const { getBlobStore } = require("./lib/_mls-shared");
-    const { countSpam, spamKey, formsToken } = require("./lib/_form-spam");
-    const siteId = String(process.env.SITE_ID || "").trim() || THIS_SITE_ID;
-    const record = await countSpam({ token: formsToken(), siteId });
-    await getBlobStore(getStore).setJSON(spamKey(siteId), record);
-    console.log(`form-spam-count: ${record.complete ? `${record.total} in ${record.days} days, ${record.formsRead} form(s) read` : `incomplete: ${record.problem}`}`);
-    return { statusCode: record.complete ? 200 : 503, body: JSON.stringify({ complete: record.complete, total: record.total ?? null }) };
+    lib = require("./lib/_form-spam");
+    deps = { getStore, getBlobStore, connectLambda };
   } catch (err) {
-    console.error("form-spam-count failed:", err && err.message);
-    return { statusCode: 500, body: JSON.stringify({ error: "form-spam-count failed" }) };
+    console.error("form-spam-count: its code did not load:", err && err.name);
+    return { statusCode: 503, headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ complete: false, saved: false, problem: `the code did not load (${(err && err.name) || "error"})` }) };
   }
+  const siteId = String(process.env.SITE_ID || "").trim() || THIS_SITE_ID;
+  return lib.runSpamCount({ event, siteId, token: lib.formsToken(), deps });
 };
 
 exports.THIS_SITE_ID = THIS_SITE_ID;

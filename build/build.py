@@ -5017,7 +5017,7 @@ def build_seller_local_proof():
     </div>
     <form class="lead-form" name="seller-local-proof" action="/thank-you.html?from=seller-local-proof" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="seller-local-proof">
-      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <p style="display:none" aria-hidden="true"><label>Don't fill this out: <input name="bot-field" autocomplete="off" tabindex="-1"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email" required>
       <input type="tel" name="phone" placeholder="Phone">
@@ -7751,7 +7751,7 @@ def build_contact():
   <div class="wrap grid-2">
     <form class="lead-form" name="contact" action="/thank-you.html?from=contact" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="contact">
-      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <p style="display:none" aria-hidden="true"><label>Don't fill this out: <input name="bot-field" autocomplete="off" tabindex="-1"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email" required>
       <input type="tel" name="phone" placeholder="Phone" required>
@@ -7938,7 +7938,7 @@ def build_guides():
     </div>
     <form class="lead-form" name="{form_name}" action="/thank-you.html?from={form_name}" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="{form_name}">
-      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <p style="display:none" aria-hidden="true"><label>Don't fill this out: <input name="bot-field" autocomplete="off" tabindex="-1"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email" required>
       {consent_boxes_html()}
@@ -10566,7 +10566,7 @@ def build_blog():
 def _tool_lead_form(form_name, button_label, extra_fields=""):
     return f"""<form class="lead-form" name="{form_name}" action="/thank-you.html?from={form_name}" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="{form_name}">
-      <p style="display:none"><label>Don't fill this out: <input name="bot-field"></label></p>
+      <p style="display:none" aria-hidden="true"><label>Don't fill this out: <input name="bot-field" autocomplete="off" tabindex="-1"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email" required>
       <input type="tel" name="phone" placeholder="Phone">
