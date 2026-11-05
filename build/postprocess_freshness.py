@@ -37,10 +37,15 @@ NON-FATAL BY DESIGN. Outside a git work tree, or on a page with no committed
 predecessor (a genuinely new page), there is nothing to compare against and
 today's date is correct anyway. Those cases are skipped silently rather than
 failing a deploy over a meta tag.
+
+ONE FATAL CHECK (2026-11-05): a dateModified on the sitewide RealEstateAgent
+entity, on any built page or listing-page shell, fails this step and so the
+deploy. build.py no longer writes one; a build date is not a content date.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -68,6 +73,61 @@ DATE_FIELDS = [
 
 PLACEHOLDER = "@@DATE@@"
 
+# 2026-11-05: the sitewide RealEstateAgent entity carries no dateModified at all
+# (build.py no longer writes it; it was BUILD_DATE). Committed copies still carry
+# it, so the comparison drops it from both sides: a committed page with the old
+# field and a fresh build without it are the same page, and the field's date must
+# not be handed to the next dateModified (a blog post's) by _restore. [^<] keeps
+# the match inside the agent's own JSON-LD <script> block.
+_AGENT_DATE = re.compile(
+    r'("@type"\s*:\s*"RealEstateAgent"[^<]{0,6000}?),\s*"dateModified"\s*:\s*"[^"]*"')
+_JSONLD_BLOCK = re.compile(r'<script type="application/ld\+json">([\s\S]*?)</script>')
+
+
+def _drop_agent_date(text: str) -> str:
+    return _AGENT_DATE.sub(r"\1", text)
+
+
+def _agent_has_date(text: str) -> bool:
+    """True when any RealEstateAgent node in the page's JSON-LD carries a dateModified.
+
+    Fail closed: a block that does not parse (a shell placeholder, broken JSON) is
+    judged by the raw text, so a date cannot hide in it."""
+    def walk(node) -> bool:
+        if isinstance(node, list):
+            return any(walk(x) for x in node)
+        if isinstance(node, dict):
+            if node.get("@type") == "RealEstateAgent" and "dateModified" in node:
+                return True
+            return any(walk(v) for v in node.values())
+        return False
+
+    for raw in _JSONLD_BLOCK.findall(text):
+        try:
+            if walk(json.loads(raw)):
+                return True
+        except ValueError:
+            if re.search(r'"RealEstateAgent"', raw) and re.search(r'"dateModified"', raw):
+                return True
+    return False
+
+
+def _agent_date_errors() -> list[str]:
+    """The gate: every built page and every listing-page shell (listing-page.js
+    renders each /listing/<id> page from one) must carry no agent dateModified."""
+    files = sorted(SITE.rglob("*.html")) + sorted(
+        (ROOT / "netlify" / "functions" / "lib").glob("_listing-page-shell*.html"))
+    errors = []
+    for path in files:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            errors.append(f"{path.relative_to(ROOT).as_posix()}: could not be read")
+            continue
+        if _agent_has_date(text):
+            errors.append(path.relative_to(ROOT).as_posix())
+    return errors
+
 
 # 2026-09-24: the lead-submit marker build.py puts on every page is measurement
 # plumbing, not content. Without this, adding it would re-date every page.
@@ -89,6 +149,7 @@ _PRODUCTION_ONLY = [
 def _blank(text: str) -> str:
     """Replace every date field with a placeholder, leaving all else untouched
     (except the lead-submit marker, which is ignored -- see _LEAD_MARKER)."""
+    text = _drop_agent_date(text)
     for pattern, _ in DATE_FIELDS:
         text = pattern.sub(lambda m: m.group(1) + PLACEHOLDER + m.group(3), text)
     # 2026-09-29: the home link changed from /index.html to "/" on every page
@@ -139,6 +200,9 @@ def _restore(fresh: str, committed: str) -> str:
     matches line up one-for-one by construction. Never call this without that
     check first.
     """
+    # The committed copy's agent dateModified (if any) is not a date the fresh page
+    # has a place for; leaving it in would shift every later dateModified by one.
+    committed = _drop_agent_date(committed)
     for pattern, _ in DATE_FIELDS:
         old_dates = [m.group(2) for m in pattern.finditer(committed)]
         if not old_dates:
@@ -179,6 +243,16 @@ def main() -> int:
     if not SITE.is_dir():
         print("  ! postprocess_freshness: no site/ directory — nothing to do.")
         return 0
+
+    # 2026-11-05: a build date on the sitewide agent entity fails the build (and so
+    # the deploy: scripts/netlify-build.sh keeps the last good deploy serving).
+    agent_dated = _agent_date_errors()
+    if agent_dated:
+        print("  !! postprocess_freshness: the sitewide RealEstateAgent carries a "
+              "dateModified (a build date is not a content date) in:")
+        for rel in agent_dated[:20]:
+            print(f"     - {rel}")
+        return 1
 
     in_git = subprocess.run(
         ["git", "rev-parse", "--is-inside-work-tree"],

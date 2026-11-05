@@ -50,7 +50,10 @@ const AGENT_DATE = /"@type":\s*"RealEstateAgent"[\s\S]{0,4000}?"dateModified"/;
 (async () => {
   process.env.BLOBS_SITE_ID = "s"; process.env.BLOBS_TOKEN = "t";
   const shell = fs.readFileSync(`${FN_DIR}/lib/_listing-page-shell.html`, "utf8");
-  check("the shell carries the build's date (what this fixes)", !!meta(shell, UPDATED) && !!meta(shell, MODIFIED) && AGENT_DATE.test(shell));
+  check("the shell carries the build's date in its two meta tags (what this fixes)", !!meta(shell, UPDATED) && !!meta(shell, MODIFIED));
+  // 2026-11-05: build.py no longer writes the agent entity's date at all
+  // (tests/test-agent-entity-no-date.js); listing-page.js still drops one if it appears.
+  check("the shell's agent entity carries no date (build.py writes none)", !AGENT_DATE.test(shell));
 
   const handler = load();
   let res = await handler({ queryStringParameters: { id: "IRE1061001" } });
