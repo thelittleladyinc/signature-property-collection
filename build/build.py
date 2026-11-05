@@ -3336,7 +3336,12 @@ def _real_estate_agent_schema():
             "Multi-generational homes", "Retirement relocation", "Expired listings",
             "Home valuation", "Real estate negotiation",
         ],
-        "dateModified": BUILD_DATE,
+        # 2026-11-05: no "dateModified" here. It was BUILD_DATE, so the agent entity
+        # on every page claimed it changed on the day of the last build that changed
+        # anything (all 114 pages read 2026-11-04). The main site's rule: "Do not put a
+        # daily dateModified on the sitewide RealEstateAgent entity simply because the
+        # generator ran." No real date exists for this entity, so none is set;
+        # build/postprocess_freshness.py fails the build if one comes back.
         # NOTE: aggregateRating deliberately NOT emitted sitewide any more.
         # Google's structured-data policy treats reviews *about* a business,
         # hosted *on that business's own site*, as self-serving and
