@@ -66,7 +66,7 @@ const { postLead, recordPush } = require("./lib/_lofty");
 const { smsConsentFromForm, applyTextingPreference } = require("./lib/_lofty-consent");
 const { addLoftyNote, refireLoftyTag, addPlanTags, sendLeadAlertEmail } = require("./lib/_notify");
 const { planForSubmission, valueReviewPlanOn, VALUE_REVIEW_SENT_TAG, interestFor, WEBSITE_SOURCE } = require("./lib/_form-plans");
-const { sendValueFormToHub } = require("./lib/_hub-intake");
+const { sendValueFormToHub, hubIntakeLogLine } = require("./lib/_hub-intake");
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
   findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
@@ -142,6 +142,9 @@ const SOURCE_LABELS = {
 // this long after the function starts (contact lookup included), so the backup
 // email always goes out inside the function's time limit.
 const CREATE_DEADLINE_MS = 7000;
+// 2026-11-12 (review): on the failure path the hub intake (after the retry queue is written) must end by this long
+// after the function starts, inside Netlify's default 10-second limit; under 1.5 s left it is not sent at all.
+const FAILURE_INTAKE_DEADLINE_MS = 9500;
 
 // 2026-11-03 (10DLC, this site): the two checkbox sentences every lead form on this
 // site now carries, character for character (Lofty's compliance wording, the same
@@ -525,11 +528,19 @@ async function handleLead(event, side) {
       // formData rides along so the queue replay can set the website fields and
       // the inquiry exactly as a first-try create would (lib/_lofty.js finishReplay)
       // -- and so does the plan, so a replayed new contact starts the same nurture plan.
+      // 2026-11-12 (review): the retry queue FIRST, always, so the lead is queued however slow anything after it is.
+      if (store) await recordPush(store, { ...result, emailResult, submissionId, smsConsent: consent.given, formData: data, plan, sourceLabel }, formName, body);
       // 2026-10-17 (Build E): a value form still reaches the hub (WEBSITE_TO_HUB_INTAKE), with the
       // Lofty lead id only when the lookup found the contact; the hub matches by email otherwise.
-      const hubIntake = await sendValueFormToHub({ formName, data, site: "signature", submissionId,
-        createdAt: (payload && payload.payload && payload.payload.created_at) || null, loftyLeadId: existing.leadId || null });
-      if (store) await recordPush(store, { ...result, emailResult, submissionId, smsConsent: consent.given, formData: data, plan, hubIntake, sourceLabel }, formName, body);
+      // 2026-11-12: only after the queue is written, only with time left (FAILURE_INTAKE_DEADLINE_MS; the
+      // intake gives up under 1.5 s), and never for a lead held for review (the hub's Do Not Contact on the
+      // shared list, its needs_review, or any other identity hold): the retry queue never depends on it.
+      const hubIntake = result.manualReview
+        ? { attempted: false, reason: "held for review; not sent to the hub intake" }
+        : await sendValueFormToHub({ formName, data, site: "signature", submissionId,
+          createdAt: (payload && payload.payload && payload.payload.created_at) || null, loftyLeadId: existing.leadId || null,
+          deadline: startedAt + FAILURE_INTAKE_DEADLINE_MS });
+      if (hubIntake.attempted) console.log(hubIntakeLogLine(formName, hubIntake));
       return { statusCode: 200, body: "ok (lofty push failed — see /site-health)" };
     }
 
@@ -656,8 +667,9 @@ async function handleLead(event, side) {
     side.own({ existing, newLeadId, leadId, provenNew });
     const hubIntakeResult = await hubIntake;
     if (hubIntakeResult.attempted) {
-      console.log(`Value review to the hub for "${formName}": ${hubIntakeResult.ok ? `${hubIntakeResult.hubStatus}` +
-        `${hubIntakeResult.reviewStatus ? `, review ${hubIntakeResult.reviewStatus}` : ""}` : `FAILED (${hubIntakeResult.error})`}.`);
+      // A value form reads "Value review to the hub ..."; any other form (WEBSITE_TO_HUB_INTAKE_ALL_FORMS, 2026-11-12)
+      // "Lead to the hub intake ...". The hub's status words only, never the person.
+      console.log(hubIntakeLogLine(formName, hubIntakeResult));
     }
     if (store) {
       await recordPush(store, {

@@ -38,16 +38,20 @@ function resp(status, body) {
 }
 
 // A fake Lofty plus a fake hub. The hub records every intake call with its headers.
-function fakeWorld({ emailHits = [], createStatus = 200, hubStatus = 200, hubBody = { status: "recorded", outcome: "created", value_review: { status: "opened", review_id: 3 } }, hubThrows = false } = {}) {
+// order: what happened, in order ("queue" = the retry queue written, "intake" = a hub intake call).
+const order = [];
+function fakeWorld({ emailHits = [], createStatus = 200, hubStatus = 200, hubBody = { status: "recorded", outcome: "created", value_review: { status: "opened", review_id: 3 } }, hubThrows = false, hubLead = null } = {}) {
   const w = { intake: [], other: [], leads: {} };
   w.fetch = async (url, init = {}) => {
     const s = String(url); const m = init.method || "GET";
     const body = init.body ? JSON.parse(init.body) : null;
     if (s.startsWith(`${HUB}/v1/intake/`)) {
       w.intake.push({ url: s, headers: init.headers, body, redirect: init.redirect, signal: !!init.signal });
+      order.push("intake");
       if (hubThrows) throw Object.assign(new Error(`down ${INTAKE_KEY}`), { name: "TimeoutError" });
       return resp(hubStatus, hubBody);
     }
+    if (hubLead && s === `${HUB}/v1/lofty/lead`) { w.other.push(s); return resp(200, hubLead); }
     if (s.startsWith(HUB)) { w.other.push(s); return resp(200, { status: "sent", provider_id: "e1" }); }
     if (m === "GET" && /\/v1\.0\/leads\?/.test(s)) return resp(200, { leads: /email=/.test(s) ? emailHits : [] });
     if (m === "POST" && /\/v1\.0\/leads$/.test(s)) {
@@ -81,6 +85,7 @@ require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, e
     setJSON: async (k, v, o) => {
       if (o && o.onlyIfNew && k in mem) return { modified: false };
       if (k === "lofty-last-push.json") pushes.push(v);
+      if (k === "lofty-failed-pushes.json" || k === "lofty-manual-review.json") order.push("queue");
       mem[k] = JSON.parse(JSON.stringify(v));
       return { modified: true };
     },
@@ -103,6 +108,7 @@ const last = () => pushes[pushes.length - 1] || {};
 async function submit(w, form, data) {
   global.fetch = w.fetch;
   for (const k of Object.keys(mem)) delete mem[k];
+  order.length = 0;
   const keep = [console.log, console.warn, console.error];
   const lines = [];
   console.log = console.warn = console.error = (...a) => lines.push(a.join(" "));
@@ -184,9 +190,30 @@ const on = () => { process.env.WEBSITE_TO_HUB_INTAKE = "on"; process.env.HUB_INT
   w = fakeWorld({ createStatus: 500 });
   await submit(w, "free-home-valuation", { address: "123 Main St, Loveland, CO 80538" });
   check("Lofty refused the create: the review still reaches the hub (no lead id), and the lead is queued as before",
-    w.intake.length === 1 && w.intake[0].body.lofty_lead_id === undefined && (mem["lofty-failed-pushes.json"] || []).length === 1 &&
-    (mem["lofty-failed-pushes.json"] || [])[0].hubIntake && (mem["lofty-failed-pushes.json"] || [])[0].hubIntake.ok === true,
+    w.intake.length === 1 && w.intake[0].body.lofty_lead_id === undefined && (mem["lofty-failed-pushes.json"] || []).length === 1,
     JSON.stringify(Object.keys(mem)));
+  check("...the retry queue is written BEFORE the hub intake is asked (the queue never waits on the hub)",
+    JSON.stringify(order) === '["queue","intake"]', JSON.stringify(order));
+  w = fakeWorld({ createStatus: 500, hubThrows: true });
+  await submit(w, "free-home-valuation", { address: "123 Main St" });
+  check("...and a hub that fails there changes nothing about the queued lead", (mem["lofty-failed-pushes.json"] || []).length === 1 && order[0] === "queue");
+  const sub0 = fs.readFileSync(`${FN_DIR}/submission-created.js`, "utf8");
+  const fail = sub0.slice(sub0.indexOf("if (!result.ok) {"), sub0.indexOf("return { statusCode: 200, body: \"ok (lofty push failed"));
+  check("...the failure path passes the intake a deadline inside the function's limit", /deadline: startedAt \+ FAILURE_INTAKE_DEADLINE_MS/.test(fail) &&
+    fail.indexOf("recordPush(") < fail.indexOf("sendValueFormToHub(") && /FAILURE_INTAKE_DEADLINE_MS = (\d+)/.test(sub0) &&
+    Number(sub0.match(/FAILURE_INTAKE_DEADLINE_MS = (\d+)/)[1]) <= 10000 - 500);
+  {
+    const calls = [];
+    const f = async (u, i) => { calls.push(i); return resp(200, { status: "recorded" }); };
+    const args = { formName: "free-home-valuation", data: person({ address: "1 A St" }), site: SITE };
+    const env = { WEBSITE_TO_HUB_INTAKE: "on", HUB_API_URL: HUB, HUB_INTAKE_KEY: INTAKE_KEY };
+    const tooLate = await H.sendValueFormToHub({ ...args, deadline: Date.now() + 1000 }, { env, fetchImpl: f });
+    const inTime = await H.sendValueFormToHub({ ...args, deadline: Date.now() + 3000 }, { env, fetchImpl: f });
+    const noDeadline = await H.sendValueFormToHub(args, { env, fetchImpl: f });
+    check("with a deadline: under 1.5 s left = not sent (said why); with time left = sent; none given = as before",
+      tooLate.attempted === false && /no time left/.test(tooLate.reason) && inTime.ok === true && noDeadline.ok === true && calls.length === 2 && H.MIN_INTAKE_MS === 1500,
+      JSON.stringify([tooLate, inTime]));
+  }
   w = fakeWorld({ hubStatus: 503, hubBody: { error: "hub api is switched off" } });
   await submit(w, "free-home-valuation", { address: "123 Main St" });
   check("the hub switched off: recorded as a failure, the Lofty path untouched", last().hubIntake.ok === false &&
@@ -220,6 +247,125 @@ const on = () => { process.env.WEBSITE_TO_HUB_INTAKE = "on"; process.env.HUB_INT
     await submit(w, "free-home-valuation", { address: "123 Main St" });
     check("a list naming none of the three sends nothing", w.intake.length === 0);
   } finally { delete process.env.WEBSITE_TO_HUB_INTAKE_FORMS; }
+
+  console.log("\n4c. Every form (WEBSITE_TO_HUB_INTAKE_ALL_FORMS, 2026-11-12)");
+  const OWN_SOURCE = SITE === "signature" ? "signature" : "website";
+  check("off unless exactly on (spaces and case forgiven)", H.allFormsOn({ WEBSITE_TO_HUB_INTAKE_ALL_FORMS: " On " }) &&
+    !H.allFormsOn({}) && !H.allFormsOn({ WEBSITE_TO_HUB_INTAKE_ALL_FORMS: "yes" }) && !H.allFormsOn({ WEBSITE_TO_HUB_INTAKE_ALL_FORMS: "1" }));
+  check("a value form always goes as website (only that source opens a review); any other form as this site's own",
+    H.intakeSource(SITE, true) === "website" && H.intakeSource(SITE, false) === OWN_SOURCE &&
+    H.intakeEndpoint({ HUB_API_URL: HUB, HUB_INTAKE_KEY: "k" }, "signature").url === `${HUB}/v1/intake/signature`);
+  // Every intent this side sends must be one the hub's contract allows (docs/hub-crossapp.md F).
+  const ALLOWED = { side: ["buyer", "seller", "both"], rent_to_own: [true], first_time_buyer: [true] };
+  const forms = Object.keys(require(`${FN_DIR}/lib/_form-plans.js`).FORM_INTEREST)
+    .concat(["contact", "home-lead", "unknown-form", "market-conditions-inquiry"]);
+  let allAllowed = true;
+  for (const f of forms) for (const choice of ["buy", "sell", "both", "value", "invest", ""]) {
+    const it = H.formIntent(f, { looking_to: choice }, SITE) || {};
+    for (const [k, v] of Object.entries(it)) if (!(ALLOWED[k] || []).includes(v)) allAllowed = false;
+  }
+  check("every form's intent uses only the contract's keys and values (and never false)", allAllowed);
+  check("intent from the form: buyer / seller / both, rent to own, first-time buyer", JSON.stringify(H.formIntent("buyers-guide", {}, SITE)) === '{"side":"buyer"}' &&
+    JSON.stringify(H.formIntent("first-time-homebuyer", {}, SITE)) === '{"side":"buyer","first_time_buyer":true}' &&
+    JSON.stringify(H.formIntent("rent-to-own-options", {}, SITE)) === '{"side":"buyer","rent_to_own":true}' &&
+    JSON.stringify(H.formIntent("home-lead", { looking_to: "both" }, SITE)) === '{"side":"both"}' &&
+    JSON.stringify(H.formIntent("cash-offer", {}, SITE)) === '{"side":"seller"}' &&
+    H.formIntent("contact", {}, SITE) === undefined && H.formIntent("newsletter-signup", {}, SITE) === undefined);
+  check("no protected characteristic: the VA form says buyer only, the retirement form seller only",
+    JSON.stringify(H.formIntent("veteran-home-purchase", {}, SITE)) === '{"side":"buyer"}' &&
+    JSON.stringify(H.formIntent("noco-retirement", {}, SITE)) === '{"side":"seller"}');
+  check("the agent-recruiting forms are never sent", ["lpt-join", "lpt-join-co", "co-license-guide", "agent-coaching"].every((f) => H.otherForm(f, {}) === null));
+
+  process.env.WEBSITE_TO_HUB_INTAKE_ALL_FORMS = "on";
+  try {
+    delete process.env.WEBSITE_TO_HUB_INTAKE;
+    w = fakeWorld();
+    await submit(w, "contact", { message: "hi" });
+    check("all forms on but WEBSITE_TO_HUB_INTAKE off: nothing sent", w.intake.length === 0 && last().hubIntake.reason === "WEBSITE_TO_HUB_INTAKE is off");
+    on();
+    w = fakeWorld();
+    lines = await submit(w, "contact", { message: "secret words" });
+    let ci = w.intake[0] || { body: {} };
+    check("a contact form: one call to this site's source, after the Lofty create, with the new lead id", w.intake.length === 1 &&
+      ci.url === `${HUB}/v1/intake/${OWN_SOURCE}` && ci.body.form_name === "contact" && ci.body.lofty_lead_id === NEWID, JSON.stringify(ci));
+    check("...no event_type (the hub records lead_received), no intent, no address, no free text", ci.body.event_type === undefined &&
+      ci.body.intent === undefined && ci.body.property_address === undefined && !JSON.stringify(ci.body).includes("secret"), JSON.stringify(ci.body));
+    check("...the intake key, redirect refused, a time limit", ci.headers["x-hub-key"] === INTAKE_KEY && ci.redirect === "manual" && ci.signal === true);
+    check("/status: kind form, the hub's words only", last().hubIntake.kind === "form" && last().hubIntake.ok === true &&
+      last().hubIntake.source === OWN_SOURCE && !/pat|example|555/i.test(JSON.stringify(last().hubIntake)), JSON.stringify(last().hubIntake));
+    check("the log line says Lead to the hub intake", lines.some((l) => l === 'Lead to the hub intake for "contact": recorded, review opened.' ||
+      l === 'Lead to the hub intake for "contact": recorded.'), lines.filter((l) => /hub intake/.test(l)).join(" | "));
+    w = fakeWorld();
+    await submit(w, "buyers-page-inquiry", { address: "55 Listing Way, Windsor, CO 80550" });
+    ci = w.intake[0] || { body: {} };
+    check("a buyer form: intent buyer, and the address it named is NOT sent (it may be a listing)", ci.body.intent && ci.body.intent.side === "buyer" &&
+      ci.body.property_address === undefined, JSON.stringify(ci.body));
+    w = fakeWorld();
+    await submit(w, "cash-offer", { address: "9 Elm St, Berthoud, CO 80513" });
+    ci = w.intake[0] || { body: {} };
+    check("a seller form about their own home: intent seller and the address", ci.body.intent && ci.body.intent.side === "seller" &&
+      ci.body.property_address === "9 Elm St" && ci.body.zip === "80513", JSON.stringify(ci.body));
+    w = fakeWorld();
+    await submit(w, "free-home-valuation", { address: "123 Main St, Loveland, CO 80538" });
+    ci = w.intake[0] || { body: {} };
+    check("a value form is exactly as before: website, home_value_view, and NO intent (the hub never reads its flag for one)",
+      ci.url === `${HUB}/v1/intake/website` && ci.body.event_type === "home_value_view" && ci.body.intent === undefined &&
+      last().hubIntake.kind === "value", JSON.stringify(ci.body));
+    process.env.WEBSITE_TO_HUB_INTAKE_FORMS = "sellers-page-inquiry";
+    w = fakeWorld();
+    await submit(w, "free-home-valuation", { address: "123 Main St" });
+    check("a value form left off WEBSITE_TO_HUB_INTAKE_FORMS stays off, even with every form on", w.intake.length === 0 &&
+      last().hubIntake.reason === "not on WEBSITE_TO_HUB_INTAKE_FORMS");
+    delete process.env.WEBSITE_TO_HUB_INTAKE_FORMS;
+    w = fakeWorld();
+    await submit(w, "lpt-join", { message: "agent" });
+    check("an agent-recruiting form: not sent", w.intake.length === 0 && /recruiting/.test(last().hubIntake.reason));
+    // A 503 from the hub is a recorded failure and Lofty is untouched. On the Signature site it is what the hub answers
+    // for source "signature" while its every-form flag is off. On the main site a non-value form goes to "website",
+    // which the hub takes whatever intake_every_form_enabled says (the flag only governs the intent there), so this
+    // site's WEBSITE_TO_HUB_INTAKE_ALL_FORMS is the only kill switch; a 503 here means the hub api itself is off.
+    w = fakeWorld({ hubStatus: 503, hubBody: { error: SITE === "signature"
+      ? "source signature is switched off at the hub (flag intake_every_form_enabled); nothing recorded"
+      : "hub api is switched off" } });
+    await submit(w, "contact", {});
+    check(SITE === "signature" ? "the hub's every-form flag off (source signature): a recorded failure, Lofty untouched"
+      : "the hub answering 503 (its api switched off): a recorded failure, Lofty untouched", last().hubIntake.ok === false &&
+      last().hubIntake.httpStatus === 503 && Object.keys(w.leads).length === 1, JSON.stringify(last().hubIntake));
+    w = fakeWorld({ createStatus: 500 });
+    await submit(w, "contact", {});
+    check("Lofty refused the create: the lead still reaches the hub (no lead id) and is queued as before", w.intake.length === 1 &&
+      w.intake[0].body.lofty_lead_id === undefined && (mem["lofty-failed-pushes.json"] || []).length === 1);
+  } finally { delete process.env.WEBSITE_TO_HUB_INTAKE_ALL_FORMS; }
+
+  console.log("\n4d. A lead held for review is never sent to the hub intake (LOFTY_VIA_HUB on)");
+  {
+    const keep = { HUB_API_KEY: process.env.HUB_API_KEY, LOFTY_VIA_HUB: process.env.LOFTY_VIA_HUB, ALL: process.env.WEBSITE_TO_HUB_INTAKE_ALL_FORMS };
+    process.env.HUB_API_KEY = "hub_" + "ab".repeat(32);
+    process.env.LOFTY_VIA_HUB = "on";
+    process.env.WEBSITE_TO_HUB_INTAKE_ALL_FORMS = "on";
+    on();
+    try {
+      for (const [label, hubLead] of [
+        ["the hub's Do Not Contact on the shared list", { ok: true, status: "held", held_by: "do_not_contact", lead_id: null, shared_list: { doNotContact: true } }],
+        ["the hub's needs_review (several leads could be this person)", { ok: false, status: "held", code: "several_leads", needs_review: true, reason: "several leads", lead_id: null, match_lead_ids: ["1", "2"] }],
+      ]) {
+        for (const form of ["free-home-valuation", "contact"]) {
+          w = fakeWorld({ hubLead });
+          await submit(w, form, { address: "123 Main St, Loveland, CO 80538" });
+          check(`${label}, ${form}: held for review, no hub intake call`, w.other.some((u) => u === `${HUB}/v1/lofty/lead`) &&
+            w.intake.length === 0 && (mem["lofty-manual-review.json"] || []).length === 1 && !(mem["lofty-failed-pushes.json"] || []).length,
+            JSON.stringify({ intake: w.intake.length, keys: Object.keys(mem) }));
+        }
+      }
+    } finally {
+      for (const [k, v] of [["HUB_API_KEY", keep.HUB_API_KEY], ["LOFTY_VIA_HUB", keep.LOFTY_VIA_HUB], ["WEBSITE_TO_HUB_INTAKE_ALL_FORMS", keep.ALL]]) {
+        if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      }
+    }
+  }
+  w = fakeWorld({ emailHits: [{ leadId: 1, emails: ["pat@example.com"] }, { leadId: 2, emails: ["pat@example.com"] }] });
+  await submit(w, "free-home-valuation", { address: "123 Main St" });
+  check("own key, an identity hold at the lookup: no hub intake call", w.intake.length === 0, JSON.stringify(w.intake.map((c) => c.url)));
 
   console.log(`\n5. Same module as the other site (${SIBLING})`);
   const other = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib", "_hub-intake.js");

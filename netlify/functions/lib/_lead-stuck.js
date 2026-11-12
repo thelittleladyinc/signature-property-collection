@@ -29,10 +29,25 @@
 //
 // Shared byte for byte by both sites (thelittleladysellshomes and
 // signature-property-collection), like lib/_lofty.js; each site's tests check it.
+//
+// THE COUNTS TO THE HUB (2026-11-12; OFF unless LEAD_STUCK_TO_HUB is exactly "on").
+// After every drain run, reportStuckToHub sends this site's queue as four numbers
+// to the Seller Intelligence hub (POST {HUB_API_URL}/v1/leads/stuck-report, the
+// website's own intake key HUB_INTAKE_KEY, which needs the hub scope leads:report),
+// so Command Center's "This morning" panel can say a site has stuck website leads:
+//   { site: this site's domain, pending, failed, oldest_age_minutes }
+// pending = queued leads still waiting for Lofty; failed = queued leads that cannot
+// be retried as they are (no lead kept to replay, flagged for identity review, or no
+// readable queue time); oldest_age_minutes = the oldest pending lead's wait (null
+// when none). Nothing else: the hub refuses any other key, so a person's data can
+// never ride along. A queue that cannot be read sends NOTHING (never zeros): the hub
+// then shows the site as "not reporting" after its own 3 hours. 3-second limit, https
+// only, a redirect refused, the key only in the x-hub-key header; never throws.
 "use strict";
 const crypto = require("crypto");
 const { FAILED_PUSH_KEY, queuedLeadKey } = require("./_lofty");
-const { sendInternalAlert, BRAND_DOMAIN } = require("./_notify");
+const { sendInternalAlert, BRAND_DOMAIN, BRAND_SITE } = require("./_notify");
+const { hubEndpoint } = require("./_hub-intake");
 
 const STUCK_ALERT_KEY = "lofty-stuck-alerts.json";
 const DEFAULT_MINUTES = 60;
@@ -272,6 +287,76 @@ async function checkStuckLeads(store, opts = {}) {
   }
 }
 
+// ---- The counts to the hub (2026-11-12, LEAD_STUCK_TO_HUB) ----------------------
+
+const STUCK_REPORT_PATH = "/v1/leads/stuck-report";
+const STUCK_REPORT_TIMEOUT_MS = 3000;
+
+function stuckToHubOn(env = process.env) {
+  return String((env && env.LEAD_STUCK_TO_HUB) || "").trim().toLowerCase() === "on";
+}
+
+// The four numbers, from the queue as read. Pure.
+// thisSite (default this site's BRAND_SITE, "tllsh" / "signature"): the Blobs store could be shared, so an entry whose
+// `site` is set to another site is that site's lead and is not counted here (an entry with no `site` is this site's).
+function stuckCounts(queue, nowMs, thisSite = BRAND_SITE) {
+  const list = Array.isArray(queue) ? queue.filter((e) => e && !(e.site && e.site !== thisSite)) : [];
+  let pending = 0;
+  let failed = 0;
+  let oldestMs = null;
+  for (const e of list) {
+    if (e.loftyId) continue; // Lofty has it; only follow-up steps are left
+    const t = queuedAtMs(e);
+    if (e.manualReview || !e.lead || t === null) { failed += 1; continue; }
+    pending += 1;
+    if (oldestMs === null || t < oldestMs) oldestMs = t;
+  }
+  return {
+    pending,
+    failed,
+    oldest_age_minutes: pending ? Math.max(0, Math.floor((nowMs - oldestMs) / 60000)) : null,
+  };
+}
+
+// opts: { deadline (epoch ms), now (epoch ms, tests), env, fetchImpl }.
+// -> { enabled:false } | { enabled:true, sent:false, reason } | { enabled:true, sent:true, ok, httpStatus, counts, error? }
+async function reportStuckToHub(store, opts = {}) {
+  const env = opts.env || process.env;
+  if (!stuckToHubOn(env)) return { enabled: false };
+  const out = { enabled: true, sent: false };
+  let asked = false;
+  try {
+    const nowMs = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const deadline = Number.isFinite(opts.deadline) ? opts.deadline : Infinity;
+    const endpoint = hubEndpoint(env, STUCK_REPORT_PATH);
+    if (!endpoint.url) return { ...out, reason: endpoint.reason };
+    const queue = await readJson(store, FAILED_PUSH_KEY);
+    if (queue === undefined) return { ...out, reason: "the retry queue could not be read; nothing reported" };
+    // Something stored that is not a list is unreadable too: never zeros it did not read. (Nothing stored = empty.)
+    if (queue !== null && !Array.isArray(queue)) return { ...out, reason: "the retry queue is not a list (unreadable); nothing reported" };
+    const counts = stuckCounts(queue, nowMs);
+    const timeoutMs = Math.min(STUCK_REPORT_TIMEOUT_MS, deadline - Date.now());
+    if (!(timeoutMs >= 500)) return { ...out, reason: "no time left in this run" };
+    const doFetch = opts.fetchImpl || fetch;
+    asked = true;
+    const res = await doFetch(endpoint.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-hub-key": endpoint.key },
+      body: JSON.stringify({ site: BRAND_DOMAIN, ...counts }),
+      redirect: "manual",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const raw = await res.text().catch(() => "");
+    let j = null;
+    try { j = JSON.parse(raw); } catch (e) { j = null; }
+    if (res.status === 200 && j && j.recorded === true) return { ...out, sent: true, ok: true, httpStatus: 200, counts };
+    const why = j && typeof j.error === "string" ? j.error.slice(0, 120) : `hub answered ${res.status}`;
+    return { ...out, sent: true, ok: false, httpStatus: res.status, counts, error: why };
+  } catch (err) {
+    return { ...out, sent: asked, ok: false, httpStatus: null, error: (err && err.name) || "error" };
+  }
+}
+
 module.exports = {
   STUCK_ALERT_KEY,
   DEFAULT_MINUTES,
@@ -285,4 +370,8 @@ module.exports = {
   stuckEmail,
   resolvedEmail,
   checkStuckLeads,
+  STUCK_REPORT_PATH,
+  stuckToHubOn,
+  stuckCounts,
+  reportStuckToHub,
 };
