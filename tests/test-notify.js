@@ -86,7 +86,7 @@ delete process.env.LEAD_ALERT_TO;
   if (emails.length) {
     const e = emails[0];
     check("email subject names the lead and source",
-      /New website lead: Dana Reyes — Contact Form/.test(e.body.subject), e.body.subject);
+      /NEW LITTLE LADY LEAD — Signature — Dana Reyes — Contact Form/.test(e.body.subject), e.body.subject);
     check("email goes to her inbox", JSON.stringify(e.body.to) === '["thelittleladyinc@gmail.com"]', JSON.stringify(e.body.to));
     check("reply_to is the buyer", e.body.reply_to === "dana@example.com", e.body.reply_to);
     check("email body carries the message", e.body.html.includes("Looking in Fort Morgan"));
@@ -353,7 +353,7 @@ delete process.env.LEAD_ALERT_TO;
   // 2026-10-13: lib/_notify.js is shared with the main site; only its four BRAND_
   // lines are this site's. Every alert, a held one too, must carry them.
   console.log("\n9. Every alert carries this site's brand lines (lib/_notify.js is shared)");
-  const BRAND = { heading: "New website lead", sentBy: "Sent by signaturepropertycollection.com", prefix: "New website lead: " };
+  const BRAND = { heading: "New website lead", sentBy: "Sent by signaturepropertycollection.com", prefix: "NEW LITTLE LADY LEAD — Signature — " };
   stubFetch(({ url, method }) => {
     if (url.includes(HUB)) return SENT("email_12");
     if (url.includes("/leads") && method === "POST") return { status: 200, body: { data: { leadId: 888 } } };

@@ -61,7 +61,7 @@
 const BRAND_SITE = "signature";
 const BRAND_HEADLINE = "New website lead";
 const BRAND_DOMAIN = "signaturepropertycollection.com";
-const BRAND_SUBJECT_PREFIX = "New website lead: ";
+const BRAND_SUBJECT_PREFIX = "NEW LITTLE LADY LEAD — Signature — ";
 
 const crypto = require("crypto");
 // 2026-10-17 (Wave 1b): the Lofty work through the hub (OFF unless LOFTY_VIA_HUB
