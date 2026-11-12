@@ -89,6 +89,14 @@ function hubFake(calls, { status = 200, body = { recorded: true }, throws = fals
   check("an empty queue: zeros and no age", JSON.stringify(S.stuckCounts([], NOW)) === '{"pending":0,"failed":0,"oldest_age_minutes":null}' &&
     JSON.stringify(S.stuckCounts(null, NOW)) === '{"pending":0,"failed":0,"oldest_age_minutes":null}');
 
+  const THIS = SIGNATURE ? "signature" : "tllsh";
+  const OTHER = SIGNATURE ? "tllsh" : "signature";
+  const shared = S.stuckCounts([entry(30, { site: THIS }), entry(200, { site: OTHER }), entry(50), entry(5, { site: OTHER, manualReview: true })], NOW);
+  check("a shared store: the other site's entries are not counted (an entry with no site is this site's)",
+    JSON.stringify(shared) === '{"pending":2,"failed":0,"oldest_age_minutes":50}', JSON.stringify(shared));
+  check("...the site is read from this site's own copy of lib/_notify.js", S.stuckCounts([entry(9, { site: "x" })], NOW, "x").pending === 1 &&
+    S.stuckCounts([entry(9, { site: "x" })], NOW).pending === 0);
+
   console.log("\n3. On: one call, the four numbers only");
   const env = { LEAD_STUCK_TO_HUB: "on", HUB_API_URL: HUB, HUB_INTAKE_KEY: INTAKE_KEY };
   calls = [];
@@ -109,6 +117,14 @@ function hubFake(calls, { status = 200, body = { recorded: true }, throws = fals
   calls = [];
   r = await S.reportStuckToHub(blobStore({}, { failGet: true }), { now: NOW, env, fetchImpl: hubFake(calls) });
   check("a queue that cannot be read: nothing sent (never zeros)", calls.length === 0 && r.sent === false && /could not be read/.test(r.reason), JSON.stringify(r));
+  for (const bad of [{ leads: [] }, "a string", 42, true]) {
+    r = await S.reportStuckToHub(blobStore({ [L.FAILED_PUSH_KEY]: bad }), { now: NOW, env, fetchImpl: hubFake(calls) });
+    check(`a stored queue that is not a list (${JSON.stringify(bad)}): unreadable, nothing sent`, calls.length === 0 && r.sent === false &&
+      /not a list/.test(r.reason), JSON.stringify(r));
+  }
+  r = await S.reportStuckToHub(blobStore({}), { now: NOW, env, fetchImpl: hubFake(calls) });
+  check("nothing stored at all: an empty queue (zeros are true then)", calls.length === 1 && calls[0].body.pending === 0 && r.ok === true, JSON.stringify(r));
+  calls = [];
   r = await S.reportStuckToHub(blobStore({}), { now: NOW, env: { LEAD_STUCK_TO_HUB: "on", HUB_API_URL: HUB }, fetchImpl: hubFake(calls) });
   check("no intake key: nothing sent, the setting named", calls.length === 0 && r.reason === "HUB_INTAKE_KEY not set", JSON.stringify(r));
   r = await S.reportStuckToHub(blobStore({}), { now: NOW, env: { ...env, HUB_API_URL: "http://hub.example.test" }, fetchImpl: hubFake(calls) });

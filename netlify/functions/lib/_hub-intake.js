@@ -41,7 +41,9 @@
 //     intake_every_form_enabled is on; off it answers 503, recorded as a failed
 //     send and nothing else changes). No event_type: the hub records
 //     lead_received, which no score counts.
-//   - Both carry `intent`: only the contract's allow-listed keys, worked out from
+//   - A value form never carries `intent` (it is exactly as before, so the hub
+//     never has to read its flag for one). Every other form carries `intent`:
+//     only the contract's allow-listed keys, worked out from
 //     the form's own Interest tags (lib/_form-plans.js interestFor): side
 //     (buyer / seller / both), rent_to_own: true, first_time_buyer: true. Never a
 //     "false" we did not hear, and nothing about a protected characteristic (the
@@ -57,6 +59,9 @@ const { interestFor, INTEREST } = require("./_form-plans");
 
 const INTAKE_PATH = "/v1/intake/website";
 const TIMEOUT_MS = 4000;
+// With args.deadline (epoch ms): no call when less than this is left, and the call's own limit is what is left
+// (2026-11-12 review: the intake must never be what runs a function out of time).
+const MIN_INTAKE_MS = 1500;
 const VALUE_FORMS = Object.freeze(["free-home-valuation", "sellers-page-inquiry"]);
 
 // The forms WEBSITE_TO_HUB_INTAKE_FORMS lets through: null = all (unset or blank),
@@ -211,16 +216,18 @@ async function sendValueFormToHub(args, deps) {
     const source = intakeSource(site, kind === "value");
     const endpoint = intakeEndpoint(env, source);
     if (!endpoint.url) return { attempted: false, kind, reason: endpoint.reason };
-    const intent = every ? formIntent(a.formName, a.data, site) : undefined;
+    const intent = every && kind === "form" ? formIntent(a.formName, a.data, site) : undefined;
     const body = intakeBody(form, a.data, { ...a, kind, intent,
       withAddress: !!(intent && (intent.side === "seller" || intent.side === "both")) });
     if (!body.email && !body.phone) return { attempted: false, kind, reason: "no email or phone on the form" };
+    const left = Number.isFinite(a.deadline) ? a.deadline - Date.now() : Infinity;
+    if (!(left >= MIN_INTAKE_MS)) return { attempted: false, kind, reason: "no time left in this run for the hub intake" };
     const res = await doFetch(endpoint.url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-hub-key": endpoint.key },
       body: JSON.stringify(body),
       redirect: "manual",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(Math.min(TIMEOUT_MS, left)),
     });
     const raw = await res.text().catch(() => "");
     let j = null;
@@ -246,5 +253,5 @@ function hubIntakeLogLine(formName, r) {
   return `${what} for "${formName}": ${r.ok ? `${r.hubStatus}${r.reviewStatus ? `, review ${r.reviewStatus}` : ""}` : `FAILED (${r.error})`}.`;
 }
 
-module.exports = { INTAKE_PATH, VALUE_FORMS, FORM_KEYS, RECRUITING_FORMS, allowedValueForms, hubIntakeOn, allFormsOn, valueForm,
+module.exports = { INTAKE_PATH, MIN_INTAKE_MS, VALUE_FORMS, FORM_KEYS, RECRUITING_FORMS, allowedValueForms, hubIntakeOn, allFormsOn, valueForm,
   otherForm, intakeSource, formIntent, intakeEndpoint, hubEndpoint, intakeBody, sendValueFormToHub, hubIntakeLogLine };

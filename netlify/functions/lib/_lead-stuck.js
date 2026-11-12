@@ -46,7 +46,7 @@
 "use strict";
 const crypto = require("crypto");
 const { FAILED_PUSH_KEY, queuedLeadKey } = require("./_lofty");
-const { sendInternalAlert, BRAND_DOMAIN } = require("./_notify");
+const { sendInternalAlert, BRAND_DOMAIN, BRAND_SITE } = require("./_notify");
 const { hubEndpoint } = require("./_hub-intake");
 
 const STUCK_ALERT_KEY = "lofty-stuck-alerts.json";
@@ -297,8 +297,10 @@ function stuckToHubOn(env = process.env) {
 }
 
 // The four numbers, from the queue as read. Pure.
-function stuckCounts(queue, nowMs) {
-  const list = Array.isArray(queue) ? queue.filter(Boolean) : [];
+// thisSite (default this site's BRAND_SITE, "tllsh" / "signature"): the Blobs store could be shared, so an entry whose
+// `site` is set to another site is that site's lead and is not counted here (an entry with no `site` is this site's).
+function stuckCounts(queue, nowMs, thisSite = BRAND_SITE) {
+  const list = Array.isArray(queue) ? queue.filter((e) => e && !(e.site && e.site !== thisSite)) : [];
   let pending = 0;
   let failed = 0;
   let oldestMs = null;
@@ -330,6 +332,8 @@ async function reportStuckToHub(store, opts = {}) {
     if (!endpoint.url) return { ...out, reason: endpoint.reason };
     const queue = await readJson(store, FAILED_PUSH_KEY);
     if (queue === undefined) return { ...out, reason: "the retry queue could not be read; nothing reported" };
+    // Something stored that is not a list is unreadable too: never zeros it did not read. (Nothing stored = empty.)
+    if (queue !== null && !Array.isArray(queue)) return { ...out, reason: "the retry queue is not a list (unreadable); nothing reported" };
     const counts = stuckCounts(queue, nowMs);
     const timeoutMs = Math.min(STUCK_REPORT_TIMEOUT_MS, deadline - Date.now());
     if (!(timeoutMs >= 500)) return { ...out, reason: "no time left in this run" };
