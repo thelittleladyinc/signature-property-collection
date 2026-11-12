@@ -66,7 +66,7 @@ const { postLead, recordPush } = require("./lib/_lofty");
 const { smsConsentFromForm, applyTextingPreference } = require("./lib/_lofty-consent");
 const { addLoftyNote, refireLoftyTag, addPlanTags, sendLeadAlertEmail } = require("./lib/_notify");
 const { planForSubmission, valueReviewPlanOn, VALUE_REVIEW_SENT_TAG, interestFor, WEBSITE_SOURCE } = require("./lib/_form-plans");
-const { sendValueFormToHub } = require("./lib/_hub-intake");
+const { sendValueFormToHub, hubIntakeLogLine } = require("./lib/_hub-intake");
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
   findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
@@ -656,8 +656,9 @@ async function handleLead(event, side) {
     side.own({ existing, newLeadId, leadId, provenNew });
     const hubIntakeResult = await hubIntake;
     if (hubIntakeResult.attempted) {
-      console.log(`Value review to the hub for "${formName}": ${hubIntakeResult.ok ? `${hubIntakeResult.hubStatus}` +
-        `${hubIntakeResult.reviewStatus ? `, review ${hubIntakeResult.reviewStatus}` : ""}` : `FAILED (${hubIntakeResult.error})`}.`);
+      // A value form reads "Value review to the hub ..."; any other form (WEBSITE_TO_HUB_INTAKE_ALL_FORMS, 2026-11-12)
+      // "Lead to the hub intake ...". The hub's status words only, never the person.
+      console.log(hubIntakeLogLine(formName, hubIntakeResult));
     }
     if (store) {
       await recordPush(store, {

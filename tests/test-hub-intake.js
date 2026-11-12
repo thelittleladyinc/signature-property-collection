@@ -221,6 +221,87 @@ const on = () => { process.env.WEBSITE_TO_HUB_INTAKE = "on"; process.env.HUB_INT
     check("a list naming none of the three sends nothing", w.intake.length === 0);
   } finally { delete process.env.WEBSITE_TO_HUB_INTAKE_FORMS; }
 
+  console.log("\n4c. Every form (WEBSITE_TO_HUB_INTAKE_ALL_FORMS, 2026-11-12)");
+  const OWN_SOURCE = SITE === "signature" ? "signature" : "website";
+  check("off unless exactly on (spaces and case forgiven)", H.allFormsOn({ WEBSITE_TO_HUB_INTAKE_ALL_FORMS: " On " }) &&
+    !H.allFormsOn({}) && !H.allFormsOn({ WEBSITE_TO_HUB_INTAKE_ALL_FORMS: "yes" }) && !H.allFormsOn({ WEBSITE_TO_HUB_INTAKE_ALL_FORMS: "1" }));
+  check("a value form always goes as website (only that source opens a review); any other form as this site's own",
+    H.intakeSource(SITE, true) === "website" && H.intakeSource(SITE, false) === OWN_SOURCE &&
+    H.intakeEndpoint({ HUB_API_URL: HUB, HUB_INTAKE_KEY: "k" }, "signature").url === `${HUB}/v1/intake/signature`);
+  // Every intent this side sends must be one the hub's contract allows (docs/hub-crossapp.md F).
+  const ALLOWED = { side: ["buyer", "seller", "both"], rent_to_own: [true], first_time_buyer: [true] };
+  const forms = Object.keys(require(`${FN_DIR}/lib/_form-plans.js`).FORM_INTEREST)
+    .concat(["contact", "home-lead", "unknown-form", "market-conditions-inquiry"]);
+  let allAllowed = true;
+  for (const f of forms) for (const choice of ["buy", "sell", "both", "value", "invest", ""]) {
+    const it = H.formIntent(f, { looking_to: choice }, SITE) || {};
+    for (const [k, v] of Object.entries(it)) if (!(ALLOWED[k] || []).includes(v)) allAllowed = false;
+  }
+  check("every form's intent uses only the contract's keys and values (and never false)", allAllowed);
+  check("intent from the form: buyer / seller / both, rent to own, first-time buyer", JSON.stringify(H.formIntent("buyers-guide", {}, SITE)) === '{"side":"buyer"}' &&
+    JSON.stringify(H.formIntent("first-time-homebuyer", {}, SITE)) === '{"side":"buyer","first_time_buyer":true}' &&
+    JSON.stringify(H.formIntent("rent-to-own-options", {}, SITE)) === '{"side":"buyer","rent_to_own":true}' &&
+    JSON.stringify(H.formIntent("home-lead", { looking_to: "both" }, SITE)) === '{"side":"both"}' &&
+    JSON.stringify(H.formIntent("cash-offer", {}, SITE)) === '{"side":"seller"}' &&
+    H.formIntent("contact", {}, SITE) === undefined && H.formIntent("newsletter-signup", {}, SITE) === undefined);
+  check("no protected characteristic: the VA form says buyer only, the retirement form seller only",
+    JSON.stringify(H.formIntent("veteran-home-purchase", {}, SITE)) === '{"side":"buyer"}' &&
+    JSON.stringify(H.formIntent("noco-retirement", {}, SITE)) === '{"side":"seller"}');
+  check("the agent-recruiting forms are never sent", ["lpt-join", "lpt-join-co", "co-license-guide", "agent-coaching"].every((f) => H.otherForm(f, {}) === null));
+
+  process.env.WEBSITE_TO_HUB_INTAKE_ALL_FORMS = "on";
+  try {
+    delete process.env.WEBSITE_TO_HUB_INTAKE;
+    w = fakeWorld();
+    await submit(w, "contact", { message: "hi" });
+    check("all forms on but WEBSITE_TO_HUB_INTAKE off: nothing sent", w.intake.length === 0 && last().hubIntake.reason === "WEBSITE_TO_HUB_INTAKE is off");
+    on();
+    w = fakeWorld();
+    lines = await submit(w, "contact", { message: "secret words" });
+    let ci = w.intake[0] || { body: {} };
+    check("a contact form: one call to this site's source, after the Lofty create, with the new lead id", w.intake.length === 1 &&
+      ci.url === `${HUB}/v1/intake/${OWN_SOURCE}` && ci.body.form_name === "contact" && ci.body.lofty_lead_id === NEWID, JSON.stringify(ci));
+    check("...no event_type (the hub records lead_received), no intent, no address, no free text", ci.body.event_type === undefined &&
+      ci.body.intent === undefined && ci.body.property_address === undefined && !JSON.stringify(ci.body).includes("secret"), JSON.stringify(ci.body));
+    check("...the intake key, redirect refused, a time limit", ci.headers["x-hub-key"] === INTAKE_KEY && ci.redirect === "manual" && ci.signal === true);
+    check("/status: kind form, the hub's words only", last().hubIntake.kind === "form" && last().hubIntake.ok === true &&
+      last().hubIntake.source === OWN_SOURCE && !/pat|example|555/i.test(JSON.stringify(last().hubIntake)), JSON.stringify(last().hubIntake));
+    check("the log line says Lead to the hub intake", lines.some((l) => l === 'Lead to the hub intake for "contact": recorded, review opened.' ||
+      l === 'Lead to the hub intake for "contact": recorded.'), lines.filter((l) => /hub intake/.test(l)).join(" | "));
+    w = fakeWorld();
+    await submit(w, "buyers-page-inquiry", { address: "55 Listing Way, Windsor, CO 80550" });
+    ci = w.intake[0] || { body: {} };
+    check("a buyer form: intent buyer, and the address it named is NOT sent (it may be a listing)", ci.body.intent && ci.body.intent.side === "buyer" &&
+      ci.body.property_address === undefined, JSON.stringify(ci.body));
+    w = fakeWorld();
+    await submit(w, "cash-offer", { address: "9 Elm St, Berthoud, CO 80513" });
+    ci = w.intake[0] || { body: {} };
+    check("a seller form about their own home: intent seller and the address", ci.body.intent && ci.body.intent.side === "seller" &&
+      ci.body.property_address === "9 Elm St" && ci.body.zip === "80513", JSON.stringify(ci.body));
+    w = fakeWorld();
+    await submit(w, "free-home-valuation", { address: "123 Main St, Loveland, CO 80538" });
+    ci = w.intake[0] || { body: {} };
+    check("a value form is still a value form: website, home_value_view, plus its intent", ci.url === `${HUB}/v1/intake/website` &&
+      ci.body.event_type === "home_value_view" && ci.body.intent && ci.body.intent.side === "seller" && last().hubIntake.kind === "value");
+    process.env.WEBSITE_TO_HUB_INTAKE_FORMS = "sellers-page-inquiry";
+    w = fakeWorld();
+    await submit(w, "free-home-valuation", { address: "123 Main St" });
+    check("a value form left off WEBSITE_TO_HUB_INTAKE_FORMS stays off, even with every form on", w.intake.length === 0 &&
+      last().hubIntake.reason === "not on WEBSITE_TO_HUB_INTAKE_FORMS");
+    delete process.env.WEBSITE_TO_HUB_INTAKE_FORMS;
+    w = fakeWorld();
+    await submit(w, "lpt-join", { message: "agent" });
+    check("an agent-recruiting form: not sent", w.intake.length === 0 && /recruiting/.test(last().hubIntake.reason));
+    w = fakeWorld({ hubStatus: 503, hubBody: { error: "source signature is switched off at the hub (flag intake_every_form_enabled); nothing recorded" } });
+    await submit(w, "contact", {});
+    check("the hub's every-form flag off: a recorded failure, Lofty untouched", last().hubIntake.ok === false && last().hubIntake.httpStatus === 503 &&
+      Object.keys(w.leads).length === 1, JSON.stringify(last().hubIntake));
+    w = fakeWorld({ createStatus: 500 });
+    await submit(w, "contact", {});
+    check("Lofty refused the create: the lead still reaches the hub (no lead id) and is queued as before", w.intake.length === 1 &&
+      w.intake[0].body.lofty_lead_id === undefined && (mem["lofty-failed-pushes.json"] || []).length === 1);
+  } finally { delete process.env.WEBSITE_TO_HUB_INTAKE_ALL_FORMS; }
+
   console.log(`\n5. Same module as the other site (${SIBLING})`);
   const other = path.join(ROOT, "..", SIBLING, "netlify", "functions", "lib", "_hub-intake.js");
   if (fs.existsSync(other)) {

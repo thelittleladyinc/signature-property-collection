@@ -51,7 +51,7 @@ const DIAG_STORE = "mls-listings";  // where submission-created.js queues them
 // inside the scheduler's 15 seconds. Its result never changes the drain's answer.
 const STUCK_BUDGET_MS = 13000;
 
-async function stuckCheck(getStore, getBlobStore, startedAt, drained) {
+async function stuckAlerts(getStore, getBlobStore, startedAt, drained) {
   try {
     const { checkStuckLeads, leadStuckAlertOn } = require("./lib/_lead-stuck");
     if (!leadStuckAlertOn()) return;
@@ -64,6 +64,30 @@ async function stuckCheck(getStore, getBlobStore, startedAt, drained) {
   } catch (err) {
     console.error("lofty-queue-drain: stuck-lead check failed (the queue is untouched):", err && err.message);
   }
+}
+
+// 2026-11-12: with LEAD_STUCK_TO_HUB exactly "on", the queue's counts (pending,
+// failed, the oldest's wait; never a person) also go to the Seller Intelligence
+// hub for Command Center's "This morning" panel (lib/_lead-stuck.js
+// reportStuckToHub, 3 s). Runs next to the email check, inside the same budget;
+// it reads the queue and writes nothing, and its result never changes the answer.
+async function stuckReport(getStore, getBlobStore, startedAt) {
+  try {
+    const { reportStuckToHub, stuckToHubOn } = require("./lib/_lead-stuck");
+    if (!stuckToHubOn()) return;
+    const store = getBlobStore(getStore, DIAG_STORE);
+    const r = await reportStuckToHub(store, { deadline: startedAt + STUCK_BUDGET_MS });
+    console.log(`lofty-queue-drain: stuck counts to the hub ${JSON.stringify(r)}`);
+  } catch (err) {
+    console.error("lofty-queue-drain: stuck counts to the hub failed (the queue is untouched):", err && err.message);
+  }
+}
+
+async function stuckCheck(getStore, getBlobStore, startedAt, drained) {
+  await Promise.all([
+    stuckAlerts(getStore, getBlobStore, startedAt, drained),
+    stuckReport(getStore, getBlobStore, startedAt),
+  ]);
 }
 
 function answer(statusCode, body) {
