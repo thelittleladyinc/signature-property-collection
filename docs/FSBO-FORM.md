@@ -9,7 +9,9 @@ What changed here, and only because the file is shared byte for byte with the ma
 - `netlify/functions/lib/_form-plans.js` gains one plan, `FSBO`, whose start tag is `Funnel - FSBO` (plain ASCII hyphen, as Christine typed it; Seller lead type), and one form, `fsbo-inquiry`. No form on this site has that name, so nothing this site does changes: every existing form starts exactly the plan it started before (the test checks the whole table on both sites).
 - `tests/test-form-plans.js` pins the new plan, as the main site's copy does.
 
-`Funnel - FSBO` is meant to start Christine's existing Lofty plan **"FSBO – Seller Support (21 Days)"**, never a second FSBO plan. In Lofty, add `Funnel - FSBO` to that plan's start tags, or tell us the plan's current trigger tag and the one constant (`PLAN_TAGS.FSBO`) changes in both repos together.
+**2026-11-17 update (Christine approved):** that plan starts on `FSBO – Checklist Requested` (EN DASH) in Lofty, and no plan starts on `Funnel - FSBO`. The shared table now adds both on the FSBO plan (`FSBO_START_TAG`, as `alsoTags`), byte-identical in both repos; `Funnel - FSBO` stays because StreetText uses it. The next paragraph is history. No form on this site is named `fsbo-inquiry`, so nothing on this site changes.
+
+(History) `Funnel - FSBO` is meant to start Christine's existing Lofty plan **"FSBO – Seller Support (21 Days)"**, never a second FSBO plan. In Lofty, add `Funnel - FSBO` to that plan's start tags, or tell us the plan's current trigger tag and the one constant (`PLAN_TAGS.FSBO`) changes in both repos together.
 
 ## Switch
 

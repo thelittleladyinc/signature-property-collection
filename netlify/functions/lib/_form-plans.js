@@ -94,6 +94,14 @@ const VALUE_REVIEW_SENT_TAG = "Value Review Sent";
 // for a Signature home-value request (switch on).
 const LUXURY_TAG = "Luxury";
 
+// 2026-11-17 (Christine approved): her Lofty plan "FSBO – Seller Support (21
+// Days)" starts on "FSBO – Checklist Requested" (U+2013 EN DASH, as the plan's
+// trigger reads in Lofty), not on "Funnel - FSBO". The FSBO form adds both, in
+// the same proven-new, consent-checked plan-tag PUT: "Funnel - FSBO" stays because
+// StreetText and the FSBO lists use it; the checklist tag is the one that starts
+// the plan. Never a second FSBO plan.
+const FSBO_START_TAG = "FSBO \u2013 Checklist Requested";
+
 // Lofty's numeric lead types (`leadTypes` on POST /v1.0/leads).
 const LEAD_TYPE = Object.freeze({ SELLER: 1, BUYER: 2 });
 
@@ -117,7 +125,7 @@ const PLANS = Object.freeze({
   DS1_DOWNSIZING: { tag: PLAN_TAGS.DS1_DOWNSIZING, leadType: LEAD_TYPE.SELLER },
   SPC_LUXURY: { tag: PLAN_TAGS.SPC_LUXURY, leadType: LEAD_TYPE.SELLER },
   RECRUIT: { tag: PLAN_TAGS.RECRUIT, leadType: null },
-  FSBO: { tag: PLAN_TAGS.FSBO, leadType: LEAD_TYPE.SELLER },
+  FSBO: { tag: PLAN_TAGS.FSBO, alsoTags: Object.freeze([FSBO_START_TAG]), leadType: LEAD_TYPE.SELLER },
   // No tag at submission: HV starts on VALUE_REVIEW_SENT_TAG, added later by the hub.
   HV_VALUE_REVIEW: { tag: null, leadType: LEAD_TYPE.SELLER },
   // Signature's home-value request, switch on: the luxury plan now, plus the
@@ -435,6 +443,7 @@ module.exports = {
   VALUE_REVIEW_FORMS,
   SIGNATURE_VALUE_REVIEW_PLAN,
   LUXURY_TAG,
+  FSBO_START_TAG,
   planForSubmission,
   leadTypesFor,
   valueReviewPlanOn,
