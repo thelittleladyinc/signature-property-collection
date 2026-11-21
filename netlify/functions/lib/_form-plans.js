@@ -222,6 +222,7 @@ const FORMS_WITHOUT_PLAN = Object.freeze([
   "newsletter-signup",
   "rent-to-own-options",
   "market-conditions-inquiry",
+  "expired-relist-review", // deliberately no automatic Smart Plan
 ]);
 
 // Forms with no plan whose leads still get a lead type (Christine, 2026-10-26:
@@ -232,6 +233,7 @@ const FORMS_WITHOUT_PLAN = Object.freeze([
 // lead type: on the create of a contact proven new only.
 const TYPE_ONLY_FORMS = Object.freeze({
   "rent-to-own-options": LEAD_TYPE.BUYER,
+  "expired-relist-review": LEAD_TYPE.SELLER,
 });
 
 function hasOwn(obj, key) {
@@ -314,6 +316,7 @@ const FORM_INTEREST = Object.freeze({
   "seller-local-proof": interests("SELLER"),
   "loveland-market-seller": interests("SELLER"),
   "sellers-page-inquiry": interests("SELLER"),
+  "expired-relist-review": interests("SELLER", "EXPIRED"),
   "free-home-valuation": interests("HOME_VALUE"),
   "cash-offer": interests("CASH_OFFER"),
   "signature-sellers-inquiry": interests("LUXURY_SELLER"),

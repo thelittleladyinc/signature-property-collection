@@ -86,6 +86,7 @@ wantI(["signature-buyers-inquiry", "signature-resort-buyer-inquiry", "signature-
 wantI(["first-time-homebuyer"], INTEREST.FIRST_TIME_BUYER);
 wantI(["veteran-home-purchase"], INTEREST.VA_BUYER);
 wantI(["sellers-guide", "seller-local-proof", "loveland-market-seller", "sellers-page-inquiry"], INTEREST.SELLER);
+wantI(["expired-relist-review"], INTEREST.SELLER, INTEREST.EXPIRED);
 wantI(["free-home-valuation"], INTEREST.HOME_VALUE);
 wantI(["cash-offer"], INTEREST.CASH_OFFER);
 wantI(["signature-sellers-inquiry"], INTEREST.LUXURY_SELLER);
@@ -120,7 +121,7 @@ put(["noco-retirement"], TAG.DS1, SELLER);
 put(["lpt-join", "lpt-join-co", "co-license-guide", "agent-coaching"], TAG.RECRUIT, null);
 put(["fsbo-inquiry"], [TAG.FSBO, FSBO_START], SELLER);
 const NO_PLAN = ["contact", "testimonials-page-inquiry", "newsletter-signup", "rent-to-own-options",
-  "market-conditions-inquiry", "some-form-nobody-has-built-yet", "", "__proto__", "constructor", "toString"];
+  "market-conditions-inquiry", "expired-relist-review", "some-form-nobody-has-built-yet", "", "__proto__", "constructor", "toString"];
 // ... except on the Signature site (the luxury brand), where these four start
 // the luxury seller plan.
 const SIGNATURE_ONLY = { "sellers-page-inquiry": [TAG.SPC, SELLER], "sellers-guide": [TAG.SPC, SELLER],
@@ -278,7 +279,7 @@ function blobStore(seed) {
       if (!same(got(form, {}, site), want)) wrong.push(`${form}: ${JSON.stringify(got(form, {}, site))}`);
     }
     check(`${site}: all ${Object.keys(EXPECT).length} planned forms start the right plan with the right lead type`, wrong.length === 0, wrong.join("; "));
-    const leaked = NO_PLAN.filter((form) => !same(got(form, {}, site), form === "rent-to-own-options" ? expectPlan(null, BUYER) : expectPlan(null, null)));
+    const leaked = NO_PLAN.filter((form) => !same(got(form, {}, site), form === "rent-to-own-options" ? expectPlan(null, BUYER) : form === "expired-relist-review" ? expectPlan(null, SELLER) : expectPlan(null, null)));
     check(`${site}: contact, testimonials, newsletter, rent-to-own, market conditions and unknown forms start nothing (rent-to-own: Buyer type only)`, leaked.length === 0, leaked.join(", "));
   }
   check("no site given = The Little Lady (main) site", same(got("sellers-page-inquiry"), expectPlan(TAG.S1, SELLER)) &&
@@ -288,8 +289,9 @@ function blobStore(seed) {
   check("rent-to-own starts no plan on either site (none until Christine picks one; the lead is hers), but is typed Buyer (Oct 26)",
     same(got("rent-to-own-options", {}, "main"), expectPlan(null, BUYER)) &&
     same(got("rent-to-own-options", {}, "signature"), expectPlan(null, BUYER)));
-  check("the type-only list is rent-to-own as Buyer, and it is still a no-plan form",
-    same({ ...P.TYPE_ONLY_FORMS }, { "rent-to-own-options": BUYER }) && P.FORMS_WITHOUT_PLAN.includes("rent-to-own-options"));
+  check("the type-only list identifies rent-to-own as Buyer and expired review as Seller, with no automatic plans",
+    same({ ...P.TYPE_ONLY_FORMS }, { "rent-to-own-options": BUYER, "expired-relist-review": SELLER }) &&
+    P.FORMS_WITHOUT_PLAN.includes("rent-to-own-options") && P.FORMS_WITHOUT_PLAN.includes("expired-relist-review"));
   check("agent recruiting forms have a plan tag and NO lead type",
     ["lpt-join", "lpt-join-co", "co-license-guide", "agent-coaching"].every((f) => same(got(f), { planTags: [TAG.RECRUIT], leadTypes: [] })));
   const r1 = P.planForSubmission("listing-inquiry", {});
@@ -350,7 +352,7 @@ function blobStore(seed) {
   for (const file of walk(path.join(ROOT, "site"))) for (const m of fs.readFileSync(file, "utf8").matchAll(/<form[^>]*\bname="([a-z-]+)"[^>]*>/g)) rendered.add(m[1]);
   const renderedUndecided = [...rendered].filter((n) => !decided.has(n));
   check(`every form rendered on the site (${rendered.size}) has a decision`, rendered.size > 0 && renderedUndecided.length === 0, renderedUndecided.join(", "));
-  check("the module's own no-plan list is the one tested here", same([...P.FORMS_WITHOUT_PLAN].sort(), NO_PLAN.slice(0, 5).sort()));
+  check("the module's own no-plan list is the one tested here", same([...P.FORMS_WITHOUT_PLAN].sort(), NO_PLAN.slice(0, 6).sort()));
   check(`this site asks for its own plans (site: "${SITE}"), with the value-review switch`,
     submission.includes(`planForSubmission(formName, data, { site: "${SITE}", valueReviewPlan: valueReviewPlanOn(process.env) })`));
 
