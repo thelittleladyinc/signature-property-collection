@@ -6,7 +6,7 @@
     "extra_rules are pattern rules that are not pages (Netlify placeholders allowed). Each becomes a forced 301 like a page.",
     "Run docs/CUTOVER-RUNBOOK.md before activating a group. Group order is proposed by page type and should be re-ordered with Search Console data once the domain is verified."
   ],
-  "active_groups": [1, 2, 3, 4],
+  "active_groups": [1, 2, 3, 4, 5],
   "groups": {
     "1": {
       "name": "The moved blog posts and the blog index",
@@ -73,11 +73,11 @@
         "/downsizing-in-northern-colorado.html": "/downsizing-in-northern-colorado.html",
         "/explore.html": "/explore.html",
         "/free-home-valuation.html": "/free-home-valuation.html",
-        "/guides/best-places-to-retire-in-northern-colorado.html": "/guides/best-places-to-retire-in-northern-colorado.html",
+        "/guides/best-places-to-retire-in-northern-colorado.html": "/the-best-places-to-retire-in-northern-colorado.html",
         "/guides/buy-like-a-pro.html": "/guides/buy-like-a-pro.html",
         "/guides/buyers-guide.html": "/guides/buyers-guide.html",
-        "/guides/cost-to-develop-raw-land-colorado.html": "/guides/cost-to-develop-raw-land-colorado.html",
-        "/guides/multi-generational-homes-northern-colorado.html": "/guides/multi-generational-homes-northern-colorado.html",
+        "/guides/cost-to-develop-raw-land-colorado.html": "/whats-the-real-cost-to-develop-raw-land-in-colorado.html",
+        "/guides/multi-generational-homes-northern-colorado.html": "/multi-generational-homes-for-sale-in-northern-colorado-find-your-familys-fit.html",
         "/guides/northern-colorado-relocation-guide.html": "/guides/northern-colorado-relocation-guide.html",
         "/guides/sell-your-home-fast.html": "/guides/sell-your-home-fast.html",
         "/guides/sellers-guide.html": "/guides/sellers-guide.html",

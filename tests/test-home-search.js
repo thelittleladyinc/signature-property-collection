@@ -120,9 +120,20 @@ check("nothing about the visitor is added (only the three utm_ tags beyond the s
 console.log("\n7. The built site sends /search-homes to the hand-off");
 const redirects = fs.readFileSync(path.join(ROOT, "site", "_redirects"), "utf8").split("\n");
 const idx = (p) => redirects.findIndex((l) => l.split(/\s+/)[0] === p);
+// 2026-11-21 (cutover group 5): once a live cutover group forwards /search-homes.html,
+// its three forms are one forced 301 to the main site's search, not the rewrite here.
+const cutoverMap = JSON.parse(fs.readFileSync(path.join(ROOT, "build", "data", "cutover_to_tllsh.json"), "utf8"));
+const searchTarget = Object.assign({}, ...(cutoverMap.active_groups || [])
+  .map((g) => cutoverMap.groups[String(g)].pages))["/search-homes.html"];
 for (const p of ["/search-homes.html", "/search-homes/", "/search-homes"]) {
-  check(`${p} is a forced rewrite to home-search`,
-    /^\S+\s+\/\.netlify\/functions\/home-search\s+200!$/.test(redirects[idx(p)] || ""), redirects[idx(p)]);
+  if (searchTarget) {
+    const want = `https://www.thelittleladysellshomes.com${searchTarget}`;
+    check(`${p} is one forced 301 to the main site's search (cutover)`,
+      (redirects[idx(p)] || "").split(/\s+/).join(" ") === `${p} ${want} 301!`, redirects[idx(p)]);
+  } else {
+    check(`${p} is a forced rewrite to home-search`,
+      /^\S+\s+\/\.netlify\/functions\/home-search\s+200!$/.test(redirects[idx(p)] || ""), redirects[idx(p)]);
+  }
 }
 check("each is the FIRST rule for its path (Netlify applies the first match)",
   ["/search-homes/", "/search-homes"].every((p) => redirects.filter((l) => l.split(/\s+/)[0] === p).length === 1));
