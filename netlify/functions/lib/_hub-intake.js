@@ -204,8 +204,8 @@ function intakeBody(form, data, opts) {
   // Preserve only the two monitored public guide paths. A visitor can supply
   // form fields, so this records browser-reported context, never a verified lead source.
   const path = d.attribution_first_page;
-  if (o.site === "main" && d.untagged_google_referral === "yes" && !campaign &&
-      d.attribution_source === "google / organic" && d.attribution_referrer === "google.com" &&
+  if (o.site === "main" && !campaign &&
+      d.attribution_source === "google / untagged search referral" && d.attribution_referrer === "google.com" &&
       (path === "/loveland-co-market-report-and-trends.html" ||
        path === "/whats-the-real-cost-to-develop-raw-land-in-colorado.html")) {
     body.raw.search_landing = { path, source: "google_search_referral" };
