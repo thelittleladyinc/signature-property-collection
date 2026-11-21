@@ -1,0 +1,23 @@
+name: Verify live Little Lady listing tracking
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-live-listing-tracking.cjs'
+      - '.github/workflows/verify-live-listing-tracking.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-html:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify public listing response is tracked
+        run: node scripts/verify-live-listing-tracking.cjs
