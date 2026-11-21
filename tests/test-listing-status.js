@@ -30,10 +30,12 @@ const blobsPath = require.resolve("@netlify/blobs", { paths: [FN_DIR] });
 let failures = 0;
 const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures++; console.log(`  FAIL ${l}${x ? ` — ${x}` : ""}`); } };
 
+const COVER = "https://img.chime.me/image/fs01/mls-listing/original_cover-test.jpeg";
+const SECOND = "https://img.chime.me/image/fs01/mls-listing/original_kitchen-test.jpeg";
 const LIVE = {
   IRE900001: {
     id: "IRE900001", address: "1 Test St", city: "Loveland", state: "CO",
-    price: 500000, status: "Active", beds: 3, baths: 2, sqft: 1800, photos: [],
+    price: 500000, status: "Active", beds: 3, baths: 2, sqft: 1800, listingId: "IRE900001", photo: COVER, photos: [COVER, SECOND],
   },
   IRE900002: {
     id: "IRE900002", address: "2 Sold Ave", city: "Windsor", state: "CO",
@@ -71,6 +73,17 @@ const okStore = () => ({
   let res = await load(okStore)({ queryStringParameters: { id: "IRE900001" } });
   check("a live listing renders 200", res.statusCode === 200, String(res.statusCode));
   check("and is indexable", !/noindex/i.test(JSON.stringify(res.headers || {})));
+
+  const images = html => html.match(/<img\b[^>]+>/g) || [];
+  const defaultCovers = images(res.body).filter(tag => tag.includes("cover-test.jpeg"));
+  check("Signature keeps its existing hero and thumbnail", defaultCovers.length === 2 && defaultCovers.every(tag => !tag.includes("srcset=")));
+  res = await load(okStore)({ queryStringParameters: { id: "IRE900001", brand: "tllsh" } });
+  const littleLadyImages = images(res.body);
+  const covers = littleLadyImages.filter(tag => tag.includes("cover-test.jpeg"));
+  check("Little Lady uses one high-priority responsive cover", covers.length === 1 &&
+    ['fetchpriority="high"', '600w', '720w', '1200w', 'sizes='].every(value => covers[0].includes(value)));
+  check("Little Lady keeps its second photo lazy and correctly numbered",
+    littleLadyImages.some(tag => tag.includes("kitchen-test.jpeg") && tag.includes('loading="lazy"') && tag.includes("photo 2")));
 
   // --- genuinely gone is a 404, which is correct and must stay -------------
   res = await load(okStore)({ queryStringParameters: { id: "IRE999999" } });
