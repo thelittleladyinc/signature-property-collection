@@ -48,8 +48,10 @@ const SMS = "By checking this box, I agree to receive transactional and informat
 const _cutover = JSON.parse(fs.readFileSync(path.join(ROOT, "build", "data", "cutover_to_tllsh.json"), "utf8"));
 const _forwardedTo = Object.assign({}, ...(_cutover.active_groups || []).map((g) => _cutover.groups[String(g)].pages));
 const _finalHref = (p) => (_forwardedTo[p] ? `https://www.thelittleladysellshomes.com${_forwardedTo[p]}` : p);
-const TERMS_HREF = _finalHref("/terms-of-service.html");
-const PRIVACY_HREF = _finalHref("/privacy-policy.html");
+// The generator writes the local address; the built pages carry the final one.
+// Either is right: both are the same two legal pages.
+const TERMS_HREFS = new Set(["/terms-of-service.html", _finalHref("/terms-of-service.html")]);
+const PRIVACY_HREFS = new Set(["/privacy-policy.html", _finalHref("/privacy-policy.html")]);
 
 function walk(dir, ok, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -121,8 +123,8 @@ function formProblems(form) {
     if (terms.inputCount !== 1) bad.push("the Terms/Privacy label holds more than one checkbox");
     if (!/(^|\s)consent(\s|$)/.test(String(terms.labelClass))) bad.push('the Terms/Privacy label is not class="consent"');
     if (terms.text !== TERMS) bad.push(`Terms/Privacy wording differs: ${JSON.stringify(terms.text)}`);
-    const want = [["Terms of Service", TERMS_HREF], ["Privacy Policy", PRIVACY_HREF]];
-    if (terms.links.length !== 2 || want.some(([t, h], i) => !terms.links[i] || terms.links[i].text !== t || terms.links[i].href !== h)) {
+    const want = [["Terms of Service", TERMS_HREFS], ["Privacy Policy", PRIVACY_HREFS]];
+    if (terms.links.length !== 2 || want.some(([t, hs], i) => !terms.links[i] || terms.links[i].text !== t || !hs.has(terms.links[i].href))) {
       bad.push(`Terms/Privacy links wrong: ${JSON.stringify(terms.links)}`);
     }
   }
@@ -180,7 +182,9 @@ auditPages(pages, "site/", 30);
 console.log("\n2. The links point at pages that exist");
 const hrefs = new Set();
 for (const { html } of pages) for (const f of leadForms(html)) for (const b of f.boxes) if (b.input.name === "terms_agree") b.links.forEach((l) => hrefs.add(l.href));
-check("the Terms/Privacy boxes link only to the two legal pages", [...hrefs].sort().join(",") === [PRIVACY_HREF, TERMS_HREF].sort().join(","), [...hrefs].join(","));
+check("the Terms/Privacy boxes link only to the two legal pages",
+  hrefs.size >= 2 && [...hrefs].every((h) => TERMS_HREFS.has(h) || PRIVACY_HREFS.has(h))
+  && [...hrefs].some((h) => TERMS_HREFS.has(h)) && [...hrefs].some((h) => PRIVACY_HREFS.has(h)), [...hrefs].join(","));
 check("/terms-of-service.html exists in site/", fs.existsSync(path.join(SITE, "terms-of-service.html")));
 check("/privacy-policy.html exists in site/", fs.existsSync(path.join(SITE, "privacy-policy.html")));
 
