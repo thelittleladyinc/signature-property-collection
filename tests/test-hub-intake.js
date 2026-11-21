@@ -140,6 +140,26 @@ const on = () => { process.env.WEBSITE_TO_HUB_INTAKE = "on"; process.env.HUB_INT
     b.raw.submission_id === "sub-1" && b.raw.site === SITE && !JSON.stringify(b).includes("secret"), JSON.stringify(b));
   check("a lead id that is not digits is left out", H.intakeBody({ form_name: "x" }, {}, { loftyLeadId: "12a" }).lofty_lead_id === undefined);
 
+  const tracked = H.intakeBody({ form_name: "contact", form_choice: null }, {
+    name: "Pat Buyer", email: "pat@example.com",
+    utm_source: "facebook", utm_medium: "paid_social", utm_campaign: "expired_seller",
+    utm_idf: "2855964", utm_content: "person@example.com", utm_term: "https://bad.invalid/a?email=pat@example.com",
+    attribution_referrer: "https://secret.invalid/?email=pat@example.com",
+  }, { kind: "form", site: SITE, loftyLeadId: 1148639689762408 });
+  check("website forms preserve only sanitized campaign attribution in hub raw (never PII or URLs)",
+    tracked.raw.attribution && tracked.raw.attribution.utm_source === "facebook" &&
+    tracked.raw.attribution.utm_campaign === "expired_seller" &&
+    tracked.raw.attribution.utm_idf === "2855964" &&
+    !Object.keys(tracked.raw.attribution).includes("utm_content") &&
+    !Object.keys(tracked.raw.attribution).includes("utm_term") &&
+    !JSON.stringify(tracked.raw.attribution).includes("@") &&
+    !JSON.stringify(tracked.raw.attribution).includes("https"),
+    JSON.stringify(tracked.raw.attribution));
+  check("untagged contact form remains untagged, no invented advertising source", H.intakeBody(
+    { form_name: "contact", form_choice: null }, { email: "pat@example.com" }, { kind: "form", site: SITE }
+  ).raw.attribution === undefined);
+
+
   console.log("\n2. Switch off: nothing goes to the hub");
   let w = fakeWorld();
   await submit(w, "free-home-valuation", { address: "123 Main St, Loveland, CO 80538" });
