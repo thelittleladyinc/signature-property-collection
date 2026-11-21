@@ -59,19 +59,26 @@ for (const [from, body] of html) {
   }
 }
 
-const townPages = [...html.keys()].filter((u) => /^\/communities\/[a-z-]+\/[a-z-]+\.html$/.test(u));
+// 2026-11-21 (cutover group 5): a town or subdivision page a live cutover group
+// forwards to the main site is not linked here any more (links point at its final
+// address), so it is judged there, not here.
+const _cutoverEarly = JSON.parse(fs.readFileSync(path.join(SITE, "..", "build", "data", "cutover_to_tllsh.json"), "utf8"));
+const _forwardedEarly = new Set((_cutoverEarly.active_groups || []).flatMap((g) => Object.keys(_cutoverEarly.groups[String(g)].pages)));
+const townPages = [...html.keys()].filter((u) => /^\/communities\/[a-z-]+\/[a-z-]+\.html$/.test(u) && !_forwardedEarly.has(u));
 const subdivisions = townPages.filter((u) => u.startsWith("/communities/loveland/"));
 const towns = townPages.filter((u) => !u.startsWith("/communities/loveland/"));
 
 check(`town pages were found (${towns.length})`, towns.length >= 25, String(towns.length));
-check(`subdivision pages were found (${subdivisions.length})`, subdivisions.length >= 8,
-  String(subdivisions.length));
+const _subdivisionsForwarded = [..._forwardedEarly].filter((u) => u.startsWith("/communities/loveland/")).length;
+check(`subdivision pages were found (${subdivisions.length}, ${_subdivisionsForwarded} forwarded by the cutover)`,
+  subdivisions.length + _subdivisionsForwarded >= 8, String(subdivisions.length));
 
 // The threshold that matters. One inbound link is what these pages had while Google
 // was declining to index them; 3 is a floor well clear of that without pinning the
 // exact county sizes, which change as towns are added.
 const MIN = 3;
 for (const [label, group] of [["town", towns], ["subdivision", subdivisions]]) {
+  if (group.length === 0) { console.log(`       note: no ${label} pages left here (all forwarded)`); continue; }
   const starved = group.filter((u) => inbound.get(u) < MIN);
   const min = Math.min(...group.map((u) => inbound.get(u)));
   check(`every ${label} page has ${MIN}+ inbound links (lowest: ${min})`,
