@@ -24,6 +24,13 @@ delete process.env.OPERATING_COUNTIES;
 const H = require(`${FN_DIR}/lib/_home-search.js`);
 const cond = (url) => JSON.parse(new URL(url).searchParams.get("condition"));
 
+const countyResult = H.homeSearchUrl({county: "Weld County", counties: "larimer,WELD", noFloor: "true", maxPrice: "640000", site: "thelittleladysellshomes"});
+check("county-only handoff uses Lofty county boundaries at the requested prices",
+  JSON.stringify(cond(countyResult)) === JSON.stringify({location: {county: ["Weld, CO", "Larimer, CO"]}, price: ",640000"}));
+check("county handoff preserves Little Lady attribution", new URL(countyResult).searchParams.get("utm_source") === "thelittleladysellshomes.com");
+check("explicit towns take precedence over county defaults", JSON.stringify(cond(H.homeSearchUrl({county:"weld",cities:"Erie"})).location) === JSON.stringify({city:["Erie, CO"]}));
+check("county handoff preserves luxury floor", cond(H.homeSearchUrl({county:"Weld"})).price === "950000,");
+
 console.log("\n1. The URL Lofty's site understands");
 const u1 = H.homeSearchUrl({ city: "Loveland", minPrice: "950000", beds: "3" });
 check("her Lofty site's search page", u1.startsWith("https://thelittleladyhomesearch.com/listing?"), u1);
