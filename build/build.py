@@ -7799,6 +7799,14 @@ def build_testimonials():
 
 
 # -------------------------------------------------------------- CONTACT ---
+def _listing_inquiry_script():
+    # Share the browser-side allowlist and handoff between the cached listing
+    # shell and its contact form. Inline it so no additional request is needed.
+    filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "listing_inquiry.js")
+    with open(filename, encoding="utf-8") as source:
+        return "<script>\n" + source.read() + "</script>"
+
+
 def build_contact():
     body = f"""
 <section class="hero" style="padding:100px 0 70px">
@@ -7812,6 +7820,15 @@ def build_contact():
   <div class="wrap grid-2">
     <form class="lead-form" name="contact" action="/thank-you.html?from=contact" method="POST" data-netlify="true" netlify-honeypot="bot-field">
       <input type="hidden" name="form-name" value="contact">
+      <input type="hidden" name="listing_address">
+      <input type="hidden" name="listing_mls">
+      <input type="hidden" name="inquiry_type">
+      <input type="hidden" name="utm_source">
+      <input type="hidden" name="utm_medium">
+      <input type="hidden" name="utm_campaign">
+      <input type="hidden" name="utm_content">
+      <input type="hidden" name="utm_ida">
+      <input type="hidden" name="utm_idf">
       <p style="display:none" aria-hidden="true"><label>Don't fill this out: <input name="bot-field" autocomplete="off" tabindex="-1"></label></p>
       <input type="text" name="name" placeholder="Full Name" required>
       <input type="email" name="email" placeholder="Email" required>
@@ -7820,6 +7837,7 @@ def build_contact():
       {consent_boxes_html()}
       <button class="btn btn-dark" type="submit">Submit</button>
     </form>
+    {_listing_inquiry_script()}
     <div class="card">
       <h2 class="article-subhead">Contact Information</h2>
       <p><a href="tel:{esc(_phone_digits())}" data-contact="call">{SITE['phone']}</a><br>
@@ -14695,6 +14713,7 @@ def write_listing_page_shell():
 {header_html("Current Listings")}
 {_trust_ribbon_html()}
 {{{{BODY}}}}
+{_listing_inquiry_script()}
 {footer_html()}
 {_scroll_reveal_script()}
 </body>
