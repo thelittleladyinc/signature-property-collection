@@ -158,6 +158,19 @@ function text(v, max) {
   return s ? s.slice(0, max) : undefined;
 }
 
+ // Campaign metadata only. Form answers, URLs and contact data must never
+ // leak into ad attribution. Source values are user-supplied, NOT verification
+ // that Meta actually delivered an ad; keep them for later cross-check.
+ const CAMPAIGN_KEYS = Object.freeze(["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "utm_ida", "utm_idf"]);
+ function attributionFromForm(data) {
+   const out = {};
+   for (const key of CAMPAIGN_KEYS) {
+     const value = data && typeof data[key] === "string" ? data[key].trim() : "";
+     if (value && value.length <= 80 && /^[a-z0-9_ .:-]+$/i.test(value) && !value.includes("@")) out[key] = value;
+   }
+   return Object.keys(out).length ? out : null;
+ }
+
 // The flat body the hub's intake reads (supabase/functions/hub-api/intake.ts).
 // opts.kind "form" (2026-11-12, EVERY FORM above): no event_type (the hub records
 // lead_received) and the address only when opts.withAddress. opts.intent rides
@@ -184,7 +197,10 @@ function intakeBody(form, data, opts) {
     form_choice: form.form_choice || undefined,
     lofty_lead_id: /^[0-9]{1,20}$/.test(leadId) ? leadId : undefined,
     raw: { site: text(o.site, 20) || "main", submission_id: text(o.submissionId, 100) || null },
+    // The hub's intake record keeps the original attribution without altering scores or Smart Plans.
   };
+  const campaign = attributionFromForm(d);
+  if (campaign) body.raw.attribution = campaign;
   if (o.intent && typeof o.intent === "object" && Object.keys(o.intent).length) body.intent = o.intent;
   return body;
 }
