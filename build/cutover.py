@@ -327,7 +327,10 @@ def verify_targets(tllsh, groups=None):
                     r'(?:f"\{COLLECTION_DIR\}(/[^"]+)"|COLLECTION_HUB|"(/blog/[^"]+)")\s*:\s*\n?\s*"(/[^"]+)"', body):
                 key = "/signature-property-collection" + rel if rel else (blog or "/signature-property-collection/index.html")
                 pairs[sig] = key
-            pairs["/index.html"] = "/signature-property-collection/index.html"  # the hub entry has no quoted key
+            # The hub entry has no quoted key. 2026-11-21 (group 6): count it only
+            # while the main site still maps it, so its flip is seen.
+            if re.search(r'^\s*COLLECTION_HUB\s*:', body, re.M):
+                pairs["/index.html"] = "/signature-property-collection/index.html"
             mapped = {}
             for g in data["groups"]:
                 mapped.update(data["groups"][g]["pages"])
