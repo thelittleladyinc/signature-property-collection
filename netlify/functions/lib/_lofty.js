@@ -92,7 +92,7 @@ const { WEBSITE_SOURCE } = require("./_form-plans");
 const crypto = require("crypto");
 
 // Must match submission-created.js TRIGGER_TAG (pinned by tests/test-queue-replay-steps.js).
-const REPLAY_TRIGGER_TAG = "Hot Lead - Website";
+const REPLAY_TRIGGER_TAG = BRAND_SITE === "tllsh" && String(process.env.LITTLE_LADY_WEBSITE_TRIGGER || "").trim().toLowerCase() === "on" ? "Source – Little Lady Website" : "Hot Lead - Website";
 
 // 2026-10-06: the nurture plan a queued lead's form starts (lib/_form-plans.js),
 // as submission-created.js stored it on the queue entry (`plan`). An entry queued
