@@ -133,6 +133,18 @@ function townsFrom(params) {
   return out;
 }
 
+// A county search must also include unincorporated addresses and respect county lines.
+function countiesFrom(params) {
+  const p = params || {};
+  const names = [p.county || "", ...String(p.counties || "").split(",")];
+  const counties = new Set();
+  for (const value of names) {
+    const name = String(value).trim().replace(/\s+county$/i, "").trim();
+    if (/^[a-z][a-z .'-]{0,39}$/i.test(name)) counties.add(titleCase(name));
+  }
+  return [...counties];
+}
+
 function minPriceFor(params) {
   const p = params || {};
   const asked = positiveInt(p.minPrice);
@@ -147,7 +159,8 @@ function conditionFor(params, counties) {
   if (towns.length) {
     condition.location = { city: towns.map((t) => `${t}, CO`) };
   } else {
-    const list = [...(counties || defaultCounties())].map((c) => `${titleCase(c)}, CO`);
+    const explicit = countiesFrom(p);
+    const list = (explicit.length ? explicit : [...(counties || defaultCounties())]).map((c) => `${titleCase(c)}, CO`);
     if (list.length) condition.location = { county: list };
   }
   const min = minPriceFor(p);
@@ -194,7 +207,9 @@ function money(n) {
 // The words on the button that leads there. Short, and true to the filter.
 function homeSearchLabel(params) {
   const towns = townsFrom(params);
-  const where = towns.length === 1 ? `${towns[0]} ` : "";
+  const countyNames = countiesFrom(params);
+  const countyArea = countyNames.map((name) => `${name} County`).join(", ");
+  const where = towns.length === 1 ? `${towns[0]} ` : countyArea ? `${countyArea} ` : "";
   const min = minPriceFor(params);
   const from = min ? ` from ${money(min)}` : "";
   return towns.length > 1
