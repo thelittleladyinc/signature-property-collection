@@ -71,7 +71,8 @@ async function run({ env = HUB_ENV, answer, probe = true, seed } = {}) {
   {
     const { f, row } = await run({ probe: false });
     check("no outbound call at all", f.calls.length === 0, f.calls.map((c) => c.url).join(" "));
-    check("the row is there and not red", row.ok === true && !row.optional, JSON.stringify(row));
+    // 2026-11-21 (audit H4): not probed = unknown for machines (ok null, stale true), never red.
+    check("the row is there and not red", row.ok !== false && row.stale === true && !row.optional, JSON.stringify(row));
     check("...and says how to test it", /Not tested yet — add \?probe=1 to this page's URL to ask the hub about the key directly\./.test(row.detail), row.detail);
   }
 

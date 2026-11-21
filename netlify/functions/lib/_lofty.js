@@ -76,6 +76,26 @@ const MAX_DRAIN_PER_RUN = 3;
 // overwriting it. A lease older than any function can run is taken over.
 const DRAIN_LOCK_KEY = "lofty-drain-lock.json";
 const DRAIN_LOCK_TTL_MS = 5 * 60 * 1000;
+// 2026-11-21 (silent-failure audit, H5): a lead must never fall out of the retry
+// queue because a read or a write failed. Until now a Blobs read that threw was
+// taken as "the queue is empty": recordPush then wrote back a queue holding only
+// the new lead (every lead queued before it gone), the drain called it "nothing
+// to do", and the drain's write-back failure was swallowed. Now:
+//   - readRetryQueue tells "nothing stored" (an empty queue) apart from "could not
+//     read it" (or something stored that is not a list), and nothing ever writes
+//     FAILED_PUSH_KEY after a read it could not trust;
+//   - a lead that cannot go on the list (read or write failed) is kept under its
+//     own key, SPILL_PREFIX + a hash of queuedLeadKey (never who), and the drain
+//     merges those keys into the list once it can read and write the list; a key
+//     is deleted only after the list holding its lead was written;
+//   - the list's 25-entry cap no longer drops the oldest leads: the overflow goes
+//     under its own keys the same way;
+//   - the drain reports a failed read or write back (readFailed / writeFailed), so
+//     its function answers an error instead of 200, and /status shows an
+//     unreadable queue as a red row (site-health.js).
+const SPILL_PREFIX = "lofty-failed/";
+// Spilled leads read per pass (in parallel); more wait for the next pass.
+const MAX_SPILL_READ = 25;
 // 2026-09-30 (consent fix): every lead this file creates goes to Lofty with
 // texting OFF (cannotText:true) -- the full shape, the minimal retry and the
 // queue replay alike, including leads queued before this change. Texting goes
@@ -223,7 +243,13 @@ async function recordPush(store, result, formName, lead) {
     const leadEmail = (lead && (lead.email || (Array.isArray(lead.emails) && lead.emails[0]))) || null;
     // formData only rides on the retry queue (for the replay), not the status record.
     const { formData: _formData, ...shown } = result || {};
-    await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, leadEmail, ...shown });
+    // 2026-11-21: the status record in its own try, so a failed write here can no
+    // longer stop the lead below from being queued.
+    try {
+      await store.setJSON(LAST_PUSH_KEY, { at: new Date().toISOString(), formName, leadEmail, ...shown });
+    } catch (err) {
+      console.error("could not record the last Lofty push (the lead is still queued if it failed):", err && err.message);
+    }
     if (!result.ok && result.manualReview) {
       // Held, not queued: the drain must never create a contact whose identity
       // is unsettled. The submission (the lead body, and the form data when the
@@ -233,16 +259,12 @@ async function recordPush(store, result, formName, lead) {
         reason: result.reason || result.responseBody || "identity needs manual review",
       });
     } else if (!result.ok) {
-      const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
-      queue.unshift({ at: new Date().toISOString(), formName, lead, ...result });
-      await store.setJSON(FAILED_PUSH_KEY, queue.slice(0, MAX_QUEUED_FAILURES));
+      await queueFailedLead(store, { at: new Date().toISOString(), formName, lead, ...result });
     } else if (result.ok && result.propertyAlert && result.propertyAlert.retryable && result.propertyAlertLeadId) {
       // Retry only the alert setup. Never create the lead, add its note or start its plan again.
-      const queue = (await store.get(FAILED_PUSH_KEY, {type:"json"}).catch(()=>null)) || [];
       const entry = {at:new Date().toISOString(),formName,lead,...result,loftyId:String(result.propertyAlertLeadId),
         followupsPending:["propertyAlert"],replay:{identity:{},newId:null,steps:{}}};
-      const kept = queue.filter(e => !(e.submissionId && e.submissionId === entry.submissionId && e.followupsPending && e.followupsPending.includes("propertyAlert")));
-      await store.setJSON(FAILED_PUSH_KEY,[entry,...kept].slice(0,MAX_QUEUED_FAILURES));
+      await queueFailedLead(store, entry, (queue) => queue.filter(e => !(e.submissionId && e.submissionId === entry.submissionId && e.followupsPending && e.followupsPending.includes("propertyAlert"))));
     }
   } catch (err) {
     // Diagnostics must never be the reason a lead push fails.
@@ -264,6 +286,128 @@ function queuedLeadKey(e) {
 
 function heldKey(e) {
   return e && e.submissionId ? `id:${e.submissionId}` : `${e && e.at}|${e && e.formName}`;
+}
+
+// ---- 2026-11-21: reading and writing the retry queue without losing a lead ----
+// (H5 in the header comment by SPILL_PREFIX.) Short, never a person: the error a
+// Blobs call threw, for logs and /status.
+function shortError(err) {
+  return String((err && (err.message || err.name)) || err || "unknown error").slice(0, 160);
+}
+
+// The list under FAILED_PUSH_KEY. -> { ok: true, list } when nothing is stored
+// (an empty queue) or a list is; { ok: false, error, notList? } when the read
+// threw or something that is not a list is stored. Never throws.
+async function readRetryQueue(store) {
+  let v;
+  try {
+    v = await store.get(FAILED_PUSH_KEY, { type: "json" });
+  } catch (err) {
+    return { ok: false, error: `the retry queue could not be read (${shortError(err)})` };
+  }
+  if (v === null || v === undefined) return { ok: true, list: [] };
+  if (!Array.isArray(v)) return { ok: false, notList: true, error: "the retry queue is not a list (unreadable)" };
+  return { ok: true, list: v.filter(Boolean) };
+}
+
+// One lead's own key: stable for the same lead, so writing it twice is one key.
+function spillKey(entry) {
+  return SPILL_PREFIX + crypto.createHash("sha256").update(queuedLeadKey(entry)).digest("hex").slice(0, 32);
+}
+
+async function spillLead(store, entry) {
+  try {
+    await store.setJSON(spillKey(entry), entry);
+    return true;
+  } catch (err) {
+    console.error("could not keep a website lead under its own retry key:", shortError(err));
+    return false;
+  }
+}
+
+// Leads kept under their own keys. -> { ok, entries: [{ key, entry }], more, error? }.
+// A store without list() (the tests' in-memory ones) has none. Never throws.
+async function readSpilledLeads(store) {
+  if (!store || typeof store.list !== "function") return { ok: true, entries: [], more: false };
+  let keys;
+  try {
+    const r = await store.list({ prefix: SPILL_PREFIX });
+    keys = ((r && r.blobs) || []).map((b) => b && b.key)
+      .filter((k) => typeof k === "string" && k.startsWith(SPILL_PREFIX)).sort();
+  } catch (err) {
+    return { ok: false, entries: [], more: false, error: `the retry keys could not be listed (${shortError(err)})` };
+  }
+  const batch = keys.slice(0, MAX_SPILL_READ);
+  try {
+    const got = await Promise.all(batch.map((key) => store.get(key, { type: "json" })));
+    const entries = [];
+    got.forEach((entry, n) => {
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) entries.push({ key: batch[n], entry });
+    });
+    return { ok: true, entries, more: keys.length > batch.length };
+  } catch (err) {
+    return { ok: false, entries: [], more: false, error: `a lead kept under its own retry key could not be read (${shortError(err)})` };
+  }
+}
+
+// Writes the list, at most MAX_QUEUED_FAILURES on it; the overflow goes under its
+// own keys first (never dropped). If any overflow lead could not be kept that way,
+// the whole list is written instead: a longer list beats a lost lead.
+// -> { ok, spilledKeys: Set, error? }. Never throws.
+async function writeRetryQueue(store, list) {
+  const all = (Array.isArray(list) ? list : []).filter(Boolean);
+  const spilledKeys = new Set();
+  let onList = all.slice(0, MAX_QUEUED_FAILURES);
+  const overflow = all.slice(MAX_QUEUED_FAILURES);
+  for (const e of overflow) {
+    if (await spillLead(store, e)) spilledKeys.add(spillKey(e));
+    else { onList = all; break; }
+  }
+  try {
+    await store.setJSON(FAILED_PUSH_KEY, onList);
+    return { ok: true, spilledKeys };
+  } catch (err) {
+    return { ok: false, spilledKeys, error: `the retry queue could not be written (${shortError(err)})` };
+  }
+}
+
+// Puts one lead on the retry queue. Only after a read it can trust does it write
+// the list; otherwise (or when that write fails) the lead goes under its own key.
+// `adjust` (optional) filters the list read before the lead goes first.
+// -> { queued, spilled?, error? }. Never throws.
+async function queueFailedLead(store, entry, adjust) {
+  const q = await readRetryQueue(store);
+  let why = q.error;
+  if (q.ok) {
+    const rest = typeof adjust === "function" ? adjust(q.list) : q.list;
+    const w = await writeRetryQueue(store, [entry, ...rest]);
+    if (w.ok) return { queued: true };
+    why = w.error;
+  }
+  if (await spillLead(store, entry)) {
+    console.warn(`Lofty retry queue: ${why}; this lead is kept under its own retry key and the list was not rewritten.`);
+    return { queued: true, spilled: true, error: why };
+  }
+  console.error(`Lofty retry queue: ${why}, and the lead could not be kept under its own key either. ` +
+    "It is still in the Netlify Forms inbox and the alert email.");
+  return { queued: false, error: why };
+}
+
+// Everything waiting: the list and the leads under their own keys, one entry per
+// lead (queuedLeadKey). For /status and lib/_lead-stuck.js. -> { ok, list, error?,
+// notList? }; ok is false when either part could not be read. Never throws.
+async function readQueuedLeads(store) {
+  const q = await readRetryQueue(store);
+  if (!q.ok) return { ok: false, list: [], error: q.error, ...(q.notList ? { notList: true } : {}) };
+  const sp = await readSpilledLeads(store);
+  if (!sp.ok) return { ok: false, list: [], error: sp.error };
+  const seen = new Set(q.list.map(queuedLeadKey));
+  const list = q.list.slice();
+  for (const { entry } of sp.entries) {
+    const k = queuedLeadKey(entry);
+    if (!seen.has(k)) { seen.add(k); list.push(entry); }
+  }
+  return { ok: true, list, ...(sp.more ? { more: true } : {}) };
 }
 
 async function holdForManualReview(store, held) {
@@ -365,8 +509,14 @@ async function drainFailedPushes(store, apiKey, opts) {
   // uses this site's key, so a missing LOFTY_API_KEY no longer stops it.
   if (!apiKey && !loftyViaHub()) return { attempted: 0, recovered: 0 };
   if (queueDrainOff()) return { attempted: 0, recovered: 0, paused: true };
-  const peek = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
-  if (!peek.length) return { attempted: 0, recovered: 0 };
+  // 2026-11-21: a queue it could not read is a failure, never "nothing to do".
+  const peek = await readRetryQueue(store);
+  if (!peek.ok) return { attempted: 0, recovered: 0, readFailed: true, error: peek.error };
+  if (!peek.list.length) {
+    const sp = await readSpilledLeads(store);
+    if (!sp.ok) return { attempted: 0, recovered: 0, readFailed: true, error: sp.error };
+    if (!sp.entries.length) return { attempted: 0, recovered: 0 };
+  }
   const lease = await takeDrainLease(store);
   if (!lease) return { attempted: 0, recovered: 0, locked: true };
   try {
@@ -379,8 +529,21 @@ async function drainFailedPushes(store, apiKey, opts) {
 async function drainWithLease(store, apiKey, opts) {
   const deadline = opts.deadline || Infinity;
   // Read again under the lease: another drain may have finished in between.
-  const queue = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
-  if (!queue.length) return { attempted: 0, recovered: 0 };
+  const read = await readRetryQueue(store);
+  if (!read.ok) return { attempted: 0, recovered: 0, readFailed: true, error: read.error };
+  // 2026-11-21: leads kept under their own keys join the list for this run (one
+  // entry per lead). Their keys are deleted only once the list holding them is
+  // written; a pass that cannot read them leaves them for the next run and says so.
+  const spilled = await readSpilledLeads(store);
+  const queue = read.list.slice();
+  const seenKeys = new Set(queue.map(queuedLeadKey));
+  for (const { entry } of spilled.entries) {
+    const k = queuedLeadKey(entry);
+    if (!seenKeys.has(k)) { seenKeys.add(k); queue.push(entry); }
+  }
+  const spillKeysRead = spilled.entries.map((s) => s.key);
+  if (!queue.length) return { attempted: 0, recovered: 0, ...(spilled.ok ? {} : { readFailed: true, error: spilled.error }) };
+  let writeError = null;
 
   const remaining = [];
   const viaHub = loftyViaHub();
@@ -511,11 +674,32 @@ async function drainWithLease(store, apiKey, opts) {
     // Lofty already accepted in front of the next run. Entries this run never
     // reached stay as they were (queue.slice(i) is empty once the loop is done),
     // and anything a form queued while this ran (recordPush puts it first) is kept.
+    //
+    // 2026-11-21: only after a re-read it can trust. A re-read that fails leaves
+    // the stored list exactly as it is (overwriting it could drop a lead a form
+    // queued meanwhile) and the run reports writeFailed; a write that fails is
+    // reported too, never swallowed. Spilled keys go only after the write landed.
     const entryKey = (e) => `${e && e.at}|${e && e.formName}`;
     const taken = new Set(queue.map(entryKey));
-    const latest = (await store.get(FAILED_PUSH_KEY, { type: "json" }).catch(() => null)) || [];
-    const arrived = (Array.isArray(latest) ? latest : []).filter((e) => e && !taken.has(entryKey(e)));
-    await store.setJSON(FAILED_PUSH_KEY, arrived.concat(remaining, queue.slice(i).filter(Boolean)).slice(0, MAX_QUEUED_FAILURES)).catch(() => {});
+    const latest = await readRetryQueue(store);
+    if (!latest.ok) {
+      writeError = `${latest.error}; the queue was left as it was`;
+    } else {
+      const arrived = latest.list.filter((e) => e && !taken.has(entryKey(e)));
+      const w = await writeRetryQueue(store, arrived.concat(remaining, queue.slice(i).filter(Boolean)));
+      if (!w.ok) {
+        writeError = w.error;
+      } else {
+        for (const key of spillKeysRead) {
+          if (w.spilledKeys.has(key)) continue;
+          try { await store.delete(key); } catch (err) {
+            console.error("Lofty queue drain: a retry key already on the list could not be deleted:", shortError(err));
+          }
+        }
+      }
+    }
+    if (writeError) console.error(`Lofty queue drain: ${writeError}`);
+    if (!spilled.ok) console.error(`Lofty queue drain: ${spilled.error}`);
     if (attempted || deferred || finished) {
       await store.setJSON(LAST_PUSH_KEY, {
         at: new Date().toISOString(),
@@ -538,6 +722,8 @@ async function drainWithLease(store, apiKey, opts) {
     ...(heldForReview ? { heldForReview } : {}), ...(consentHeld ? { consentHeld } : {}),
     ...(leftForHub ? { leftForHub } : {}), ...(viaHub ? { viaHub: true } : {}),
     ...(recoveredKeys.length ? { recoveredKeys } : {}),
+    ...(writeError ? { writeFailed: true, error: writeError } : {}),
+    ...(!spilled.ok ? { readFailed: true, error: writeError || spilled.error } : {}),
   };
 }
 
@@ -714,6 +900,13 @@ module.exports = {
   recordPush,
   holdForManualReview,
   queuedLeadKey,
+  SPILL_PREFIX,
+  MAX_QUEUED_FAILURES,
+  readRetryQueue,
+  readSpilledLeads,
+  readQueuedLeads,
+  queueFailedLead,
+  spillKey,
   drainFailedPushes,
   queueDrainOff,
   REPLAY_TRIGGER_TAG,

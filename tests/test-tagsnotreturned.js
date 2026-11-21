@@ -49,7 +49,8 @@ const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures+
   const p = JSON.parse(res.body);
   const row = p.checks.find((c) => /What Lofty says/.test(c.name));
   console.log(`       ${row.ok ? "✓" : "✗"} ${row.detail.slice(0, 150)}…`);
-  check("row is no longer red — it's a Lofty limitation, not a fault", row.ok === true);
+  // 2026-11-21 (audit H4): the saved reading is from August, so for machines it is stale (ok null), never red.
+  check("row is no longer red — it's a Lofty limitation, not a fault", row.ok !== false && row.stale === true);
   check("states the limitation plainly", /does NOT return tags/.test(row.detail));
   check("explains the returning-buyer consequence", /RETURNING buyer/.test(row.detail));
   check("stops asking her to send the line", !/send me this line/.test(row.detail));

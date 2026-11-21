@@ -124,7 +124,8 @@ const cases = [
   const parsed2 = JSON.parse(res2.body);
   const row2 = parsed2.checks.find((c) => c.name === "What Lofty says about your last lead");
   check("row tells her how to run it", /add \?probe=1/.test(row2.detail), row2.detail);
-  check("not-yet-run does not read as broken", row2.ok === true);
+  // 2026-11-21 (audit H4): never run = unknown for machines (ok null, stale true), not ok and not red.
+  check("not-yet-run does not read as broken", row2.ok !== false && row2.stale === true && row2.checkedAt === null);
   // And the new summary row must say plainly that nothing here has been run yet,
   // rather than leaving the page looking like a set of current readings.
   const summary = parsed2.checks.find((c) => c.name === "Live checks are current");

@@ -72,7 +72,10 @@ const KEY = "status-test-key-7f3a";
   json = JSON.parse(jres.body);
   check("JSON: allOk and the checks, each with name, ok and optional only",
     typeof json.allOk === "boolean" && Array.isArray(json.checks) && json.checks.length === openNames.length &&
-    json.checks.every((c) => typeof c.name === "string" && typeof c.ok === "boolean" && typeof c.optional === "boolean" && Object.keys(c).length === 3),
+    // 2026-11-21 (audit H4): a live check not run recently answers ok null with stale and checkedAt (a time, never who).
+    json.checks.every((c) => typeof c.name === "string" && typeof c.optional === "boolean" &&
+      ((typeof c.ok === "boolean" && Object.keys(c).length === 3) ||
+       (c.ok === null && c.stale === true && "checkedAt" in c && Object.keys(c).length === 5))),
     JSON.stringify(json.checks[0]));
   check("JSON: no detail, no raw records, no settings", !("raw" in json) && !("cloudinaryConfig" in json) && !jres.body.includes(ADDRESS) && !jres.body.includes(lastPush.at));
   check("JSON says why", json.details === "hidden" && /status key/i.test(json.why) && !jres.body.includes(KEY));
