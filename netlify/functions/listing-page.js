@@ -240,7 +240,12 @@ function idxUnavailableBody(gate) {
 </section>`;
 }
 
-function listingBody(l, fetchedAt) {
+function listingBody(l, fetchedAt, brand) {
+  function contactLink(intent) {
+    if (brand !== "tllsh" || !l.listingId) return "/contact.html";
+    const params = new URLSearchParams({ intent, mls: l.listingId, address: [l.address, l.city].filter(Boolean).join(", ") });
+    return esc("/contact.html?" + params.toString());
+  }
   const count = photoCount(l);
   const addressLine = [l.address, l.city, l.state, l.zip].filter(Boolean).join(", ");
   const specs = [
@@ -284,14 +289,14 @@ function listingBody(l, fetchedAt) {
         <p>This is one of ${esc(AGENT_NAME)}&rsquo;s own listings. Call
         <a href="tel:${esc(AGENT_PHONE.replace(/[^0-9]/g, ""))}" style="text-decoration:underline">${esc(AGENT_PHONE)}</a>
         or send a message and you&rsquo;ll hear back from her directly.</p>
-        <a class="cta" href="/contact.html">Request A Private Showing &rarr;</a>
+        <a class="cta" href="${contactLink("showing")}">Request A Private Showing &rarr;</a>
       </div>`
     : `<div class="card">
         <h3>Want To See This Home?</h3>
         <p>${esc(AGENT_NAME)} can show you this property and any other active listing in
         Northern Colorado, and will tell you honestly how it compares to the rest of what&rsquo;s
         available at this price.</p>
-        <a class="cta" href="/contact.html">Schedule A Showing &rarr;</a>
+        <a class="cta" href="${contactLink("showing")}">Schedule A Showing &rarr;</a>
       </div>`;
 
   const listedBy = l.agentName
@@ -342,7 +347,7 @@ ${gallery ? `<section class="tight"><div class="wrap">
     </div>
     ${localSpotsBlock(l)}
     <div class="btn-row" style="justify-content:flex-start;margin-top:28px">
-      <a class="btn btn-dark" href="/contact.html">Ask About ${esc(l.address || "This Home")}</a>
+      <a class="btn btn-dark" href="${contactLink("question")}">Ask About ${esc(l.address || "This Home")}</a>
       <a class="btn btn-outline" style="border-color:#141415;color:#141415" href="/search-homes.html?cities=${encodeURIComponent(l.city || "")}">More Homes In ${esc(l.city || "This Area")}</a>
     </div>
     ${disclaimerHtml(fetchedAt)}
@@ -752,7 +757,7 @@ exports.handler = async (event) => {
         // The shell already wraps {{SCHEMA}} in its own <script type="application/ld+json">; wrapping it here too
         // nested one script tag inside another and no search engine could read the listing schema (2026-10-24).
         SCHEMA: listingSchema(l, canonical, ogImage),
-        BODY: listingBody(l, state && (state.lastSuccessAt || state.lastRunAt)),
+        BODY: listingBody(l, state && (state.lastSuccessAt || state.lastRunAt), params.brand),
         DATA_DATE: l.modificationTimestamp || null,
       }),
     };
