@@ -161,12 +161,12 @@ function text(v, max) {
  // Campaign metadata only. Form answers, URLs and contact data must never
  // leak into ad attribution. Source values are user-supplied, NOT verification
  // that Meta actually delivered an ad; keep them for later cross-check.
- const CAMPAIGN_KEYS = Object.freeze(["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "utm_ida", "utm_idf"]);
+ const CAMPAIGN_KEYS = Object.freeze(["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_ida", "utm_idf"]);
  function attributionFromForm(data) {
    const out = {};
    for (const key of CAMPAIGN_KEYS) {
      const value = data && typeof data[key] === "string" ? data[key].trim() : "";
-     if (value && value.length <= 80 && /^[a-z0-9_ .:-]+$/i.test(value) && !value.includes("@")) out[key] = value;
+     if (value && value.length <= 80 && /^[a-z0-9][a-z0-9_.:-]*$/i.test(value) && (key === "utm_ida" || key === "utm_idf" || !/^[0-9]{10,13}$/.test(value))) out[key] = value;
    }
    return Object.keys(out).length ? out : null;
  }
