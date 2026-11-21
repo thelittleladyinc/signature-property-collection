@@ -256,6 +256,16 @@ function listingBody(l, fetchedAt, brand) {
     l.subdivision ? `${l.subdivision} neighborhood` : null,
   ].filter(Boolean);
 
+  const littleLady = brand === "tllsh";
+  const cover = count ? photoUrl(l, 0) : null;
+  const smallCover = littleLady && cover && isLoftyPhoto(cover) ? sizedPhoto(cover, CARD_PHOTO_WIDTH) : cover;
+  const responsiveCover = smallCover && smallCover !== cover
+    ? ` srcset="${esc(smallCover)} ${CARD_PHOTO_WIDTH}w, ${esc(sizedPhoto(cover, 720))} 720w, ${esc(cover)} ${LARGE_PHOTO_WIDTH}w" sizes="(max-width:500px) calc(100vw - 40px), (max-width:900px) 92vw, (min-width:1360px) 600px, calc(46vw - 32px)"`
+    : "";
+  // The Little Lady cover is shown above the gallery; keep its original
+  // photo numbers and omit the duplicate. Signature keeps its existing grid.
+  const firstGalleryPhoto = littleLady ? 1 : 0;
+
   const gallery = count > 1
     ? `<div class="listing-detail-thumbs">` +
       // 2026-08-18: MLS Grid warned twice in one day about request-per-second
@@ -264,7 +274,8 @@ function listingBody(l, fetchedAt, brand) {
       // photo is a live MLS Grid fetch. Photo 0 keeps a real src (it is the
       // page's main image); the rest carry data-src and are drained two at a
       // time by the pacer in the script block below.
-      Array.from({ length: Math.min(count, GALLERY_PHOTOS) }, (_, i) => {
+      Array.from({ length: Math.min(count, GALLERY_PHOTOS) - firstGalleryPhoto }, (_, offset) => {
+        const i = offset + firstGalleryPhoto;
         const src = photoUrl(l, i, CARD_PHOTO_WIDTH);
         // Lofty's CDN has no per-second limit to pace for, so its photos load
         // natively; anything served through listing-photo keeps the pacer.
@@ -313,7 +324,7 @@ function listingBody(l, fetchedAt, brand) {
 <section class="tight" style="padding-top:10px">
   <div class="wrap grid-2">
     <div>
-      ${count ? `<img src="${esc(photoUrl(l, 0))}" alt="${esc(addressLine)}"
+      ${cover ? `<img src="${esc(cover)}"${responsiveCover}${littleLady ? ' fetchpriority="high"' : ""} alt="${esc(addressLine)}"
         style="width:100%;border-radius:4px;box-shadow:0 10px 30px rgba(20,20,21,.10)">` : ""}
     </div>
     <div>
