@@ -242,7 +242,7 @@ function idxUnavailableBody(gate) {
 
 function listingBody(l, fetchedAt, brand) {
   function contactLink(intent) {
-    if (brand !== "tllsh" || !l.listingId) return "/contact.html";
+    if (!l.listingId) return "/contact.html";
     const params = new URLSearchParams({ intent, mls: l.listingId, address: [l.address, l.city].filter(Boolean).join(", ") });
     return esc("/contact.html?" + params.toString());
   }
