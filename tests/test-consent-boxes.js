@@ -41,8 +41,15 @@ const TERMS = "By checking this box, I agree to the Terms of Service and Privacy
 const SMS = "By checking this box, I agree to receive transactional and informational SMS communications, " +
   "including appointment reminders, property updates, and account notifications from Little Lady. " +
   "Message frequency varies. Message and data rates may apply. Reply HELP for help or STOP to opt out.";
-const TERMS_HREF = "/terms-of-service.html";
-const PRIVACY_HREF = "/privacy-policy.html";
+// 2026-11-21 (cutover group 5): once a live cutover group forwards the two legal
+// pages to the main site, the build points every link to them at their final
+// address there (build.py repoint_forwarded_links), the consent links included.
+// The wording is unchanged; only where the two links land.
+const _cutover = JSON.parse(fs.readFileSync(path.join(ROOT, "build", "data", "cutover_to_tllsh.json"), "utf8"));
+const _forwardedTo = Object.assign({}, ...(_cutover.active_groups || []).map((g) => _cutover.groups[String(g)].pages));
+const _finalHref = (p) => (_forwardedTo[p] ? `https://www.thelittleladysellshomes.com${_forwardedTo[p]}` : p);
+const TERMS_HREF = _finalHref("/terms-of-service.html");
+const PRIVACY_HREF = _finalHref("/privacy-policy.html");
 
 function walk(dir, ok, out = []) {
   if (!fs.existsSync(dir)) return out;

@@ -79,7 +79,10 @@ check("default copy stands without JS", /id="ty-message"/.test(ty)
 check("gives a same-day commitment, not a vague 'shortly'", !/in touch shortly/.test(ty));
 check("offers a tappable phone for the urgent case", /href="tel:\d/.test(ty));
 check("keeps the visitor on the site instead of dead-ending",
-  /href="\/communities\//.test(ty) && /href="\/search-homes\.html"/.test(ty));
+  // 2026-11-21 (cutover group 5): the links may point at their final address on
+  // the main site once a live cutover group forwards them.
+  /href="(https:\/\/www\.thelittleladysellshomes\.com)?\/communities\//.test(ty)
+  && /href="(\/search-homes\.html|https:\/\/www\.thelittleladysellshomes\.com\/signature-property-collection\/search-homes\.html)"/.test(ty));
 
 // Every tailored message must key off a form that really exists, or it is dead code
 // that reads like coverage.
