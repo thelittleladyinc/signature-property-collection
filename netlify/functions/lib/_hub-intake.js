@@ -85,6 +85,13 @@ function allFormsOn(env) {
 
 // Agents asking about LPT: not a homeowner or buyer lead, never sent to the hub.
 const RECRUITING_FORMS = Object.freeze(["co-license-guide", "lpt-join", "lpt-join-co", "agent-coaching"]);
+const SEARCH_GUIDE_PATHS = new Set([
+  "/loveland-co-market-report-and-trends.html",
+  "/whats-the-real-cost-to-develop-raw-land-in-colorado.html",
+  "/rent-to-own.html",
+  "/multi-generational-homes-for-sale-in-northern-colorado-find-your-familys-fit.html",
+  "/understanding-open-zoning-in-larimer-county.html",
+]);
 
 // The homepage form's answers the hub may keep as form_choice.
 const HOME_LEAD_CHOICES = Object.freeze(["buy", "sell", "both", "value", "invest"]);
@@ -201,13 +208,12 @@ function intakeBody(form, data, opts) {
   };
   const campaign = attributionFromForm(d);
   if (campaign) body.raw.attribution = campaign;
-  // Preserve only the two monitored public guide paths. A visitor can supply
+  // Preserve only these public guides on the main site. A visitor can supply
   // form fields, so this records browser-reported context, never a verified lead source.
   const path = d.attribution_first_page;
   if (o.site === "main" && !campaign &&
       d.attribution_source === "google / untagged search referral" && d.attribution_referrer === "google.com" &&
-      (path === "/loveland-co-market-report-and-trends.html" ||
-       path === "/whats-the-real-cost-to-develop-raw-land-in-colorado.html")) {
+      SEARCH_GUIDE_PATHS.has(path)) {
     body.raw.search_landing = { path, source: "google_search_referral" };
   }
   if (o.intent && typeof o.intent === "object" && Object.keys(o.intent).length) body.intent = o.intent;
