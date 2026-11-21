@@ -35,7 +35,8 @@ const check = (l, c, x) => { if (c) console.log(`  ok   ${l}`); else { failures+
   check("points at the free no-signup alternative", backup && /Notifications/.test(backup.detail));
   // The stubbed store has no sync state, so unrelated rows are red here. What
   // matters is that the missing Resend key is NOT one of them.
-  const reds = p.checks.filter((c) => !c.ok && !c.optional).map((c) => c.name);
+  // 2026-11-21 (audit H4): ok null = a live check not run recently (stale), not red.
+  const reds = p.checks.filter((c) => c.ok === false && !c.optional).map((c) => c.name);
   check("missing Resend key is not counted as a failure",
     !reds.some((n) => /email/i.test(n)), "red rows: " + reds.join(", "));
   check("only the empty-stub rows are red",

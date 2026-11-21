@@ -114,21 +114,32 @@ exports.handler = async () => {
   const apiKey = process.env.LOFTY_API_KEY;
   // 2026-10-26: with LOFTY_VIA_HUB=on the replay goes through the hub, not this key.
   if (!apiKey && !loftyViaHub()) {
-    console.log("lofty-queue-drain: LOFTY_API_KEY not set — nothing to retry with.");
+    // 2026-11-21 (silent-failure audit, M2): an error, not 200. With no key and the
+    // hub switch off, no queued lead can reach Lofty, and Netlify's scheduled-run
+    // view must say so instead of showing every run as fine.
+    console.error("lofty-queue-drain: LOFTY_API_KEY not set and LOFTY_VIA_HUB is off — queued leads cannot be retried.");
     await stuckCheck(getStore, getBlobStore, startedAt, null);
-    return answer(200, "no Lofty key configured");
+    return answer(503, "not run: no Lofty key configured (LOFTY_API_KEY unset, LOFTY_VIA_HUB off); the queue is kept as it is");
   }
   try {
     const store = getBlobStore(getStore, DIAG_STORE);
     const result = await drainFailedPushes(store, apiKey, { deadline: startedAt + DRAIN_BUDGET_MS });
-    console.log(`lofty-queue-drain: ${result.attempted || result.locked || result.deferred || result.finished
+    console.log(`lofty-queue-drain: ${result.attempted || result.locked || result.deferred || result.finished || result.readFailed || result.writeFailed
       ? JSON.stringify(result) : "nothing to replay"} (${Date.now() - startedAt} ms)`);
     await stuckCheck(getStore, getBlobStore, startedAt, result);
+    // 2026-11-21 (M2/H5): a queue it could not read, or could not write back, is a
+    // failed run: lib/_lofty.js then never overwrites the list and keeps any new
+    // lead under its own key, but the run must not look fine.
+    if (result.readFailed || result.writeFailed) {
+      console.error(`lofty-queue-drain: ${result.error || "the retry queue could not be read or written"}`);
+      return answer(503, `failed: ${result.error || "the retry queue could not be read or written"}; no queued lead was dropped`);
+    }
     return answer(200, result.locked ? "skipped: another drain holds the lease" : "ok");
   } catch (err) {
     // Nothing is lost: the queue stays as it was for the next run.
     console.error("lofty-queue-drain failed (queue kept for the next run):", err && err.message);
     await stuckCheck(getStore, getBlobStore, startedAt, null);
-    return answer(200, "error logged");
+    // 2026-11-21 (M2): a crash answers 500, so Netlify shows the run as failed.
+    return answer(500, `failed: ${(err && err.name) || "error"} (see the function log; the queue is kept for the next run)`);
   }
 };

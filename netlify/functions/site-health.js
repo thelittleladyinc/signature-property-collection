@@ -62,6 +62,7 @@ const { tagsFromLead, describeTagShape } = require("./lib/_notify");
 // the queue already loaded below and the stuck-lead record, both from Blobs: this
 // row makes no outbound call of any kind, on a plain load or with ?probe=1.
 const { leadStuckAlertOn, stuckMinutes, queueSummary, STUCK_ALERT_KEY } = require("./lib/_lead-stuck");
+const { readQueuedLeads } = require("./lib/_lofty");
 // 2026-10-24: with LOFTY_VIA_HUB=on the two Lofty probes below go through the
 // Seller Intelligence hub (POST /v1/lofty/read: me, lead) -- this site's own key is
 // never sent (lib/_lofty-hub.js).
@@ -779,6 +780,27 @@ function ageNote(v) {
   };
 }
 
+// 2026-11-21 (silent-failure audit, H4). The page keeps its rule that an old or
+// never-run probe reading is not a failure (its light stays green, its wording
+// says how old the reading is). But ?format=json is read by machines -- the
+// Seller Intelligence hub's daily Connections check reads only that -- and there
+// such a row is not "ok": nobody knows. probeStale marks a probe row whose reading
+// is older than GOOGLE_CHECK_TTL_MS or was never taken (only when the probe
+// applies); forMachines turns such a row's ok:true into ok:null with stale:true and
+// checkedAt (the reading's time, null = never). A row that is red for a reason of
+// its own (a key not set) keeps ok:false. allOk keeps its meaning, "no known
+// failure", so nothing turns red for an old reading.
+function probeStale(applicable, v, age) {
+  if (!applicable || (v && !age.stale)) return undefined;
+  return { stale: true, checkedAt: (v && v.checkedAt) || null };
+}
+
+function forMachines(c) {
+  const { probe, ...row } = c || {};
+  if (probe && probe.stale && row.ok === true) return { ...row, ok: null, stale: true, checkedAt: probe.checkedAt };
+  return row;
+}
+
 // A real place and a point in Loveland — real inputs, so a success genuinely
 // proves the API works rather than proving a placeholder round-trips.
 // 2026-09-26: no longer her street address; she does not publish it anywhere.
@@ -996,14 +1018,17 @@ exports.handler = async (event) => {
   const access = statusAccess(event);
   const detailsOpen = access.ok;
 
-  const [state, mine, suspension, cachedGoogle, loftyLast, loftyFailed, loftyHeld, cachedLoftyKey,
+  const [state, mine, suspension, cachedGoogle, loftyLast, loftyQueueRead, loftyHeld, cachedLoftyKey,
     cachedLoftyLead, cachedPhotoCheck, cachedCloudCheck, cachedHubKey] = await Promise.all([
     store.get(SYNC_STATE_KEY, { type: "json" }),
     store.get(MINE_LISTINGS_KEY, { type: "json" }),
     store.get(SUSPENSION_KEY, { type: "json" }),
     store.get(GOOGLE_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_LAST_PUSH_KEY, { type: "json" }).catch(() => null),
-    store.get(LOFTY_FAILED_PUSH_KEY, { type: "json" }).catch(() => null),
+    // 2026-11-21 (silent-failure audit, H5): the list AND the leads kept under
+    // their own retry keys, and whether they could be read at all (never "empty"
+    // from a failed read). readQueuedLeads never throws.
+    readQueuedLeads(store),
     store.get(LOFTY_MANUAL_REVIEW_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(LOFTY_LEAD_CHECK_KEY, { type: "json" }).catch(() => null),
@@ -1011,6 +1036,9 @@ exports.handler = async (event) => {
     store.get(CLOUDINARY_CHECK_KEY, { type: "json" }).catch(() => null),
     store.get(HUB_CHECK_KEY, { type: "json" }).catch(() => null),
   ]);
+  const loftyFailed = loftyQueueRead && loftyQueueRead.ok ? loftyQueueRead.list : null;
+  const loftyQueueError = loftyQueueRead && loftyQueueRead.ok ? null
+    : redactPersonal((loftyQueueRead && loftyQueueRead.error) || "the retry queue could not be read").slice(0, 200);
 
   // ---- Google key check (opt-in, cached) ----
   const googleKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -1330,6 +1358,7 @@ exports.handler = async (event) => {
     name: "Geocoding API enabled",
     // An untested probe isn't a failure, so it doesn't turn the page red.
     ok: !googleKey ? false : (!google || !google.geocoding || googleAge.stale ? true : google.geocoding.ok),
+    probe: probeStale(!!googleKey, google && google.geocoding ? google : null, googleAge),
     detail: googleDetail("geocoding") +
       (google && google.geocoding && !google.geocoding.ok
         ? " → enable it at console.cloud.google.com/apis/library/geocoding-backend.googleapis.com"
@@ -1338,6 +1367,7 @@ exports.handler = async (event) => {
   checks.push({
     name: "Places API enabled",
     ok: !googleKey ? false : (!google || !google.places || googleAge.stale ? true : google.places.ok),
+    probe: probeStale(!!googleKey, google && google.places ? google : null, googleAge),
     detail: googleDetail("places") +
       (google && google.places && !google.places.ok
         ? " → enable it at console.cloud.google.com/apis/library/places-backend.googleapis.com"
@@ -1353,6 +1383,7 @@ exports.handler = async (event) => {
     // Same rule as the other probe rows: a stale FAILURE is not evidence about
     // now, so it must not keep the page red on its own.
     ok: !photoCheck || photoAge.stale ? true : !!photoCheck.ok,
+    probe: probeStale(true, photoCheck, photoAge),
     detail: photoCheck
       ? photoAge.warning + photoAge.when + photoCheck.detail
       : (LISTINGS_SOURCE === "lofty"
@@ -1386,6 +1417,7 @@ exports.handler = async (event) => {
     // don't know" is the same as the never-tested case, which is already green
     // with a "not tested yet" detail.
     ok: !isCloudinaryConfigured() ? false : (!cloudCheck || cloudAge.stale ? true : !!cloudCheck.ok),
+    probe: probeStale(isCloudinaryConfigured(), cloudCheck, cloudAge),
     detail: !isCloudinaryConfigured()
       ? "Cloudinary env vars aren't all set."
       : (!cloudCheck
@@ -1475,6 +1507,7 @@ exports.handler = async (event) => {
     ok: !process.env.LOFTY_API_KEY
       ? loftyViaHub()
       : (!loftyKeyCheck || loftyKeyAge.stale ? true : loftyKeyCheck.ok),
+    probe: probeStale(loftyReachable, loftyKeyCheck, loftyKeyAge),
     detail: !process.env.LOFTY_API_KEY
       ? (loftyViaHub()
         ? "Not needed: LOFTY_VIA_HUB is on, so every Lofty call goes through the Seller Intelligence hub " +
@@ -1509,6 +1542,7 @@ exports.handler = async (event) => {
     ok: hubSettingsProblem
       ? false
       : (!hubKeyCheck || hubKeyAge.stale ? true : hubKeyCheck.ok),
+    probe: probeStale(!hubNotSetUp && !hubSettingsProblem, hubKeyCheck, hubKeyAge),
     detail: hubNotSetUp
       ? "HUB_API_URL and HUB_API_KEY aren't set in Netlify, so nothing on this site asks the hub."
       : hubSettingsProblem
@@ -1562,6 +1596,8 @@ exports.handler = async (event) => {
       `Lofty said: ${redactPersonal(loftyLast.responseBody || "(empty response)").slice(0, 240)}. ` +
       `${failedCount} lead(s) queued and recoverable — nothing is lost, the submissions are also in Netlify Forms.`;
   }
+  // 2026-11-21: a count of 0 above is only true when the queue could be read.
+  if (loftyQueueError) loftyDetail += " The retry queue could not be read, so queued leads are not counted here (see the \"Lofty retry queue\" row).";
   checks.push({ name: "Website leads reaching Lofty", ok: loftyOk, detail: loftyDetail });
 
   // ---- Leads waiting on a human --------------------------------------------
@@ -1578,7 +1614,19 @@ exports.handler = async (event) => {
   // How many website leads wait in the retry queue and how long the oldest has
   // waited; red once one has waited past LEAD_STUCK_ALERT_MINUTES (60). Counts,
   // form names and times only -- never who: this page is public. Blobs reads only.
-  if (leadStuckAlertOn()) {
+  // 2026-11-21 (silent-failure audit, H5): a queue that could not be read is a red,
+  // required row whatever LEAD_STUCK_ALERT says: until now it read "Empty". The
+  // hub's daily check sees this row in the JSON (its name and a red light).
+  if (loftyQueueError) {
+    checks.push({
+      name: "Lofty retry queue",
+      ok: false,
+      detail: `Could not read the retry queue: ${loftyQueueError}. Website leads Lofty refused may be waiting and are ` +
+        "not counted. Nothing was overwritten: a new lead that cannot go on the list is kept under its own retry key, " +
+        "and every submission is also in the Netlify Forms inbox and the alert email. Check Netlify Blobs " +
+        "(BLOBS_SITE_ID / BLOBS_TOKEN) and the lofty-queue-drain function log.",
+    });
+  } else if (leadStuckAlertOn()) {
     const minutes = stuckMinutes();
     const q = queueSummary(loftyFailed, Date.now(), minutes);
     const stuckRecord = await store.get(STUCK_ALERT_KEY, { type: "json" }).catch(() => null);
@@ -1796,6 +1844,7 @@ exports.handler = async (event) => {
   checks.push({
     name: "What Lofty says about your last lead",
     ok: leadAge.stale ? true : leadRowOk,
+    probe: probeStale(loftyReachable, loftyLeadCheck, leadAge),
     detail: loftyLeadCheck ? leadAge.warning + leadAge.when + leadRowDetail : leadRowDetail,
   });
 
@@ -2151,7 +2200,10 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
       body: JSON.stringify({
-        allOk, checks: checks.map((c) => ({ name: c.name, ok: !!c.ok, optional: !!c.optional })),
+        allOk, checks: checks.map(forMachines).map((c) => ({
+          name: c.name, ok: c.ok === null ? null : !!c.ok, optional: !!c.optional,
+          ...(c.stale ? { stale: true, checkedAt: c.checkedAt } : {}),
+        })),
         details: "hidden", why: access.why,
       }, null, 2),
     };
@@ -2166,13 +2218,13 @@ exports.handler = async (event) => {
       // Contains no secret: the api_key is the public half of the pair, and the
       // secret appears only as a length and a set of character-class flags.
       body: JSON.stringify({
-        allOk, checks,
+        allOk, checks: checks.map(forMachines),
         cloudinaryConfig: (() => { try { return cloudinaryDiagnostics(); } catch (e) { return { error: String(e && e.message) }; } })(),
         // loftyLast / loftyFailed are summaries, never the stored records: those
         // carry the lead's name, email, phone and message (see redactPersonal).
         raw: {
           state, suspension, mineCount, mineCloudinaryCount, google,
-          loftyLast: publicPushRecord(loftyLast), loftyFailed: publicFailedQueue(loftyFailed), loftyHeld: heldPublic,
+          loftyLast: publicPushRecord(loftyLast), loftyFailed: { ...publicFailedQueue(loftyFailed), ...(loftyQueueError ? { readable: false } : {}) }, loftyHeld: heldPublic,
           loftyKeyCheck, loftyLeadCheck, photoCheck, cloudCheck, hubKeyCheck,
         },
       }, null, 2),

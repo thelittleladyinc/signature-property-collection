@@ -118,7 +118,8 @@ const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, tex
   posted.length = 0;
   global.fetch = async (url, init) => { if (init && init.method === "POST") posted.push(1); return resp(200, {}); };
   let out = await drain();
-  check("with no Lofty key it does nothing", out.statusCode === 200 && posted.length === 0 && store.data[L.FAILED_PUSH_KEY].length === 1);
+  // 2026-11-21 (audit M2): an error answer, not 200, so the scheduled-run view shows it.
+  check("with no Lofty key it does nothing, and the run says it failed", out.statusCode === 503 && posted.length === 0 && store.data[L.FAILED_PUSH_KEY].length === 1);
   // 2026-10-26: a paused queue says so (it answered "ok" before), with or without a key, and touches nothing.
   for (const key of [undefined, "k"]) {
     if (key) process.env.LOFTY_API_KEY = key; else delete process.env.LOFTY_API_KEY;

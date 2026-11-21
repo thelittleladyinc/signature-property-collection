@@ -45,7 +45,7 @@
 // only, a redirect refused, the key only in the x-hub-key header; never throws.
 "use strict";
 const crypto = require("crypto");
-const { FAILED_PUSH_KEY, queuedLeadKey } = require("./_lofty");
+const { queuedLeadKey, readQueuedLeads } = require("./_lofty");
 const { sendInternalAlert, BRAND_DOMAIN, BRAND_SITE } = require("./_notify");
 const { hubEndpoint } = require("./_hub-intake");
 
@@ -200,8 +200,11 @@ async function checkStuckLeads(store, opts = {}) {
     const nowMs = Number.isFinite(opts.now) ? opts.now : Date.now();
     const deadline = Number.isFinite(opts.deadline) ? opts.deadline : Infinity;
     const minutes = stuckMinutes();
-    const queue = await readJson(store, FAILED_PUSH_KEY);
-    if (queue === undefined) return { ...out, error: "the retry queue could not be read" };
+    // 2026-11-21: the list and the leads kept under their own retry keys
+    // (lib/_lofty.js readQueuedLeads); either unreadable = no alert from a guess.
+    const read = await readQueuedLeads(store);
+    if (!read.ok) return { ...out, error: "the retry queue could not be read" };
+    const queue = read.list;
     const state = await readJson(store, STUCK_ALERT_KEY);
     if (state === undefined) return { ...out, error: "the alert record could not be read" };
     const records = { ...((state && state.alerted) || {}) };
@@ -330,10 +333,12 @@ async function reportStuckToHub(store, opts = {}) {
     const deadline = Number.isFinite(opts.deadline) ? opts.deadline : Infinity;
     const endpoint = hubEndpoint(env, STUCK_REPORT_PATH);
     if (!endpoint.url) return { ...out, reason: endpoint.reason };
-    const queue = await readJson(store, FAILED_PUSH_KEY);
-    if (queue === undefined) return { ...out, reason: "the retry queue could not be read; nothing reported" };
+    // 2026-11-21: the list and the leads kept under their own retry keys.
+    const read = await readQueuedLeads(store);
     // Something stored that is not a list is unreadable too: never zeros it did not read. (Nothing stored = empty.)
-    if (queue !== null && !Array.isArray(queue)) return { ...out, reason: "the retry queue is not a list (unreadable); nothing reported" };
+    if (!read.ok && read.notList) return { ...out, reason: "the retry queue is not a list (unreadable); nothing reported" };
+    if (!read.ok) return { ...out, reason: "the retry queue could not be read; nothing reported" };
+    const queue = read.list;
     const counts = stuckCounts(queue, nowMs);
     const timeoutMs = Math.min(STUCK_REPORT_TIMEOUT_MS, deadline - Date.now());
     if (!(timeoutMs >= 500)) return { ...out, reason: "no time left in this run" };

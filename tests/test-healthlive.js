@@ -118,7 +118,8 @@ const CLOUD_ROW = "Cloudinary account healthy (optional)";
     check("in words readable at a glance", r && /\b3 days ago\b/.test(r.detail), r && String(r.detail).slice(0, 120));
     check("it warns before the reading is acted on", r && /THIS READING IS OLD/.test(r.detail),
       "a days-old failure shown with no warning — this is the original bug");
-    check("and a stale failure does not stand as a current failure", r && r.ok === true,
+    // 2026-11-21 (audit H4): for machines an old reading is unknown (ok null, stale true), never ok and never red.
+    check("and a stale failure does not stand as a current failure", r && r.ok !== false && r.stale === true,
       "an old failure still turning the row red is what made me tell her it was broken");
   }
 
@@ -228,7 +229,7 @@ const CLOUD_ROW = "Cloudinary account healthy (optional)";
       );
       check(
         "and a stale failure does not stand as a current failure",
-        r.ok === true,
+        r.ok !== false && r.stale === true,
         "an old failure still turning the row red is what made me tell her it was broken"
       );
     }
