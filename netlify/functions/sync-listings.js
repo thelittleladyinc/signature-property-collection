@@ -1181,6 +1181,13 @@ function mlsGridMarketDataOn(env) {
 }
 exports.mlsGridMarketDataOn = mlsGridMarketDataOn; // for tests
 
+// MY_LISTINGS_ELSEWHERE: exactly "on" (trimmed, any case). Anything else = this site refreshes her listings, as before.
+function myListingsElsewhere(env) {
+  const v = (env || process.env).MY_LISTINGS_ELSEWHERE;
+  return String(v == null ? "" : v).trim().toLowerCase() === "on";
+}
+exports.myListingsElsewhere = myListingsElsewhere; // for tests
+
 exports.handler = async () => {
   // One clock for the whole invocation, so the MLS Grid path's time budget
   // (TIME_BUDGET_MS and the rest, all measured from startedAt) counts the time
@@ -1200,7 +1207,12 @@ exports.handler = async () => {
   // a 15 s window can never give it; told the truth it would always skip. Before it is switched on with MLS Grid it
   // needs its own scheduled slot -- see NEXT-SESSION.md 2.1.
   const side = mlsSideBySide({ startedAt, viaHub });
-  const result = await loftyScheduledRun(side, startedAt);
+  // 2026-11-22 (Signature move, step 1): with MY_LISTINGS_ELSEWHERE exactly "on" her Lofty listings are refreshed by
+  // the main site's sync-my-listings (SYNC_MY_LISTINGS=on there), so this run skips its own copy of that refresh.
+  // The market-data run below keeps going.
+  const result = myListingsElsewhere()
+    ? { statusCode: 200, body: "her listings are refreshed by the main site (MY_LISTINGS_ELSEWHERE=on)" }
+    : await loftyScheduledRun(side, startedAt);
   let gridRan = false;
   if (mlsGridMarketDataOn()) {
     try {
