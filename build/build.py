@@ -3870,7 +3870,10 @@ CUTOVER_LINK_TARGETS = {
 
 def _cutover_link_target(path):
     """The final address for a link to `path` when its group forwards it, else None.
-    Matches the three forms the cutover forwards: /page.html, /page/ and /page."""
+    Matches the three forms the cutover forwards: /page.html, /page/ and /page.
+    2026-11-21 (group 6): "/" is the home page, so it follows /index.html."""
+    if path == "/" and "/index.html" in CUTOVER_LINK_TARGETS:
+        return CUTOVER_LINK_TARGETS["/index.html"]
     if path in CUTOVER_LINK_TARGETS:
         return CUTOVER_LINK_TARGETS[path]
     for _p, _dst in CUTOVER_LINK_TARGETS.items():

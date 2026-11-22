@@ -29,10 +29,22 @@ check("[build.processing.html] pretty_urls = false", /^\s*pretty_urls\s*=\s*fals
 
 console.log("\n2. The home page keeps the address Google knows");
 const redirects = fs.readFileSync(path.join(SITE, "_redirects"), "utf8").split("\n").map((l) => l.trim());
-check('"/" is a 200 rewrite to /index.html, not a redirect',
-  redirects.some((l) => /^\/\s+\/index\.html\s+200!?$/.test(l)));
-const home = fs.readFileSync(path.join(SITE, "index.html"), "utf8");
-check("the header's home link is \"/\"", /<a href="\/" class="brand-wordmark"/.test(home));
+// 2026-11-21 (cutover group 6): once a live cutover group forwards the home page,
+// "/" is one forced 301 to its final address on the main site instead.
+const cutoverMap = JSON.parse(fs.readFileSync(path.join(ROOT, "build", "data", "cutover_to_tllsh.json"), "utf8"));
+const homeTarget = Object.assign({}, ...(cutoverMap.active_groups || [])
+  .map((g) => cutoverMap.groups[String(g)].pages))["/index.html"];
+if (homeTarget) {
+  const want = `https://www.thelittleladysellshomes.com${homeTarget}`;
+  check(`"/" is one forced 301 to the main site's ${homeTarget} (cutover)`,
+    redirects.some((l) => l.split(/\s+/).join(" ") === `/ ${want} 301!`),
+    redirects.filter((l) => /^\/\s/.test(l)).join(" | "));
+} else {
+  check('"/" is a 200 rewrite to /index.html, not a redirect',
+    redirects.some((l) => /^\/\s+\/index\.html\s+200!?$/.test(l)));
+  const home = fs.readFileSync(path.join(SITE, "index.html"), "utf8");
+  check("the header's home link is \"/\"", /<a href="\/" class="brand-wordmark"/.test(home));
+}
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
