@@ -66,7 +66,7 @@ const { postLead, recordPush } = require("./lib/_lofty");
 const { smsConsentFromForm, applyTextingPreference } = require("./lib/_lofty-consent");
 const { addLoftyNote, refireLoftyTag, addPlanTags, sendLeadAlertEmail } = require("./lib/_notify");
 const { planForSubmission, valueReviewPlanOn, VALUE_REVIEW_SENT_TAG, interestFor, WEBSITE_SOURCE } = require("./lib/_form-plans");
-const { sendValueFormToHub, hubIntakeLogLine } = require("./lib/_hub-intake");
+const { sendValueFormToHub, hubIntakeLogLine, cashPlanHold } = require("./lib/_hub-intake");
 const { homeValueProperty } = require("./lib/_lead-address");
 const {
   findExistingLead, alertReturningLead, websiteFieldValues, ensureWebsiteFields, setWebsiteFields,
@@ -616,9 +616,11 @@ async function handleLead(event, side) {
     const newLeadId = leadIdFromResponse(result.responseBody);
     const provenNew = !!(existing.ok && !existing.anyMatch && newLeadId && newLeadId === String(leadId) &&
         noteResult.ok && noteTarget === leadId);
+    let cashGate = { hold: false };
     const planResult = !plan.planTags.length
       ? { attempted: false, skipped: plan.plan ? `its plan starts later in Lofty, on the tag "${VALUE_REVIEW_SENT_TAG}"` : "no plan for this form" }
       : !provenNew ? { attempted: false, skipped: planSkipReason(existing, newLeadId, leadId, noteResult), planTags: plan.planTags }
+      : (cashGate = await cashPlanHold(plan, hubIntake)).hold ? { attempted: false, skipped: cashGate.reason, planTags: plan.planTags }
       : await addPlanTags(newLeadId, plan.planTags, apiKey);
     console.log(planLogLine(formName, plan, planResult, Array.isArray(body.leadTypes)));
     // Recorded again before the optional steps below (a returning lead's task,

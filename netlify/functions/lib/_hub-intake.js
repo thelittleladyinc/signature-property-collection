@@ -269,6 +269,8 @@ async function sendValueFormToHub(args, deps) {
       // Counts only: how much of the intent the hub kept (present only while its flag is on).
       if (Number.isInteger(j.intent_kept)) out.intentKept = j.intent_kept;
       if (Number.isInteger(j.intent_dropped)) out.intentDropped = j.intent_dropped;
+      // A cash-offer form: the hub's own cash check (hub.cash_offer_hold) answers created / existing / held.
+      if (j.cash_offer && typeof j.cash_offer.status === "string") out.cashOffer = j.cash_offer.status.slice(0, 20);
       return out;
     }
     const why = j && typeof j.error === "string" ? j.error.slice(0, 120) : `hub answered ${res.status}`;
@@ -278,6 +280,26 @@ async function sendValueFormToHub(args, deps) {
   }
 }
 
+// 2026-11-22 (Christine, the cash-offer walkthrough: "website form - yes"): the cash-offer form starts S2 on a
+// contact proven new, and the hub only checked the owner afterwards. Before the S2 tag goes on, the hub intake's
+// answer is read: the hub holds a cash request for a pre-foreclosure owner (call only, Colorado foreclosure-rescue
+// rules), Do Not Contact or an email opt-out, and then S2 is not started (Christine still gets the lead alert and
+// the note). With the intake switched on but no answer, S2 is not started either (it could not be checked);
+// with the intake switched off, the form works as before.
+const S2_PLAN_TAG = "S2 - Seller Options";
+async function cashPlanHold(plan, hubIntake, env = process.env) {
+  if (!plan || !Array.isArray(plan.planTags) || !plan.planTags.includes(S2_PLAN_TAG)) return { hold: false };
+  if (!hubIntakeOn(env) || !allFormsOn(env)) return { hold: false };
+  let r = null;
+  try { r = await hubIntake; } catch (e) { r = null; }
+  if (r && r.ok && r.cashOffer === "held") {
+    return { hold: true, reason: "the hub held this cash request (call only, Do Not Contact or an email opt-out): S2 not started, call them" };
+  }
+  if (r && r.ok) return { hold: false };
+  const why = (r && (r.error || r.reason)) || "no answer";
+  return { hold: true, reason: `the hub could not check this cash request (${String(why).slice(0, 80)}): S2 not started, call them` };
+}
+
 // The log line for /status and the function log: the form, the hub's status words, never the person.
 function hubIntakeLogLine(formName, r) {
   const what = r && r.kind === "form" ? "Lead to the hub intake" : "Value review to the hub";
@@ -285,4 +307,4 @@ function hubIntakeLogLine(formName, r) {
 }
 
 module.exports = { INTAKE_PATH, MIN_INTAKE_MS, VALUE_FORMS, FORM_KEYS, RECRUITING_FORMS, allowedValueForms, hubIntakeOn, allFormsOn, valueForm,
-  otherForm, intakeSource, formIntent, intakeEndpoint, hubEndpoint, intakeBody, sendValueFormToHub, hubIntakeLogLine };
+  otherForm, intakeSource, formIntent, intakeEndpoint, hubEndpoint, intakeBody, sendValueFormToHub, hubIntakeLogLine, cashPlanHold, S2_PLAN_TAG };
