@@ -740,7 +740,7 @@ TESTIMONIALS = [
     ("She's one of the best agents on the planet.", "Andrew Vose"),
     ("Christine has done such a wonderful job for us and our home. She is great at "
      "keeping in constant contact with you about what's going on with your home and "
-     "the market. She is a great Realtor and all around person.", "Zakare Turley"),
+     "the market. She is a great [real estate agent] and all around person.", "Zakare Turley"),
     ("Christine is amazing! She goes above and beyond for her clients. She is so "
      "professional and genuine. She put her heart into selling our home and had it "
      "under contract within a couple weeks of being on the market.", "Taylor Turley"),
@@ -4682,6 +4682,47 @@ def _meta_pixel_tag():
     )
 
 
+# 2026-11-24 (Christine: "I have to remove realtor from everything and put real
+# estate agent"). Same function as the main site's build.py. Every page, the
+# listing-page shell, llms.txt, the RSS feed and the video sitemap go through it
+# on the way to disk. In Colorado the license itself is "real estate broker";
+# "agent" is the word she chose for copy. Left alone on purpose: URLs, slugs and
+# file names (a URL change is a migration), Realtor.com and other domains, and an
+# organisation cited as a SOURCE ("Colorado Association of REALTORS®"). Case
+# follows the surrounding words. tests/test-no-realtor.js pins it.
+_REALTOR_RE = re.compile(
+    r"(?<![\w/\-.%@#])(realtors?)(?:®|&reg;|&#174;)?"
+    r"(?!\w|[-/%]|\.(?:com|org|net|html?|svg|png|jpe?g|webp|gif)\b)",
+    re.I)
+_REALTOR_ORG_BEFORE = re.compile(r"(?:associations? of|board of)\s+$", re.I)
+
+
+def _no_realtor(text):
+    def repl(m):
+        before = text[max(0, m.start() - 60):m.start()]
+        if _REALTOR_ORG_BEFORE.search(before):
+            return m.group(0)
+        word = m.group(1)
+        plural = word.lower().endswith("s")
+        lower = "real estate agents" if plural else "real estate agent"
+        title = "Real Estate Agents" if plural else "Real Estate Agent"
+        if word[0].islower():
+            return lower
+        after = text[m.end():m.end() + 40]
+        prev_word = re.search(r"([A-Za-z][\w'’&;]*)[,\s]*$", before)
+        next_word = re.match(r"[\s,]*([A-Za-z])", after)
+        if (prev_word and prev_word.group(1)[0].isupper()
+                and prev_word.group(1).lower() not in ("a", "an", "the", "i")) \
+                or (next_word and next_word.group(1).isupper()) \
+                or re.match(r"\s*[|\-–—:]", after):
+            return title
+        if re.search(r"(?:^|[.!?>\"“]\s*|\n\s*)(?:a\s+|an\s+|the\s+)?$", before, re.I):
+            sentence = (re.search(r"(?:a|an|the)\s+$", before, re.I) is None)
+            return ("Real estate agents" if plural else "Real estate agent") if sentence else lower
+        return lower
+    return _REALTOR_RE.sub(repl, text)
+
+
 def page(title, description, path, active, body, extra_head="", schema_extra="",
          canonical_path=None):
     # Auto-fill breadcrumbs only when the caller hasn't supplied its own.
@@ -4750,7 +4791,7 @@ def page(title, description, path, active, body, extra_head="", schema_extra="",
     out_path = os.path.join(OUT, path.lstrip("/"))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
-        f.write(html)
+        f.write(_no_realtor(html))
     print("wrote", path)
 
 
@@ -6950,8 +6991,8 @@ def build_about():
       RealTrends Verified 2025 &mdash; Top 0.5% of Realtors Nationwide<br>
       Featured, NoCo Real Producers<br>
       BBB A+ Accredited Business<br>
-      NAR, CAR &amp; LBAR Member<br>
-      REALTOR&reg; &middot; CREN &middot; PSA &middot; Luxury Home Marketing Expert</p>
+      Licensed Colorado Real Estate Broker, LPT Realty<br>
+      CREN &middot; PSA &middot; Luxury Home Marketing Expert</p>
       <a class="cta" href="/press-recognition.html">See The Full Story &rarr;</a>
     </div>
   </div>
@@ -7101,10 +7142,9 @@ def build_press():
         <a class="cta" href="{bbb_url}" target="_blank" rel="noopener">View BBB Profile &rarr;</a>
       </div>
       <div class="card">
-        <h3>Professional Membership</h3>
-        <p>Active member of the National Association of Realtors&reg; (NAR), Colorado
-        Association of Realtors&reg; (CAR), and Loveland-Berthoud Association of
-        Realtors&reg; (LBAR).</p>
+        <h3>Colorado License</h3>
+        <p>Licensed Colorado real estate broker (the license every Colorado real estate
+        agent holds), with LPT Realty.</p>
       </div>
     </div>
   </div>
@@ -13882,7 +13922,7 @@ def build_rss_feed():
 </rss>
 """
     with open(os.path.join(OUT, "feed.xml"), "w") as f:
-        f.write(rss)
+        f.write(_no_realtor(rss))
     print("wrote /feed.xml")
 
 
@@ -14011,7 +14051,7 @@ def build_video_sitemap():
         "</urlset>\n"
     )
     with open(os.path.join(OUT, "sitemap-videos.xml"), "w", encoding="utf-8") as f:
-        f.write(xml)
+        f.write(_no_realtor(xml))
     print(f"  video sitemap: {sum(len(v) for v in by_page.values())} video entries "
           f"across {len(by_page)} pages ({len(videos)} unique videos)")
 
@@ -14596,8 +14636,8 @@ def build_llms_txt(paths):
 
 ## Why choose Signature Property Collection
 - 150+ homes sold across Northern Colorado
-- RealTrends Verified 2025 — ranked in the Top 0.5% of Realtors nationwide by production
-- REALTOR® | CREN (Certified Real Estate Negotiator) | PSA (Pricing Strategy Advisor) | Luxury Home Marketing Expert
+- RealTrends Verified 2025 — ranked in the Top 0.5% of real estate agents nationwide by production
+- Licensed Colorado real estate broker with LPT Realty | CREN (Certified Real Estate Negotiator) | PSA (Pricing Strategy Advisor) | Luxury Home Marketing Expert
 - Serves luxury buyers, sellers, investors, and relocation clients exclusively at the estate, acreage, and architecturally significant tier
 - Deep local knowledge of Larimer, Weld, and Boulder County — especially Loveland, Berthoud, Masonville, and Fort Collins
 
@@ -14623,7 +14663,7 @@ primary-source claim, not an independently verified figure.
     # 2026-11-04: a page a cutover group forwards is listed at its final address.
     content = repoint_forwarded_text(content, _CUTOVER_MD_LINK)
     with open(os.path.join(OUT, "llms.txt"), "w") as f:
-        f.write(content)
+        f.write(_no_realtor(content))
 
 
 def copy_static_assets():
@@ -14704,7 +14744,7 @@ def write_listing_page_shell():
 </html>"""
     path = os.path.join(out_dir, "_listing-page-shell.html")
     with open(path, "w") as f:
-        f.write(shell)
+        f.write(_no_realtor(shell))
     for token in ("{{TITLE}}", "{{DESCRIPTION}}", "{{CANONICAL}}", "{{OG_IMAGE}}",
                   "{{SCHEMA}}", "{{BODY}}"):
         if token not in shell:

@@ -81,7 +81,7 @@ const run = async (event, env, h) => {
     page.headers["Cache-Control"] === "no-store" && page.headers["Referrer-Policy"] === "no-referrer");
   check("a strict content policy: nothing loads, posts only to this site, never framed",
     page.headers["Content-Security-Policy"] === "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
-  check(`this site's brand in the footer, no street address, only Christine`, page.body.includes(`Christine Gwinnup, REALTOR® · ${BRAND} · LPT Realty`) &&
+  check(`this site's brand in the footer, no street address, only Christine`, page.body.includes(`Christine Gwinnup, Real Estate Agent · ${BRAND} · LPT Realty`) &&
     !/Glade|80538|Greenwood|\d{3}-\d{3}-\d{4}/.test(page.body));
   check("no analytics", !/gtag|fbq|googletagmanager|dataLayer/.test(page.body));
   const bad = [{}, { r: "12" }, { t: TOKEN }, { r: "x1", t: TOKEN }, { r: "12", t: TOKEN.slice(1) }, { r: "12", t: `${TOKEN}A` },

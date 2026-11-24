@@ -65,7 +65,7 @@ function page(brand, title, bodyHtml, statusCode) {
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
     "<meta name=\"robots\" content=\"noindex, nofollow\"><meta name=\"referrer\" content=\"no-referrer\">" +
     `<title>${esc(title)} | ${esc(brand)}</title><style>${STYLE}</style></head>` +
-    `<body><main>${bodyHtml}</main><footer>Christine Gwinnup, REALTOR® · ${esc(brand)} · LPT Realty</footer></body></html>\n`;
+    `<body><main>${bodyHtml}</main><footer>Christine Gwinnup, Real Estate Agent · ${esc(brand)} · LPT Realty</footer></body></html>\n`;
   return { statusCode, headers: { ...HEADERS }, body: html };
 }
 
