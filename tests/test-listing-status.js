@@ -75,6 +75,12 @@ const okStore = () => ({
   check("and is indexable", !/noindex/i.test(JSON.stringify(res.headers || {})));
 
   const images = html => html.match(/<img\b[^>]+>/g) || [];
+  const propertyLinks = [...res.body.matchAll(/href="(\/contact\.html\?intent=[^"]+)"/g)]
+    .map(match => new URL(match[1].replace(/&amp;/g, "&"), "https://signaturepropertycollection.com"));
+  check("Signature showing and question links carry the correct property",
+    ["showing", "question"].every(intent => propertyLinks.some(url =>
+      url.searchParams.get("intent") === intent && url.searchParams.get("mls") === "IRE900001" &&
+      url.searchParams.get("address") === "1 Test St, Loveland")));
   const defaultCovers = images(res.body).filter(tag => tag.includes("cover-test.jpeg"));
   check("Signature keeps its existing hero and thumbnail", defaultCovers.length === 2 && defaultCovers.every(tag => !tag.includes("srcset=")));
   res = await load(okStore)({ queryStringParameters: { id: "IRE900001", brand: "tllsh" } });
